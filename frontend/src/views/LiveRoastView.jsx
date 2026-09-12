@@ -480,11 +480,18 @@ export default function LiveRoastView() {
         : "--:--",
   };
 
+  // The Configure Roast form (with its "Load saved config" dropdown) only
+  // renders while phase === "idle" -- once ON is pressed it disappears,
+  // taking the only visible indication of which preset was loaded with
+  // it, from then until a roast object exists (whose live-header panel
+  // shows roast.title/beans/etc). presetName isn't cleared by
+  // handleToggleConnect, so it's still accurate here.
+  const presetHint = presetName && (phase === "idle" || phase === "armed") ? ` Loaded config: "${presetName}".` : "";
   const toolbarElement = (
     <ArtisanToolbar
       phase={phase}
       elapsedLabel={elapsedLabel}
-      statusText={STATUS_TEXT[phase]}
+      statusText={STATUS_TEXT[phase] + presetHint}
       milestones={milestones}
       onToggleConnect={handleToggleConnect}
       onStart={handleStart}
