@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Backend runtime data (sample_roasts/ demo asset is intentionally tracked)
+backend/data/roasts.db
+backend/data/roasts/*.alog
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
