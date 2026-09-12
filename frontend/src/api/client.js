@@ -7,8 +7,11 @@ async function request(path, options = {}) {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || `${res.status} ${res.statusText}`);
+    const err = new Error(body.detail || `${res.status} ${res.statusText}`);
+    err.status = res.status; // lets callers distinguish e.g. 404 ("doesn't exist yet") from real failures
+    throw err;
   }
+  if (res.status === 204) return null; // no body -- DELETE endpoints, e.g. -- don't try to parse it
   const contentType = res.headers.get("content-type") || "";
   return contentType.includes("application/json") ? res.json() : res.text();
 }
@@ -25,6 +28,7 @@ export const api = {
   listRoasts: (params = {}) => request(`/roasts?${new URLSearchParams(params)}`),
   createRoast: (payload) => request("/roasts", { method: "POST", body: JSON.stringify(payload) }),
   getRoast: (id) => request(`/roasts/${id}`),
+  deleteRoast: (id) => request(`/roasts/${id}`, { method: "DELETE" }),
   stopRoast: (id) => request(`/roasts/${id}/stop`, { method: "POST" }),
   sendCommand: (id, command) => request(`/roasts/${id}/commands`, { method: "POST", body: JSON.stringify(command) }),
   addNote: (id, note) => request(`/roasts/${id}/notes`, { method: "POST", body: JSON.stringify(note) }),
@@ -32,6 +36,23 @@ export const api = {
   alogDownloadUrl: (id) => `${BASE}/roasts/${id}/alog`,
   importAlog: (path, title) =>
     request(`/roasts/import?${new URLSearchParams({ path, ...(title ? { title } : {}) })}`, { method: "POST" }),
+
+  // presets (saved roast configurations)
+  listPresets: () => request("/presets"),
+  savePreset: (name, config, controls = {}) =>
+    request("/presets", { method: "POST", body: JSON.stringify({ name, config, ...controls }) }),
+  updatePreset: (id, name, config, controls = {}) =>
+    request(`/presets/${id}`, { method: "PUT", body: JSON.stringify({ name, config, ...controls }) }),
+  deletePreset: (id) => request(`/presets/${id}`, { method: "DELETE" }),
+
+  // settings (Ollama connection for AI roast reviews)
+  getSettings: () => request("/settings"),
+  saveSettings: (settings) => request("/settings", { method: "PUT", body: JSON.stringify(settings) }),
+  checkOllama: (url) => request(`/settings/ollama/status?${new URLSearchParams({ url })}`),
+
+  // AI roast review
+  getReview: (roastId) => request(`/roasts/${roastId}/review`),
+  generateReview: (roastId) => request(`/roasts/${roastId}/review`, { method: "POST" }),
 };
 
 export function roastStreamUrl(id) {

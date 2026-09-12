@@ -1,13 +1,6 @@
-// Mirrors Artisan desktop's top toolbar during a roast: icon buttons,
-// milestone readouts (DRY%, time-to-dry, time-to-first-crack), the
-// ON/OFF device toggle + START recording button, and a big digital
-// elapsed-time clock.
-const ICONS = [
-  { glyph: "⊕", title: "New roast" },
-  { glyph: "⌂", title: "Home" },
-  { glyph: "»", title: "More" },
-];
-
+// Mirrors Artisan desktop's top toolbar during a roast: milestone
+// readouts (DRY%, time-to-dry, time-to-first-crack), the ON/OFF device
+// toggle + START recording button, and a big digital elapsed-time clock.
 export default function ArtisanToolbar({
   phase,
   elapsedLabel,
@@ -22,14 +15,6 @@ export default function ArtisanToolbar({
   return (
     <div className="artisan-toolbar-wrap">
       <div className="artisan-toolbar">
-        <div className="artisan-toolbar-icons">
-          {ICONS.map((icon) => (
-            <button key={icon.title} type="button" className="icon-btn" title={icon.title} disabled>
-              {icon.glyph}
-            </button>
-          ))}
-        </div>
-
         <div className="artisan-toolbar-milestones">
           <div className="milestone-box">
             <span className="milestone-label">DRY%</span>

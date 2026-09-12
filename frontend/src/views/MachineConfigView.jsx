@@ -61,7 +61,7 @@ export default function MachineConfigView() {
         </p>
         <div className="filters-row">
           <input placeholder="Search brand or model…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <label>
+          <label className="checkbox-label">
             <input
               type="checkbox"
               checked={onlyControlCapable}
@@ -69,7 +69,9 @@ export default function MachineConfigView() {
             />
             Control-capable only
           </label>
-          <span className="hint">{filtered.length} machines</span>
+          <span className="hint" style={{ marginLeft: "auto" }}>
+            {filtered.length} machines
+          </span>
         </div>
         <table className="roast-table">
           <thead>

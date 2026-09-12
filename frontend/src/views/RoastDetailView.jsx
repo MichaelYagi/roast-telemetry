@@ -2,6 +2,27 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import RoastChart from "../components/RoastChart.jsx";
+import RoastReviewCard from "../components/RoastReviewCard.jsx";
+
+// Mirrors the Configure Roast form's <option> labels (LiveRoastView.jsx)
+// so history shows the same human-readable name, not the raw mode enum.
+const MODE_LABELS = {
+  simulator: "Artisan Simulator",
+  alog_playback: ".alog Playback",
+  artisan_live: "Artisan Live Bridge",
+  modbus_live: "Direct Modbus (FZ94 EVO, USB)",
+  ms6514_live: "Direct USB (Mastech MS6514)",
+};
+
+// Mirrors backend/app/api/roasts.py's alog_filename() exactly -- same
+// input (title + the raw created_at ISO string, sliced not reformatted),
+// so this label always matches the filename the browser actually saves,
+// without a round trip to ask the server what it named it.
+function alogFilename(title, createdAt) {
+  const safeTitle = title.replace(/[\\/:*?"<>|]/g, "_").trim() || "roast";
+  const timestamp = createdAt.slice(0, 16).replace("T", "_").replace(":", "");
+  return `${safeTitle}_${timestamp}.alog`;
+}
 
 export default function RoastDetailView() {
   const { id } = useParams();
@@ -34,9 +55,14 @@ export default function RoastDetailView() {
           {roast.duration_s ? `${Math.floor(roast.duration_s / 60)}:${String(Math.round(roast.duration_s % 60)).padStart(2, "0")}` : "—"}
         </p>
         {roast.alog_path && (
-          <a href={api.alogDownloadUrl(roast.id)} target="_blank" rel="noreferrer">
-            Download .alog
-          </a>
+          // No target="_blank" -- the response is Content-Disposition:
+          // attachment, so it downloads without navigating away; adding
+          // _blank just pops an empty new tab in some browsers while the
+          // file downloads silently in the background, looking like a
+          // no-op click.
+          <>
+            Download <a href={api.alogDownloadUrl(roast.id)}>{alogFilename(roast.title, roast.created_at)}</a>
+          </>
         )}
       </div>
 
@@ -46,6 +72,26 @@ export default function RoastDetailView() {
 
       <div className="detail-grid">
         <div className="panel">
+          <h3>Data source</h3>
+          <ul className="kv-list">
+            <li>
+              <span>Mode</span>
+              <span>{MODE_LABELS[roast.mode] || roast.mode}</span>
+            </li>
+            {roast.mode === "alog_playback" && (
+              <>
+                <li>
+                  <span>Source file</span>
+                  <span>{roast.source_alog_path || "—"}</span>
+                </li>
+                <li>
+                  <span>Speed</span>
+                  <span>{roast.playback_speed != null ? `${roast.playback_speed}x` : "—"}</span>
+                </li>
+              </>
+            )}
+          </ul>
+
           <h3>Machine</h3>
           {machine ? (
             <ul className="kv-list">
@@ -115,6 +161,8 @@ export default function RoastDetailView() {
             {roast.notes.length === 0 && <li>No notes.</li>}
           </ul>
         </div>
+
+        <RoastReviewCard roastId={roast.id} roastActive={roast.status === "roasting" || roast.status === "cooling"} />
       </div>
     </div>
   );

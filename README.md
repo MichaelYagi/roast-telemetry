@@ -1,4 +1,4 @@
-# Artisan Web Roasting Platform
+# Roast Telemetry
 
 An API-first coffee roasting platform that reuses Artisan Scope's concepts
 (BT/ET/RoR curves, roast events, `.alog` logs). Every roast is driven by
@@ -67,7 +67,7 @@ Build the frontend once, then run only the backend — it serves the
 compiled UI itself:
 
 ```bash
-cd artisan-web-api
+cd roast-telemetry
 python3 -m venv .venv && source .venv/bin/activate   # first time only
 pip install -r backend/requirements.txt               # first time only
 cd frontend && npm install && npm run build && cd ..   # first time / after UI changes
@@ -91,7 +91,7 @@ hot-reload rather than rebuilding on every change.
 #### Backend
 
 ```bash
-cd artisan-web-api
+cd roast-telemetry
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
 PYTHONPATH=. uvicorn backend.app.main:app --reload --port 8000
@@ -126,6 +126,126 @@ END/SC START/DROP manual event-marker buttons underneath the chart.
 > edit. `vite.config.js` already sets `server.watch.usePolling` to work
 > around this — if you still see stale behavior, restart `npm run dev`.
 
+## Testing the hardware-dependent modes without real hardware
+
+`simulator` and `alog_playback` need nothing extra — they're fully
+self-contained. The three modes that talk to real hardware
+(`modbus_live`, `artisan_live`, `ms6514_live`) can each be exercised
+end-to-end, through the app's actual connection code, using a fake
+standing in for the real device. All three fakes live in
+`/hardware_fakes` and share one thermal model (`hardware_fakes/_thermal.py`,
+reusing `simulator.SimulatorEngine`) so BT/ET behave like a real roast
+regardless of which mode you're testing. Full details, including the
+WebLCDs and MS6514 fakes, are in `hardware_fakes/README.md`; below is the
+quick-start for the Modbus one, since it's the only mode that can also
+be *controlled* (Heater/Fan/Drum), not just read.
+
+### Setting up the mock Modbus roaster
+
+`ModbusSerialClient` (used by `modbus_bridge`) needs a real OS serial
+port, so faking it over plain TCP isn't an option — instead, `socat`
+creates a linked pair of virtual serial ports, one for the fake device,
+one for the app to connect to, exactly as if a USB-RS485 cable joined
+them.
+
+```bash
+# one-time
+sudo apt install socat
+
+# terminal 1 -- create the virtual pair, leave it running
+socat -d -d pty,raw,echo=0,link=/tmp/ttyFAKE_ROASTER pty,raw,echo=0,link=/tmp/ttyFAKE_ROASTER_APP
+
+# terminal 2 -- start the fake FZ94 EVO
+cd roast-telemetry && source .venv/bin/activate
+python -m hardware_fakes.modbus_fz94 --port /tmp/ttyFAKE_ROASTER
+
+# terminal 3 -- the app itself (see "Running it" above)
+PYTHONPATH=. uvicorn backend.app.main:app --port 8000
+```
+
+In the app's **Live Roast → Configure Roast** form:
+- **Data source**: `Direct Modbus (FZ94 EVO, USB)`
+- **Serial port**: `/tmp/ttyFAKE_ROASTER_APP` (the *other* end of the pair)
+- Leave baud rate at the default (57600)
+- Click **ON**, then **START**
+
+BT/ET should populate immediately and climb like a real roast; the
+Heater/Fan/Drum sliders write real Modbus registers the fake decodes
+and feeds back into its thermal model, so raising Heater visibly speeds
+up ET/BT.
+
+The fake's thermal clock starts on the *first* request it receives, not
+when the process launches -- so it's fine to leave it running for a
+while (setting up socat, configuring the form) before you click START;
+Charge happens right when the app actually connects, not whenever the
+fake happened to start. You only need to restart the fake process
+itself when you want a genuinely fresh roast (e.g. after one already
+finished, or to reset mid-roast Heater/Fan/Drum changes).
+
+Since re-entering the serial port / thresholds every time gets old
+fast, use the **"Save this configuration as"** field at the bottom of
+the form once you've got it dialed in — it persists to the backend
+(`GET/POST/DELETE /api/presets`) and reappears in the **"Load saved
+config"** dropdown next time, for this or any other mode. For
+`simulator`/`modbus_live` (the controllable modes), the Heater/Fan/Drum
+starting values shown in the form are saved too, and get auto-sent as
+the roast's first command right after START when you load that preset
+again — e.g. save a "Fake FZ94 test rig" preset with Heater=85%/Fan=15%
+and loading it later both starts the roast *and* dials in those slider
+positions immediately, no manual re-adjustment needed.
+
+### Suggested manual test settings
+
+Right after clicking START, set **Heater=85%, Fan=15%** (Drum at the
+default 50%) in the Control Panel. This isn't a guess — it's the actual
+thermal model run forward, so the timings below are exact for this
+setting:
+
+| Event | Type | Time | BT |
+|---|---|---|---|
+| Charge | auto | 0:00 | 96.0°C |
+| Turning Point | auto | 0:45 | 82.0°C |
+| Dry End | auto (threshold 160°C) | 3:35 | 160.1°C |
+| FC Start | auto (threshold 196°C) | 5:27 | 196.1°C |
+| FC End | **click it** | ~6:00 | ~205°C |
+| SC Start | **click it** | ~6:30 | ~211°C |
+| Drop | **click it, by** | ~6:50–6:54 | ~217–218°C |
+| Cool End | **click it, then stop the roast** | by ~9:50 | falling |
+
+Charge/Turning Point/Dry End/FC Start auto-fire from the BT curve
+(`roast_heuristics.LiveRoastDetector`) — nothing to click. FC End, SC
+Start, Drop and Cool End are judgment calls in real roasting too, so
+they stay manual event buttons under the chart; the times above just
+tell you *when the underlying fake's own physics hit those points*, so
+your manual clicks land in the right place on the curve.
+
+The **Drop** deadline matters more than the others: the fake's internal
+physics hit its own drop threshold (218°C) at ~6:50 regardless of
+whether you've clicked anything, and BT starts falling on its own after
+that — click late and you'll mark Drop on an already-cooling curve.
+After ~9:50 the fake's roast is fully finished and BT/ET just hold flat
+at their final cooled-down value — click OFF around then to end your
+recording cleanly. (An earlier version of the fake auto-restarted a
+fresh Charge once finished, "to stay usable as a standing fixture" —
+that silently reset BT/ET back to ~96°C/200°C mid-recording if you
+didn't stop at exactly the right second, corrupting the tail of the
+`.alog` with an unmarked second Charge. It's been removed for exactly
+that reason; restart the fake process for a new test roast instead.)
+
+### Saving to `.alog`
+
+Automatic — nothing extra to do. Click **OFF** once you're done (right
+after Cool End): that stops the roast and always writes the `.alog`
+file to `backend/data/roasts/<roast_id>.alog`, regardless of how the
+roast ends ("complete" if the engine itself signaled done, "stopped" if
+you clicked OFF yourself — the only way any live-hardware mode ever
+ends, since none of them have an automatic "done" signal — or "aborted"
+if something actually went wrong). To get the file itself:
+
+1. Click **View detail** (appears next to the toolbar once finished),
+   or find the roast under **History**
+2. Click **Download .alog** at the top of the detail page
+
 ## API summary
 
 All routes live under `/api` (e.g. `/api/roasts`); omitted below for brevity.
@@ -140,7 +260,8 @@ All routes live under `/api` (e.g. `/api/roasts`); omitted below for brevity.
 | GET | `/roasts` | Roast history (filter: `mode`, `status`, `machine_id`) |
 | POST | `/roasts` | Create **and start** a roast (`mode`: `simulator` \| `alog_playback`) |
 | GET | `/roasts/{id}` | Full roast detail (profile, events, notes) — live or historical |
-| POST | `/roasts/{id}/stop` | Abort/finish a roast, persist its `.alog` |
+| DELETE | `/roasts/{id}` | Delete a roast + its `.alog` file (409 if still roasting/cooling) |
+| POST | `/roasts/{id}/stop` | Deliberately stop a roast (status `stopped`), persist its `.alog` |
 | POST | `/roasts/{id}/commands` | `heater_pct` / `fan_pct` / `drum_speed_pct` (simulator) or `speed` (playback) |
 | POST | `/roasts/{id}/notes` | Append a timestamped note |
 | POST | `/roasts/{id}/events` | Append a custom event marker |
@@ -148,6 +269,10 @@ All routes live under `/api` (e.g. `/api/roasts`); omitted below for brevity.
 | POST | `/roasts/import` | Import an existing `.alog` file as history (`path`, optional `title`) |
 | WS | `/roasts/{id}/stream` | Live sample/event stream (sends a `snapshot` first) |
 | GET | `/roasts/{id}/stream/sse` | Same stream over Server-Sent Events |
+| GET | `/presets` | List saved roast configurations |
+| POST | `/presets` | Save the current Configure-Roast form as a named preset |
+| GET | `/presets/{id}` | One saved preset's full config |
+| DELETE | `/presets/{id}` | Delete a saved preset |
 
 ## Assumptions worth knowing about
 

@@ -4,6 +4,7 @@ playback) over its lifecycle and streams samples out over pub/sub.
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -17,11 +18,14 @@ from simulator import SimulatorEngine
 
 from .. import storage
 from ..models import (
+    ALWAYS_AUTO_EVENT_TYPES,
+    MILESTONE_SEQUENCE,
     ControlCommand,
     EventCreateRequest,
     NoteCreateRequest,
     Roast,
     RoastCreateRequest,
+    RoastEventType,
     RoastMode,
     RoastStatus,
     RoastSummary,
@@ -60,6 +64,12 @@ class RoastSession:
         self.profile: list[dict] = []
         self.events: list[dict] = []
         self.notes: list[dict] = []
+
+        self.source_alog_path: Optional[str] = None
+        self.playback_speed: Optional[float] = None
+        if request.mode == RoastMode.ALOG_PLAYBACK:
+            self.source_alog_path = request.alog_path
+            self.playback_speed = request.playback_speed
 
         if request.mode == RoastMode.SIMULATOR:
             engine = SimulatorEngine()
@@ -122,7 +132,20 @@ class RoastSession:
     async def _run_loop(self) -> None:
         try:
             while not self._stop_requested.is_set():
-                sample = await asyncio.to_thread(self.device.read, self.sample_interval_s)
+                # `speed` (only meaningful for AlogPlayer) multiplies the dt we
+                # hand to engine.tick(). We divide the tick step by it here so
+                # every recorded sample still advances roast-time by exactly
+                # sample_interval_s regardless of speed -- speed only changes
+                # how fast that roast-time elapses in real (wall-clock) time,
+                # not how densely the profile gets sampled. Without this, a
+                # faster speed silently coarsened the recorded/charted profile.
+                speed = getattr(self._engine, "speed", 1.0)
+                if speed is not None and speed <= 0:
+                    await asyncio.sleep(min(self.sample_interval_s, 0.5))
+                    continue
+                tick_dt = self.sample_interval_s / speed if speed else self.sample_interval_s
+
+                sample = await asyncio.to_thread(self.device.read, tick_dt)
                 events = sample.pop("events", [])
                 finished = sample.pop("finished", False)
 
@@ -140,7 +163,7 @@ class RoastSession:
                     await self._finish(RoastStatus.COMPLETE)
                     break
 
-                await asyncio.sleep(self.sample_interval_s)
+                await asyncio.sleep(tick_dt)
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # pragma: no cover - defensive
@@ -149,11 +172,15 @@ class RoastSession:
             await pubsub.publish(self.id, {"type": "error", "roast_id": self.id, "message": str(exc)})
 
     async def abort(self) -> None:
+        """Despite the name (kept for API/method-name stability), this is
+        the operator's deliberate OFF/stop action, not an error -- it
+        finishes the roast as STOPPED. Real failures (an exception in the
+        read/tick loop, above) are what actually produce ABORTED."""
         self._stop_requested.set()
         if self._task is not None and self._task is not asyncio.current_task():
             await self._task
-        if self.status not in (RoastStatus.COMPLETE, RoastStatus.ABORTED):
-            await self._finish(RoastStatus.ABORTED)
+        if self.status not in (RoastStatus.COMPLETE, RoastStatus.STOPPED, RoastStatus.ABORTED):
+            await self._finish(RoastStatus.STOPPED)
 
     async def _finish(self, status: RoastStatus) -> None:
         self._stop_requested.set()
@@ -185,6 +212,7 @@ class RoastSession:
             duration_s=self.duration_s,
             weight_roasted_g=self.weight_roasted_g,
             alog_path=self.alog_path,
+            playback_speed=self.playback_speed,
         )
         await pubsub.publish(self.id, {"type": "finished", "roast_id": self.id, "status": self.status.value})
 
@@ -193,6 +221,8 @@ class RoastSession:
         if self.status not in (RoastStatus.ROASTING, RoastStatus.COOLING):
             raise RoastSessionError(f"roast {self.id} is not active (status={self.status.value})")
         payload = command.model_dump(exclude_none=True)
+        if "speed" in payload:
+            self.playback_speed = payload["speed"]
         return self.device.write(payload)
 
     def add_note(self, req: NoteCreateRequest) -> dict:
@@ -206,6 +236,16 @@ class RoastSession:
         return note
 
     def add_event(self, req: EventCreateRequest) -> dict:
+        if req.type in MILESTONE_SEQUENCE:
+            if req.type in ALWAYS_AUTO_EVENT_TYPES:
+                raise RoastSessionError(f"{req.type.value} is always auto-detected -- it can't be marked manually")
+            existing_types = {RoastEventType(e["type"]) for e in self.events if e["type"] != RoastEventType.CUSTOM.value}
+            if req.type in existing_types:
+                raise RoastSessionError(f"{req.type.value} has already been marked for this roast")
+            idx = MILESTONE_SEQUENCE.index(req.type)
+            later_types = set(MILESTONE_SEQUENCE[idx + 1:])
+            if existing_types & later_types:
+                raise RoastSessionError(f"can't mark {req.type.value} -- a later milestone is already recorded")
         event = {
             "id": str(uuid.uuid4()),
             "time_s": self.profile[-1]["time_s"] if self.profile else 0.0,
@@ -233,7 +273,9 @@ class RoastSession:
             weight_green_g=self.weight_green_g,
             weight_roasted_g=self.weight_roasted_g,
             duration_s=self.duration_s,
-            alog_path=self.alog_path if self.status in (RoastStatus.COMPLETE, RoastStatus.ABORTED) else None,
+            alog_path=self.alog_path if self.status in (RoastStatus.COMPLETE, RoastStatus.STOPPED, RoastStatus.ABORTED) else None,
+            source_alog_path=self.source_alog_path,
+            playback_speed=self.playback_speed,
         )
 
     def to_roast(self) -> Roast:
@@ -261,6 +303,8 @@ class RoastSessionManager:
             "weight_roasted_g": None,
             "duration_s": None,
             "alog_path": None,
+            "source_alog_path": session.source_alog_path,
+            "playback_speed": session.playback_speed,
         })
         return session
 
@@ -303,10 +347,28 @@ class RoastSessionManager:
             weight_roasted_g=row["weight_roasted_g"],
             duration_s=row["duration_s"],
             alog_path=row["alog_path"],
+            source_alog_path=row.get("source_alog_path"),
+            playback_speed=row.get("playback_speed"),
             profile=parsed["profile"],
             events=parsed["events"],
             notes=parsed["notes"],
         )
+
+    def delete(self, roast_id: str) -> None:
+        session = self.get(roast_id)
+        if session is not None and session.status in (RoastStatus.ROASTING, RoastStatus.COOLING):
+            raise RoastSessionError(f"roast {roast_id} is still active -- stop it before deleting")
+        self.sessions.pop(roast_id, None)
+
+        row = storage.get_roast_row(roast_id)
+        if row is None:
+            raise RoastSessionError(f"unknown roast {roast_id}")
+        if row.get("alog_path"):
+            try:
+                os.remove(row["alog_path"])
+            except OSError:
+                pass  # already gone, or never written (e.g. a stale/orphaned row) -- fine either way
+        storage.delete_roast_row(roast_id)
 
     def list_summaries(self, **filters) -> list[RoastSummary]:
         rows = storage.list_roast_rows(**filters)

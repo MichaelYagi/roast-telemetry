@@ -19,8 +19,11 @@ class RoastStatus(str, Enum):
     IDLE = "idle"
     ROASTING = "roasting"
     COOLING = "cooling"
-    COMPLETE = "complete"
-    ABORTED = "aborted"
+    COMPLETE = "complete"  # the engine itself signaled it's done (is_finished())
+    STOPPED = "stopped"  # the operator deliberately ended it (OFF/stop) -- the
+    # only way any live-hardware mode ever ends, since none of them have an
+    # automatic "done" signal; not an error, distinct from ABORTED
+    ABORTED = "aborted"  # ended abnormally (an exception in the read/tick loop)
 
 
 class DeviceStatus(str, Enum):
@@ -42,6 +45,31 @@ class RoastEventType(str, Enum):
     DROP = "DROP"
     COOL_END = "COOL_END"
     CUSTOM = "CUSTOM"
+
+
+# Canonical roast-milestone order, matching real Artisan's own button
+# behavior: a milestone can only be marked if nothing *later* in this
+# sequence has fired yet (skipping ahead is fine -- e.g. Drop without
+# ever marking SC Start/SC End -- but going back is not), and once any
+# milestone fires (auto or manual), it's permanently set -- no re-marking
+# it, and marking a later one locks out any earlier ones that were
+# skipped. CUSTOM isn't part of this -- imported real-Artisan manual
+# control-channel events are legitimately repeatable, not milestones.
+MILESTONE_SEQUENCE = [
+    RoastEventType.CHARGE,
+    RoastEventType.TURNING_POINT,
+    RoastEventType.DRY_END,
+    RoastEventType.FC_START,
+    RoastEventType.FC_END,
+    RoastEventType.SC_START,
+    RoastEventType.SC_END,
+    RoastEventType.DROP,
+    RoastEventType.COOL_END,
+]
+
+# These two are never manually markable -- always auto-detected (a sharp
+# BT drop, and the BT minimum right after), no human judgment involved.
+ALWAYS_AUTO_EVENT_TYPES = {RoastEventType.CHARGE, RoastEventType.TURNING_POINT}
 
 
 class Machine(BaseModel):
@@ -135,12 +163,78 @@ class RoastSummary(BaseModel):
     weight_roasted_g: Optional[float] = None
     duration_s: Optional[float] = None
     alog_path: Optional[str] = None
+    # alog_playback mode only: the server-side file being replayed (distinct
+    # from `alog_path`, which is where *this* roast's own recording gets
+    # saved) and the speed it was started at.
+    source_alog_path: Optional[str] = None
+    playback_speed: Optional[float] = None
 
 
 class Roast(RoastSummary):
     profile: list[RoastProfilePoint] = []
     events: list[RoastEvent] = []
     notes: list[RoastNote] = []
+
+
+class RoastPresetCreateRequest(BaseModel):
+    name: str
+    config: RoastCreateRequest
+    # Control-channel starting point (simulator/modbus_live only). Kept
+    # separate from `config` since these are runtime commands sent after
+    # a roast starts, not part of RoastCreateRequest -- but a preset still
+    # wants to remember and replay them as the roast's first command.
+    heater_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    fan_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    drum_speed_pct: Optional[float] = Field(default=None, ge=0, le=100)
+
+
+class RoastPreset(BaseModel):
+    id: str
+    name: str
+    created_at: str
+    config: RoastCreateRequest
+    heater_pct: Optional[float] = None
+    fan_pct: Optional[float] = None
+    drum_speed_pct: Optional[float] = None
+
+
+# Valid keys for AppSettings.broken_out_panels -- which live readouts the
+# Live Roast view should also render large in the optional breakout panel
+# (frontend/src/components/BreakoutPanel.jsx), in addition to (not instead
+# of) their normal small display elsewhere on the page.
+BREAKOUT_PANEL_KEYS = {
+    "bt", "et", "ror_bt", "ror_et", "time",
+    "dry_pct", "to_dry", "to_fcs",
+    "heater", "fan", "drum", "playback_speed",
+}
+
+
+class AppSettings(BaseModel):
+    ollama_url: Optional[str] = None
+    ollama_model: Optional[str] = None
+    broken_out_panels: list[str] = []
+
+
+class OllamaStatus(BaseModel):
+    connected: bool
+    models: list[str] = []
+    error: Optional[str] = None
+
+
+class ReviewStatus(str, Enum):
+    PENDING = "pending"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class RoastReview(BaseModel):
+    roast_id: str
+    status: ReviewStatus
+    review_text: Optional[str] = None
+    error: Optional[str] = None
+    model: Optional[str] = None
+    created_at: str
+    completed_at: Optional[str] = None
 
 
 class NoteCreateRequest(BaseModel):

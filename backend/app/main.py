@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import storage
-from .api import devices, machines, roasts
+from .api import devices, machines, presets, roasts, settings
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
@@ -17,11 +17,17 @@ FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "di
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     storage.init_db()
+    # Crash/restart recovery: any roast still marked roasting/cooling from
+    # a previous process is orphaned -- its in-memory session is gone and
+    # can never come back, so leaving it stuck as "roasting" forever would
+    # make it permanently unreachable and unstoppable. See
+    # storage.abort_stale_roasts for the full rationale.
+    storage.abort_stale_roasts()
     yield
 
 
 app = FastAPI(
-    title="Artisan Web API",
+    title="Roast Telemetry",
     description=(
         "API-first coffee roasting platform: Artisan-style simulator mode, "
         "a mock USB/serial device layer, and an .alog playback engine, "
@@ -42,6 +48,8 @@ app.add_middleware(
 app.include_router(roasts.router, prefix="/api")
 app.include_router(machines.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
+app.include_router(presets.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
 
 
 @app.get("/api/health")

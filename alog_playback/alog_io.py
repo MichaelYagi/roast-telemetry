@@ -25,7 +25,7 @@ This module reads two shapes:
 Schema this module writes (top level keys)::
 
     {
-      "version": "artisan-web-api-1.0",
+      "version": "roast-telemetry-1.0",
       "title": str,
       "roastdate": iso8601 str,
       "beans": str,
@@ -44,12 +44,14 @@ Schema this module writes (top level keys)::
 from __future__ import annotations
 
 import ast
+import bisect
 import json
 import os
+import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-ALOG_VERSION = "artisan-web-api-1.0"
+ALOG_VERSION = "roast-telemetry-1.0"
 
 
 def load_alog(path: str) -> dict:
@@ -265,10 +267,75 @@ def _compute_ror(timex: list, temps: list, window_s: float = 24.0) -> list:
         if temps[i] is None or j >= i or temps[j] is None:
             continue
         dt = timex[i] - timex[j]
-        if dt <= 0:
+        # Until the trailing window is fully populated (e.g. the first ~24s
+        # after charge), `dt` is much shorter than `window_s`, so dividing a
+        # small raw delta by a small dt and scaling by 60 wildly amplifies
+        # sensor noise into physically implausible spikes (seen as RoR in
+        # the hundreds of deg/min right at charge). Real roast software
+        # simply leaves RoR blank until the window is actually full.
+        if dt <= 0 or dt < window_s * 0.9:
             continue
         ror[i] = (temps[i] - temps[j]) / dt * 60.0
     return ror
+
+
+# Real Artisan machines that actually log Burner/Air/Drum telemetry (e.g.
+# Kaleido) report it as *continuous* per-sample "extra device" channels --
+# parallel `extratemp1`/`extratemp2` arrays (each itself a list of one
+# array per extra device) plus their own `extratimex` timeline, with
+# `extraname1`/`extraname2` giving each array's label. A label of the form
+# `{N}` is Artisan's convention for "use etypes[N]'s name" (e.g. `{3}` ->
+# etypes[3] == "Burner"), tying an extra channel back to the same
+# Burner/Air/Drum/Damper vocabulary used by manual specialevents. This is
+# distinct from -- and far higher resolution than -- the specialevents log,
+# which only records manual slider *adjustments*, not the resulting value
+# at every sample.
+_CHANNEL_FIELD = {"Burner": "heater_pct", "Air": "fan_pct", "Drum": "drum_speed_pct"}
+_EXTRANAME_ETYPE_RE = re.compile(r"^\{(\d+)\}$")
+
+
+def _step_hold_align(src_times: list, src_values: list, target_times: list) -> list:
+    """Resample a (possibly differently-timed) step-valued channel onto
+    `target_times`, holding each sample's value forward until the next one
+    (matching how a control-channel reading actually behaves between
+    updates) rather than interpolating a slope that was never there."""
+    if not src_times or not src_values:
+        return [None] * len(target_times)
+    out = []
+    for t in target_times:
+        idx = bisect.bisect_right(src_times, t) - 1
+        out.append(src_values[idx] if idx >= 0 else src_values[0])
+    return out
+
+
+def _extract_continuous_channels(data: dict, timex: list) -> dict[str, list]:
+    """Map real Artisan's extra-device channels onto our heater_pct/
+    fan_pct/drum_speed_pct fields, aligned to the main `timex`."""
+    etypes = data.get("etypes") or []
+    extratimex = data.get("extratimex") or []
+    pairs = [
+        (data.get("extraname1") or [], data.get("extratemp1") or []),
+        (data.get("extraname2") or [], data.get("extratemp2") or []),
+    ]
+
+    result: dict[str, list] = {}
+    for names, temps in pairs:
+        for i, name in enumerate(names):
+            m = _EXTRANAME_ETYPE_RE.match(str(name)) if name else None
+            if not m or i >= len(temps):
+                continue
+            etype_idx = int(m.group(1))
+            if not (0 <= etype_idx < len(etypes)):
+                continue
+            field = _CHANNEL_FIELD.get(etypes[etype_idx])
+            if not field or field in result:
+                continue
+            values = temps[i]
+            src_times = extratimex[i] if i < len(extratimex) else timex
+            if not values or len(values) != len(src_times):
+                continue
+            result[field] = _step_hold_align(src_times, values, timex)
+    return result
 
 
 def alog_dict_to_points(data: dict) -> dict:
@@ -284,6 +351,7 @@ def alog_dict_to_points(data: dict) -> dict:
         ror_et = _compute_ror(timex, temp1)
     control_list = data.get("control") or []
     control = {c["time_s"]: c for c in control_list if isinstance(c, dict) and "time_s" in c}
+    continuous = _extract_continuous_channels(data, timex)
 
     profile = []
     for i, t in enumerate(timex):
@@ -294,9 +362,9 @@ def alog_dict_to_points(data: dict) -> dict:
             "bt": temp2[i] if i < len(temp2) else None,
             "ror_bt": ror_bt[i] if i < len(ror_bt) else None,
             "ror_et": ror_et[i] if i < len(ror_et) else None,
-            "heater_pct": c.get("heater_pct"),
-            "fan_pct": c.get("fan_pct"),
-            "drum_speed_pct": c.get("drum_speed_pct"),
+            "heater_pct": continuous["heater_pct"][i] if "heater_pct" in continuous else c.get("heater_pct"),
+            "fan_pct": continuous["fan_pct"][i] if "fan_pct" in continuous else c.get("fan_pct"),
+            "drum_speed_pct": continuous["drum_speed_pct"][i] if "drum_speed_pct" in continuous else c.get("drum_speed_pct"),
         })
 
     weight_green_g, weight_roasted_g = _extract_weight(data)

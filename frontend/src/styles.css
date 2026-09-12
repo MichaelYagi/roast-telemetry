@@ -17,6 +17,12 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  /* Safety net: nothing on the page should ever need to scroll
+     horizontally (narrow-viewport nav wrapping and the breakout-split
+     escape-width math are both meant to prevent it), but if anything else
+     overflows slightly this clips it instead of adding a page-wide
+     horizontal scrollbar. */
+  overflow-x: hidden;
 }
 
 .app-shell {
@@ -26,12 +32,76 @@ body {
 }
 
 .app-header {
+  padding: 1.25rem 0;
+}
+
+.app-header-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.25rem 0;
   flex-wrap: wrap;
   gap: 0.75rem;
+  width: 100%;
+}
+
+/* Mirrors .breakout-split-escape (same 100vw/left:50%/translateX trick,
+   same 1.25rem gutter) so the header's left edge lines up exactly with
+   the content row below -- toggled by LiveRoastView via a body class +
+   --breakout-split-width custom property (App.jsx has no props/context
+   connection to that route-level state, so this is the simplest bridge
+   between them without lifting state up or introducing Context for one
+   value). Header itself escapes .app-shell's cap; .app-header-inner is
+   what actually gets constrained to the split width, so title+nav occupy
+   the same width as .live-roast below, and the divider's line reads as
+   continuous from the very top of the page instead of starting partway
+   down where the roast content begins. */
+body.breakout-split-active {
+  /* Both columns below now size themselves to exactly fill what's left
+     of the viewport (see --breakout-available-height, set from JS) and
+     scroll internally, so there's nothing left for the page itself to
+     scroll -- keeping this off is what actually stops the panel from
+     bleeding past the bottom of the screen. */
+  overflow: hidden;
+}
+body.breakout-split-active .app-shell {
+  padding-bottom: 0;
+}
+
+body.breakout-split-active .app-header {
+  position: relative;
+  /* Measured clientWidth (excludes any scrollbar), not 100vw (which
+     doesn't) -- see the updateAvailableSpace effect in LiveRoastView.jsx
+     for why using raw 100vw here caused a page-level horizontal scrollbar. */
+  width: var(--breakout-viewport-width, 100vw);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1.25rem 1.25rem 0;
+  box-sizing: border-box;
+}
+
+body.breakout-split-active .app-header-inner {
+  width: var(--breakout-split-width, 780px);
+}
+
+.app-header-divider {
+  display: none;
+}
+
+/* Aligned to land exactly on the content divider's own visible line (see
+   .breakout-split-divider::after below): 1.25rem is .app-header's own
+   left padding (matches .breakout-split-escape's), then splitWidth to
+   reach the end of .app-header-inner/.live-roast, then the divider's
+   0.4rem margin plus half its 8px box (4px) to its centered 2px line. */
+body.breakout-split-active .app-header-divider {
+  display: block;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(1.25rem + var(--breakout-split-width, 780px) + 0.4rem + 4px);
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--border);
+  pointer-events: none;
 }
 
 .app-header h1 {
@@ -41,7 +111,8 @@ body {
 
 .app-header nav {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
 }
 
 .app-header nav a {
@@ -50,6 +121,20 @@ body {
   font-weight: 600;
   padding: 0.35rem 0.6rem;
   border-radius: 6px;
+  white-space: nowrap;
+}
+
+/* All 5 nav links plus the title never fit on one line at phone widths --
+   without this they forced the whole page to scroll horizontally instead
+   of wrapping to a second/third line. */
+@media (max-width: 640px) {
+  .app-header nav {
+    gap: 0.3rem 0.5rem;
+  }
+  .app-header nav a {
+    padding: 0.3rem 0.45rem;
+    font-size: 0.9rem;
+  }
 }
 
 .app-header nav a.active {
@@ -87,6 +172,22 @@ body {
   min-width: 160px;
 }
 
+/* A checkbox+text label isn't a stacked "label above input" filter field
+   like the .filters-row/.form-row selects it'd otherwise inherit column/
+   flex:1/min-width from -- it should just sit compact and inline. The
+   extra specificity (class+element+class) is what actually overrides the
+   rule above, no !important needed. */
+.filters-row label.checkbox-label,
+.form-row label.checkbox-label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  flex: none;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 input,
 select,
 button {
@@ -109,6 +210,15 @@ button.danger {
   background: #b91c1c;
 }
 
+button.link-like {
+  background: none;
+  color: #b91c1c;
+  border: none;
+  padding: 0;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -119,9 +229,387 @@ button:disabled {
   font-weight: 600;
 }
 
+.save-preset-row button {
+  align-self: flex-end;
+}
+
 .hint {
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+.preset-feedback {
+  color: #166534;
+  font-weight: 600;
+}
+
+.ollama-status {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.ollama-status-ok {
+  color: #166534;
+}
+
+.ollama-status-bad {
+  color: #b91c1c;
+}
+
+.breakout-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+.breakout-order-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+
+.breakout-order-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.breakout-order-swatch {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.breakout-order-label {
+  flex: 1;
+}
+
+.breakout-order-list button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.breakout-add-btn {
+  background: var(--panel);
+  color: var(--accent);
+  border: 1px dashed var(--border);
+  text-align: left;
+}
+
+.live-roast-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.live-roast-layout > .live-roast {
+  flex: 1;
+  min-width: 0;
+}
+
+.breakout-panel {
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  position: sticky;
+  top: 1rem;
+}
+
+/* Split-pane mode: only used above BREAKOUT_SPLIT_MIN_VIEWPORT (see
+   LiveRoastView.jsx), replacing the plain .live-roast-layout sidebar
+   above with a full-viewport-width, user-resizable two-pane split. The
+   "escape" div breaks out of .app-shell's 1200px cap via the negative-
+   margin trick (a plain 100vw box, independent of any ancestor's width),
+   so the two panes together always use the *entire* window width -- no
+   dead margin on either side, and no top offset either: the panel starts
+   at the same y-position as the chart, not pushed down further.
+   Deliberately uses a negative margin, not `transform`, to shift itself
+   into place -- a `transform` on an ancestor creates a new containing
+   block for `position: fixed` descendants, which would trap
+   .breakout-split-panel-pane's fixed positioning to this box instead of
+   the true viewport (see that rule below, which needs to reach y=0, above
+   this box's own top edge). */
+.breakout-split-escape {
+  position: relative;
+  /* Measured clientWidth, not 100vw -- see .app-header's identical rule
+     above and the updateAvailableSpace effect in LiveRoastView.jsx. */
+  width: var(--breakout-viewport-width, 100vw);
+  left: 50%;
+  margin-left: calc(var(--breakout-viewport-width, 100vw) / -2);
+  padding: 0 1.25rem;
+  box-sizing: border-box;
+  /* Set from JS (measured header height, not guessed) -- this is the
+     actual fix for panels bleeding past the bottom of the viewport: the
+     row below is given a real, exact height instead of an estimate. */
+  height: var(--breakout-available-height, calc(100vh - 4rem));
+}
+
+.breakout-split-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  height: 100%;
+}
+
+.breakout-split-row > .live-roast {
+  min-width: 0;
+  flex: 0 0 auto; /* width set inline from splitWidth state, not flex-grow */
+  height: 100%;
+  /* This column's own content (chart, controls, notes...) is often taller
+     than the viewport -- now that the page itself no longer scrolls in
+     split mode, this column has to scroll itself instead. */
+  overflow-y: auto;
+}
+
+.breakout-split-divider {
+  flex: 0 0 8px;
+  align-self: stretch;
+  cursor: col-resize;
+  position: relative;
+  margin: 0 0.4rem;
+}
+
+.breakout-split-divider::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--border);
+}
+
+.breakout-split-divider:hover::after,
+.breakout-split-divider.dragging::after {
+  background: var(--accent);
+}
+
+/* Fixed to the true viewport (not the row's flex flow) so the panel
+   column reaches all the way to y=0, using the space above that would
+   otherwise sit empty next to the header/title -- not just filling
+   .breakout-split-row's own height, which starts below the header. Width
+   is computed the same way the row's own layout would: viewport width,
+   minus the escape div's left+right padding, minus the main column, minus
+   the divider's own box+margins. Safe to take out of the row's flex flow
+   entirely -- nothing else there needs that space back. */
+.breakout-split-panel-pane {
+  position: fixed;
+  top: 0;
+  right: 1.25rem;
+  bottom: 0;
+  width: calc(
+    var(--breakout-viewport-width, 100vw) - 1.25rem - 1.25rem -
+      var(--breakout-split-width, 780px) - 8px - 0.4rem - 0.4rem
+  );
+  min-width: 0;
+}
+
+/* Sizing lives on .breakout-panel itself, not split across it and its
+   .breakout-split-panel-pane parent -- that two-element split was an
+   earlier bug (the height cap wasn't reliably reaching the boxes through
+   a flex parent -> flex child -> flex grandchild chain). One element
+   with an explicit height, hard-clipped, is much harder to get wrong.
+   Height comes from the parent's own fixed top/bottom (definite, not
+   guessed), so this just fills 100% of that. */
+.breakout-split-panel-pane .breakout-panel {
+  position: static;
+  height: 100%;
+  max-height: 100%;
+  width: 100%;
+  /* Each box flexes to divide this panel's exact height evenly (flex: 1,
+     min-height: 0 below), so nothing should ever need to scroll here --
+     hidden, not auto, so a stray sub-pixel rounding overflow never shows
+     a scrollbar track sitting next to the boxes. */
+  overflow-y: hidden;
+  box-sizing: border-box;
+}
+
+.breakout-split-panel-pane .breakout-panel .breakout-box {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* Only in split-pane mode do the boxes grow to fill/divide the available
+   height and scale their font size with it -- in the plain sidebar mode
+   (.live-roast-layout, narrow fixed-width, no tall space to fill) they
+   keep today's compact fixed size instead. Label stays pinned near the
+   top (its own natural size, flex: 0 0 auto below) and the value fills
+   and centers in whatever's left, rather than the two being centered as
+   one small block in the middle of the box. */
+.breakout-split-panel-pane .breakout-box {
+  flex: 1;
+  align-items: stretch;
+  /* Establishes a query container so .breakout-value/.breakout-label below
+     can size their font in cqh (% of *this box's own* rendered height) --
+     this is what makes the text scale correctly whether 1 or all 12
+     panels are enabled, without knowing that count in advance. */
+  container-type: size;
+}
+
+.breakout-split-panel-pane .breakout-label {
+  flex: 0 0 auto;
+  font-size: clamp(1rem, min(14cqh, 18cqw), 2.8rem);
+}
+
+.breakout-split-panel-pane .breakout-value {
+  /* Fills whatever's left below the label and centers the number inside
+     it, so the value actually occupies the box instead of just sitting
+     next to the label in a centered pair. */
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Now that each box's actual height is a real, exact fraction of a
+     precisely-measured available height (not an overflowing estimate),
+     it's safe to size the text much closer to filling the box -- bounded
+     by *both* cqh and cqw (via min()), not height alone, so a panel
+     dragged narrow (the split divider) doesn't let tall-but-narrow boxes
+     blow values like "125.2°" past the box's own width. 32cqw is sized
+     for ~6-7 character values (the longest this panel ever shows, e.g. a
+     temperature with a degree sign); most values are shorter and won't
+     hit this width ceiling at all. */
+  font-size: clamp(3rem, min(80cqh, 42cqw), 32rem);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.breakout-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 5px solid;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.breakout-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.breakout-value {
+  font-family: "Courier New", ui-monospace, monospace;
+  font-weight: 800;
+  font-size: 2.2rem;
+  line-height: 1.2;
+}
+
+@media (max-width: 900px) {
+  .live-roast-layout {
+    flex-direction: column;
+  }
+  .breakout-panel {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+    position: static;
+  }
+  .breakout-box {
+    flex: 1;
+    min-width: 130px;
+  }
+}
+
+.review-card-body {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.review-text {
+  line-height: 1.5;
+}
+
+/* formatMessage() (frontend/src/lib/mdToHtml.js) renders raw h1-h6/
+   strong/em/code/pre/table/blockquote tags -- style them here rather
+   than globally, so they don't leak into the rest of the app. */
+.review-text h1,
+.review-text h2,
+.review-text h3,
+.review-text h4,
+.review-text h5,
+.review-text h6 {
+  margin: 0.8em 0 0.3em;
+  line-height: 1.3;
+}
+
+.review-text h1 {
+  font-size: 1.3rem;
+}
+.review-text h2 {
+  font-size: 1.15rem;
+}
+.review-text h3 {
+  font-size: 1.05rem;
+}
+
+.review-text code.code-inline {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+}
+
+.review-text pre {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  padding: 0.75em;
+  overflow-x: auto;
+}
+
+.review-text blockquote {
+  margin: 0.5em 0;
+  padding-left: 0.75em;
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+}
+
+.review-text table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+}
+
+.review-text th,
+.review-text td {
+  border: 1px solid var(--border);
+  padding: 0.3em 0.6em;
+  text-align: left;
+}
+
+.review-text .copy-btn {
+  display: none; /* formatMessage() emits a copy-to-clipboard button that expects
+                     a click handler this app doesn't wire up -- hide rather than
+                     ship a dead button */
+}
+
+.review-meta {
+  margin-top: 0.5rem;
+}
+
+.spinner {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -0.15em;
+  margin-right: 0.4em;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .live-header {
@@ -141,6 +629,30 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.live-meta {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.25rem;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+}
+
+.live-meta li {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.live-meta .meta-label {
+  color: var(--text-muted);
+}
+
+.live-meta .meta-value {
+  font-weight: 600;
+  word-break: break-all;
 }
 
 .live-grid,
@@ -202,12 +714,17 @@ button:disabled {
 
 .note-input {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
 }
 
-.note-input input {
-  flex: 1;
+.note-input textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
 }
 
 .stats-row {
@@ -236,6 +753,12 @@ button:disabled {
   align-items: center;
   flex-wrap: wrap;
   margin-bottom: 1rem;
+}
+
+.table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
 }
 
 .roast-table {
@@ -272,6 +795,16 @@ button:disabled {
 .status-aborted {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.status-stopped {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-cooling {
+  background: #cffafe;
+  color: #155e75;
 }
 
 .status-idle {
@@ -331,21 +864,6 @@ button:disabled {
   gap: 1.25rem;
   padding: 0.6rem 1rem;
   flex-wrap: wrap;
-}
-
-.artisan-toolbar-icons {
-  display: flex;
-  gap: 0.3rem;
-}
-
-.icon-btn {
-  background: transparent;
-  color: var(--text-muted);
-  border: 1px solid transparent;
-  font-size: 1.05rem;
-  line-height: 1;
-  padding: 0.35rem 0.5rem;
-  border-radius: 6px;
 }
 
 .artisan-toolbar-milestones {

@@ -170,7 +170,9 @@ const axisUnitLabelsPlugin = {
     ctx.fillStyle = "#57534e";
     ctx.textBaseline = "bottom";
     ctx.textAlign = "left";
-    ctx.fillText(opts.leftUnit, chartArea.left, chartArea.top - 40);
+    if (opts.leftUnit) {
+      ctx.fillText(opts.leftUnit, chartArea.left, chartArea.top - 40);
+    }
     if (opts.rightUnit) {
       ctx.textAlign = "right";
       ctx.fillText(opts.rightUnit, chartArea.right, chartArea.top - 40);
@@ -296,6 +298,7 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
     return { datasets };
   }, [profile, events, visible, endTime]);
 
+  const showTemp = visible.BT || visible.ET;
   const showRor = visible.ROR_BT || visible.ROR_ET;
   const showControl = visible.Burner || visible.Air || visible.Drum || visible.Damper;
 
@@ -322,7 +325,7 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
         },
         eventMarkers: { events },
         phaseBands: { phases },
-        axisUnitLabels: { leftUnit: "°C", rightUnit: showRor ? "°C/min" : null },
+        axisUnitLabels: { leftUnit: showTemp ? "°C" : null, rightUnit: showRor ? "°C/min" : null },
       },
       scales: {
         x: {
@@ -336,6 +339,7 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
           position: "left",
           grid: { color: "#e7e5e4" },
           ticks: { color: "#78716c" },
+          display: showTemp,
         },
         yRor: {
           type: "linear",
@@ -343,6 +347,12 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
           grid: { drawOnChartArea: false },
           ticks: { color: "#78716c" },
           display: showRor,
+          // Fixed range (matches typical Artisan RoR scope bounds) so a
+          // single transient spike -- e.g. the sharp BT dip right after
+          // charge -- can't stretch the axis and flatten the rest of the
+          // roast's curve into an unreadable line near zero.
+          min: -50,
+          max: 50,
         },
         yControl: {
           type: "linear",
@@ -354,7 +364,7 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
         },
       },
     }),
-    [events, phases, showRor, showControl]
+    [events, phases, showTemp, showRor, showControl]
   );
 
   return (

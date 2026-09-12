@@ -17,6 +17,8 @@ export default function HistoryDashboard() {
   const [importTitle, setImportTitle] = useState("");
   const [importError, setImportError] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [deletingSelected, setDeletingSelected] = useState(false);
   const navigate = useNavigate();
 
   function refresh() {
@@ -26,6 +28,31 @@ export default function HistoryDashboard() {
       .listRoasts(params)
       .then(setRoasts)
       .finally(() => setLoading(false));
+  }
+
+  function toggleSelected(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allSelected = roasts.length > 0 && roasts.every((r) => selectedIds.has(r.id));
+  const someSelected = roasts.some((r) => selectedIds.has(r.id));
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      if (allSelected) {
+        const next = new Set(prev);
+        roasts.forEach((r) => next.delete(r.id));
+        return next;
+      }
+      const next = new Set(prev);
+      roasts.forEach((r) => next.add(r.id));
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -46,6 +73,53 @@ export default function HistoryDashboard() {
       setImportError(err.message);
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function handleDelete(id, title) {
+    if (!window.confirm(`Delete "${title}"? This removes it from history and deletes its .alog file. This can't be undone.`)) {
+      return;
+    }
+    try {
+      await api.deleteRoast(id);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      refresh();
+    } catch (err) {
+      window.alert(err.message);
+    }
+  }
+
+  async function handleDeleteSelected() {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    if (
+      !window.confirm(
+        `Delete ${ids.length} roast${ids.length === 1 ? "" : "s"}? This removes them from history and deletes their .alog files. This can't be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeletingSelected(true);
+    try {
+      const results = await Promise.allSettled(ids.map((id) => api.deleteRoast(id)));
+      const failed = results
+        .map((r, i) => (r.status === "rejected" ? { id: ids[i], reason: r.reason.message } : null))
+        .filter(Boolean);
+      setSelectedIds(new Set());
+      refresh();
+      if (failed.length) {
+        const titles = failed.map((f) => {
+          const roast = roasts.find((r) => r.id === f.id);
+          return `${roast ? roast.title : f.id}: ${f.reason}`;
+        });
+        window.alert(`${failed.length} of ${ids.length} couldn't be deleted:\n${titles.join("\n")}`);
+      }
+    } finally {
+      setDeletingSelected(false);
     }
   }
 
@@ -114,16 +188,39 @@ export default function HistoryDashboard() {
           <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
             <option value="">All</option>
             <option value="roasting">Roasting</option>
+            <option value="cooling">Cooling</option>
             <option value="complete">Complete</option>
+            <option value="stopped">Stopped</option>
             <option value="aborted">Aborted</option>
           </select>
         </label>
       </div>
 
       <div className="panel">
+        {someSelected && (
+          <div className="table-toolbar">
+            <button
+              type="button"
+              className="danger"
+              disabled={deletingSelected}
+              onClick={handleDeleteSelected}
+            >
+              {deletingSelected ? "Deleting…" : `Delete selected (${selectedIds.size})`}
+            </button>
+          </div>
+        )}
         <table className="roast-table">
           <thead>
             <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => el && (el.indeterminate = someSelected && !allSelected)}
+                  onChange={toggleSelectAll}
+                  disabled={roasts.length === 0}
+                />
+              </th>
               <th>Title</th>
               <th>Mode</th>
               <th>Status</th>
@@ -136,16 +233,19 @@ export default function HistoryDashboard() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={7}>Loading…</td>
+                <td colSpan={8}>Loading…</td>
               </tr>
             )}
             {!loading && roasts.length === 0 && (
               <tr>
-                <td colSpan={7}>No roasts yet.</td>
+                <td colSpan={8}>No roasts yet.</td>
               </tr>
             )}
             {roasts.map((r) => (
               <tr key={r.id}>
+                <td>
+                  <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => toggleSelected(r.id)} />
+                </td>
                 <td>{r.title}</td>
                 <td>{r.mode}</td>
                 <td>
@@ -156,6 +256,10 @@ export default function HistoryDashboard() {
                 <td>{new Date(r.created_at).toLocaleString()}</td>
                 <td>
                   <Link to={`/roasts/${r.id}`}>View</Link>
+                  {" · "}
+                  <button type="button" className="danger link-like" onClick={() => handleDelete(r.id, r.title)}>
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

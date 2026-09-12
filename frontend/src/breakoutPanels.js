@@ -1,0 +1,17 @@
+// Shared between SettingsView (the toggle checkboxes) and BreakoutPanel
+// (what actually renders) -- mirrors backend/app/models.py's
+// BREAKOUT_PANEL_KEYS exactly, same key strings on both sides.
+export const BREAKOUT_PANEL_ITEMS = [
+  { key: "bt", label: "BT", color: "#1d4ed8" },
+  { key: "et", label: "ET", color: "#be123c" },
+  { key: "ror_bt", label: "ΔBT (RoR)", color: "#8b5cf6" },
+  { key: "ror_et", label: "RoR (ET)", color: "#c4b5fd" },
+  { key: "time", label: "Elapsed time", color: "#334155" },
+  { key: "dry_pct", label: "DRY%", color: "#0891b2" },
+  { key: "to_dry", label: "»DRY", color: "#0891b2" },
+  { key: "to_fcs", label: "»FCs", color: "#0891b2" },
+  { key: "heater", label: "Heater %", color: "#f59e0b" },
+  { key: "fan", label: "Fan %", color: "#0891b2" },
+  { key: "drum", label: "Drum %", color: "#16a34a" },
+  { key: "playback_speed", label: "Playback speed", color: "#334155" },
+];
