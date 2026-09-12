@@ -126,6 +126,22 @@ END/SC START/DROP manual event-marker buttons underneath the chart.
 > edit. `vite.config.js` already sets `server.watch.usePolling` to work
 > around this — if you still see stale behavior, restart `npm run dev`.
 
+## Running the backend tests
+
+```bash
+pip install -r requirements-dev.txt   # backend/requirements.txt + pytest
+python -m pytest
+```
+
+Run from the repo root — `pytest.ini` puts it on `sys.path` (`pythonpath = .`,
+matching how the app itself is always run: `PYTHONPATH=. uvicorn ...`).
+Covers the .alog reader/writer (including real Artisan's own file shape),
+`AlogPlayer`'s playback/interpolation, milestone event sequencing
+(`RoastSession.add_event`), settings persistence, and the settings API.
+Each DB-touching test gets its own throwaway SQLite file (see
+`tests/conftest.py`'s `isolated_db` fixture) — none of it touches
+`backend/data/roasts.db`. There's no frontend test suite yet.
+
 ## Testing the hardware-dependent modes without real hardware
 
 `simulator` and `alog_playback` need nothing extra — they're fully
