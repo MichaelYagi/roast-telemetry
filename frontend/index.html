@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Roast Telemetry</title>
+    <script>
+      // Applies a saved theme choice (see ThemePicker.jsx) before the page
+      // paints -- without this, picking Coffee would flash the default
+      // Light theme on every reload until React mounts and re-applies it.
+      (function () {
+        try {
+          var theme = localStorage.getItem("roast-telemetry:theme");
+          if (theme && theme !== "light") {
+            document.documentElement.setAttribute("data-theme", theme);
+          }
+        } catch (e) {}
+      })();
+    </script>
     <script src="https://michaelyagi.github.io/js/md_to_html.js"></script>
   </head>
   <body>

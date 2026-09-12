@@ -6,7 +6,70 @@
   --text: #1c1917;
   --text-muted: #78716c;
   --accent: #2e6da4;
+  --accent-soft: #e6f0f8;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Alternative themes -- picked via the ThemePicker next to the header
+   title (App.jsx/ThemePicker.jsx), applied as a `data-theme` attribute on
+   <html> (see index.html's inline script for why: it has to run before
+   first paint, or switching themes flashes the light one first on every
+   reload). Only these few vars need overriding -- everything else in this
+   file is built from them, by design, so a new theme is just a new block
+   like these, not a re-theme of every rule. */
+
+/* Plain neutral dark -- Light's own values with lightness inverted (dark
+   neutral grey bg, near-white text) and the same panel-lighter-than-bg
+   elevation relationship Light has, just kept grayscale rather than
+   warmed -- the deliberate contrast with Coffee below. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #17171a;
+  --panel: #222226;
+  --border: #38383c;
+  --text: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --accent: #5b9bd5;
+  --accent-soft: #1e2a35;
+}
+
+/* Dark, coffee-toned alternative theme. */
+:root[data-theme="coffee"] {
+  color-scheme: dark;
+  --bg: #1b120d;
+  --panel: #2a1d16;
+  --border: #4a3527;
+  --text: #f2e4d8;
+  --text-muted: #b89a80;
+  --accent: #d68c3f;
+  --accent-soft: #3a2a1c;
+}
+
+/* Light, buttery/pastry theme -- warm cream bg and crust-brown accent,
+   companion to Coffee (same bakery-case palette family, but light instead
+   of dark, the same way Dark is Light's palette-neutral dark counterpart). */
+:root[data-theme="croissant"] {
+  color-scheme: light;
+  --bg: #fbf3e3;
+  --panel: #fffdf7;
+  --border: #ecd9b8;
+  --text: #4a3220;
+  --text-muted: #9c7b52;
+  --accent: #c8862b;
+  --accent-soft: #f5e6c8;
+}
+
+/* Light, matcha-latte theme -- sage green instead of Croissant's cream, a
+   second light option with a distinctly different (non-brown) accent. */
+:root[data-theme="matcha"] {
+  color-scheme: light;
+  --bg: #eef2e3;
+  --panel: #f8faf3;
+  --border: #cfdab8;
+  --text: #2f3a22;
+  --text-muted: #6b7d52;
+  --accent: #5c8a3a;
+  --accent-soft: #dfead0;
 }
 
 * {
@@ -139,7 +202,100 @@ body.breakout-split-active .app-header-divider {
 
 .app-header nav a.active {
   color: var(--accent);
-  background: #e6f0f8;
+  background: var(--accent-soft);
+}
+
+.app-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.theme-picker {
+  position: relative;
+}
+
+.theme-picker-button {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.theme-picker-button:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.theme-swatch {
+  display: flex;
+  gap: 2px;
+}
+
+.theme-swatch span {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.theme-picker-caret {
+  font-size: 0.6rem;
+  line-height: 1;
+}
+
+.theme-picker-menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 0.35rem;
+  z-index: 30;
+  min-width: 170px;
+}
+
+.theme-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.theme-picker-option:hover {
+  background: var(--accent-soft);
+}
+
+.theme-picker-option-label {
+  flex: 1;
+}
+
+.theme-picker-option-check {
+  color: var(--accent);
+  font-weight: 700;
+  visibility: hidden;
+}
+
+.theme-picker-option.selected .theme-picker-option-check {
+  visibility: visible;
 }
 
 .panel {
@@ -195,7 +351,12 @@ button {
   padding: 0.45rem 0.6rem;
   border-radius: 6px;
   border: 1px solid var(--border);
-  background: white;
+  /* Was a hardcoded white -- same bug as .milestone-box above: text here
+     inherits var(--text), which goes light in dark themes, so a
+     background that never changed made every text field and dropdown
+     unreadable (light text on white) as soon as a dark theme was picked. */
+  background: var(--panel);
+  color: var(--text);
 }
 
 button {
@@ -876,7 +1037,13 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #f1f0ef;
+  /* Was a hardcoded light grey -- its label/value text color comes from
+     var(--text)/var(--text-muted), which flip to near-white in dark
+     themes, so a background that never changed made them unreadable
+     (near-white text on a background that stayed light). var(--bg) tracks
+     the theme and (in every theme so far) reads as a subtle inset against
+     the surrounding var(--panel) wrapper either way. */
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.25rem 0.6rem;

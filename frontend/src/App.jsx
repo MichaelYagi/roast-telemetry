@@ -1,4 +1,5 @@
 import { NavLink, Route, Routes } from "react-router-dom";
+import ThemePicker from "./components/ThemePicker.jsx";
 import HistoryDashboard from "./views/HistoryDashboard.jsx";
 import LiveRoastView from "./views/LiveRoastView.jsx";
 import MachineConfigView from "./views/MachineConfigView.jsx";
@@ -15,7 +16,10 @@ export default function App() {
             see the body.breakout-split-active rules in styles.css. Default
             (non-split) layout is unaffected either way. */}
         <div className="app-header-inner">
-          <h1>Roast Telemetry</h1>
+          <div className="app-title-group">
+            <h1>Roast Telemetry</h1>
+            <ThemePicker />
+          </div>
           <nav>
             <NavLink to="/" end>
               Live Roast
