@@ -22,7 +22,14 @@ def _to_device(session) -> Device:
     # at that shim layer; for live bridges (Artisan/Modbus) the actually
     # useful error -- "port busy", "connection refused", etc. -- lives one
     # level down in the engine's own status. Surface that when present.
-    last_error = status["last_error"] or engine_status.get("last_error")
+    # modbus_bridge specifically also tracks a separate control_last_error
+    # (Air/Drum drive writes, on their own connection when control_port is
+    # set) -- without this fallback, a rejected/errored drive write was
+    # captured internally but never reached the API or UI at all, so a
+    # wrong Air/Drum register looked identical to "wrote successfully."
+    last_error = (
+        status["last_error"] or engine_status.get("last_error") or engine_status.get("control_last_error")
+    )
     return Device(
         id=session.id,
         name=f"{session.mode.value}:{session.id[:8]}",
