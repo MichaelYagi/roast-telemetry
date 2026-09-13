@@ -4,6 +4,7 @@
 export const BREAKOUT_PANEL_ITEMS = [
   { key: "bt", label: "BT", color: "#1d4ed8" },
   { key: "et", label: "ET", color: "#be123c" },
+  { key: "dt", label: "DT", color: "#c2410c" },
   { key: "ror_bt", label: "ΔBT (RoR)", color: "#8b5cf6" },
   { key: "ror_et", label: "RoR (ET)", color: "#c4b5fd" },
   { key: "time", label: "Elapsed time", color: "#334155" },

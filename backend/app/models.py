@@ -210,7 +210,7 @@ class RoastPreset(BaseModel):
 # (frontend/src/components/BreakoutPanel.jsx), in addition to (not instead
 # of) their normal small display elsewhere on the page.
 BREAKOUT_PANEL_KEYS = {
-    "bt", "et", "ror_bt", "ror_et", "time",
+    "bt", "et", "dt", "ror_bt", "ror_et", "time",
     "dry_pct", "to_dry", "to_fcs",
     "heater", "fan", "drum", "playback_speed",
 }

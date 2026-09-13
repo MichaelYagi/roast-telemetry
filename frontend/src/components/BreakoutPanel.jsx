@@ -10,6 +10,7 @@ function computeValues(latest, milestones, elapsedLabel, roast) {
   return {
     bt: fmt(latest?.bt, 1, "°"),
     et: fmt(latest?.et, 1, "°"),
+    dt: fmt(latest?.dt, 1, "°"),
     ror_bt: fmt(latest?.ror_bt, 1),
     ror_et: fmt(latest?.ror_et, 1),
     time: elapsedLabel,

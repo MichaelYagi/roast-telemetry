@@ -1228,6 +1228,10 @@ button:disabled {
   background: #1d4ed8;
 }
 
+.readout-dt {
+  background: #c2410c;
+}
+
 .readout-ror {
   background: #78716c;
 }
