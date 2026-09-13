@@ -9,7 +9,7 @@ so BT/ET behave like a real roast no matter which one you're using.
 
 | Fake | Stands in for | Protocol | Needs a virtual serial port? |
 |---|---|---|---|
-| `modbus_fz94.py` | Coffee-Tech FZ94 EVO | Modbus RTU (hand-rolled framing) | Yes |
+| `modbus_fz94.py` | Coffee-Tech FZ-94 (plain, not EVO) | Modbus RTU (hand-rolled framing) | Yes — two, if using Air/Drum |
 | `weblcds_server.py` | A running Artisan (WebLCDs) | WebSocket/JSON | No — plain TCP |
 | `ms6514_device.py` | Mastech MS6514 meter | Raw 18-byte serial frames | Yes |
 
@@ -36,30 +36,42 @@ Install once:
 sudo apt install socat
 ```
 
-### Modbus (FZ94 EVO)
+### Modbus (FZ-94)
 
-Terminal 1 -- create the virtual pair and keep it running:
+BT/ET/DT and Burner share one serial connection; Air/Drum (VFD drives)
+need a *second*, separate one -- confirmed real on the actual hardware
+(different baud rate/framing), not an app quirk. Skip the second pair
+and `--drive-port` below if you only care about temperatures and Burner.
+
+Terminal 1 -- temperature/burner virtual pair, keep it running:
 
 ```
 socat -d -d pty,raw,echo=0,link=/tmp/ttyFAKE_ROASTER pty,raw,echo=0,link=/tmp/ttyFAKE_ROASTER_APP
 ```
 
-Terminal 2 -- start the fake slave on one end:
+Terminal 2 -- drive (Air/Drum) virtual pair, keep it running too:
 
 ```
-python -m hardware_fakes.modbus_fz94 --port /tmp/ttyFAKE_ROASTER
+socat -d -d pty,raw,echo=0,link=/tmp/ttyFAKE_DRIVES pty,raw,echo=0,link=/tmp/ttyFAKE_DRIVES_APP
 ```
 
-In the app, choose **Direct Modbus (FZ94 EVO, USB)**, serial port
-`/tmp/ttyFAKE_ROASTER_APP` (the *other* end of the pair). Once
+Terminal 3 -- start the fake slave(s):
+
+```
+python -m hardware_fakes.modbus_fz94 --port /tmp/ttyFAKE_ROASTER --drive-port /tmp/ttyFAKE_DRIVES
+```
+
+In the app, choose **Direct Modbus (FZ-94, USB)**, temperature/burner
+serial port `/tmp/ttyFAKE_ROASTER_APP`, drive serial port
+`/tmp/ttyFAKE_DRIVES_APP` (the *other* end of each pair). Once
 connected, the Heater/Fan/Drum sliders write real Modbus registers that
 this fake decodes and feeds back into the thermal model -- so turning
-the burner up should actually show BT/ET climbing faster.
+the burner up should actually show BT/ET/DT climbing faster.
 
-The thermal clock starts on the fake's *first* received request, not at
-process launch -- it's fine to leave it sitting idle for a while before
-connecting; Charge happens right when the app actually starts talking
-to it.
+The thermal clock starts on the fake's *first* received request on
+*either* bus, not at process launch -- it's fine to leave it sitting
+idle for a while before connecting; Charge happens right when the app
+actually starts talking to it.
 
 ### MS6514
 

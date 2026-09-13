@@ -23,13 +23,24 @@ one of five data sources:
 5. **Direct Modbus Bridge** (`/modbus_bridge`) — talks straight to a real
    roaster's PLC over Modbus RTU (USB/serial), bypassing Artisan entirely.
    Unlike the Artisan Live Bridge, this one *can* control the roaster
-   (burner/air/drum), since it's just standard Modbus register reads and
-   writes. Ships configured for Coffee-Tech Engineering's FZ94 EVO by
-   default (register addresses taken from Artisan's own machine preset —
-   see "Assumptions"), but every address is a constructor argument, not
-   hardcoded, so it can be repointed at a different Modbus roaster.
-   Mutually exclusive with Artisan (or anything else) also holding that
-   same serial port — pick one owner of the port at a time.
+   (Burner/Air/Drum), since it's just standard Modbus register reads and
+   writes. Ships configured for Coffee-Tech Engineering's plain **FZ-94**
+   by default — not the EVO, which connects over Modbus TCP/Ethernet
+   instead, a different connection method entirely. Every slave ID/
+   register/baud rate below is confirmed against real users' own Artisan
+   setup guides for this exact machine (see "Assumptions"), not guessed;
+   every one is also a constructor argument, not hardcoded, so it can be
+   repointed at a different Modbus roaster:
+   - BT/ET/DT (bean/environment/drum-space temperature) and Burner (a
+     drum-temp *setpoint* the roaster's own PID bangs the 3 heating
+     elements around, not a power %) all share one serial connection at
+     2400 baud, 8N1.
+   - Air/Drum are separate VFD drives on a **second** serial connection
+     (a real, documented baud-rate difference, not an app quirk) at
+     19200 baud, 8N2 — optional; leave it unconfigured to skip Air/Drum
+     control while keeping BT/ET/DT/Burner.
+   Mutually exclusive with Artisan (or anything else) also holding the
+   same serial port(s) — pick one owner of each port at a time.
 
 Both live bridges share the same independent event-auto-detection and
 RoR computation (`/roast_heuristics`), since neither WebLCDs nor a raw
@@ -168,27 +179,32 @@ them.
 # one-time
 sudo apt install socat
 
-# terminal 1 -- create the virtual pair, leave it running
+# terminal 1 -- temperature/burner virtual pair, leave it running
 socat -d -d pty,raw,echo=0,link=/tmp/ttyFAKE_ROASTER pty,raw,echo=0,link=/tmp/ttyFAKE_ROASTER_APP
 
-# terminal 2 -- start the fake FZ94 EVO
-cd roast-telemetry && source .venv/bin/activate
-python -m hardware_fakes.modbus_fz94 --port /tmp/ttyFAKE_ROASTER
+# terminal 2 -- drive (Air/Drum) virtual pair, leave it running too
+# (skip this and --drive-port below if you only care about BT/ET/DT/Burner)
+socat -d -d pty,raw,echo=0,link=/tmp/ttyFAKE_DRIVES pty,raw,echo=0,link=/tmp/ttyFAKE_DRIVES_APP
 
-# terminal 3 -- the app itself (see "Running it" above)
+# terminal 3 -- start the fake FZ-94
+cd roast-telemetry && source .venv/bin/activate
+python -m hardware_fakes.modbus_fz94 --port /tmp/ttyFAKE_ROASTER --drive-port /tmp/ttyFAKE_DRIVES
+
+# terminal 4 -- the app itself (see "Running it" above)
 PYTHONPATH=. uvicorn backend.app.main:app --port 8000
 ```
 
 In the app's **Live Roast → Configure Roast** form:
-- **Data source**: `Direct Modbus (FZ94 EVO, USB)`
-- **Serial port**: `/tmp/ttyFAKE_ROASTER_APP` (the *other* end of the pair)
-- Leave baud rate at the default (57600)
+- **Data source**: `Direct Modbus (FZ-94, USB)`
+- **Temperature/Burner serial port**: `/tmp/ttyFAKE_ROASTER_APP`
+- **Drive (Air/Drum) serial port**: `/tmp/ttyFAKE_DRIVES_APP` (leave blank if you skipped terminal 2)
+- Leave both baud rates at their defaults (2400 / 19200)
 - Click **ON**, then **START**
 
-BT/ET should populate immediately and climb like a real roast; the
+BT/ET/DT should populate immediately and climb like a real roast; the
 Heater/Fan/Drum sliders write real Modbus registers the fake decodes
 and feeds back into its thermal model, so raising Heater visibly speeds
-up ET/BT.
+up ET/BT/DT.
 
 The fake's thermal clock starts on the *first* request it receives, not
 when the process launches -- so it's fine to leave it running for a
@@ -364,28 +380,33 @@ All routes live under `/api` (e.g. `/api/roasts`); omitted below for brevity.
   thresholds; Drop/Cool End stay manual (this platform's event buttons)
   since they're roast-level judgment calls, not thresholds — same as a
   human roaster.
-- **Direct Modbus Bridge register map**: also verified, not guessed —
-  pulled directly from Artisan's own machine preset for this exact model
-  (`src/includes/Machines/Coffee-Tech/FZ94_EVO.aset` in Artisan's repo).
-  BT is holding register 100, DT (this machine's ET-equivalent) is
-  register 80, both function code 3 (read holding registers). Control
-  writes use function code 6 (write single register): register 20 (range
-  30–70), register 16 (range 30–70), register 35 (range 30–100). The
-  channel *names* — Air=20, Drum=16, Burner=35 — are inferred, not
-  confirmed against FZ94 EVO's manual: they follow Artisan's standard
-  slider ordering convention (Air, Drum, Damper, Burner — the same order
-  seen in a real Artisan `.alog`'s `etypes` field, checked independently
-  elsewhere in this project) combined with which slider slot the preset
-  disables (slot 3 = Damper, absent here, consistent with a
-  burner/air/drum-only machine). Confirm which slider moves which
-  physical actuator on the real hardware before roasting with it —
-  swap the register numbers in `modbus_bridge/engine.py`'s constructor
-  defaults if it turns out to be wrong. Tested against a mocked
-  `pymodbus` client (register math, control-command clamping, and
-  failure handling all verified this way), not real FZ94 EVO hardware —
-  none was available in this environment. The register addresses
-  themselves are real; the wire-level RTU behavior against your specific
-  unit is unverified until you try it.
+- **Direct Modbus Bridge register map**: confirmed against real users' own
+  working Artisan setup guides for this exact machine (the plain FZ-94,
+  USB/RTU — not the EVO, which is Modbus TCP/Ethernet, a different
+  connection method entirely):
+  [BT/ET/DT](https://artisan-roasterscope.blogspot.com/2015/01/connecting-artisan-to-coffee-tech-fz-94.html),
+  [Air/Drum drives](https://artisan-roasterscope.blogspot.com/2016/08/fz-94-4-taking-control.html),
+  [Burner](https://artisan-roasterscope.blogspot.com/2016/08/fz-94-2-pushing-drum-heat-limit.html).
+  BT/ET/DT are each their own Modbus slave device (11/13/12), all at
+  register 0, function code 3, value = temperature×10; Burner shares DT's
+  slave (12), register 5, same ×10 convention, but it's a drum-temperature
+  *setpoint* the roaster's own bang-bang PID uses to switch its 3 heating
+  elements — there's no "burner power %" on this hardware, so this app
+  maps its 0–100 `heater_pct` UI onto a configurable SV range (default
+  100–250°C) as its own approximation, not something documented anywhere.
+  Air (slave 1) and Drum (slave 2) are VFD drives needing two writes each
+  (control register 8192 for run/stop, then frequency register 8193,
+  value = percent×100) — and run at a genuinely different baud rate
+  (19200/8N2) than the temperature bus (2400/8N1), confirmed from the
+  source, not an app quirk, which is why `modbus_control_port` is a
+  wholly separate serial connection rather than another register on the
+  same one. Tested against a mocked `pymodbus` client plus an actual
+  dual-serial-pair run against `hardware_fakes/modbus_fz94.py` (register
+  math, the two-connection split, control-command clamping, and failure
+  handling all verified this way), not real FZ-94 hardware — none was
+  available in this environment. The slave IDs/registers/baud rates
+  themselves are real, sourced from the links above; the wire-level RTU
+  behavior against your specific unit is unverified until you try it.
 - **Simulator physics**: `simulator/engine.py` is a first-order thermal
   model (ET chases a heater-driven setpoint; BT lags ET with an explicit
   charge-dip/turning-point phase) tuned to produce a ~10-11 minute roast

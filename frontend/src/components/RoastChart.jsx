@@ -39,6 +39,12 @@ const CONTINUOUS_FIELD_BY_CHANNEL = {
 const SERIES_DEFS = [
   { key: "BT", label: "BT", color: "#1d4ed8", axis: "yTemp", source: "profile", field: "bt", defaultOn: true },
   { key: "ET", label: "ET", color: "#be123c", axis: "yTemp", source: "profile", field: "et", defaultOn: true },
+  // Drum space temperature -- a genuine third probe on machines that have
+  // one (e.g. the FZ-94's slave-12 probe; see modbus_bridge/engine.py),
+  // not a control value. profile[i].dt is null for every mode that
+  // doesn't have one, same as any other absent channel -- off by default
+  // since most modes never populate it.
+  { key: "DT", label: "DT", color: "#c2410c", axis: "yTemp", source: "profile", field: "dt", defaultOn: false },
   { key: "ROR_BT", label: "RoR (BT)", color: "#8b5cf6", axis: "yRor", source: "profile", field: "ror_bt", defaultOn: true },
   { key: "ROR_ET", label: "RoR (ET)", color: "#c4b5fd", axis: "yRor", source: "profile", field: "ror_et", defaultOn: false },
   { key: "Burner", label: "Burner", color: "#f59e0b", axis: "yControl", source: "channel", defaultOn: false },

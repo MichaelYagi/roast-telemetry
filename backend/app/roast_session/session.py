@@ -103,6 +103,8 @@ class RoastSession:
                 engine = ModbusEngine(
                     request.modbus_port,
                     baudrate=request.modbus_baudrate,
+                    control_port=request.modbus_control_port,
+                    control_baudrate=request.modbus_control_baudrate,
                     dry_end_c=request.dry_end_c,
                     fc_start_c=request.fc_start_c,
                 )

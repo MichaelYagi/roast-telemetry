@@ -72,7 +72,9 @@ export default function LiveRoastView() {
     artisan_host: "",
     artisan_port: 8080,
     modbus_port: "",
-    modbus_baudrate: 57600,
+    modbus_baudrate: 2400,
+    modbus_control_port: "",
+    modbus_control_baudrate: 19200,
     ms6514_port: "",
     dry_end_c: 160,
     fc_start_c: 196,
@@ -308,7 +310,9 @@ export default function LiveRoastView() {
     }
     if (form.mode === "modbus_live") {
       payload.modbus_port = form.modbus_port;
-      payload.modbus_baudrate = Number(form.modbus_baudrate) || 57600;
+      payload.modbus_baudrate = Number(form.modbus_baudrate) || 2400;
+      payload.modbus_control_port = form.modbus_control_port || null;
+      payload.modbus_control_baudrate = Number(form.modbus_control_baudrate) || 19200;
     }
     if (form.mode === "ms6514_live") {
       payload.ms6514_port = form.ms6514_port;
@@ -399,6 +403,8 @@ export default function LiveRoastView() {
       artisan_port: c.artisan_port ?? f.artisan_port,
       modbus_port: c.modbus_port || "",
       modbus_baudrate: c.modbus_baudrate ?? f.modbus_baudrate,
+      modbus_control_port: c.modbus_control_port || "",
+      modbus_control_baudrate: c.modbus_control_baudrate ?? f.modbus_control_baudrate,
       ms6514_port: c.ms6514_port || "",
       dry_end_c: c.dry_end_c ?? "",
       fc_start_c: c.fc_start_c ?? "",
@@ -553,7 +559,7 @@ export default function LiveRoastView() {
                 <option value="simulator">Artisan Simulator</option>
                 <option value="alog_playback">.alog Playback</option>
                 <option value="artisan_live">Artisan Live Bridge</option>
-                <option value="modbus_live">Direct Modbus (FZ94 EVO, USB)</option>
+                <option value="modbus_live">Direct Modbus (FZ-94, USB)</option>
                 <option value="ms6514_live">Direct USB (Mastech MS6514)</option>
               </select>
             </label>
@@ -630,7 +636,7 @@ export default function LiveRoastView() {
           {form.mode === "modbus_live" && (
             <div className="form-row">
               <label>
-                Serial port
+                Temperature/Burner serial port
                 <input
                   placeholder="COM3"
                   value={form.modbus_port}
@@ -645,11 +651,30 @@ export default function LiveRoastView() {
                   onChange={(e) => setForm({ ...form, modbus_baudrate: e.target.value })}
                 />
               </label>
+              <label>
+                Drive (Air/Drum) serial port — optional
+                <input
+                  placeholder="COM4 (leave blank to skip Air/Drum control)"
+                  value={form.modbus_control_port}
+                  onChange={(e) => setForm({ ...form, modbus_control_port: e.target.value })}
+                />
+              </label>
+              <label>
+                Drive baud rate
+                <input
+                  type="number"
+                  value={form.modbus_control_baudrate}
+                  onChange={(e) => setForm({ ...form, modbus_control_baudrate: e.target.value })}
+                />
+              </label>
               <p className="hint">
-                Direct Modbus RTU to the FZ94 EVO over USB — bypasses Artisan entirely. Register addresses are
-                Coffee-Tech's own, from Artisan's FZ94 EVO preset. This can control the roaster (Burner/Air/Drum
-                below) — mutually exclusive with Artisan also connected to this same port. Not tested against
-                real FZ94 EVO hardware; confirm which slider moves which physical control before roasting with it.
+                Direct Modbus RTU to the FZ-94 over USB (not the EVO, which is network/Ethernet) — bypasses
+                Artisan entirely. BT/ET/DT and Burner (a drum-temp setpoint, not a power %) are on the
+                temperature port above; Air/Drum are separate VFD drives that run at a different baud rate on
+                real hardware, so they need their own serial port — leave that field blank to skip Air/Drum
+                control (Burner still works). Mutually exclusive with Artisan also connected to the same
+                port(s). Not tested against real FZ-94 hardware; register/slave numbers are from real users'
+                own Artisan setup guides for this machine, not verified against yours.
               </p>
             </div>
           )}
@@ -853,7 +878,7 @@ export default function LiveRoastView() {
             )}
             {activeMode === "modbus_live" && (
               <p className="hint" style={{ gridColumn: "1 / -1" }}>
-                Controls above write directly to the FZ94 EVO over {form.modbus_port || "the serial port"}:
+                Controls above write directly to the FZ-94 over {form.modbus_port || "the serial port"}:
                 Heater → Burner (register 35, 30–100), Fan → Air (register 20, 30–70), Drum Speed → Drum
                 (register 16, 30–70) — out-of-range values are clamped to the machine's valid range. Charge and
                 Turning Point auto-detect from BT; Dry End/FC Start trigger at your set thresholds. Mark Drop

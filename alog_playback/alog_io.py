@@ -273,21 +273,27 @@ def roast_to_artisan_native_dict(
         _fill_and_floatify([p.get("drum_speed_pct") for p in export_profile]),
     ]
     # The donor template's own extraname2 (second extra-device bank, e.g.
-    # a Kaleido's SV/AT/AH sensors) is left as-is rather than emptied --
-    # roughly a dozen *other* per-device fields (extradevicecolor2,
-    # extraCurveVisibility2, extraNoneTempHint2, ...) are all still sized
-    # to match its original device count, and clearing extraname2 without
-    # also clearing every one of those was the actual cause of a later
-    # "setProfile() list index out of range" crash: Artisan indexes those
-    # metadata arrays by device position regardless of what's actually in
-    # extraname2/extratemp2. This app has no real data for that bank
-    # (SV/AT/AH aren't things this app measures), so extratemp2 is filled
-    # with flat placeholder curves -- same length as everything else
-    # (this roast's own timex), same channel count as the template's own
-    # extraname2, everything else about it stays exactly as the template
-    # had it.
-    extraname2 = data.get("extraname2") or []
-    extratemp2 = [[0.0] * len(timex) for _ in extraname2]
+    # a Kaleido's SV/AT/AH sensors) is left the same *length* rather than
+    # emptied -- roughly a dozen *other* per-device fields
+    # (extradevicecolor2, extraCurveVisibility2, extraNoneTempHint2, ...)
+    # are all still sized to match its original device count, and
+    # clearing extraname2 without also clearing every one of those was
+    # the actual cause of a later "setProfile() list index out of range"
+    # crash: Artisan indexes those metadata arrays by device position
+    # regardless of what's actually in extraname2/extratemp2. Slot 0 is
+    # repurposed for DT (drum space temp -- a real third probe on the
+    # FZ-94, its own Modbus slave ID, not the same thing as BT/ET;
+    # see modbus_bridge/engine.py) when available; the remaining slots
+    # (this app has no data for real Kaleido AT/AH sensors) stay flat
+    # placeholder curves, same as before.
+    extraname2 = list(data.get("extraname2") or [])
+    extratemp2 = []
+    for i in range(len(extraname2)):
+        if i == 0:
+            extraname2[0] = "DT"
+            extratemp2.append(_fill_and_floatify([p.get("dt") for p in export_profile]))
+        else:
+            extratemp2.append([0.0] * len(timex))
     extratimex = [timex] * max(len(extraname1), len(extraname2), 1)
 
     roastdate_dt = None
@@ -529,6 +535,12 @@ def _compute_ror(timex: list, temps: list, window_s: float = 24.0) -> list:
 # at every sample.
 _CHANNEL_FIELD = {"Burner": "heater_pct", "Air": "fan_pct", "Drum": "drum_speed_pct"}
 _EXTRANAME_ETYPE_RE = re.compile(r"^\{(\d+)\}$")
+# Not an etype-indexed control channel like the above -- a genuine third
+# temperature probe (Coffee-Tech FZ-94's drum space temp, its own
+# Modbus slave ID). Written/read by plain label, same as how a real
+# Kaleido file's own SV/AT/AH sensors are plain-labeled rather than
+# `{N}`-indexed -- this app just happens to recognize "DT" specifically.
+_DT_EXTRANAME_LABEL = "DT"
 
 
 def _step_hold_align(src_times: list, src_values: list, target_times: list) -> list:
@@ -558,13 +570,18 @@ def _extract_continuous_channels(data: dict, timex: list) -> dict[str, list]:
     result: dict[str, list] = {}
     for names, temps in pairs:
         for i, name in enumerate(names):
-            m = _EXTRANAME_ETYPE_RE.match(str(name)) if name else None
-            if not m or i >= len(temps):
+            if i >= len(temps):
                 continue
-            etype_idx = int(m.group(1))
-            if not (0 <= etype_idx < len(etypes)):
-                continue
-            field = _CHANNEL_FIELD.get(etypes[etype_idx])
+            if name == _DT_EXTRANAME_LABEL:
+                field = "dt"
+            else:
+                m = _EXTRANAME_ETYPE_RE.match(str(name)) if name else None
+                if not m:
+                    continue
+                etype_idx = int(m.group(1))
+                if not (0 <= etype_idx < len(etypes)):
+                    continue
+                field = _CHANNEL_FIELD.get(etypes[etype_idx])
             if not field or field in result:
                 continue
             values = temps[i]
@@ -602,6 +619,7 @@ def alog_dict_to_points(data: dict) -> dict:
             "heater_pct": continuous["heater_pct"][i] if "heater_pct" in continuous else c.get("heater_pct"),
             "fan_pct": continuous["fan_pct"][i] if "fan_pct" in continuous else c.get("fan_pct"),
             "drum_speed_pct": continuous["drum_speed_pct"][i] if "drum_speed_pct" in continuous else c.get("drum_speed_pct"),
+            "dt": continuous["dt"][i] if "dt" in continuous else c.get("dt"),
         })
 
     weight_green_g, weight_roasted_g = _extract_weight(data)

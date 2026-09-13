@@ -97,6 +97,11 @@ class RoastProfilePoint(BaseModel):
     time_s: float
     bt: Optional[float] = None
     et: Optional[float] = None
+    # Drum space temperature -- a genuine third probe on some machines
+    # (e.g. the Coffee-Tech FZ-94, its own Modbus slave ID; see
+    # modbus_bridge/engine.py), not a control value. None for every mode
+    # that doesn't have one.
+    dt: Optional[float] = None
     ror_bt: Optional[float] = None
     ror_et: Optional[float] = None
     heater_pct: Optional[float] = None
@@ -140,8 +145,10 @@ class RoastCreateRequest(BaseModel):
     playback_speed: float = 1.0
     artisan_host: Optional[str] = Field(default=None, description="Required when mode=artisan_live: host/IP running Artisan with WebLCDs enabled")
     artisan_port: int = Field(default=8080, description="Artisan's WebLCDs port (Config > Curves > UI tab); artisan_live mode only")
-    modbus_port: Optional[str] = Field(default=None, description="Required when mode=modbus_live: serial port the roaster is on, e.g. 'COM3'")
-    modbus_baudrate: int = Field(default=57600, description="modbus_live mode only; default matches Coffee-Tech FZ94 EVO")
+    modbus_port: Optional[str] = Field(default=None, description="Required when mode=modbus_live: serial port the roaster's temperature probes are on, e.g. 'COM3'")
+    modbus_baudrate: int = Field(default=2400, description="modbus_live mode only; default matches a real Coffee-Tech FZ-94 Artisan setup guide")
+    modbus_control_port: Optional[str] = Field(default=None, description="modbus_live mode only, optional: separate serial port for Air/Drum drive control, e.g. 'COM4'. These run at a different baud rate than the temperature probes on a real FZ-94, so they need their own connection; leave blank to skip drive control (Burner still works over modbus_port alone).")
+    modbus_control_baudrate: int = Field(default=19200, description="modbus_live mode only; baud rate for modbus_control_port, if set")
     ms6514_port: Optional[str] = Field(default=None, description="Required when mode=ms6514_live: serial port the Mastech MS6514 is on, e.g. 'COM5'")
     dry_end_c: Optional[float] = Field(default=160.0, description="BT threshold for auto-detecting Dry End; live-bridge modes only. Null disables it.")
     fc_start_c: Optional[float] = Field(default=196.0, description="BT threshold for auto-detecting FC Start; live-bridge modes only. Null disables it.")

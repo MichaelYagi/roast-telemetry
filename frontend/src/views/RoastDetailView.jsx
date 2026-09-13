@@ -10,7 +10,7 @@ const MODE_LABELS = {
   simulator: "Artisan Simulator",
   alog_playback: ".alog Playback",
   artisan_live: "Artisan Live Bridge",
-  modbus_live: "Direct Modbus (FZ94 EVO, USB)",
+  modbus_live: "Direct Modbus (FZ-94, USB)",
   ms6514_live: "Direct USB (Mastech MS6514)",
 };
 
