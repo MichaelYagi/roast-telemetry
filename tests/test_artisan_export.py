@@ -93,6 +93,44 @@ def test_weight_loss_computed_when_both_weights_present():
     assert d["computed"]["weight_loss"] == round((350.0 - 301.0) / 350.0 * 100, 1)
 
 
+def test_no_key_beyond_the_template_and_no_native_notes_field():
+    # Regression: the template used to be built via load_alog(), which
+    # defensively adds `control`/`ror_bt`/`ror_et` for this app's own
+    # reader -- fields a real Artisan file doesn't actually have. Real
+    # Artisan also has no native `notes` list (only roastingnotes, a
+    # single free-text field) -- writing one anyway was exactly what got
+    # a real export rejected as "Invalid artisan format".
+    from alog_playback.alog_io import _load_artisan_template
+
+    template_keys = set(_load_artisan_template().keys())
+    d = roast_to_artisan_native_dict(title="t", profile=_profile(3), events=[], notes=[{"id": "n1", "time_s": 1.0, "text": "hi"}])
+    assert set(d.keys()) == template_keys
+    assert "notes" not in d
+    assert "control" not in d
+    assert "ror_bt" not in d
+    assert "ror_et" not in d
+
+
+def test_missing_control_values_at_start_dont_leave_gaps():
+    # A real roast's first tick or two often has no Heater/Fan/Drum set
+    # yet (before the operator touches a slider) -- a raw None there
+    # broke Artisan's own "extra device" channels outright, unlike its
+    # main BT/ET channels which do tolerate gaps.
+    profile = [
+        {"time_s": 0.0, "bt": 90.0, "et": 150.0, "heater_pct": None, "fan_pct": None, "drum_speed_pct": None},
+        {"time_s": 1.0, "bt": 91.0, "et": 151.0, "heater_pct": None, "fan_pct": None, "drum_speed_pct": None},
+        {"time_s": 2.0, "bt": 92.0, "et": 152.0, "heater_pct": 85.0, "fan_pct": 30, "drum_speed_pct": 50.0},
+    ]
+    d = roast_to_artisan_native_dict(title="t", profile=profile, events=[], notes=[])
+
+    for channel in d["extratemp1"]:
+        assert None not in channel
+        assert all(isinstance(v, float) for v in channel)
+    # Backward-filled from the first known value, not zeroed out.
+    assert d["extratemp1"][0][:3] == [85.0, 85.0, 85.0]  # Burner
+    assert d["extratemp1"][1][:3] == [30.0, 30.0, 30.0]  # Air (was an int upstream)
+
+
 def test_custom_events_become_parallel_arrays_not_dicts():
     profile = _profile(200)
     events = [

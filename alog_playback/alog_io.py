@@ -103,6 +103,28 @@ def _nearest_index(sorted_times: list, t: float) -> int:
     return idx - 1 if (t - before) <= (after - t) else idx
 
 
+def _fill_and_floatify(values: list) -> list:
+    """Real Artisan's "extra device" temperature arrays (extratemp1/2)
+    aren't built to tolerate gaps the way its main BT/ET channels are --
+    a `None` anywhere in one is exactly what made a real export get
+    rejected outright as "Invalid artisan format" instead of just
+    rendering with a hole in the curve. Heater/Fan/Drum legitimately
+    start as None for the first tick or two of a real roast, before the
+    operator has touched a slider -- forward-fill (and, for that leading
+    gap specifically, backward-fill from the first real value) instead of
+    ever emitting one. Also normalizes int/float mixing from upstream
+    (some engines report a control value as a bare int) -- Artisan's own
+    files are consistently float."""
+    filled: list[Optional[float]] = []
+    last: Optional[float] = None
+    for v in values:
+        if v is not None:
+            last = float(v)
+        filled.append(last)
+    first_known = next((v for v in filled if v is not None), 0.0)
+    return [v if v is not None else first_known for v in filled]
+
+
 def roast_to_artisan_native_dict(
     *,
     title: str,
@@ -246,11 +268,27 @@ def roast_to_artisan_native_dict(
     # shared extratimex entry per channel is enough (no resampling needed).
     extraname1 = ["{3}", "{0}", "{1}"]  # Burner, Air, Drum
     extratemp1 = [
-        [p.get("heater_pct") for p in export_profile],
-        [p.get("fan_pct") for p in export_profile],
-        [p.get("drum_speed_pct") for p in export_profile],
+        _fill_and_floatify([p.get("heater_pct") for p in export_profile]),
+        _fill_and_floatify([p.get("fan_pct") for p in export_profile]),
+        _fill_and_floatify([p.get("drum_speed_pct") for p in export_profile]),
     ]
-    extratimex = [timex, timex, timex]
+    # The donor template's own extraname2 (second extra-device bank, e.g.
+    # a Kaleido's SV/AT/AH sensors) is left as-is rather than emptied --
+    # roughly a dozen *other* per-device fields (extradevicecolor2,
+    # extraCurveVisibility2, extraNoneTempHint2, ...) are all still sized
+    # to match its original device count, and clearing extraname2 without
+    # also clearing every one of those was the actual cause of a later
+    # "setProfile() list index out of range" crash: Artisan indexes those
+    # metadata arrays by device position regardless of what's actually in
+    # extraname2/extratemp2. This app has no real data for that bank
+    # (SV/AT/AH aren't things this app measures), so extratemp2 is filled
+    # with flat placeholder curves -- same length as everything else
+    # (this roast's own timex), same channel count as the template's own
+    # extraname2, everything else about it stays exactly as the template
+    # had it.
+    extraname2 = data.get("extraname2") or []
+    extratemp2 = [[0.0] * len(timex) for _ in extraname2]
+    extratimex = [timex] * max(len(extraname1), len(extraname2), 1)
 
     roastdate_dt = None
     if roastdate:
@@ -259,14 +297,14 @@ def roast_to_artisan_native_dict(
         except ValueError:
             pass
 
-    # Written two ways: `roastingnotes` is real Artisan's own single
-    # free-text field (so a human opening this in Artisan sees them at
-    # all); `notes` is our own list-of-dicts shape so this app's own
-    # reader (alog_dict_to_points) can still recover each note's original
-    # time_s/author individually, not just a flattened text blob. Real
-    # Artisan also has a `notes` key, but its per-item shape when
-    # non-empty isn't something this codebase has seen in a real export
-    # to confirm -- this list is only ever read back by this app itself.
+    # Real Artisan's own file has no native per-timestamp `notes` list at
+    # all -- only this single free-text `roastingnotes` field (confirmed
+    # against the raw donor export: no `'notes':` key anywhere in it).
+    # alog_dict_to_points below parses this same "[Ns] text" format back
+    # into individual note entries, so this app's own reader still
+    # recovers them -- writing an extra `notes` key here (a shape real
+    # Artisan doesn't have) was tried first and is exactly what made
+    # Artisan reject the file as invalid.
     notes_text = "\n".join(f"[{n.get('time_s', 0):.0f}s] {n.get('text', '')}" for n in notes)
 
     data.update({
@@ -275,7 +313,6 @@ def roast_to_artisan_native_dict(
         "title": title,
         "beans": beans or "",
         "roastingnotes": notes_text,
-        "notes": [dict(n) for n in notes],
         "weight": [weight_green_g or 0.0, weight_roasted_g or 0.0, "g"],
         "roastertype": roastertype or "Roast Telemetry (simulated)",
         "roastdate": roastdate_dt.strftime("%a %b %d %Y") if roastdate_dt else data.get("roastdate", ""),
@@ -293,8 +330,8 @@ def roast_to_artisan_native_dict(
         "specialeventsStrings": specialeventsStrings,
         "extraname1": extraname1,
         "extratemp1": extratemp1,
-        "extraname2": [],
-        "extratemp2": [],
+        "extraname2": extraname2,
+        "extratemp2": extratemp2,
         "extratimex": extratimex,
     })
     return data
@@ -562,5 +599,27 @@ def alog_dict_to_points(data: dict) -> dict:
         "roastdate": _extract_roastdate(data),
         "profile": profile,
         "events": _extract_events(data, timex, temp2),
-        "notes": data.get("notes") or [],
+        "notes": _extract_notes(data),
     }
+
+
+_ROASTINGNOTES_LINE_RE = re.compile(r"^\[(\d+)s\] (.*)$")
+
+
+def _extract_notes(data: dict) -> list[dict]:
+    """A real `notes` list (this app's own writer shape, or a future
+    real-Artisan one if it ever turns out to have a documented per-item
+    shape) is used as-is. Real Artisan has no such field today -- our own
+    writer instead flattens notes into `roastingnotes` (real Artisan's
+    single free-text field, so a human opening the file in Artisan still
+    sees them), one per line as "[<time_s>s] <text>" -- parsed back out
+    here so this app's own reader still recovers individual notes."""
+    raw = data.get("notes")
+    if raw:
+        return list(raw)
+    notes = []
+    for i, line in enumerate(str(data.get("roastingnotes") or "").splitlines()):
+        m = _ROASTINGNOTES_LINE_RE.match(line)
+        if m:
+            notes.append({"id": f"note-{i}", "time_s": float(m.group(1)), "text": m.group(2), "author": None})
+    return notes
