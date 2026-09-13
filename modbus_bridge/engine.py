@@ -48,7 +48,13 @@ reading (function 3), confirmed identical in the .aset's `[Modbus]`
   spanning Coffee-Tech's own factory-recommended 190C starting point) to
   keep the existing Controls UI slider working unmodified -- that mapping
   itself isn't documented anywhere, it's this app's own approximation to
-  fit a percentage-based UI onto a setpoint-based control.
+  fit a percentage-based UI onto a setpoint-based control. Since it's a
+  holding register, `tick()` also reads it back (same address as the
+  write) and reports the inverse mapping as `heater_pct` -- the PLC's
+  actual current setpoint, not just an echo of this app's own last write.
+  Matters on connecting to a device that's already running (an operator's
+  own manual setting, or a previous session) -- without this it would
+  read blank/0 until this app happened to write it itself.
 - Raw register value is temperature x10 as an integer (e.g. `1807` ->
   180.7C) -- hence bt_divisor/et_divisor/dt_divisor/burner_divisor below.
   Confirmed in source, not just inferred: `modbusport.py`'s `setTarget()`
@@ -309,7 +315,25 @@ class ModbusEngine:
 
         sample = self._detector.observe(time_s, bt, et)
         sample["dt"] = dt
-        sample["heater_pct"] = self._last_values.get("burner")  # no PV register for this one -- SV echo only
+
+        # Burner SV is a holding register -- readable from the same address
+        # it's written to (register 5), so this reports the PLC's actual
+        # current setpoint, not just an echo of the last command this app
+        # itself sent. Matters on connecting to a device an operator (or a
+        # previous session) already has running: without this, heater_pct
+        # would read blank/0 until this app happened to write it, which is
+        # both misleading and, if the UI ever auto-sent a "starting value"
+        # on top of that, actively risked clobbering real state instead of
+        # reflecting it. See burner_sv_range_c for the inverse of the same
+        # mapping _write_burner_sv uses.
+        heater_fb = None
+        if self.burner_register is not None:
+            sv_raw = self._read_register(self.burner_register, self.burner_slave_id)
+            if sv_raw is not None:
+                sv_c = sv_raw / self.burner_divisor
+                sv_lo, sv_hi = self.burner_sv_range_c
+                heater_fb = max(0.0, min(100.0, (sv_c - sv_lo) / (sv_hi - sv_lo) * 100.0))
+        sample["heater_pct"] = heater_fb if heater_fb is not None else self._last_values.get("burner")
 
         # Prefer a genuine feedback read over echoing the last command --
         # confirms the drive actually took the write, not just that pymodbus

@@ -71,6 +71,36 @@ def test_tick_reads_bt_et_dt_from_their_own_slaves_with_divisor():
     assert (0, 12) in primary.reads
 
 
+def test_tick_reads_burner_sv_back_as_heater_pct_not_just_last_command():
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls)
+    primary = instances["PRIMARY"]
+
+    # Simulates a device an operator already has running -- this app never
+    # wrote anything, but the PLC's own holding register already holds a
+    # real setpoint. 227.5C -> raw 2275 -> 85% across the default 100-250C
+    # range, same math as the write-side test below, just the read side.
+    primary.register_values[(12, 5)] = 2275
+
+    sample = engine.tick(1.0)
+
+    assert sample["heater_pct"] == pytest.approx(85.0)
+    assert (5, 12) in primary.reads
+
+
+def test_tick_reports_no_heater_pct_when_burner_register_disabled():
+    # Unlike Air/Drum (separate control vs. feedback registers), Burner
+    # reads and writes the same holding register -- disabling it disables
+    # both ends, not just the readback, so there's no write left to echo.
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", burner_register=None, client_cls=client_cls)
+
+    engine.apply_command({"heater_pct": 42.0})  # no-op: _write_burner_sv bails out too
+    sample = engine.tick(1.0)
+
+    assert sample["heater_pct"] is None
+
+
 def test_apply_command_heater_pct_writes_sv_setpoint_to_burner_slave():
     client_cls, instances = _make_fake_client_cls()
     engine = ModbusEngine("PRIMARY", client_cls=client_cls)

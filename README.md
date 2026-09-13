@@ -435,7 +435,10 @@ All routes live under `/api` (e.g. `/api/roasts`); omitted below for brevity.
   This app maps its 0–100 `heater_pct` UI onto a configurable SV range
   (default 100–250°C, comfortably spanning Coffee-Tech's own
   factory-recommended 190°C starting point) as its own approximation, not
-  something documented anywhere. Air (slave 1) and Drum (slave 2) are
+  something documented anywhere. Since it's a holding register, it's also
+  *read* back (same address as the write) and reported as the PLC's actual
+  current setpoint — not just an echo of this app's own last command.
+  Air (slave 1) and Drum (slave 2) are
   Delta VFD-L drives needing two writes each (control register 8192 for
   run/stop, then frequency register 8193, value = percent×100), plus a
   separate read-only feedback register (8451, same ×100 convention) for
@@ -451,7 +454,14 @@ All routes live under `/api` (e.g. `/api/roasts`); omitted below for brevity.
   not real FZ-94 hardware — none was available in this environment. The
   slave IDs/registers/baud rate themselves are from Artisan's own source;
   the wire-level RTU behavior against your specific unit is unverified
-  until you try it.
+  until you try it. Because Heater/Fan/Drum are all genuinely read back
+  (not echoed), connecting to a `modbus_live` roast never writes a
+  "starting value" on your behalf — the Controls panel's sliders just show
+  whatever the roaster is actually doing (an operator's own manual
+  setting, or state left over from a previous session included), and
+  nothing changes on the machine until you move a slider yourself. The
+  "% at start" fields on the New Roast form only apply to `simulator`,
+  which has no real device state to read.
 - **Simulator physics**: `simulator/engine.py` is a first-order thermal
   model (ET chases a heater-driven setpoint; BT lags ET with an explicit
   charge-dip/turning-point phase) tuned to produce a ~10-11 minute roast

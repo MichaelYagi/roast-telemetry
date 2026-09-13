@@ -9,8 +9,11 @@ module's docstring for the full citations):
     - BT:      slave 11, register 0    (function code 3, read),  x10 int
     - ET:      slave 13, register 0    (function code 3, read),  x10 int
     - DT:      slave 12, register 0    (function code 3, read),  x10 int
-    - Burner:  slave 12, register 5    (function code 6, write), x10 int,
-               a *setpoint temperature* (bang-bang PID), not a power %
+    - Burner:  slave 12, register 5    (function code 3 read *and* code 6
+               write), x10 int, a *setpoint temperature* (bang-bang PID),
+               not a power % -- readable from the same register it's
+               written to, so this also answers "what's it actually set
+               to right now" for a device connected to mid-roast
     - Air:     slave 1,  registers 8192 (run/stop, write) + 8193 (freq,
                write, x100) + 8451 (actual speed, read, x100)
     - Drum:    slave 2,  same three registers, its own slave
@@ -95,6 +98,15 @@ def _sv_to_heater_pct(sv_c: float) -> float:
         return 0.0
     pct = (sv_c - lo) / (hi - lo) * 100.0
     return max(0.0, min(100.0, pct))
+
+
+def _heater_pct_to_sv(pct: float) -> float:
+    """Forward direction of the same mapping -- lets a Burner SV *read*
+    report back the thermal model's current heater_pct as the setpoint a
+    real PLC would hold in that same holding register, mirroring
+    ModbusEngine.tick()'s own new SV readback."""
+    lo, hi = BURNER_SV_RANGE_C
+    return lo + (max(0.0, min(100.0, pct)) / 100.0) * (hi - lo)
 
 
 def _crc16(data: bytes) -> bytes:
@@ -222,6 +234,13 @@ class FZ94Simulator:
 
         if function == READ_HOLDING_REGISTERS:
             count = int.from_bytes(frame[4:6], "big")
+            # Checked before temp_slaves: burner_slave_id defaults to the
+            # same slave as DT (12, same physical PID controller), so a
+            # read for *this* register has to be distinguished by address,
+            # not slave ID alone, before falling into the DT-shaped read.
+            if slave_id == self.burner_slave_id and address == BURNER_REGISTER:
+                self._handle_burner_read(bus, address, count)
+                return
             temp_key = self.temp_slaves.get(slave_id)
             if temp_key is not None:
                 self._handle_temp_read(bus, slave_id, temp_key, address, count)
@@ -278,6 +297,21 @@ class FZ94Simulator:
             body += v.to_bytes(2, "big")
         bus.ser.write(body + _crc16(body))
         self._log(f"[{bus.name}] read slave={slave_id} ({channel_key}) addr={address} count={count} -> {values}")
+
+    def _handle_burner_read(self, bus: _SerialBus, address: int, count: int) -> None:
+        heater_pct = self.driver.snapshot().get("heater_pct")
+        values = []
+        for offset in range(count):
+            if address + offset == BURNER_REGISTER and heater_pct is not None:
+                sv_c = _heater_pct_to_sv(heater_pct)
+                values.append(max(0, min(65535, int(round(sv_c * BURNER_DIVISOR)))))
+            else:
+                values.append(0)
+        body = bytes([self.burner_slave_id, READ_HOLDING_REGISTERS, count * 2])
+        for v in values:
+            body += v.to_bytes(2, "big")
+        bus.ser.write(body + _crc16(body))
+        self._log(f"[{bus.name}] read slave={self.burner_slave_id} (Burner SV) addr={address} count={count} -> {values}")
 
     def _handle_burner_write(self, bus: _SerialBus, address: int, value: int) -> None:
         if address != BURNER_REGISTER:

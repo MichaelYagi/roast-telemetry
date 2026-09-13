@@ -23,6 +23,15 @@ function formatElapsed(seconds) {
 
 const LIVE_MODES = ["artisan_live", "modbus_live", "ms6514_live"];
 const CONTROLLABLE_MODES = ["simulator", "modbus_live"];
+// modbus_live reads Heater/Fan/Drum back from the device itself (genuine
+// PLC/VFD registers, not an echo of this app's own commands -- see
+// modbus_bridge/engine.py's tick()), so auto-sending a "starting value" on
+// connect would overwrite whatever the roaster's actually doing instead of
+// just reflecting it -- e.g. an operator's own manual setting, or state
+// left over from a previous session. simulator has no such real state to
+// clobber (and nothing to read back), so it still needs an explicit
+// starting point.
+const AUTO_APPLY_STARTING_CONTROLS_MODES = ["simulator"];
 
 // simulator/engine.py's SimulatorConfig defaults -- that engine has no
 // per-roast override for these (RoastSession always constructs a plain
@@ -341,9 +350,11 @@ export default function LiveRoastView() {
       const summary = await api.createRoast(payload);
       setRoastId(summary.id);
       setPhase("roasting");
-      const controls = buildControlsFromForm();
-      if (Object.keys(controls).length) {
-        api.sendCommand(summary.id, controls).catch((err) => setError(err.message));
+      if (AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode)) {
+        const controls = buildControlsFromForm();
+        if (Object.keys(controls).length) {
+          api.sendCommand(summary.id, controls).catch((err) => setError(err.message));
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -731,7 +742,7 @@ export default function LiveRoastView() {
               </label>
             </div>
           )}
-          {CONTROLLABLE_MODES.includes(form.mode) && (
+          {AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) && (
             <div className="form-row">
               <label>
                 Heater % at start
@@ -761,6 +772,13 @@ export default function LiveRoastView() {
                 Sent as the roast's first command right after START, and used as the Controls panel's starting position.
               </p>
             </div>
+          )}
+          {form.mode === "modbus_live" && (
+            <p className="hint">
+              Heater/Fan/Drum aren't set here -- once connected, the Controls panel on the Live Roast page reads and
+              shows whatever the roaster is actually doing (from the device itself, not a guess), and nothing is
+              written to it until you move a slider yourself.
+            </p>
           )}
           <div className="form-row save-preset-row">
             <label>
