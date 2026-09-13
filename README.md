@@ -152,6 +152,32 @@ Each DB-touching test gets its own throwaway SQLite file (see
 `tests/conftest.py`'s `isolated_db` fixture) — none of it touches
 `backend/data/roasts.db`. There's no frontend test suite yet.
 
+## Releasing
+
+Versioning is git-tag-only — there's no VERSION file or committed version
+number to keep in sync; the tag pushed to a commit *is* that commit's
+version (`frontend/package.json`'s own `"version"` is cosmetic and not
+enforced against the tag). `.github/workflows/ci.yml` runs backend tests
++ frontend build on every push/PR to `main`; `.github/workflows/release.yml`
+re-runs both as a gate on tag push and only proceeds to package a release
+if they pass — a tag on a broken commit can't produce one.
+
+To cut a release:
+
+```bash
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+That's the entire trigger. Once the gate passes, it zips the backend
+(+ its standalone engine packages) and the built frontend together and
+attaches `roast-telemetry-vX.Y.Z.zip` to a GitHub Release for that tag —
+there's no hosting target configured yet, so this is a runnable snapshot,
+not a deploy. To use it: unzip, `pip install -r backend/requirements.txt`,
+then `PYTHONPATH=. uvicorn backend.app.main:app` from the unzipped root
+(the frontend is already built into `frontend/dist`, which the backend
+serves directly — see `backend/app/main.py`).
+
 ## Testing the hardware-dependent modes without real hardware
 
 `simulator` and `alog_playback` need nothing extra — they're fully
