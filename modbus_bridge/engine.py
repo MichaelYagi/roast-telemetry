@@ -95,6 +95,17 @@ shipped preset and source code (see above), the most authoritative
 source available without the hardware itself; the Air/Drum register
 numbers are still only blog-sourced; and the actual wire-level RTU
 behavior against your specific unit is unverified either way.
+
+For comparison, not application: the FZ94 EVO's own shipped preset
+(``FZ94_EVO.aset``) is *not* empty the way the plain FZ94's is -- it has
+real Air/Drum/Burner ``writeSingle`` slider commands (register 20 for
+Drum, 16 for Air, 35 for Burner, all on a single slave/device ID 1, sent
+over Modbus *TCP* since the EVO connects over Ethernet, not serial RTU).
+That's a completely different register scheme and connection method from
+this module's serial-RTU/8192/8193 defaults -- confirms the two models
+genuinely don't share a register map (different hardware generations),
+it does not corroborate or refute 8192/8193 for the plain FZ94 either
+way. Do not apply the EVO's registers here.
 """
 from __future__ import annotations
 
