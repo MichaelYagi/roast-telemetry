@@ -1296,3 +1296,119 @@ button:disabled {
     width: 100%;
   }
 }
+
+/* ============================================================
+   GARBAGEFIRE CHAOS MODE -- not just recolored, actually offensive.
+   Ported techniques (not literal selectors -- this app's components are
+   different) from the source theme: Comic Sans everywhere, every border
+   a different dashed/dotted/double style in a clashing color, rotated/
+   skewed transforms, text-shadow stacks, offset "sticker" box-shadows,
+   asymmetric border-radius, a pulsing gradient on the primary action.
+   Every rule below is scoped to :root[data-theme="garbagefire"] and
+   lives last in this file so it wins regardless of selector specificity
+   elsewhere -- delete this block entirely to remove the theme.
+   ============================================================ */
+:root[data-theme="garbagefire"] * {
+  font-family: "Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive !important;
+}
+
+:root[data-theme="garbagefire"] .app-header {
+  background: #ffea00 !important;
+  border-bottom: 6px dashed #7f00ff !important;
+  box-shadow: 0 4px 0 #ff00ff, 0 8px 0 #00ff00 !important;
+}
+:root[data-theme="garbagefire"] .app-header h1 {
+  color: #ff0000 !important;
+  text-shadow: 3px 3px 0 #0000ff, -1px -1px 0 #00ff00 !important;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  transform: rotate(-2deg);
+  display: inline-block;
+}
+:root[data-theme="garbagefire"] .app-header nav a {
+  border: 3px dotted #ff00ff !important;
+  border-radius: 50% 0 50% 0 !important;
+  background: #39ff14 !important;
+  color: #0000ff !important;
+  font-weight: 900 !important;
+  transform: rotate(-1deg);
+}
+:root[data-theme="garbagefire"] .app-header nav a.active {
+  background: #00ffff !important;
+  color: #ff0000 !important;
+  transform: rotate(2deg);
+}
+:root[data-theme="garbagefire"] .app-header nav a:hover {
+  filter: invert(1) hue-rotate(90deg) !important;
+  transform: rotate(5deg) scale(1.15) !important;
+}
+
+:root[data-theme="garbagefire"] .panel {
+  border: 4px double #ff00ff !important;
+  border-top: 8px solid #ff7f00 !important;
+  border-radius: 0 20px 0 20px !important;
+  box-shadow: 5px 5px 0 #00ff00, -3px -3px 0 #0000ff !important;
+}
+
+:root[data-theme="garbagefire"] input,
+:root[data-theme="garbagefire"] select {
+  border: 3px solid #ff4500 !important;
+  border-radius: 20px 0 20px 0 !important;
+  color: #0000ff !important;
+}
+
+:root[data-theme="garbagefire"] button {
+  border: 3px dashed #00ffff !important;
+  border-radius: 50% 0 50% 0 !important;
+  font-weight: 900 !important;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3) !important;
+}
+:root[data-theme="garbagefire"] button:hover:not(:disabled) {
+  filter: invert(1) hue-rotate(90deg) saturate(2) !important;
+  transform: rotate(-4deg) scale(1.08) !important;
+}
+
+:root[data-theme="garbagefire"] .power-btn-on {
+  background: linear-gradient(45deg, #ff0000, #00ff00, #0000ff) !important;
+  background-size: 400% 400% !important;
+  color: #ffff00 !important;
+  border: 4px dashed #ff00ff !important;
+  box-shadow: 4px 4px 0 #ff7f00, -2px -2px 0 #00ffff !important;
+  animation: garbagefirePulse 1.2s infinite alternate !important;
+}
+:root[data-theme="garbagefire"] .power-btn-off {
+  background: repeating-linear-gradient(45deg, #ff0000, #ff0000 6px, #ffff00 6px, #ffff00 12px) !important;
+  color: #000 !important;
+}
+@keyframes garbagefirePulse {
+  from {
+    background-position: 0% 50%;
+    box-shadow: 4px 4px 0 #ff7f00, -2px -2px 0 #00ffff;
+  }
+  to {
+    background-position: 100% 50%;
+    box-shadow: -4px -4px 0 #ff00ff, 3px 3px 0 #ffff00;
+  }
+}
+
+:root[data-theme="garbagefire"] .breakout-box {
+  border-left-width: 8px !important;
+  border-style: dashed !important;
+  border-color: #ff00ff !important;
+  border-radius: 0 24px 0 24px !important;
+  box-shadow: 4px 4px 0 #00ff00 !important;
+  transform: rotate(-1deg);
+}
+:root[data-theme="garbagefire"] .breakout-value {
+  text-shadow: 3px 3px 0 #0000ff, -1px -1px 0 #00ff00 !important;
+}
+
+:root[data-theme="garbagefire"] .event-btn {
+  border: 3px dotted #0000ff !important;
+  border-radius: 0 12px !important;
+  text-shadow: 1px 1px 0 #000 !important;
+}
+:root[data-theme="garbagefire"] .event-btn:hover:not(:disabled) {
+  transform: skew(-6deg) !important;
+  filter: saturate(2.5) !important;
+}

@@ -211,7 +211,7 @@ class RoastPreset(BaseModel):
 # of) their normal small display elsewhere on the page.
 BREAKOUT_PANEL_KEYS = {
     "bt", "et", "dt", "ror_bt", "ror_et", "time",
-    "dry_pct", "to_dry", "to_fcs",
+    "dry_pct", "maillard_pct", "dev_pct", "to_dry", "to_fcs",
     "heater", "fan", "drum", "playback_speed",
 }
 

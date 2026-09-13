@@ -459,6 +459,7 @@ export default function LiveRoastView() {
 
   const dryEndEvent = roast?.events?.find((e) => e.type === "DRY_END");
   const fcStartEvent = roast?.events?.find((e) => e.type === "FC_START");
+  const dropEvent = roast?.events?.find((e) => e.type === "DROP");
 
   // Thresholds only exist as a concept for simulator + the live-hardware
   // modes (auto-detected from a BT threshold); alog_playback just replays
@@ -484,6 +485,19 @@ export default function LiveRoastView() {
       : fcStartEtaS != null
         ? `~${formatElapsed(latest.time_s + fcStartEtaS)}`
         : "--:--",
+    // Same convention as dryPercent above: only shown once the phase's
+    // own boundary events have *both* fired (a completed duration, not a
+    // guess at one still in progress), as a % of elapsed time so far --
+    // not of the final Charge-to-Drop total, which isn't known yet mid-roast
+    // (that's what RoastChart.jsx's own computePhases() shows post-hoc).
+    maillardPercent:
+      dryEndEvent && fcStartEvent && latest?.time_s
+        ? `${(((fcStartEvent.time_s - dryEndEvent.time_s) / latest.time_s) * 100).toFixed(1)}%`
+        : "---",
+    devPercent:
+      fcStartEvent && dropEvent && latest?.time_s
+        ? `${(((dropEvent.time_s - fcStartEvent.time_s) / latest.time_s) * 100).toFixed(1)}%`
+        : "---",
   };
 
   // The Configure Roast form (with its "Load saved config" dropdown) only

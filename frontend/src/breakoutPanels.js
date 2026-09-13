@@ -9,6 +9,8 @@ export const BREAKOUT_PANEL_ITEMS = [
   { key: "ror_et", label: "RoR (ET)", color: "#c4b5fd" },
   { key: "time", label: "Elapsed time", color: "#334155" },
   { key: "dry_pct", label: "DRY%", color: "#0891b2" },
+  { key: "maillard_pct", label: "Maillard%", color: "#d97706" },
+  { key: "dev_pct", label: "DEV%", color: "#dc2626" },
   { key: "to_dry", label: "»DRY", color: "#0891b2" },
   { key: "to_fcs", label: "»FCs", color: "#0891b2" },
   { key: "heater", label: "Heater %", color: "#f59e0b" },

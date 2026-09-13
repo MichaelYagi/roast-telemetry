@@ -15,6 +15,8 @@ function computeValues(latest, milestones, elapsedLabel, roast) {
     ror_et: fmt(latest?.ror_et, 1),
     time: elapsedLabel,
     dry_pct: milestones?.dryPercent ?? "—",
+    maillard_pct: milestones?.maillardPercent ?? "—",
+    dev_pct: milestones?.devPercent ?? "—",
     to_dry: milestones?.dryTime ?? "—",
     to_fcs: milestones?.fcsTime ?? "—",
     heater: fmt(latest?.heater_pct, 0, "%"),
