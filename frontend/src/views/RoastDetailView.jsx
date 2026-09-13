@@ -59,7 +59,8 @@ export default function RoastDetailView() {
           // attachment, so it downloads without navigating away; adding
           // _blank just pops an empty new tab in some browsers while the
           // file downloads silently in the background, looking like a
-          // no-op click.
+          // no-op click. Real Artisan's own native format -- File > Open
+          // in Artisan itself opens this directly, no conversion needed.
           <>
             Download <a href={api.alogDownloadUrl(roast.id)}>{alogFilename(roast.title, roast.created_at)}</a>
           </>

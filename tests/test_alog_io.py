@@ -11,28 +11,29 @@ from alog_playback.alog_io import (
     _step_hold_align,
     alog_dict_to_points,
     load_alog,
-    roast_to_alog_dict,
-    save_alog,
+    roast_to_artisan_native_dict,
+    save_artisan_native_alog,
 )
 
 
 def test_roundtrip_through_save_and_load(tmp_path):
+    # Full pipeline: build a roast -> write it (the app's one and only
+    # .alog format, real Artisan's own) -> read it back through this
+    # module's own reader too, not just Artisan's.
     profile = [
-        {"time_s": 0.0, "bt": 20.0, "et": 25.0, "ror_bt": None, "ror_et": None,
-         "heater_pct": 70.0, "fan_pct": 50.0, "drum_speed_pct": 60.0},
-        {"time_s": 1.0, "bt": 21.0, "et": 26.0, "ror_bt": 60.0, "ror_et": 60.0,
-         "heater_pct": 70.0, "fan_pct": 50.0, "drum_speed_pct": 60.0},
+        {"time_s": 0.0, "bt": 20.0, "et": 25.0, "heater_pct": 70.0, "fan_pct": 50.0, "drum_speed_pct": 60.0},
+        {"time_s": 1.0, "bt": 21.0, "et": 26.0, "heater_pct": 70.0, "fan_pct": 50.0, "drum_speed_pct": 60.0},
     ]
     events = [{"id": "e1", "time_s": 0.0, "type": "CHARGE", "label": "Charge", "value": 20.0}]
     notes = [{"id": "n1", "time_s": 0.5, "text": "hello", "author": None}]
 
-    alog_dict = roast_to_alog_dict(
+    alog_dict = roast_to_artisan_native_dict(
         title="Test Roast", profile=profile, events=events, notes=notes,
         beans="Guatemala", weight_green_g=200.0, weight_roasted_g=170.0,
-        machine_brand="Coffee-Tech", machine_model="FZ94",
+        roastertype="Coffee-Tech FZ94", roastdate="2026-01-01T00:00:00+00:00",
     )
     path = str(tmp_path / "roast.alog")
-    save_alog(path, alog_dict)
+    save_artisan_native_alog(path, alog_dict)
 
     loaded = load_alog(path)
     points = alog_dict_to_points(loaded)
@@ -41,9 +42,11 @@ def test_roundtrip_through_save_and_load(tmp_path):
     assert points["beans"] == "Guatemala"
     assert points["weight_green_g"] == 200.0
     assert points["weight_roasted_g"] == 170.0
-    assert points["machine"] == {"brand": "Coffee-Tech", "model": "FZ94"}
-    assert [p["time_s"] for p in points["profile"]] == [0.0, 1.0]
-    assert [p["bt"] for p in points["profile"]] == [20.0, 21.0]
+    assert points["machine"] == {"brand": None, "model": "Coffee-Tech FZ94"}
+    # Index 0 is a synthetic pre-charge lead-in sample -- see
+    # roast_to_artisan_native_dict's docstring for why one gets prepended.
+    assert [p["time_s"] for p in points["profile"]] == [-1.0, 0.0, 1.0]
+    assert [p["bt"] for p in points["profile"]] == [20.0, 20.0, 21.0]
     assert points["events"][0]["type"] == "CHARGE"
     assert points["notes"][0]["text"] == "hello"
 

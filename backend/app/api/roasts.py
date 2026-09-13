@@ -146,10 +146,16 @@ def set_weight(roast_id: str, grams: float) -> dict:
 
 @router.get("/{roast_id}/alog")
 def download_alog(roast_id: str) -> FileResponse:
+    """Real Artisan's own native format (Python-literal syntax +
+    timeindex/computed/specialevents) -- File > Open in Artisan itself
+    opens this directly. See roast_to_artisan_native_dict's docstring for
+    why that's the only format this app writes."""
     roast = session_manager.get_roast_detail(roast_id)
     if roast is None or not roast.alog_path:
         raise HTTPException(status_code=404, detail="alog not available (roast still in progress or not found)")
-    return FileResponse(roast.alog_path, filename=alog_filename(roast.title, roast.created_at), media_type="application/json")
+    return FileResponse(
+        roast.alog_path, filename=alog_filename(roast.title, roast.created_at), media_type="application/octet-stream"
+    )
 
 
 def _row_to_review(row: dict) -> RoastReview:

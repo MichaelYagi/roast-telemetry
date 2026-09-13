@@ -1,57 +1,43 @@
-"""Read/write Artisan-compatible ``.alog`` files.
+"""Read/write real Artisan-compatible ``.alog`` files.
 
-This module reads two shapes:
+This app writes exactly one ``.alog`` shape: real Artisan's own native
+one, built by ``roast_to_artisan_native_dict``/``save_artisan_native_alog``
+below -- so File > Open in real Artisan opens a roast recorded by this
+app directly, same as any roast Artisan recorded itself. An earlier
+version wrote its own minimal JSON shape instead (only meant to round-trip
+through this app's own reader, not actually open in Artisan) -- ``load_alog``
+below still reads that shape too, purely so roasts already on disk from
+before this change keep working, not because anything writes it anymore.
 
-1. **Real Artisan files.** Verified against an actual Kaleido-exported
-   ``.alog``: the file is a Python dict literal (``str(dict)``, meant to
-   be loaded with ``eval`` -- we use ``ast.literal_eval`` instead, which
-   is safe), with ``timex``/``temp1`` (ET)/``temp2`` (BT) arrays,
-   ``weight`` as ``[green, roasted, unit]``, named roast-phase markers in
-   an 8-element ``timeindex`` array (CHARGE/DRY_END/FC_START/FC_END/
-   SC_START/SC_END/DROP/COOL_END, 0 = not recorded -- confirmed by cross-
-   checking every non-zero index's ET/BT against the file's own
-   ``computed`` block), Turning Point separately at
-   ``computed['TP_idx']``, and manual control-channel adjustments as
-   parallel arrays (``specialevents`` = indices into ``timex``,
-   ``specialeventstype`` = index into ``etypes`` e.g. ``['Air','Drum',
-   'Damper','Burner','--']``, ``specialeventsvalue``, and optionally
-   ``specialeventsStrings`` for a custom label). Real Artisan carries many
-   more fields (energy/AUC accounting, PID tuning, alarms, ...) that this
-   platform has no use for and ignores.
-2. **Our own writer's shape**, below -- plain JSON with event/note
-   records as objects instead of parallel arrays, since round-tripping
-   only needs to be internally consistent.
-
-Schema this module writes (top level keys)::
-
-    {
-      "version": "roast-telemetry-1.0",
-      "title": str,
-      "roastdate": iso8601 str,
-      "beans": str,
-      "weight": {"green_g": float|None, "roasted_g": float|None},
-      "machine": {"brand": str|None, "model": str|None},
-      "timex": [float, ...],          # seconds since charge
-      "temp1": [float|None, ...],     # ET, aligned with timex
-      "temp2": [float|None, ...],     # BT, aligned with timex
-      "ror_bt": [float|None, ...],
-      "ror_et": [float|None, ...],
-      "control": [{"time_s","heater_pct","fan_pct","drum_speed_pct"}, ...],
-      "specialevents": [{"time_s","type","label","value"}, ...],
-      "notes": [{"time_s","text","author"}, ...],
-    }
+Verified against an actual Kaleido-exported ``.alog``: the file is a
+Python dict literal (``str(dict)``, meant to be loaded with ``eval`` --
+we use ``ast.literal_eval`` instead, which is safe), with
+``timex``/``temp1`` (ET)/``temp2`` (BT) arrays, ``weight`` as ``[green,
+roasted, unit]``, named roast-phase markers in an 8-element ``timeindex``
+array (CHARGE/DRY_END/FC_START/FC_END/SC_START/SC_END/DROP/COOL_END, 0 =
+not recorded -- confirmed by cross-checking every non-zero index's ET/BT
+against the file's own ``computed`` block), Turning Point separately at
+``computed['TP_idx']``, and manual control-channel adjustments as
+parallel arrays (``specialevents`` = indices into ``timex``,
+``specialeventstype`` = index into ``etypes`` e.g. ``['Air','Drum',
+'Damper','Burner','--']``, ``specialeventsvalue``, and optionally
+``specialeventsStrings`` for a custom label). Real Artisan carries many
+more fields (energy/AUC accounting, PID tuning, alarms, ...) that this
+platform has no use for -- see ``roast_to_artisan_native_dict``'s
+docstring for how those get handled on write (cloned from a real,
+confirmed-working export rather than guessed at).
 """
 from __future__ import annotations
 
 import ast
 import bisect
+import copy
 import json
 import os
 import re
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime
 from typing import Any, Optional
-
-ALOG_VERSION = "roast-telemetry-1.0"
 
 
 def load_alog(path: str) -> dict:
@@ -77,14 +63,47 @@ def load_alog(path: str) -> dict:
     return data
 
 
-def save_alog(path: str, data: dict) -> None:
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    data = {**data, "version": data.get("version", ALOG_VERSION)}
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+# Real Artisan's fixed manual/continuous control-channel vocabulary and
+# its index into it -- same convention _extract_continuous_channels below
+# already reads (`{N}` extraname labels, specialeventstype indices).
+ARTISAN_ETYPES = ["Air", "Drum", "Damper", "Burner", "--"]
+_ARTISAN_CHANNEL_INDEX = {"Air": 0, "Drum": 1, "Damper": 2, "Burner": 3}
+
+# CHARGE/DRY_END/FC_START/FC_END/SC_START/SC_END/DROP/COOL_END, in
+# timeindex's fixed order -- Turning Point is deliberately excluded, same
+# as real Artisan (it lives in computed['TP_idx'] instead, see below).
+_ARTISAN_TIMEINDEX_TYPES = [
+    "CHARGE", "DRY_END", "FC_START", "FC_END", "SC_START", "SC_END", "DROP", "COOL_END",
+]
+
+_ARTISAN_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "artisan_native_template.json")
+_artisan_template_cache: Optional[dict] = None
 
 
-def roast_to_alog_dict(
+def _load_artisan_template() -> dict:
+    global _artisan_template_cache
+    if _artisan_template_cache is None:
+        with open(_ARTISAN_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+            _artisan_template_cache = json.load(f)
+    return copy.deepcopy(_artisan_template_cache)
+
+
+def _nearest_index(sorted_times: list, t: float) -> int:
+    """Index into `sorted_times` closest to `t` -- events fire at whatever
+    the roast's clock happened to read, which won't always land exactly
+    on a sample time_s."""
+    if not sorted_times:
+        return 0
+    idx = bisect.bisect_left(sorted_times, t)
+    if idx <= 0:
+        return 0
+    if idx >= len(sorted_times):
+        return len(sorted_times) - 1
+    before, after = sorted_times[idx - 1], sorted_times[idx]
+    return idx - 1 if (t - before) <= (after - t) else idx
+
+
+def roast_to_artisan_native_dict(
     *,
     title: str,
     profile: list,
@@ -93,40 +112,205 @@ def roast_to_alog_dict(
     beans: Optional[str] = None,
     weight_green_g: Optional[float] = None,
     weight_roasted_g: Optional[float] = None,
-    machine_brand: Optional[str] = None,
-    machine_model: Optional[str] = None,
+    roastertype: Optional[str] = None,
     roastdate: Optional[str] = None,
 ) -> dict:
-    """Build an .alog-shaped dict from in-memory roast state.
+    """Build a file real Artisan can actually open (File > Open) -- this
+    is the only .alog shape this app writes (see this module's own
+    docstring). Real Artisan's loader wants Python-literal syntax
+    (True/False/None), the `timeindex`/`computed` milestone blocks, and
+    parallel-array `specialevents`, not a list of dicts.
 
-    ``profile`` is a list of dicts with keys time_s/bt/et/ror_bt/ror_et.
-    ``events``/``notes`` are lists of dicts as produced by the roast
-    session (RoastEvent/RoastNote shapes).
+    Rather than guess at the ~190 other fields a real Artisan save
+    carries (colorimeter settings, alarm config, BTU/CO2 accounting,
+    cupping scores, ...) and risk the file being rejected over one we
+    didn't know was required, this clones a real, confirmed-working
+    Artisan export (artisan_native_template.json, captured from an
+    actual roast) and only overwrites the fields that make *this*
+    roast's own curve, milestones, events, and metadata correct.
+    Everything else keeps that donor roast's own values -- cosmetically
+    stale (its cupping notes, alarm settings, etc.) but never a reason
+    Artisan would fail to load or render the file.
+
+    Serialize the result with save_artisan_native_alog (Python-literal
+    syntax, not JSON) -- see that function below.
     """
-    return {
-        "version": ALOG_VERSION,
+    data = _load_artisan_template()
+
+    # Real Artisan files always have a brief pre-charge lead-in, so index 0
+    # being reserved as "not recorded" never collides with a real milestone
+    # there. This app's own roasts don't -- recording starts *at* Charge,
+    # so Charge is almost always sample 0 -- which would otherwise make
+    # every exported roast's own Charge marker indistinguishable from "not
+    # recorded" the moment it's read back. A single synthetic flat sample
+    # one tick before the first real one sidesteps that ambiguity instead
+    # of just accepting a broken Charge marker on every export.
+    export_profile = profile
+    if profile:
+        lead_in = dict(profile[0])
+        lead_in["time_s"] = profile[0]["time_s"] - 1.0
+        export_profile = [lead_in, *profile]
+
+    timex = [p["time_s"] for p in export_profile]
+    temp1 = [p.get("et") for p in export_profile]  # Artisan's ET channel
+    temp2 = [p.get("bt") for p in export_profile]  # Artisan's BT channel
+
+    # Only the first occurrence of each milestone type -- matches
+    # MILESTONE_SEQUENCE's "permanently set once marked" semantics.
+    milestone_events: dict[str, dict] = {}
+    for e in events:
+        et = e.get("type")
+        if et and et != "CUSTOM" and et not in milestone_events:
+            milestone_events[et] = e
+
+    def milestone_idx(event_type: str) -> int:
+        e = milestone_events.get(event_type)
+        if e is None or not timex:
+            return 0  # Artisan's own "not recorded" sentinel
+        return _nearest_index(timex, e["time_s"])
+
+    timeindex = [milestone_idx(t) for t in _ARTISAN_TIMEINDEX_TYPES]
+    charge_idx, dry_idx, fcs_idx, fce_idx, scs_idx, sce_idx, drop_idx, coolend_idx = timeindex
+
+    def time_at(idx: int) -> Optional[float]:
+        return timex[idx] if timex and 0 < idx < len(timex) else None
+
+    def bt_at(idx: int) -> Optional[float]:
+        return temp2[idx] if temp2 and 0 < idx < len(temp2) else None
+
+    def et_at(idx: int) -> Optional[float]:
+        return temp1[idx] if temp1 and 0 < idx < len(temp1) else None
+
+    tp_event = milestone_events.get("TURNING_POINT")
+    tp_idx = _nearest_index(timex, tp_event["time_s"]) if tp_event and timex else None
+
+    computed = dict(data.get("computed") or {})
+    # None (not 0) when there's no real Turning Point -- unlike the other
+    # milestones, our reader's own _extract_named_milestones treats
+    # TP_idx == 0 as a *valid* recorded index (matching real Artisan's own
+    # tolerance for TP legitimately landing on the first sample), so
+    # writing 0 here for "not recorded" would fabricate a bogus Turning
+    # Point at the synthetic lead-in sample every time one wasn't fired.
+    computed["TP_idx"] = tp_idx
+    if tp_idx is not None and timex and 0 <= tp_idx < len(timex):
+        computed["TP_time"] = timex[tp_idx]
+        computed["TP_ET"] = et_at(tp_idx) if tp_idx > 0 else (temp1[0] if temp1 else None)
+        computed["TP_BT"] = bt_at(tp_idx) if tp_idx > 0 else (temp2[0] if temp2 else None)
+    computed["CHARGE_ET"] = et_at(charge_idx)
+    computed["CHARGE_BT"] = bt_at(charge_idx)
+    computed["DRY_time"], computed["DRY_ET"], computed["DRY_BT"] = time_at(dry_idx), et_at(dry_idx), bt_at(dry_idx)
+    computed["FCs_time"], computed["FCs_ET"], computed["FCs_BT"] = time_at(fcs_idx), et_at(fcs_idx), bt_at(fcs_idx)
+    computed["DROP_time"], computed["DROP_ET"], computed["DROP_BT"] = time_at(drop_idx), et_at(drop_idx), bt_at(drop_idx)
+    computed["COOL_time"], computed["COOL_ET"], computed["COOL_BT"] = time_at(coolend_idx), et_at(coolend_idx), bt_at(coolend_idx)
+
+    # Phase durations -- confirmed against the template's own donor roast
+    # (dryphasetime == DRY_time, midphasetime == FCs_time - DRY_time, etc,
+    # since profile time_s is already charge-relative, i.e. t=0 is Charge).
+    dry_t, fcs_t, drop_t, cool_t = computed["DRY_time"], computed["FCs_time"], computed["DROP_time"], computed["COOL_time"]
+    if dry_t is not None:
+        computed["dryphasetime"] = dry_t
+    if dry_t is not None and fcs_t is not None:
+        computed["midphasetime"] = fcs_t - dry_t
+    if fcs_t is not None and drop_t is not None:
+        computed["finishphasetime"] = drop_t - fcs_t
+    if drop_t is not None and cool_t is not None:
+        computed["coolphasetime"] = cool_t - drop_t
+    if drop_t is not None:
+        computed["totaltime"] = drop_t
+
+    if weight_green_g:
+        computed["weightin"] = weight_green_g
+        if weight_roasted_g:
+            computed["weightout"] = weight_roasted_g
+            loss_pct = (weight_green_g - weight_roasted_g) / weight_green_g * 100
+            computed["weight_loss"] = round(loss_pct, 1)
+            computed["total_yield"] = weight_roasted_g
+            computed["total_loss"] = round(loss_pct, 1)
+
+    # Manual control-channel adjustments (CUSTOM events with a channel) --
+    # Artisan's own parallel-array log, not a list of dicts.
+    custom_events = [e for e in events if e.get("type") == "CUSTOM"]
+    specialevents, specialeventstype, specialeventsvalue, specialeventsStrings = [], [], [], []
+    for e in custom_events:
+        idx = _nearest_index(timex, e["time_s"]) if timex else 0
+        specialevents.append(idx)
+        specialeventstype.append(_ARTISAN_CHANNEL_INDEX.get(e.get("channel"), 4))
+        specialeventsvalue.append(e.get("value") if e.get("value") is not None else 0.0)
+        specialeventsStrings.append(e.get("label") or "")
+
+    # Heater/Fan/Drum as continuous "extra device" channels (Artisan's
+    # `{N}` extraname convention, same one _extract_continuous_channels
+    # below already reads back) -- these are per-sample power settings,
+    # not discrete manual adjustments, so they belong here, not in
+    # specialevents. All three share this roast's own timeline, so one
+    # shared extratimex entry per channel is enough (no resampling needed).
+    extraname1 = ["{3}", "{0}", "{1}"]  # Burner, Air, Drum
+    extratemp1 = [
+        [p.get("heater_pct") for p in export_profile],
+        [p.get("fan_pct") for p in export_profile],
+        [p.get("drum_speed_pct") for p in export_profile],
+    ]
+    extratimex = [timex, timex, timex]
+
+    roastdate_dt = None
+    if roastdate:
+        try:
+            roastdate_dt = datetime.fromisoformat(roastdate)
+        except ValueError:
+            pass
+
+    # Written two ways: `roastingnotes` is real Artisan's own single
+    # free-text field (so a human opening this in Artisan sees them at
+    # all); `notes` is our own list-of-dicts shape so this app's own
+    # reader (alog_dict_to_points) can still recover each note's original
+    # time_s/author individually, not just a flattened text blob. Real
+    # Artisan also has a `notes` key, but its per-item shape when
+    # non-empty isn't something this codebase has seen in a real export
+    # to confirm -- this list is only ever read back by this app itself.
+    notes_text = "\n".join(f"[{n.get('time_s', 0):.0f}s] {n.get('text', '')}" for n in notes)
+
+    data.update({
+        "roastUUID": str(uuid.uuid4()),
+        "mode": "C",
         "title": title,
-        "roastdate": roastdate or datetime.now(timezone.utc).isoformat(),
-        "beans": beans,
-        "weight": {"green_g": weight_green_g, "roasted_g": weight_roasted_g},
-        "machine": {"brand": machine_brand, "model": machine_model},
-        "timex": [p["time_s"] for p in profile],
-        "temp1": [p.get("et") for p in profile],
-        "temp2": [p.get("bt") for p in profile],
-        "ror_bt": [p.get("ror_bt") for p in profile],
-        "ror_et": [p.get("ror_et") for p in profile],
-        "control": [
-            {
-                "time_s": p["time_s"],
-                "heater_pct": p.get("heater_pct"),
-                "fan_pct": p.get("fan_pct"),
-                "drum_speed_pct": p.get("drum_speed_pct"),
-            }
-            for p in profile
-        ],
-        "specialevents": [dict(e) for e in events],
+        "beans": beans or "",
+        "roastingnotes": notes_text,
         "notes": [dict(n) for n in notes],
-    }
+        "weight": [weight_green_g or 0.0, weight_roasted_g or 0.0, "g"],
+        "roastertype": roastertype or "Roast Telemetry (simulated)",
+        "roastdate": roastdate_dt.strftime("%a %b %d %Y") if roastdate_dt else data.get("roastdate", ""),
+        "roastisodate": roastdate_dt.strftime("%Y-%m-%d") if roastdate_dt else data.get("roastisodate", ""),
+        "roasttime": roastdate_dt.strftime("%H:%M:%S") if roastdate_dt else data.get("roasttime", ""),
+        "timex": timex,
+        "temp1": temp1,
+        "temp2": temp2,
+        "timeindex": timeindex,
+        "computed": computed,
+        "etypes": ARTISAN_ETYPES,
+        "specialevents": specialevents,
+        "specialeventstype": specialeventstype,
+        "specialeventsvalue": specialeventsvalue,
+        "specialeventsStrings": specialeventsStrings,
+        "extraname1": extraname1,
+        "extratemp1": extratemp1,
+        "extraname2": [],
+        "extratemp2": [],
+        "extratimex": extratimex,
+    })
+    return data
+
+
+def save_artisan_native_alog(path: str, data: dict) -> None:
+    """Writes Python-literal syntax (True/False/None, single-quoted
+    strings), matching real Artisan's own file format -- NOT JSON.
+    `repr()` on a dict/list/str/int/float/bool/None tree round-trips
+    exactly through ast.literal_eval (what load_alog uses to read real
+    Artisan files), which is the only property that actually matters
+    here -- byte-for-byte formatting doesn't need to match Artisan's own
+    writer, just be parseable by it."""
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(repr(data))
 
 
 def _extract_weight(data: dict) -> tuple[Optional[float], Optional[float]]:

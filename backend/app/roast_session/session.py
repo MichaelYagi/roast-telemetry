@@ -5,11 +5,18 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from alog_playback import AlogPlayer, alog_dict_to_points, load_alog, roast_to_alog_dict, save_alog
+from alog_playback import (
+    AlogPlayer,
+    alog_dict_to_points,
+    load_alog,
+    roast_to_artisan_native_dict,
+    save_artisan_native_alog,
+)
 from artisan_bridge import ArtisanBridgeEngine
 from mock_device import MockDevice
 from modbus_bridge import ModbusEngine
@@ -192,7 +199,13 @@ class RoastSession:
         elif isinstance(self._engine, (ModbusEngine, MS6514Engine)):
             self._engine.close()  # release the serial port
 
-        alog_dict = roast_to_alog_dict(
+        # Written in real Artisan's own native shape (Python-literal syntax
+        # + timeindex/computed/specialevents), not a bespoke JSON one --
+        # this app used to write its own minimal JSON format, but that
+        # could only round-trip through this app's own reader, not
+        # actually open in Artisan itself. See roast_to_artisan_native_dict's
+        # docstring for the full rationale.
+        alog_dict = roast_to_artisan_native_dict(
             title=self.title,
             profile=self.profile,
             events=self.events,
@@ -200,11 +213,10 @@ class RoastSession:
             beans=self.beans,
             weight_green_g=self.weight_green_g,
             weight_roasted_g=self.weight_roasted_g,
-            machine_brand=(self.machine or {}).get("brand"),
-            machine_model=(self.machine or {}).get("model"),
+            roastertype=self.machine_label,
             roastdate=self.created_at,
         )
-        save_alog(self.alog_path, alog_dict)
+        save_artisan_native_alog(self.alog_path, alog_dict)
 
         storage.update_roast(
             self.id,
@@ -387,7 +399,12 @@ class RoastSessionManager:
         roast_id = str(uuid.uuid4())
         dest_path = storage.alog_path_for(roast_id)
         data = load_alog(source_path)
-        save_alog(dest_path, data)
+        # A plain file copy, not a parse-then-reserialize round trip --
+        # there's nothing to transform on import, and copying preserves
+        # the source file exactly (real Artisan's own syntax when it's a
+        # real Artisan export, which is the common case for this feature).
+        os.makedirs(os.path.dirname(os.path.abspath(dest_path)), exist_ok=True)
+        shutil.copyfile(source_path, dest_path)
         parsed = alog_dict_to_points(data)
         duration_s = parsed["profile"][-1]["time_s"] if parsed["profile"] else 0.0
         summary = {
