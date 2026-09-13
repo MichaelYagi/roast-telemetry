@@ -307,6 +307,16 @@ def roast_to_artisan_native_dict(
     # Artisan reject the file as invalid.
     notes_text = "\n".join(f"[{n.get('time_s', 0):.0f}s] {n.get('text', '')}" for n in notes)
 
+    # Temp axis range -- was left as the donor template's own stale
+    # ymin/ymax (0-275, sized for that roast's own curve), unrelated to
+    # this one's actual temperatures. 0 as a floor (a roast chart never
+    # needs to show sub-zero), max recorded temp rounded up to the next
+    # 25 with a little headroom above it so the curve doesn't touch the
+    # top edge.
+    all_temps = [t for t in (temp1 + temp2) if t is not None]
+    if all_temps:
+        computed_ymax = (int(max(all_temps)) // 25 + 2) * 25
+
     data.update({
         "roastUUID": str(uuid.uuid4()),
         "mode": "C",
@@ -323,6 +333,7 @@ def roast_to_artisan_native_dict(
         # date shown in the app is the donor template's own, regardless of
         # what those string fields say.
         "roastepoch": int(roastdate_dt.timestamp()) if roastdate_dt else data.get("roastepoch", 0),
+        **({"ymin": 0, "ymax": computed_ymax} if all_temps else {}),
         "timex": timex,
         "temp1": temp1,
         "temp2": temp2,
