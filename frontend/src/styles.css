@@ -152,7 +152,21 @@ body.breakout-split-active .app-header {
      for why using raw 100vw here caused a page-level horizontal scrollbar. */
   width: var(--breakout-viewport-width, 100vw);
   left: 50%;
-  transform: translateX(-50%);
+  /* Deliberately a negative margin, not `transform` -- same reasoning as
+     .breakout-split-escape below. `transform` creates a new stacking
+     context, which bundles the header (and everything in it, including
+     .theme-picker-menu's z-index:30) into one atomic paint unit ordered
+     by DOM position among its .app-shell siblings. Since
+     .breakout-split-escape's content starts at the same y=0 the header
+     occupies (by design, so the toolbar row lines up with the title),
+     anything of its that overlaps the header there -- e.g. .artisan-toolbar
+     -- would paint on top of the theme dropdown regardless of its
+     z-index, because that z-index only wins *inside* the header's own
+     stacking context, not against a later root-level sibling. This was
+     the actual cause of the theme dropdown becoming unclickable once a
+     roast starts (confirmed via Playwright: .artisan-toolbar was
+     intercepting the click). */
+  margin-left: calc(var(--breakout-viewport-width, 100vw) / -2);
   padding: 1.25rem 1.25rem 0;
   box-sizing: border-box;
 }
@@ -630,11 +644,17 @@ button:disabled {
      this is what makes the text scale correctly whether 1 or all 12
      panels are enabled, without knowing that count in advance. */
   container-type: size;
+  /* Safety clip: with enough panels enabled at once (or a short window),
+     a box's own share of --breakout-available-height can end up shorter
+     than the value text's clamp() floor can shrink to (see below) --
+     without this, that overflow doesn't just get clipped, it visually
+     bleeds up/down into whichever neighboring box happens to be there. */
+  overflow: hidden;
 }
 
 .breakout-split-panel-pane .breakout-label {
   flex: 0 0 auto;
-  font-size: clamp(1rem, min(14cqh, 18cqw), 2.8rem);
+  font-size: clamp(0.6rem, min(14cqh, 18cqw), 2.8rem);
 }
 
 .breakout-split-panel-pane .breakout-value {
@@ -656,8 +676,13 @@ button:disabled {
      actual rendered string's length) makes the width ceiling scale with
      that specific value instead of guessing one number for all of them --
      140cqw / chars keeps text width comfortably under the box's own
-     width for any length this panel ever displays. */
-  font-size: clamp(3rem, min(80cqh, calc(140cqw / var(--value-chars, 6))), 32rem);
+     width for any length this panel ever displays. Floor is 0.85rem, not
+     something larger -- with many panels enabled at once, a box's actual
+     share of the available height can be shorter than a bigger floor
+     could ever shrink to fit, which forced an overflow (see the sibling
+     .breakout-box's own overflow:hidden, added as a second line of
+     defense, not a substitute for actually being able to shrink here). */
+  font-size: clamp(0.85rem, min(80cqh, calc(140cqw / var(--value-chars, 6))), 32rem);
   line-height: 1;
   white-space: nowrap;
 }
@@ -681,7 +706,14 @@ button:disabled {
 }
 
 .breakout-value {
-  font-family: "Courier New", ui-monospace, monospace;
+  /* Not a literal monospace font -- at the split-panel-pane's huge clamp()
+     sizes (up to 32rem), Courier New's "." sits centered in a full
+     digit-width cell, which reads as a gap between digit groups rather
+     than a decimal point (e.g. "66.6" misread as "66  6"). tabular-nums
+     still keeps digits themselves a fixed width so live-updating values
+     don't jitter; only punctuation is now proportionally (and legibly)
+     sized. */
+  font-variant-numeric: tabular-nums;
   font-weight: 800;
   font-size: 2.2rem;
   line-height: 1.2;
