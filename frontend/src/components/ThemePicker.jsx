@@ -12,6 +12,7 @@ const THEMES = [
   { id: "coffee", label: "Coffee", swatch: ["#1b120d", "#2a1d16", "#d68c3f"] },
   { id: "croissant", label: "Croissant", swatch: ["#fbf3e3", "#fffdf7", "#c8862b"] },
   { id: "matcha", label: "Matcha", swatch: ["#eef2e3", "#f8faf3", "#5c8a3a"] },
+  { id: "garbagefire", label: "Garbagefire", swatch: ["#ffe4e1", "#fafad2", "#ff0000"] },
 ];
 
 function applyTheme(id) {

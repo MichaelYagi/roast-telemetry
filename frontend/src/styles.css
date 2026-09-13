@@ -72,6 +72,21 @@
   --accent-soft: #dfead0;
 }
 
+/* Deliberately hideous -- ported from the "garbagefire" theme in
+   https://github.com/MichaelYagi/mcp-platform/blob/main/client/ui/css/themes.css
+   (sickly pastel pink page, pale-yellow panels, magenta borders, violent
+   purple text, pure-red accent). Not a design mistake -- a tradition. */
+:root[data-theme="garbagefire"] {
+  color-scheme: light;
+  --bg: #ffe4e1;
+  --panel: #fafad2;
+  --border: #ff00ff;
+  --text: #9400d3;
+  --text-muted: #8b4513;
+  --accent: #ff0000;
+  --accent-soft: #adff2f;
+}
+
 * {
   box-sizing: border-box;
 }
