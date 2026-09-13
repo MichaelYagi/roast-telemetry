@@ -72,7 +72,7 @@ export default function LiveRoastView() {
     artisan_host: "",
     artisan_port: 8080,
     modbus_port: "",
-    modbus_baudrate: 2400,
+    modbus_baudrate: 19200,
     modbus_control_port: "",
     modbus_control_baudrate: 19200,
     ms6514_port: "",
@@ -310,7 +310,7 @@ export default function LiveRoastView() {
     }
     if (form.mode === "modbus_live") {
       payload.modbus_port = form.modbus_port;
-      payload.modbus_baudrate = Number(form.modbus_baudrate) || 2400;
+      payload.modbus_baudrate = Number(form.modbus_baudrate) || 19200;
       payload.modbus_control_port = form.modbus_control_port || null;
       payload.modbus_control_baudrate = Number(form.modbus_control_baudrate) || 19200;
     }
@@ -636,7 +636,7 @@ export default function LiveRoastView() {
           {form.mode === "modbus_live" && (
             <div className="form-row">
               <label>
-                Temperature/Burner serial port
+                Serial port
                 <input
                   placeholder="COM3"
                   value={form.modbus_port}
@@ -652,9 +652,9 @@ export default function LiveRoastView() {
                 />
               </label>
               <label>
-                Drive (Air/Drum) serial port — optional
+                Separate drive port — optional, uncommon
                 <input
-                  placeholder="COM4 (leave blank to skip Air/Drum control)"
+                  placeholder="only if your own wiring needs a 2nd connection for Air/Drum"
                   value={form.modbus_control_port}
                   onChange={(e) => setForm({ ...form, modbus_control_port: e.target.value })}
                 />
@@ -669,12 +669,13 @@ export default function LiveRoastView() {
               </label>
               <p className="hint">
                 Direct Modbus RTU to the FZ-94 over USB (not the EVO, which is network/Ethernet) — bypasses
-                Artisan entirely. BT/ET/DT and Burner (a drum-temp setpoint, not a power %) are on the
-                temperature port above; Air/Drum are separate VFD drives that run at a different baud rate on
-                real hardware, so they need their own serial port — leave that field blank to skip Air/Drum
-                control (Burner still works). Mutually exclusive with Artisan also connected to the same
-                port(s). Not tested against real FZ-94 hardware; register/slave numbers are from real users'
-                own Artisan setup guides for this machine, not verified against yours.
+                Artisan entirely. One connection handles BT/ET/DT/Burner (a drum-temp setpoint, not a power %)
+                and Air/Drum together, matching Artisan's own shipped preset for this machine (19200 baud,
+                8N2) — the "separate drive port" field only matters if your own wiring genuinely needs a
+                second connection, which is uncommon; leave it blank otherwise. Mutually exclusive with
+                Artisan also connected to the same port(s). Not tested against real FZ-94 hardware; the
+                BT/ET/DT/Burner numbers and the single-connection setup are confirmed against Artisan's own
+                shipped machine preset and source code; Air/Drum register numbers are only blog-sourced.
               </p>
             </div>
           )}

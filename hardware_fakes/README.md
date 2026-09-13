@@ -9,7 +9,7 @@ so BT/ET behave like a real roast no matter which one you're using.
 
 | Fake | Stands in for | Protocol | Needs a virtual serial port? |
 |---|---|---|---|
-| `modbus_fz94.py` | Coffee-Tech FZ-94 (plain, not EVO) | Modbus RTU (hand-rolled framing) | Yes — two, if using Air/Drum |
+| `modbus_fz94.py` | Coffee-Tech FZ-94 (plain, not EVO) | Modbus RTU (hand-rolled framing) | Yes — one (two only for unusual wiring) |
 | `weblcds_server.py` | A running Artisan (WebLCDs) | WebSocket/JSON | No — plain TCP |
 | `ms6514_device.py` | Mastech MS6514 meter | Raw 18-byte serial frames | Yes |
 
@@ -38,35 +38,35 @@ sudo apt install socat
 
 ### Modbus (FZ-94)
 
-BT/ET/DT and Burner share one serial connection; Air/Drum (VFD drives)
-need a *second*, separate one -- confirmed real on the actual hardware
-(different baud rate/framing), not an app quirk. Skip the second pair
-and `--drive-port` below if you only care about temperatures and Burner.
+One serial connection handles BT/ET/DT/Burner *and* Air/Drum together --
+confirmed against Artisan's own shipped machine preset for this model
+(19200 baud, 8N2). A genuinely separate second connection is only needed
+for unusual wiring; skip `--drive-port` below unless you specifically
+need that.
 
-Terminal 1 -- temperature/burner virtual pair, keep it running:
+Terminal 1 -- create the virtual pair, keep it running:
 
 ```
 socat -d -d pty,raw,echo=0,link=/tmp/ttyFAKE_ROASTER pty,raw,echo=0,link=/tmp/ttyFAKE_ROASTER_APP
 ```
 
-Terminal 2 -- drive (Air/Drum) virtual pair, keep it running too:
+Terminal 2 -- start the fake slave:
 
 ```
-socat -d -d pty,raw,echo=0,link=/tmp/ttyFAKE_DRIVES pty,raw,echo=0,link=/tmp/ttyFAKE_DRIVES_APP
+python -m hardware_fakes.modbus_fz94 --port /tmp/ttyFAKE_ROASTER
 ```
 
-Terminal 3 -- start the fake slave(s):
+In the app, choose **Direct Modbus (FZ-94, USB)**, serial port
+`/tmp/ttyFAKE_ROASTER_APP` (the *other* end of the pair), and leave the
+drive-port field blank. Once connected, the Heater/Fan/Drum sliders write
+real Modbus registers that this fake decodes and feeds back into the
+thermal model -- so turning the burner up should actually show BT/ET/DT
+climbing faster.
 
-```
-python -m hardware_fakes.modbus_fz94 --port /tmp/ttyFAKE_ROASTER --drive-port /tmp/ttyFAKE_DRIVES
-```
-
-In the app, choose **Direct Modbus (FZ-94, USB)**, temperature/burner
-serial port `/tmp/ttyFAKE_ROASTER_APP`, drive serial port
-`/tmp/ttyFAKE_DRIVES_APP` (the *other* end of each pair). Once
-connected, the Heater/Fan/Drum sliders write real Modbus registers that
-this fake decodes and feeds back into the thermal model -- so turning
-the burner up should actually show BT/ET/DT climbing faster.
+If you specifically need to test the separate-connection case
+(`modbus_control_port`), add a second virtual pair and pass
+`--drive-port` to the fake -- see `python -m hardware_fakes.modbus_fz94
+--help`.
 
 The thermal clock starts on the fake's *first* received request on
 *either* bus, not at process launch -- it's fine to leave it sitting

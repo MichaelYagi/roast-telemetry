@@ -6,55 +6,70 @@ device support).
 Register map default is Coffee-Tech Engineering's plain FZ-94 (USB/RTU --
 *not* the FZ-94 EVO, which connects over Modbus TCP/Ethernet, a different
 connection method entirely; artisan-scope.org/machines/coffeetech/).
-Confirmed against real users' own working Artisan setup guides for this
-exact machine, not guessed -- see the two blog series linked below.
+Confirmed against Artisan's own shipped machine preset for this exact
+model -- ``src/includes/Machines/Coffee-Tech/FZ94.aset`` in
+https://github.com/artisan-roaster-scope/artisan -- and its
+Modbus-handling source, ``src/artisanlib/modbusport.py``, not just
+paraphrased from blog write-ups (though those independently corroborate
+it: https://artisan-roasterscope.blogspot.com/2015/01/connecting-artisan-to-coffee-tech-fz-94.html,
+.../2016/08/fz-94-2-pushing-drum-heat-limit.html,
+.../2016/08/fz-94-3-connecting-drives.html, .../2016/08/fz-94-4-taking-control.html).
 
-**Temperature probes** (https://artisan-roasterscope.blogspot.com/2015/01/connecting-artisan-to-coffee-tech-fz-94.html):
-each is its *own* Modbus slave device (a separate PID controller per
-probe), all at register 0, not three registers on one shared slave:
+**One connection for everything.** Artisan's own shipped preset uses a
+single Modbus RTU serial connection (one port, one baud rate/framing) for
+every device below -- BT/ET/DT/Burner *and* Air/Drum -- as one multi-drop
+bus with different slave IDs, not two separate connections. (An earlier
+version of this module assumed the temperature probes and the drives
+needed genuinely separate connections at different baud rates, based on
+one blog's account of upgrading their setup mid-series; that was wrong --
+it was a snapshot of that author's setup *before* they'd unified
+everything onto one bus, not the final/shipped configuration.) Default
+communication, straight from the .aset: **19200 baud, 8 data bits, no
+parity, 2 stop bits.**
+
+**Temperature probes + Burner:** each is its *own* Modbus slave device (a
+separate PID controller per probe/setpoint), all at register 0 for
+reading (function 3), confirmed identical in the .aset's `[Modbus]`
+`inputN`/`deviceId` fields:
 
 - BT: slave 11, register 0
 - ET: slave 13, register 0
 - DT: slave 12, register 0 -- drum *space* temperature, a genuine third
-  probe, not the same reading as ET and not just a relabeling of it (an
-  earlier version of this module assumed that; it was wrong)
-- Communication: 2400 baud, 8N1 (8 data bits, no parity, 1 stop bit),
-  Modbus function 3 (read holding register)
+  probe, not the same reading as ET and not just a relabeling of it
+- Burner: same slave as DT (12) -- it's that PID controller -- register 5
+  (`PID_SV_register=5`, `PID_device_ID=12` in the .aset), not a power
+  percentage at all. It's a bang-bang (on/off + hysteresis) PID that
+  switches the 3 heating elements around a drum-temperature *limit* (the
+  FZ-94's own user manual independently confirms 3 separately-switched
+  1000W elements plus one "Drum heat limit controller" with its own
+  setpoint -- there's no per-element percentage control on this hardware
+  at all). This app's `heater_pct` (0-100%) is mapped onto a configurable
+  SV temperature range (`burner_sv_range_c`, default 100-250C, comfortably
+  spanning Coffee-Tech's own factory-recommended 190C starting point) to
+  keep the existing Controls UI slider working unmodified -- that mapping
+  itself isn't documented anywhere, it's this app's own approximation to
+  fit a percentage-based UI onto a setpoint-based control.
 - Raw register value is temperature x10 as an integer (e.g. `1807` ->
-  180.7C) -- hence bt_divisor/et_divisor/dt_divisor below
+  180.7C) -- hence bt_divisor/et_divisor/dt_divisor/burner_divisor below.
+  Confirmed in source, not just inferred: `modbusport.py`'s `setTarget()`
+  maps the .aset's `SVmultiplier=1` to an actual x10 multiplier internally
+  (1/2 mean x10/x100 respectively -- an enum, not a literal multiplier).
 
-**Air/Drum drives** (https://artisan-roasterscope.blogspot.com/2016/08/fz-94-3-connecting-drives.html
-and .../2016/08/fz-94-4-taking-control.html): VFDs, not simple
-registers -- each needs a run/stop word written before a frequency
-command means anything, and run at a *different* baud rate/framing than
-the temperature probes above:
+**Air/Drum drives:** VFDs, not simple registers -- each needs a run/stop
+word written before a frequency command means anything:
 
 - Air: slave 1; Drum: slave 2
 - Control register 8192 (1=Stop, 2=Run), then frequency register 8193
-  (value = percent x100, so 100% -> 10000)
+  (value = percent x100, so 100% -> 10000) -- this part is from the blog
+  write-ups specifically (the .aset's own `[Sliders]` block ships with
+  empty `slidercommands`, i.e. not pre-wired the way the temperature side
+  is), so it's the least-confirmed piece of this whole module.
 - Air range 0-100%, Drum range 0-70% (per the blog's own drive limits)
-- Communication: 19200 baud, 8N2 (2 stop bits) -- confirmed different
-  from the temperature probes' 2400/8N1. A single Modbus RTU connection
-  is one shared baud rate/framing for every device on it, so on hardware
-  wired exactly as these posts describe, the drives cannot share a
-  serial connection with the temperature probes -- hence `control_port`
-  below being a genuinely separate connection, not just different
-  registers on the same one.
-
-**Burner** (https://artisan-roasterscope.blogspot.com/2016/08/fz-94-2-pushing-drum-heat-limit.html):
-not a power percentage at all -- there's no "burner %" on this hardware.
-It's a bang-bang (on/off + hysteresis) PID that switches the 3 heating
-elements around a drum-temperature *limit*:
-
-- Slave 12 (the same physical device as the DT probe above -- it's that
-  PID controller), register 5 (0x0005), value x10 (same convention as
-  the temperature reads) -- so this rides the *temperature* connection
-  (2400/8N1), not the drives' 19200/8N2 one.
-- This app's `heater_pct` (0-100%) is mapped onto a configurable SV
-  temperature range (`burner_sv_range_c`, default 100-250C) to keep the
-  existing Controls UI slider working unmodified -- that mapping itself
-  isn't documented anywhere, it's this app's own approximation to fit a
-  percentage-based UI onto a setpoint-based control.
+- `control_port`/`control_baudrate` below exist only as an override for
+  wiring that genuinely needs a second physical connection (uncommon) --
+  by default (`control_port=None`) drive writes go out on the same
+  primary connection as everything else, matching the confirmed single-bus
+  architecture above.
 
 A different Modbus roaster model will have a completely different
 register map. None of this is hardcoded to the FZ-94 specifically --
@@ -73,12 +88,13 @@ operator is running Artisan against this same roaster, use
 instead of this engine (owns the port, but can control).
 
 Not tested against real FZ-94 hardware (none available in this
-environment) -- verified against a mocked pymodbus client instead. Every
-slave ID/register/baud rate above is from real users' own setup guides
-for this exact machine (linked above); the actual wire-level RTU
-behavior against your specific unit is still unverified, and the
-heater_pct-to-SV-temperature mapping is this app's own invention, not
-documented anywhere.
+environment) -- verified against a mocked pymodbus client instead. The
+temperature/Burner slave IDs/registers/multiplier and the single-bus
+19200/8N2 communication settings are confirmed against Artisan's own
+shipped preset and source code (see above), the most authoritative
+source available without the hardware itself; the Air/Drum register
+numbers are still only blog-sourced; and the actual wire-level RTU
+behavior against your specific unit is unverified either way.
 """
 from __future__ import annotations
 
@@ -97,10 +113,10 @@ class ModbusEngine:
     def __init__(
         self,
         port: str,
-        baudrate: int = 2400,
+        baudrate: int = 19200,
         bytesize: int = 8,
         parity: str = "N",
-        stopbits: int = 1,
+        stopbits: int = 2,
         timeout: float = 0.4,
         # Temperature reads (and the Burner SV write, same physical PID
         # device as DT) -- all on this primary connection. Confirmed.
@@ -117,11 +133,10 @@ class ModbusEngine:
         burner_register: Optional[int] = 5,
         burner_divisor: float = 10.0,
         burner_sv_range_c: tuple[float, float] = (100.0, 250.0),
-        # Air/Drum drives -- a genuinely separate connection (different
-        # baud/framing than the temperature bus above; see module
-        # docstring). None (default) means "not configured" -- drive
-        # control commands are just dropped, same as any other engine
-        # missing an optional channel, rather than erroring.
+        # Air/Drum drives -- share the primary connection above by
+        # default (confirmed single-bus architecture; see module
+        # docstring). control_port is an override for wiring that
+        # genuinely needs a second physical connection, not the norm.
         control_port: Optional[str] = None,
         control_baudrate: int = 19200,
         control_bytesize: int = 8,
@@ -184,13 +199,12 @@ class ModbusEngine:
             self._last_error = str(exc)
             self._connected = False
 
-        # Drives only -- Burner rides the primary connection above (it's
-        # the DT probe's own PID device). If control_port isn't given,
-        # self._control_client stays None and drive commands are no-ops
-        # (see _write_drive) rather than silently trying to reuse the
-        # temperature connection's mismatched baud rate/framing.
-        self._control_client = None
-        self._control_connected = False
+        # Drives share the primary connection by default (confirmed
+        # single-bus architecture -- see module docstring). control_port
+        # is only for the uncommon case of wiring that genuinely needs a
+        # second physical connection; self._has_separate_control tracks
+        # which situation this is, for status() reporting.
+        self._has_separate_control = bool(control_port)
         if control_port:
             self._control_client = client_cls(
                 port=control_port, baudrate=control_baudrate, bytesize=control_bytesize,
@@ -203,6 +217,9 @@ class ModbusEngine:
             except Exception as exc:  # pragma: no cover - depends on local hardware/OS
                 self._control_last_error = str(exc)
                 self._control_connected = False
+        else:
+            self._control_client = self._client
+            self._control_connected = self._connected
 
     # -- Modbus I/O -----------------------------------------------------
     def _read_register(self, address: int, slave_id: int, *, is_heartbeat: bool = False) -> Optional[int]:
@@ -302,10 +319,7 @@ class ModbusEngine:
         self, name: str, slave_id: int, control_register: Optional[int], frequency_register: Optional[int],
         value: float, value_range: tuple[float, float],
     ) -> None:
-        # No control_port configured -- nothing to write to (see
-        # __init__). Not an error: same as any other engine silently
-        # ignoring a control command for a channel it doesn't have.
-        if self._control_client is None or control_register is None or frequency_register is None:
+        if control_register is None or frequency_register is None:
             return
         lo, hi = value_range
         clamped = max(lo, min(hi, value))
@@ -334,8 +348,11 @@ class ModbusEngine:
             "port": self.port,
             "connected": self._connected,
             "last_error": self._last_error,
+            # Only meaningfully distinct from the above when a separate
+            # control_port was actually configured -- otherwise drives
+            # share the primary connection's own status.
             "control_port": self.control_port,
-            "control_connected": self._control_connected if self._control_client is not None else None,
+            "control_connected": self._control_connected,
             "control_last_error": self._control_last_error,
         }
 
@@ -344,7 +361,10 @@ class ModbusEngine:
             self._client.close()
         except Exception:  # pragma: no cover - best-effort cleanup
             pass
-        if self._control_client is not None:
+        # Only a distinct object (and needs its own close()) when a
+        # separate control_port was configured -- otherwise it's the same
+        # client as self._client, already closed above.
+        if self._has_separate_control:
             try:
                 self._control_client.close()
             except Exception:  # pragma: no cover - best-effort cleanup

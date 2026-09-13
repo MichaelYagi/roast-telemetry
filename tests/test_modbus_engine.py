@@ -124,24 +124,41 @@ def test_apply_command_zero_drive_value_sends_stop_not_run():
     assert (8193, 0, 1) in control.writes
 
 
-def test_apply_command_drive_writes_are_noop_without_control_port():
+def test_drives_share_the_primary_connection_by_default():
+    # Confirmed single-bus architecture (Artisan's own shipped FZ94.aset
+    # uses one connection for BT/ET/DT/Burner *and* Air/Drum) -- without
+    # a separate control_port, drive writes go out on the same client as
+    # everything else, not dropped as a no-op.
     client_cls, instances = _make_fake_client_cls()
     engine = ModbusEngine("PRIMARY", client_cls=client_cls)  # no control_port
 
-    # Must not raise, and must not create a second client.
     engine.apply_command({"fan_pct": 50.0, "drum_speed_pct": 50.0})
 
-    assert engine._control_client is None
-    assert list(instances.keys()) == ["PRIMARY"]
+    assert list(instances.keys()) == ["PRIMARY"]  # no second client created
+    primary = instances["PRIMARY"]
+    assert (8192, 2, 1) in primary.writes
+    assert (8193, 5000, 1) in primary.writes
+    assert (8192, 2, 2) in primary.writes
+    assert (8193, 5000, 2) in primary.writes
 
 
-def test_control_connection_uses_its_own_baud_and_framing():
+def test_default_connection_settings_match_the_shipped_artisan_preset():
     client_cls, instances = _make_fake_client_cls()
-    ModbusEngine("PRIMARY", baudrate=2400, control_port="CONTROL", control_baudrate=19200, client_cls=client_cls)
+    ModbusEngine("PRIMARY", client_cls=client_cls)
 
-    assert instances["PRIMARY"].baudrate == 2400
-    assert instances["PRIMARY"].stopbits == 1
-    assert instances["CONTROL"].baudrate == 19200
+    # 19200 baud, 8 data bits, no parity, 2 stop bits -- straight from
+    # Artisan's own FZ94.aset [Modbus] block, not the earlier (wrong)
+    # 2400/8N1 assumption.
+    assert instances["PRIMARY"].baudrate == 19200
+    assert instances["PRIMARY"].stopbits == 2
+
+
+def test_control_connection_uses_its_own_baud_and_framing_when_configured():
+    client_cls, instances = _make_fake_client_cls()
+    ModbusEngine("PRIMARY", control_port="CONTROL", control_baudrate=9600, client_cls=client_cls)
+
+    assert instances["PRIMARY"].baudrate == 19200
+    assert instances["CONTROL"].baudrate == 9600
     assert instances["CONTROL"].stopbits == 2
 
 

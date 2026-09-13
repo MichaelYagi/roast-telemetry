@@ -3,8 +3,8 @@ USB/RTU -- not the EVO, which is Modbus TCP over Ethernet, a different
 connection method entirely; see ``modbus_bridge/engine.py``'s docstring).
 
 Serves the register/slave map ``modbus_bridge/engine.py`` expects,
-confirmed against real users' own FZ-94 Artisan setup guides (see that
-module's docstring for the citations):
+confirmed against Artisan's own shipped FZ-94 preset/source (see that
+module's docstring for the full citations):
 
     - BT:      slave 11, register 0    (function code 3, read),  x10 int
     - ET:      slave 13, register 0    (function code 3, read),  x10 int
@@ -14,15 +14,15 @@ module's docstring for the citations):
     - Air:     slave 1,  registers 8192 (run/stop) + 8193 (freq, x100)
     - Drum:    slave 2,  registers 8192 (run/stop) + 8193 (freq, x100)
 
-BT/ET/DT/Burner and the temperature connection's own framing (2400 baud,
-8N1) are all one bus/slave-set; Air/Drum and their drive-specific framing
-(19200 baud, 8N2) are a second, genuinely separate one -- confirmed
-different baud rates for real, not an arbitrary choice this fake made up
-(see the module docstring cited above). Passing ``--drive-port`` runs
-both buses concurrently (the drive bus on a background thread), sharing
-one ``ThermalDriver`` so a command from either bus affects the same
-simulated roast. Without ``--drive-port``, only BT/ET/DT/Burner work,
-same as leaving ``control_port`` unset on the real engine.
+One connection handles all of it by default (19200 baud, 8N2 -- Artisan's
+own shipped preset's exact settings), matching the real engine's default
+of sharing one connection for BT/ET/DT/Burner *and* Air/Drum. Passing
+``--drive-port`` instead runs a second bus concurrently (on a background
+thread) for the uncommon case of wiring that genuinely needs two
+connections -- matching the real engine's optional ``control_port``
+override. Either way both buses (if two are used) share one
+``ThermalDriver``, so a command from either affects the same simulated
+roast.
 
 BT/ET/DT readings and reactions to Burner/Air/Drum writes are driven by
 the same thermal model as the app's own Simulator mode (see
@@ -46,15 +46,16 @@ stable ``ModbusSerialClient``, which this responds to like a real slave.
 
 Usage::
 
-    # temperature + burner only
+    # BT/ET/DT/Burner + Air/Drum, all on one connection (the normal case)
     python -m hardware_fakes.modbus_fz94 --port /tmp/ttyFAKE_ROASTER
 
-    # + Air/Drum drives on a second virtual pair
+    # only if your own wiring genuinely needs a second connection for
+    # Air/Drum -- matches the real engine's control_port override
     python -m hardware_fakes.modbus_fz94 --port /tmp/ttyFAKE_ROASTER \\
         --drive-port /tmp/ttyFAKE_ROASTER_DRIVES
 
-Then point the app's "Direct Modbus" ``modbus_port`` (and, if using
---drive-port, ``modbus_control_port``) fields at the other end of each
+Then point the app's "Direct Modbus" ``modbus_port`` field (and, only if
+using --drive-port, ``modbus_control_port`` too) at the other end of each
 virtual serial pair (see hardware_fakes/README.md for the ``socat`` setup).
 """
 from __future__ import annotations
@@ -164,7 +165,7 @@ class FZ94Simulator:
         self._driver_started = False
         self._start_lock = threading.Lock()
 
-        self.temp_bus = _SerialBus(port, baudrate, stopbits=1, name="temp/burner", log=self._log)
+        self.temp_bus = _SerialBus(port, baudrate, stopbits=2, name="temp/burner", log=self._log)
         self.drive_bus = (
             _SerialBus(drive_port, drive_baudrate, stopbits=2, name="drives", log=self._log)
             if drive_port
@@ -293,7 +294,7 @@ def _exception_response(slave_id: int, function: int, code: int) -> bytes:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--port", required=True, help="temperature/burner bus serial port, e.g. /tmp/ttyFAKE_ROASTER")
-    parser.add_argument("--baudrate", type=int, default=2400)
+    parser.add_argument("--baudrate", type=int, default=19200)
     parser.add_argument("--bt-slave-id", type=int, default=11)
     parser.add_argument("--et-slave-id", type=int, default=13)
     parser.add_argument("--dt-slave-id", type=int, default=12)
