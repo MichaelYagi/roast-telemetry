@@ -37,7 +37,10 @@ export default function BreakoutPanel({ enabledKeys, latest, milestones, elapsed
       {items.map((item) => (
         <div key={item.key} className="breakout-box" style={{ borderColor: item.color }}>
           <span className="breakout-label">{item.label}</span>
-          <span className="breakout-value" style={{ color: item.color }}>
+          <span
+            className="breakout-value"
+            style={{ color: item.color, "--value-chars": String(values[item.key]).length }}
+          >
             {values[item.key]}
           </span>
         </div>

@@ -585,8 +585,13 @@ button:disabled {
   /* Each box flexes to divide this panel's exact height evenly (flex: 1,
      min-height: 0 below), so nothing should ever need to scroll here --
      hidden, not auto, so a stray sub-pixel rounding overflow never shows
-     a scrollbar track sitting next to the boxes. */
+     a scrollbar track sitting next to the boxes. Both axes explicit: with
+     only overflow-y set, the spec computes overflow-x as auto instead of
+     staying visible -- that's what was actually producing the horizontal
+     scrollbar (a value like "00:00" briefly overflowing its box while
+     the divider was mid-drag), not a page-level overflow. */
   overflow-y: hidden;
+  overflow-x: hidden;
   box-sizing: border-box;
 }
 
@@ -625,16 +630,19 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Now that each box's actual height is a real, exact fraction of a
-     precisely-measured available height (not an overflowing estimate),
-     it's safe to size the text much closer to filling the box -- bounded
-     by *both* cqh and cqw (via min()), not height alone, so a panel
-     dragged narrow (the split divider) doesn't let tall-but-narrow boxes
-     blow values like "125.2°" past the box's own width. 32cqw is sized
-     for ~6-7 character values (the longest this panel ever shows, e.g. a
-     temperature with a degree sign); most values are shorter and won't
-     hit this width ceiling at all. */
-  font-size: clamp(3rem, min(80cqh, 42cqw), 32rem);
+  /* Bounded by *both* cqh and cqw (via min()), not height alone, so a
+     panel dragged narrow (the split divider) doesn't let tall-but-narrow
+     boxes blow past the box's own width. A flat cqw ceiling was the
+     actual bug here: it has no idea how many characters it's sizing --
+     42cqw comfortably fits a 2-character value ("4x") but overflows a
+     5-character one ("00:00"), which is exactly what got clipped and
+     forced a horizontal scrollbar while the divider was being dragged.
+     --value-chars (set inline per box in BreakoutPanel.jsx, from the
+     actual rendered string's length) makes the width ceiling scale with
+     that specific value instead of guessing one number for all of them --
+     140cqw / chars keeps text width comfortably under the box's own
+     width for any length this panel ever displays. */
+  font-size: clamp(3rem, min(80cqh, calc(140cqw / var(--value-chars, 6))), 32rem);
   line-height: 1;
   white-space: nowrap;
 }

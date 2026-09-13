@@ -262,6 +262,31 @@ if something actually went wrong). To get the file itself:
    or find the roast under **History**
 2. Click **Download .alog** at the top of the detail page
 
+## What's stored where
+
+**Backend, `backend/data/roasts.db` (SQLite)** — shared across every
+browser/device pointed at this server:
+
+| Table | Holds |
+|---|---|
+| `roasts` | Per-roast metadata: title, mode, status, machine, beans, weights, duration, playback speed, and the path to its `.alog` file. The full per-second profile/events/notes live in that `.alog` file on disk (`backend/data/roasts/<id>.alog`), not in SQLite — this table just indexes it for fast history listing/filtering. |
+| `roast_presets` | "Load saved config" entries — the full Configure Roast form plus its starting Heater/Fan/Drum values. |
+| `settings` | Ollama URL/model (AI Roast Review), and which panels are enabled/ordered in the Big Readout Panel. |
+| `roast_reviews` | The latest AI-generated review per roast (one row each, overwritten on regenerate). |
+
+**Browser `localStorage`** — per-browser, never sent to the server, doesn't
+sync across devices or tabs on a different machine:
+
+| Key | Holds |
+|---|---|
+| `roast-telemetry:theme` | Selected theme (Light/Dark/Coffee/Croissant/Matcha) |
+| `roast-telemetry:breakoutSplitWidth` | Dragged divider position in the Big Readout Panel's split-pane layout |
+
+Rule of thumb: anything that should look the same for anyone opening the
+app, or that a roast's own record needs, goes in the DB. Anything that's
+just "how do I like my own browser to look right now" goes in
+`localStorage`.
+
 ## API summary
 
 All routes live under `/api` (e.g. `/api/roasts`); omitted below for brevity.
