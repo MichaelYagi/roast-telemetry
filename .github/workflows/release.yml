@@ -1,0 +1,80 @@
+name: Release
+
+# Versioning is git-tag-only -- there's no VERSION file or package.json
+# bump to keep in sync, the tag pushed to this commit *is* the version.
+# Pushing a `vX.Y.Z` tag is the entire release trigger; this workflow is
+# itself the gate -- backend-tests/frontend-build must both pass before
+# the release job is allowed to run (see `needs:` below), so a tag on a
+# broken commit never produces a release. There's no hosting target yet
+# (no Dockerfile/cloud config), so "deploy" here means: package a runnable
+# snapshot (backend + built frontend) and attach it to a GitHub Release
+# for that tag.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements-dev.txt
+      - run: PYTHONPATH=. pytest -q
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+  release:
+    needs: [backend-tests, frontend-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      # Runnable snapshot: backend source + its standalone engine packages
+      # + the already-built frontend, minus dev-only/runtime-data cruft.
+      # Not a Docker image or a hosted deploy (see the workflow comment
+      # above) -- just what someone needs to `pip install -r
+      # backend/requirements.txt && PYTHONPATH=. uvicorn backend.app.main:app`
+      # against this exact tagged version.
+      - name: Package release archive
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          STAGE="roast-telemetry-${VERSION}"
+          mkdir "$STAGE"
+          cp -r backend simulator mock_device alog_playback artisan_bridge \
+            modbus_bridge ms6514_bridge roast_heuristics hardware_fakes \
+            frontend requirements-dev.txt pytest.ini README.md "$STAGE"/
+          rm -f "$STAGE"/backend/data/roasts.db
+          rm -rf "$STAGE"/backend/data/roasts/*.alog
+          rm -rf "$STAGE"/frontend/node_modules
+          zip -r "${STAGE}.zip" "$STAGE"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: roast-telemetry-*.zip
+          generate_release_notes: true
