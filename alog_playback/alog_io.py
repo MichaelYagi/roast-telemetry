@@ -318,6 +318,11 @@ def roast_to_artisan_native_dict(
         "roastdate": roastdate_dt.strftime("%a %b %d %Y") if roastdate_dt else data.get("roastdate", ""),
         "roastisodate": roastdate_dt.strftime("%Y-%m-%d") if roastdate_dt else data.get("roastisodate", ""),
         "roasttime": roastdate_dt.strftime("%H:%M:%S") if roastdate_dt else data.get("roasttime", ""),
+        # Artisan's own UI reads this (a Unix timestamp), not the
+        # roastdate/roastisodate/roasttime strings above -- without it the
+        # date shown in the app is the donor template's own, regardless of
+        # what those string fields say.
+        "roastepoch": int(roastdate_dt.timestamp()) if roastdate_dt else data.get("roastepoch", 0),
         "timex": timex,
         "temp1": temp1,
         "temp2": temp2,
