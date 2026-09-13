@@ -410,8 +410,13 @@ All routes live under `/api` (e.g. `/api/roasts`); omitted below for brevity.
   not just paraphrased from blog write-ups, though those independently
   corroborate it:
   [BT/ET/DT](https://artisan-roasterscope.blogspot.com/2015/01/connecting-artisan-to-coffee-tech-fz-94.html),
-  [Air/Drum drives](https://artisan-roasterscope.blogspot.com/2016/08/fz-94-4-taking-control.html),
-  [Burner](https://artisan-roasterscope.blogspot.com/2016/08/fz-94-2-pushing-drum-heat-limit.html).
+  [Burner](https://artisan-roasterscope.blogspot.com/2016/08/fz-94-2-pushing-drum-heat-limit.html),
+  Air/Drum control writes from
+  [part 4](https://artisan-roasterscope.blogspot.com/2016/08/fz-94-4-taking-control.html)
+  specifically, Air/Drum speed *feedback* from
+  [part 3](https://artisan-roasterscope.blogspot.com/2016/08/fz-94-3-connecting-drives.html)
+  specifically — different posts in the same 5-part series, not one post
+  covering both directions.
   **One serial connection handles everything** — 19200 baud, 8N2, straight
   from the `.aset`'s own `[Modbus]` block (an earlier version of this
   assumed the temperature probes and Air/Drum drives needed two separate
@@ -430,12 +435,15 @@ All routes live under `/api` (e.g. `/api/roasts`); omitted below for brevity.
   This app maps its 0–100 `heater_pct` UI onto a configurable SV range
   (default 100–250°C, comfortably spanning Coffee-Tech's own
   factory-recommended 190°C starting point) as its own approximation, not
-  something documented anywhere. Air (slave 1) and Drum (slave 2) are VFD
-  drives needing two writes each (control register 8192 for run/stop,
-  then frequency register 8193, value = percent×100) — this part is
-  blog-sourced only, the `.aset`'s own `[Sliders]` block ships without a
-  configured write command for it, so it's the least-confirmed piece
-  here. `modbus_control_port` exists only for wiring that genuinely needs
+  something documented anywhere. Air (slave 1) and Drum (slave 2) are
+  Delta VFD-L drives needing two writes each (control register 8192 for
+  run/stop, then frequency register 8193, value = percent×100), plus a
+  separate read-only feedback register (8451, same ×100 convention) for
+  the drive's *actual* current speed — used in place of just echoing the
+  last command back, so a rejected/misrouted write doesn't silently look
+  identical to a successful one. All of this is blog-sourced only, the
+  `.aset`'s own `[Sliders]` block ships without a configured write
+  command for it, so it's the least-confirmed piece here. `modbus_control_port` exists only for wiring that genuinely needs
   a *separate* second connection (uncommon) — the default is one port for
   everything. Tested against a mocked `pymodbus` client plus actual
   serial traffic against `hardware_fakes/modbus_fz94.py` (register math,

@@ -162,6 +162,43 @@ def test_control_connection_uses_its_own_baud_and_framing_when_configured():
     assert instances["CONTROL"].stopbits == 2
 
 
+def test_tick_prefers_real_drive_feedback_over_last_command_echo():
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", control_port="CONTROL", client_cls=client_cls)
+    control = instances["CONTROL"]
+
+    engine.apply_command({"fan_pct": 60.0, "drum_speed_pct": 40.0})
+    # Real drive reports back a different speed than what was commanded --
+    # tick() should surface *that* (register 8451, /100 divisor), not just
+    # echo the command back.
+    control.register_values[(1, 8451)] = 5800  # Air actually running at 58.0%
+    control.register_values[(2, 8451)] = 3900  # Drum actually running at 39.0%
+
+    sample = engine.tick(1.0)
+
+    assert sample["fan_pct"] == pytest.approx(58.0)
+    assert sample["drum_speed_pct"] == pytest.approx(39.0)
+    assert (8451, 1) in control.reads
+    assert (8451, 2) in control.reads
+
+
+def test_tick_falls_back_to_command_echo_when_feedback_register_disabled():
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine(
+        "PRIMARY",
+        control_port="CONTROL",
+        air_feedback_register=None,
+        drum_feedback_register=None,
+        client_cls=client_cls,
+    )
+    engine.apply_command({"fan_pct": 60.0, "drum_speed_pct": 40.0})
+
+    sample = engine.tick(1.0)
+
+    assert sample["fan_pct"] == pytest.approx(60.0)
+    assert sample["drum_speed_pct"] == pytest.approx(40.0)
+
+
 def test_drum_range_clamps_above_70_percent():
     client_cls, instances = _make_fake_client_cls()
     engine = ModbusEngine("PRIMARY", control_port="CONTROL", client_cls=client_cls)

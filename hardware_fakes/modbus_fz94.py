@@ -11,8 +11,9 @@ module's docstring for the full citations):
     - DT:      slave 12, register 0    (function code 3, read),  x10 int
     - Burner:  slave 12, register 5    (function code 6, write), x10 int,
                a *setpoint temperature* (bang-bang PID), not a power %
-    - Air:     slave 1,  registers 8192 (run/stop) + 8193 (freq, x100)
-    - Drum:    slave 2,  registers 8192 (run/stop) + 8193 (freq, x100)
+    - Air:     slave 1,  registers 8192 (run/stop, write) + 8193 (freq,
+               write, x100) + 8451 (actual speed, read, x100)
+    - Drum:    slave 2,  same three registers, its own slave
 
 One connection handles all of it by default (19200 baud, 8N2 -- Artisan's
 own shipped preset's exact settings), matching the real engine's default
@@ -81,6 +82,7 @@ BURNER_SV_RANGE_C = (100.0, 250.0)  # must match ModbusEngine's own default
 DRIVE_CONTROL_REGISTER = 8192
 DRIVE_FREQUENCY_REGISTER = 8193
 DRIVE_RUN, DRIVE_STOP = 2, 1
+DRIVE_FEEDBACK_REGISTER = 8451  # actual speed readback, same x100 convention as the frequency write
 
 
 def _sv_to_heater_pct(sv_c: float) -> float:
@@ -220,10 +222,15 @@ class FZ94Simulator:
 
         if function == READ_HOLDING_REGISTERS:
             count = int.from_bytes(frame[4:6], "big")
-            key = self.temp_slaves.get(slave_id)
-            if key is None:
-                return  # not one of our temperature slaves
-            self._handle_temp_read(bus, slave_id, key, address, count)
+            temp_key = self.temp_slaves.get(slave_id)
+            if temp_key is not None:
+                self._handle_temp_read(bus, slave_id, temp_key, address, count)
+                return
+            drive_key = self.drive_slaves.get(slave_id)
+            if drive_key is not None:
+                self._handle_drive_read(bus, slave_id, drive_key, address, count)
+                return
+            # else: not one of our slaves -- ignore.
         elif function == WRITE_SINGLE_REGISTER:
             value = int.from_bytes(frame[4:6], "big")
             if slave_id == self.burner_slave_id:
@@ -252,6 +259,25 @@ class FZ94Simulator:
             body += v.to_bytes(2, "big")
         bus.ser.write(body + _crc16(body))
         self._log(f"[{bus.name}] read slave={slave_id} ({key}) addr={address} count={count} -> {values}")
+
+    def _handle_drive_read(self, bus: _SerialBus, slave_id: int, channel_key: str, address: int, count: int) -> None:
+        # Real speed readback (register 8451), not the last-commanded value
+        # -- this fake's thermal model applies commands instantaneously
+        # (no ramp/lag), so in practice it'll match what was last written,
+        # but it's read from the driver's own current state, the same way
+        # a real VFD would report *its* actual state, not just echo.
+        pct = self.driver.snapshot().get(channel_key)
+        values = []
+        for offset in range(count):
+            if address + offset == DRIVE_FEEDBACK_REGISTER and pct is not None:
+                values.append(max(0, min(65535, int(round(pct * 100)))))
+            else:
+                values.append(0)  # unmapped register -- real device would 0-fill or error
+        body = bytes([slave_id, READ_HOLDING_REGISTERS, count * 2])
+        for v in values:
+            body += v.to_bytes(2, "big")
+        bus.ser.write(body + _crc16(body))
+        self._log(f"[{bus.name}] read slave={slave_id} ({channel_key}) addr={address} count={count} -> {values}")
 
     def _handle_burner_write(self, bus: _SerialBus, address: int, value: int) -> None:
         if address != BURNER_REGISTER:

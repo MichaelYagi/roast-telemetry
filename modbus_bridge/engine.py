@@ -55,15 +55,28 @@ reading (function 3), confirmed identical in the .aset's `[Modbus]`
   maps the .aset's `SVmultiplier=1` to an actual x10 multiplier internally
   (1/2 mean x10/x100 respectively -- an enum, not a literal multiplier).
 
-**Air/Drum drives:** VFDs, not simple registers -- each needs a run/stop
-word written before a frequency command means anything:
+**Air/Drum drives:** Delta VFD-L frequency drives, not simple registers --
+each needs a run/stop word written before a frequency command means
+anything. Precisely attributed (the .aset's own `[Sliders]` block ships
+with empty `slidercommands`, i.e. not pre-wired the way the temperature
+side is, so none of this is Artisan-preset-confirmed the way BT/ET/DT/
+Burner are -- it's all from one person's FZ-94/Delta VFD-L installation,
+written up across a 5-part blog series, not independently corroborated by
+a second source):
 
-- Air: slave 1; Drum: slave 2
-- Control register 8192 (1=Stop, 2=Run), then frequency register 8193
-  (value = percent x100, so 100% -> 10000) -- this part is from the blog
-  write-ups specifically (the .aset's own `[Sliders]` block ships with
-  empty `slidercommands`, i.e. not pre-wired the way the temperature side
-  is), so it's the least-confirmed piece of this whole module.
+- Air: slave 1; Drum: slave 2 -- same VFD model, same registers, different
+  slave ID each.
+- Control register 8192 (2000H; 1=Stop, 2=Run), then frequency register
+  8193 (2001H; value = percent x100, so 100% -> 10000, factor confirmed
+  as "we send 10.000 to indicate 100% speed") -- from
+  .../2016/08/fz-94-4-taking-control.html specifically.
+- Feedback register 8451 -- reads the drive's *actual* current speed
+  (divide raw by 100, same x100 convention as the write side), not an
+  echo of the last command. Same register on both slave IDs. From
+  .../2016/08/fz-94-3-connecting-drives.html specifically (that post is
+  about wiring + this read register; the control/frequency *write*
+  registers above are a different post in the series -- don't assume one
+  post covers both directions).
 - Air range 0-100%, Drum range 0-70% (per the blog's own drive limits)
 - `control_port`/`control_baudrate` below exist only as an override for
   wiring that genuinely needs a second physical connection (uncommon) --
@@ -158,10 +171,18 @@ class ModbusEngine:
         air_control_register: Optional[int] = 8192,
         air_frequency_register: Optional[int] = 8193,
         air_range: tuple[float, float] = (0, 100),
+        # Real speed readback, not an echo of the last command -- same
+        # register on both drives (same Delta VFD-L model, different
+        # slave ID each). None disables it, falling back to the command
+        # echo below (see module docstring for the source/confidence).
+        air_feedback_register: Optional[int] = 8451,
+        air_feedback_divisor: float = 100.0,
         drum_slave_id: int = 2,
         drum_control_register: Optional[int] = 8192,
         drum_frequency_register: Optional[int] = 8193,
         drum_range: tuple[float, float] = (0, 70),
+        drum_feedback_register: Optional[int] = 8451,
+        drum_feedback_divisor: float = 100.0,
         dry_end_c: Optional[float] = 160.0,
         fc_start_c: Optional[float] = 196.0,
         client_cls=ModbusSerialClient,  # injectable for testing without real hardware
@@ -187,10 +208,14 @@ class ModbusEngine:
         self.air_control_register = air_control_register
         self.air_frequency_register = air_frequency_register
         self.air_range = air_range
+        self.air_feedback_register = air_feedback_register
+        self.air_feedback_divisor = air_feedback_divisor or 1.0
         self.drum_slave_id = drum_slave_id
         self.drum_control_register = drum_control_register
         self.drum_frequency_register = drum_frequency_register
         self.drum_range = drum_range
+        self.drum_feedback_register = drum_feedback_register
+        self.drum_feedback_divisor = drum_feedback_divisor or 1.0
 
         self._detector = LiveRoastDetector(dry_end_c=dry_end_c, fc_start_c=fc_start_c)
         self._last_time_s = 0.0
@@ -233,16 +258,22 @@ class ModbusEngine:
             self._control_connected = self._connected
 
     # -- Modbus I/O -----------------------------------------------------
-    def _read_register(self, address: int, slave_id: int, *, is_heartbeat: bool = False) -> Optional[int]:
+    def _read_register(
+        self, address: int, slave_id: int, *, is_heartbeat: bool = False, client=None
+    ) -> Optional[int]:
         """``is_heartbeat`` gates whether this read's outcome updates
         overall connected/last_error state. BT is the heartbeat (always
         required); ET/DT are optional and shouldn't be able to mask a BT
         failure by succeeding afterward in the same tick, nor clear a
         real BT error just because it happened to work. Each temperature
         channel is its own Modbus slave device, not a register on a
-        shared one -- ``slave_id`` is passed per call, not fixed on self."""
+        shared one -- ``slave_id`` is passed per call, not fixed on self.
+        ``client`` defaults to the primary connection; Air/Drum feedback
+        reads pass ``self._control_client`` instead, since that's where
+        those slave IDs actually live when control_port is set."""
+        client = client or self._client
         try:
-            result = self._client.read_holding_registers(address, count=1, device_id=slave_id)
+            result = client.read_holding_registers(address, count=1, device_id=slave_id)
             if result.isError():
                 if is_heartbeat:
                     self._last_error = str(result)
@@ -278,9 +309,26 @@ class ModbusEngine:
 
         sample = self._detector.observe(time_s, bt, et)
         sample["dt"] = dt
-        sample["heater_pct"] = self._last_values.get("burner")
-        sample["fan_pct"] = self._last_values.get("air")
-        sample["drum_speed_pct"] = self._last_values.get("drum")
+        sample["heater_pct"] = self._last_values.get("burner")  # no PV register for this one -- SV echo only
+
+        # Prefer a genuine feedback read over echoing the last command --
+        # confirms the drive actually took the write, not just that pymodbus
+        # didn't error. Falls back to the echo if no feedback register is
+        # configured (or its read fails), so this degrades to the old
+        # behavior rather than going blank.
+        air_fb = None
+        if self.air_feedback_register is not None:
+            air_raw = self._read_register(self.air_feedback_register, self.air_slave_id, client=self._control_client)
+            air_fb = (air_raw / self.air_feedback_divisor) if air_raw is not None else None
+        sample["fan_pct"] = air_fb if air_fb is not None else self._last_values.get("air")
+
+        drum_fb = None
+        if self.drum_feedback_register is not None:
+            drum_raw = self._read_register(
+                self.drum_feedback_register, self.drum_slave_id, client=self._control_client
+            )
+            drum_fb = (drum_raw / self.drum_feedback_divisor) if drum_raw is not None else None
+        sample["drum_speed_pct"] = drum_fb if drum_fb is not None else self._last_values.get("drum")
         return sample
 
     def get_new_events(self) -> list:
