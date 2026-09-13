@@ -340,6 +340,10 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
           grid: { color: "#e7e5e4" },
           ticks: { color: "#78716c" },
           display: showTemp,
+          // Without an explicit floor, Chart.js auto-fits to the visible
+          // data's own min (e.g. ~82C at Turning Point), starting the
+          // axis mid-way up rather than at a real baseline.
+          min: 0,
         },
         yRor: {
           type: "linear",
@@ -361,6 +365,18 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
           ticks: { color: "#78716c" },
           title: { display: true, text: "ctrl", color: "#78716c" },
           display: showControl,
+          // Heater/Fan/Drum/Damper are always 0-100% -- without a fixed
+          // range here too, Chart.js auto-fit whatever narrow slice of
+          // values was actually visible, so a ~constant 50% Drum line
+          // (say) landed at an arbitrary height instead of a real
+          // percentage scale. Artisan itself plots these against its own
+          // temperature axis rather than a dedicated one -- this app
+          // deliberately doesn't match that (a real 0-100 scale is more
+          // readable than a control value squashed near zero on a 350-
+          // degree axis), so don't "fix" this to match Artisan's own
+          // choice here.
+          min: 0,
+          max: 100,
         },
       },
     }),
