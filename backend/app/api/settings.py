@@ -19,6 +19,14 @@ def get_settings() -> AppSettings:
     return AppSettings(**storage.get_settings())
 
 
+def _filter_panels(keys: list[str]) -> list[str]:
+    return [k for k in keys if k in BREAKOUT_PANEL_KEYS]
+
+
+def _filter_colors(colors: dict[str, str]) -> dict[str, str]:
+    return {k: v for k, v in colors.items() if k in BREAKOUT_PANEL_KEYS and _HEX_COLOR_RE.match(v)}
+
+
 @router.put("", response_model=AppSettings)
 def update_settings(settings: AppSettings) -> AppSettings:
     # Silently drop unknown keys/malformed values rather than error --
@@ -29,20 +37,28 @@ def update_settings(settings: AppSettings) -> AppSettings:
     # attribute on the frontend (BreakoutPanel.jsx), and while a native
     # `<input type="color">` always produces a clean #rrggbb string, this
     # is the API boundary -- don't trust that assumption holds for every
-    # caller.
-    panels = [p for p in settings.broken_out_panels if p in BREAKOUT_PANEL_KEYS]
-    colors = {
-        k: v for k, v in settings.breakout_panel_colors.items() if k in BREAKOUT_PANEL_KEYS and _HEX_COLOR_RE.match(v)
-    }
+    # caller. small_readout_panels is a second, independent enabled-list
+    # over the same BREAKOUT_PANEL_KEYS -- same validation, own storage
+    # key -- but shares breakout_panel_colors with broken_out_panels
+    # rather than having its own: colors are a property of the item
+    # (e.g. "bt" is the same blue everywhere), not something that should
+    # drift between two panels showing the same value.
+    panels = _filter_panels(settings.broken_out_panels)
+    colors = _filter_colors(settings.breakout_panel_colors)
+    small_panels = _filter_panels(settings.small_readout_panels)
     storage.set_settings(
         ollama_url=settings.ollama_url,
         ollama_model=settings.ollama_model,
         broken_out_panels=panels,
         breakout_panel_colors=colors,
+        small_readout_panels=small_panels,
     )
     return AppSettings(
-        ollama_url=settings.ollama_url, ollama_model=settings.ollama_model, broken_out_panels=panels,
+        ollama_url=settings.ollama_url,
+        ollama_model=settings.ollama_model,
+        broken_out_panels=panels,
         breakout_panel_colors=colors,
+        small_readout_panels=small_panels,
     )
 
 

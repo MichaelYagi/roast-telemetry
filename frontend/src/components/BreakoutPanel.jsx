@@ -41,7 +41,14 @@ export default function BreakoutPanel({ enabledKeys, latest, milestones, elapsed
       {items.map((item) => {
         const color = colorOverrides?.[item.key] || item.color;
         return (
-          <div key={item.key} className="breakout-box" style={{ borderColor: color }}>
+          // --item-color, not just borderColor: the Big Readout Panel's
+          // own look (white box, colored border+text) only needs
+          // borderColor/color inline -- the Small Readout column wants
+          // the *same* color value presented differently (a solid filled
+          // background instead), which a scoped stylesheet rule can only
+          // pull off by reading a custom property, not an inline style
+          // meant for something else.
+          <div key={item.key} className="breakout-box" style={{ borderColor: color, "--item-color": color }}>
             <span className="breakout-label">{item.label}</span>
             <span className="breakout-value" style={{ color, "--value-chars": String(values[item.key]).length }}>
               {values[item.key]}

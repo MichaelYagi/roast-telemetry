@@ -263,11 +263,26 @@ def get_settings() -> dict:
         )
     except (json.JSONDecodeError, TypeError):
         breakout_panel_colors = {}
+    try:
+        # Falls back to the fixed ET/BT/DT/deltaBT legend this replaced,
+        # but only when the key was truly never saved (values.get returns
+        # None, not the string "[]" json.dumps([]) would have produced) --
+        # an install that explicitly saves an empty Small Readout list
+        # gets to keep it empty on the next load, not have this default
+        # forced back.
+        small_readout_panels = (
+            json.loads(values["small_readout_panels"])
+            if values.get("small_readout_panels")
+            else ["et", "bt", "dt", "ror_bt"]
+        )
+    except (json.JSONDecodeError, TypeError):
+        small_readout_panels = ["et", "bt", "dt", "ror_bt"]
     return {
         "ollama_url": values.get("ollama_url"),
         "ollama_model": values.get("ollama_model"),
         "broken_out_panels": broken_out_panels,
         "breakout_panel_colors": breakout_panel_colors,
+        "small_readout_panels": small_readout_panels,
     }
 
 
@@ -276,6 +291,8 @@ def set_settings(**kv) -> None:
         kv["broken_out_panels"] = json.dumps(kv["broken_out_panels"])
     if "breakout_panel_colors" in kv:
         kv["breakout_panel_colors"] = json.dumps(kv["breakout_panel_colors"])
+    if "small_readout_panels" in kv:
+        kv["small_readout_panels"] = json.dumps(kv["small_readout_panels"])
     with _conn() as c:
         for key, value in kv.items():
             c.execute(

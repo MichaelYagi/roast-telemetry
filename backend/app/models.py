@@ -246,7 +246,21 @@ class AppSettings(BaseModel):
     # in frontend/src/breakoutPanels.js's BREAKOUT_PANEL_ITEMS. A key
     # absent here just means "use the built-in default" -- this only
     # needs to hold actual overrides, not a full copy of every item.
+    # Shared by broken_out_panels AND small_readout_panels below (colors
+    # are a property of the item -- e.g. "bt" is the same blue everywhere
+    # it's shown -- not something that should drift between two panels
+    # showing the same value).
     breakout_panel_colors: dict[str, str] = {}
+    # Independent from broken_out_panels above -- same BREAKOUT_PANEL_ITEMS
+    # registry and the same breakout_panel_colors, but its own ordered
+    # enabled list, rendered as a compact scaled column beside the chart at
+    # any width (not gated to broken_out_panels' >=1400px split-layout
+    # threshold). storage.get_settings() seeds this to
+    # ["et", "bt", "dt", "ror_bt"] only the first time (key never saved
+    # before) -- matches the fixed ET/BT/DT/deltaBT legend this replaced,
+    # so existing installs see no visual change until they actually touch
+    # Settings > Small Readout.
+    small_readout_panels: list[str] = []
 
 
 class OllamaStatus(BaseModel):

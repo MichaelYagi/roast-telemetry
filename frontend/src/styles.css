@@ -1379,49 +1379,75 @@ button:disabled {
   min-width: 0;
 }
 
-.readout-col {
+/* Small Readout -- an independent, user-configured BreakoutPanel instance
+   (see Settings > Small Readout) shown beside the chart at any width.
+   Replaced a fixed ET/BT/DT/deltaBT legend that used to live here;
+   reuses the exact same auto-scaling approach as the wide split-pane
+   Big Readout Panel (.breakout-split-panel-pane below), just with a much
+   narrower/shorter ceiling on the clamp()s since this column is nowhere
+   near as roomy. .scope-body's own `align-items: stretch` is what gives
+   this a definite height to divide among boxes, same as the old
+   .readout-col relied on implicitly. */
+.small-readout-col {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  width: 92px;
+  width: 108px;
   flex-shrink: 0;
 }
 
-.readout-box {
-  border-radius: 8px;
-  padding: 0.4rem 0.5rem;
+.small-readout-col .breakout-panel {
+  flex: 1;
+  position: static;
+  width: 100%;
+  height: 100%;
+  gap: 0.4rem;
+}
+
+.small-readout-col .breakout-box {
+  /* Solid filled background in the item's own color, not the Big Readout
+     Panel's white-box-with-colored-border look -- matches the original
+     fixed ET/BT/DT/deltaBT legend's style exactly (this replaced it).
+     The *color value* is still shared with the Big Panel (see
+     BreakoutPanel.jsx's --item-color), only the presentation differs
+     here, which is why this needs its own background/border/text-color
+     rules instead of just inheriting the base .breakout-box look. */
+  background: var(--item-color);
+  border-left: none;
+  border-color: transparent;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+  padding: 0.3rem 0.4rem;
+  container-type: size;
+  overflow: hidden;
+}
+
+.small-readout-col .breakout-label {
+  flex: 0 0 auto;
+  font-size: clamp(0.55rem, min(16cqh, 20cqw), 0.85rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* White, not the base rule's var(--text-muted) -- that's tuned for
+     dark text on the panel background, illegible on a solid color fill. */
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.small-readout-col .breakout-value {
+  flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  color: white;
-}
-
-.readout-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  opacity: 0.85;
-}
-
-.readout-value {
-  font-size: 1.15rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
-.readout-et {
-  background: #be123c;
-}
-
-.readout-bt {
-  background: #1d4ed8;
-}
-
-.readout-dt {
-  background: #c2410c;
-}
-
-.readout-ror {
-  background: #78716c;
+  justify-content: center;
+  font-size: clamp(0.8rem, min(60cqh, calc(140cqw / var(--value-chars, 6))), 2.4rem);
+  line-height: 1;
+  white-space: nowrap;
+  /* Overrides BreakoutPanel.jsx's own inline `color: <item color>` --
+     needed here specifically: that's the item's color rendered as *text*
+     for the Big Panel's white background, but this box's background
+     *is* that same color now, so colored-on-colored would be illegible.
+     Only a stylesheet rule with !important can win against an inline
+     style attribute at all -- this is that one legitimate case for it. */
+  color: white !important;
 }
 
 .event-button-row {
@@ -1449,12 +1475,13 @@ button:disabled {
   .scope-body {
     flex-direction: column;
   }
-  .readout-col {
+  .small-readout-col {
     flex-direction: row;
     width: 100%;
+    height: 70px;
   }
-  .readout-box {
-    flex: 1;
+  .small-readout-col .breakout-panel {
+    flex-direction: row;
   }
   .artisan-toolbar-power {
     margin-left: 0;

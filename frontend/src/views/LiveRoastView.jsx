@@ -4,10 +4,10 @@ import { api } from "../api/client.js";
 import { useRoastStream } from "../api/ws.js";
 import ArtisanToolbar from "../components/ArtisanToolbar.jsx";
 import BreakoutPanel from "../components/BreakoutPanel.jsx";
+import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 import ConnectionBadge from "../components/ConnectionBadge.jsx";
 import ControlPanel from "../components/ControlPanel.jsx";
 import EventButtonRow from "../components/EventButtonRow.jsx";
-import LiveReadouts from "../components/LiveReadouts.jsx";
 import RoastChart from "../components/RoastChart.jsx";
 
 const SETTINGS_POLL_MS = 5000;
@@ -134,7 +134,8 @@ export default function LiveRoastView() {
   const [presetName, setPresetName] = useState("");
   const [presetFeedback, setPresetFeedback] = useState(null);
   const [brokenOutPanels, setBrokenOutPanels] = useState([]); // ordered array, matches Settings' display order
-  const [panelColors, setPanelColors] = useState({}); // key -> hex override, from Settings' color pickers
+  const [panelColors, setPanelColors] = useState({}); // key -> hex override, shared by both readout panels
+  const [smallReadoutPanels, setSmallReadoutPanels] = useState([]); // ordered array, independent from brokenOutPanels
   const [viewportWide, setViewportWide] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= BREAKOUT_SPLIT_MIN_VIEWPORT
   );
@@ -262,10 +263,10 @@ export default function LiveRoastView() {
     reconnectActiveRoast();
   }, []);
 
-  // Hot-applies Settings > Big Readout Panel changes to an already-open
-  // tab -- same lightweight polling pattern the device list elsewhere
-  // uses, rather than a dedicated push channel for
-  // what's a rarely-changed, low-stakes display preference.
+  // Hot-applies Settings > Big Readout Panel / Small Readout changes to an
+  // already-open tab -- same lightweight polling pattern the device list
+  // elsewhere uses, rather than a dedicated push channel for what's a
+  // rarely-changed, low-stakes display preference.
   useEffect(() => {
     const load = () =>
       api
@@ -273,6 +274,10 @@ export default function LiveRoastView() {
         .then((s) => {
           setBrokenOutPanels(s.broken_out_panels || []);
           setPanelColors(s.breakout_panel_colors || {});
+          // Defensive filter, not just SettingsView's editor-side one -- an
+          // older save (from before "time" was excluded) could still have
+          // it in the array, and this view polls settings independently.
+          setSmallReadoutPanels((s.small_readout_panels || []).filter((k) => !SMALL_READOUT_EXCLUDED_KEYS.includes(k)));
         })
         .catch(() => {});
     load();
@@ -1130,14 +1135,24 @@ export default function LiveRoastView() {
               <div className="scope-chart">
                 <RoastChart profile={roast?.profile || []} events={roast?.events || []} title={null} />
               </div>
-              {/* Redundant with the split breakout panel (same values,
-                  much bigger) and space is genuinely tight there -- the
-                  chart's own BT/ET/DT/RoR checkboxes above it already
-                  double as a color legend, so nothing is lost by hiding
-                  this specifically in split mode. Still shown as normal
-                  in the narrower sidebar-panel layout, where it isn't
-                  competing with anything for room. */}
-              {!showSplitLayout && <LiveReadouts latest={latest} />}
+              {/* Independent from the split breakout panel now (see
+                  Settings > Small Readout) -- always shown regardless of
+                  showSplitLayout, since it's the user's own separate
+                  choice of what goes here, not an automatic duplicate of
+                  the big panel. Renders nothing (via BreakoutPanel's own
+                  empty-list check) if nothing's enabled, same as before
+                  Small Readout existed as a concept -- used to be a
+                  hardcoded ET/BT/DT/deltaBT legend instead. */}
+              <div className="small-readout-col">
+                <BreakoutPanel
+                  enabledKeys={smallReadoutPanels}
+                  latest={latest}
+                  milestones={milestones}
+                  elapsedLabel={elapsedLabel}
+                  roast={roast}
+                  colorOverrides={panelColors}
+                />
+              </div>
             </div>
             <EventButtonRow disabled={!isActive} events={roast?.events || []} onFire={handleFireEvent} />
           </div>

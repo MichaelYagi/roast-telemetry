@@ -21,7 +21,45 @@ def test_settings_roundtrip_including_panel_list(isolated_db):
         "ollama_model": "llama3.1",
         "broken_out_panels": ["bt", "et", "time"],
         "breakout_panel_colors": {"bt": "#112233"},
+        # Never saved in this test -- falls back to the seeded default.
+        "small_readout_panels": ["et", "bt", "dt", "ror_bt"],
     }
+
+
+def test_small_readout_panels_roundtrips_independently_of_broken_out_panels(isolated_db):
+    isolated_db.set_settings(small_readout_panels=["heater", "fan"])
+
+    result = isolated_db.get_settings()
+
+    assert result["small_readout_panels"] == ["heater", "fan"]
+    assert result["broken_out_panels"] == []  # untouched by the above
+
+
+def test_breakout_panel_colors_is_shared_by_both_panels(isolated_db):
+    # There's deliberately no separate small_readout_colors -- colors are
+    # a property of the item (e.g. "bt" is the same blue everywhere it's
+    # shown), not something that should drift between two panels
+    # displaying the same value.
+    isolated_db.set_settings(
+        broken_out_panels=["bt"],
+        small_readout_panels=["bt"],
+        breakout_panel_colors={"bt": "#112233"},
+    )
+
+    result = isolated_db.get_settings()
+
+    assert result["breakout_panel_colors"] == {"bt": "#112233"}
+    assert "small_readout_colors" not in result
+
+
+def test_small_readout_panels_explicit_empty_list_stays_empty(isolated_db):
+    # Distinguishes "never saved" (seeded default) from "user deliberately
+    # cleared it" (stays empty) -- both look falsy-ish at a glance, but
+    # json.dumps([]) is the *string* "[]", which is truthy, unlike a
+    # genuinely-missing key, so get_settings() can and does tell them apart.
+    isolated_db.set_settings(small_readout_panels=[])
+
+    assert isolated_db.get_settings()["small_readout_panels"] == []
 
 
 def test_get_settings_defaults_on_empty_db(isolated_db):
@@ -30,6 +68,7 @@ def test_get_settings_defaults_on_empty_db(isolated_db):
         "ollama_model": None,
         "broken_out_panels": [],
         "breakout_panel_colors": {},
+        "small_readout_panels": ["et", "bt", "dt", "ror_bt"],
     }
 
 

@@ -19,3 +19,9 @@ export const BREAKOUT_PANEL_ITEMS = [
   { key: "drum", label: "Drum %", color: "#16a34a" },
   { key: "playback_speed", label: "Playback speed", color: "#334155" },
 ];
+
+// "Elapsed time" is redundant right beside the chart, which already has
+// its own elapsed-time x-axis -- excluded only from the Small Readout
+// column (both its Settings editor and its live render), not the Big
+// Readout Panel, which isn't tied to sitting next to the chart the same way.
+export const SMALL_READOUT_EXCLUDED_KEYS = ["time"];

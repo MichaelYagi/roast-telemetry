@@ -16,6 +16,7 @@ def test_get_settings_defaults(client):
     assert resp.status_code == 200
     assert resp.json() == {
         "ollama_url": None, "ollama_model": None, "broken_out_panels": [], "breakout_panel_colors": {},
+        "small_readout_panels": ["et", "bt", "dt", "ror_bt"],
     }
 
 
@@ -52,6 +53,43 @@ def test_put_settings_drops_invalid_panel_colors(client):
 
     get_resp = client.get("/api/settings")
     assert get_resp.json()["breakout_panel_colors"] == {"bt": "#112233"}
+
+
+def test_put_settings_filters_small_readout_panels_independently(client):
+    resp = client.put("/api/settings", json={
+        "ollama_url": None,
+        "ollama_model": None,
+        "broken_out_panels": ["bt"],
+        "small_readout_panels": ["heater", "not_a_real_panel_key", "fan"],
+    })
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["small_readout_panels"] == ["heater", "fan"]
+    # Untouched by small_readout_panels above -- an independent enabled
+    # list, not a variant of broken_out_panels.
+    assert body["broken_out_panels"] == ["bt"]
+
+    get_resp = client.get("/api/settings")
+    assert get_resp.json()["small_readout_panels"] == ["heater", "fan"]
+
+
+def test_breakout_panel_colors_apply_to_both_big_and_small_readouts(client):
+    # Colors are a property of the item, not the panel -- one shared map
+    # (breakout_panel_colors), used regardless of which enabled-list(s) a
+    # key appears in.
+    resp = client.put("/api/settings", json={
+        "ollama_url": None,
+        "ollama_model": None,
+        "broken_out_panels": ["bt"],
+        "small_readout_panels": ["bt"],
+        "breakout_panel_colors": {"bt": "#112233"},
+    })
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["breakout_panel_colors"] == {"bt": "#112233"}
+    assert "small_readout_colors" not in body
 
 
 def test_put_settings_preserves_panel_order(client):
