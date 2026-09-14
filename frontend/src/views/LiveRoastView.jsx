@@ -1130,7 +1130,14 @@ export default function LiveRoastView() {
               <div className="scope-chart">
                 <RoastChart profile={roast?.profile || []} events={roast?.events || []} title={null} />
               </div>
-              <LiveReadouts latest={latest} />
+              {/* Redundant with the split breakout panel (same values,
+                  much bigger) and space is genuinely tight there -- the
+                  chart's own BT/ET/DT/RoR checkboxes above it already
+                  double as a color legend, so nothing is lost by hiding
+                  this specifically in split mode. Still shown as normal
+                  in the narrower sidebar-panel layout, where it isn't
+                  competing with anything for room. */}
+              {!showSplitLayout && <LiveReadouts latest={latest} />}
             </div>
             <EventButtonRow disabled={!isActive} events={roast?.events || []} onFire={handleFireEvent} />
           </div>
