@@ -686,6 +686,14 @@ export default function LiveRoastView() {
   // merely armed, matching Artisan's own control-before-record model, not
   // just once an actual roast is roasting/cooling.
   const isActive = roast && (roast.status === "roasting" || roast.status === "cooling" || roast.status === "idle");
+  // Narrower than isActive on purpose -- milestone events (EventButtonRow)
+  // shouldn't be markable during the merely-armed/preview window: profile
+  // is empty there, so a click would land at time_s=0.0 and then silently
+  // survive into the real recording once START is pressed (see
+  // add_event()'s own status guard on the backend, which rejects this
+  // server-side too -- this is just so the button is disabled *before*
+  // that doomed request round trips).
+  const isRecording = roast && (roast.status === "roasting" || roast.status === "cooling");
   // While armed (status "idle"), roast.profile is intentionally empty --
   // the server never appends to it before recording starts (that's what
   // keeps the chart showing no curve pre-recording) -- so BT/ET/etc. come
@@ -1352,7 +1360,12 @@ export default function LiveRoastView() {
                 />
               </div>
             </div>
-            <EventButtonRow disabled={!isActive} events={roast?.events || []} onFire={handleFireEvent} />
+            <EventButtonRow
+              disabled={!isRecording}
+              events={roast?.events || []}
+              onFire={handleFireEvent}
+              manualCharge={LIVE_MODES.includes(activeMode)}
+            />
           </div>
 
           {roast && (

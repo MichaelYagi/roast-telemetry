@@ -258,25 +258,39 @@ def _feed_charge_sequence(engine, primary):
     return engine.tick(1.0)
 
 
-def test_reset_detection_lets_charge_fire_again():
-    """LiveRoastDetector's CHARGE detection is one-shot by design (see its
-    own docstring/_phase machine) -- reset_detection() exists specifically
-    so a roast that starts *recording* after a live connection was already
-    open for a while (see RoastSession.begin_recording()) doesn't
-    permanently lose CHARGE to whatever the detector happened to observe
-    during that earlier window."""
+def test_charge_is_never_auto_detected():
+    """Real hardware means a real operator marks milestones by hand --
+    ModbusEngine constructs its LiveRoastDetector with
+    detect_milestones=False (see engine.py's __init__), so even a sharp
+    BT drop that would trip the default 8C/20s heuristic fires nothing.
+    The detector's own detect_milestones capability is covered directly
+    in tests/test_live_roast_detector.py -- this just confirms the
+    engine's shipped default actually uses it."""
     client_cls, instances = _make_fake_client_cls()
     engine = ModbusEngine("PRIMARY", client_cls=client_cls)
     primary = instances["PRIMARY"]
 
     _feed_charge_sequence(engine, primary)
-    first_events = [e["type"] for e in engine.get_new_events()]
-    assert first_events == ["CHARGE"]
 
-    # Without a reset, the detector's _phase has already moved past
-    # "pre_charge" -- feeding the exact same drop again would fire nothing.
+    assert engine.get_new_events() == []
+
+
+def test_reset_detection_restarts_the_elapsed_time_clock():
+    """reset_detection() exists so a roast that starts *recording* after
+    a live connection was already open for a while (see
+    RoastSession.begin_recording()) gets a time axis starting fresh at 0,
+    not wherever the earlier preview window left off -- an actually wrong
+    time axis on the persisted roast otherwise, not just cosmetic."""
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls)
+    primary = instances["PRIMARY"]
+    primary.register_values[(11, 0)] = 1000  # BT 100.0C, steady
+
+    for _ in range(5):
+        sample = engine.tick(1.0)
+    assert sample["time_s"] == 5.0
+
     engine.reset_detection()
 
-    _feed_charge_sequence(engine, primary)
-    second_events = [e["type"] for e in engine.get_new_events()]
-    assert second_events == ["CHARGE"]
+    sample = engine.tick(1.0)
+    assert sample["time_s"] == 1.0

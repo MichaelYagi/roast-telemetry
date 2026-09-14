@@ -186,31 +186,36 @@ PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code></pre>
   <h3>Suggested manual test settings</h3>
   <p>
     Right after clicking START, set <strong>Burner=85%, Air=15%</strong>
-    (Drum at the default 50%) in the Controls panel. This isn't a guess —
-    it's the actual thermal model run forward, so the timings below are
-    exact for this setting:
+    (Drum at the default 50%) in the Controls panel. Every milestone is a
+    manual click for <code>modbus_live</code> (real hardware means a real
+    operator marking them by hand, not an algorithm guessing from the
+    curve — see <a href="index.html#testing-mode">Testing Mode</a> and
+    the <a href="real-hardware-checklist.html">real-hardware
+    checklist</a>) — the fake's thermal model isn't a guess, though, so
+    the times below tell you exactly when to click each one:
   </p>
   <table>
-    <thead><tr><th>Event</th><th>Type</th><th>Time</th><th>BT</th></tr></thead>
+    <thead><tr><th>Event</th><th>Click it around</th><th>BT</th></tr></thead>
     <tbody>
-      <tr><td>Charge</td><td>auto</td><td>0:00</td><td>96.0°C</td></tr>
-      <tr><td>Turning Point</td><td>auto</td><td>0:45</td><td>82.0°C</td></tr>
-      <tr><td>Dry End</td><td>auto (threshold 160°C)</td><td>3:35</td><td>160.1°C</td></tr>
-      <tr><td>FC Start</td><td>auto (threshold 196°C)</td><td>5:27</td><td>196.1°C</td></tr>
-      <tr><td>FC End</td><td><strong>click it</strong></td><td>~6:00</td><td>~205°C</td></tr>
-      <tr><td>SC Start</td><td><strong>click it</strong></td><td>~6:30</td><td>~211°C</td></tr>
-      <tr><td>Drop</td><td><strong>click it, by</strong></td><td>~6:50–6:54</td><td>~217–218°C</td></tr>
-      <tr><td>Cool End</td><td><strong>click it, then stop the roast</strong></td><td>by ~9:50</td><td>falling</td></tr>
+      <tr><td>Charge</td><td>right when you press START</td><td>96.0°C</td></tr>
+      <tr><td>Dry End</td><td>~3:35</td><td>~160°C</td></tr>
+      <tr><td>FC Start</td><td>~5:27</td><td>~196°C</td></tr>
+      <tr><td>FC End</td><td>~6:00</td><td>~205°C</td></tr>
+      <tr><td>SC Start</td><td>~6:30</td><td>~211°C</td></tr>
+      <tr><td>Drop</td><td>by ~6:50–6:54</td><td>~217–218°C</td></tr>
+      <tr><td>Cool End</td><td>by ~9:50, then stop the roast</td><td>falling</td></tr>
     </tbody>
   </table>
   <p>
-    Charge/Turning Point/Dry End/FC Start auto-fire from the BT curve
-    (<code>roast_heuristics.LiveRoastDetector</code>) — nothing to click.
-    FC End, SC Start, Drop and Cool End are judgment calls in real
-    roasting too, so they stay manual event buttons under the chart; the
-    times above just tell you <em>when the underlying fake's own physics
-    hit those points</em>, so your manual clicks land in the right place
-    on the curve.
+    Turning Point isn't in this table — it has no button at all (see
+    Testing Mode) and, since Charge no longer auto-fires here either, its
+    own auto-detection (which only ever triggers as a side effect of
+    Charge's detected phase transition) can't fire anymore, so it simply
+    won't appear on this or any real-hardware roast. Every other row is a
+    genuine judgment call in real roasting too, same as FC End/SC
+    Start/Drop/Cool End always were — the times above just tell you
+    <em>when the underlying fake's own physics hit those points</em>, so
+    your manual clicks land in the right place on the curve.
   </p>
   <p>
     The <strong>Drop</strong> deadline matters more than the others: the

@@ -122,7 +122,11 @@ class MS6514Engine:
         self.port = port
         self._dry_end_c = dry_end_c
         self._fc_start_c = fc_start_c
-        self._detector = LiveRoastDetector(dry_end_c=dry_end_c, fc_start_c=fc_start_c)
+        # Real hardware means a real operator standing at the machine --
+        # milestones are marked by hand (this platform's own event
+        # buttons), not guessed from the temperature curve. See
+        # roast_heuristics.LiveRoastDetector's own docstring.
+        self._detector = LiveRoastDetector(dry_end_c=dry_end_c, fc_start_c=fc_start_c, detect_milestones=False)
         self._last_time_s = 0.0
         self._last_bt: Optional[float] = None
         self._last_et: Optional[float] = None
@@ -201,7 +205,7 @@ class MS6514Engine:
         after a while spent connected/previewing gets a genuinely fresh
         detector and a time axis starting at 0, not wherever preview left
         off."""
-        self._detector = LiveRoastDetector(dry_end_c=self._dry_end_c, fc_start_c=self._fc_start_c)
+        self._detector = LiveRoastDetector(dry_end_c=self._dry_end_c, fc_start_c=self._fc_start_c, detect_milestones=False)
         self._last_time_s = 0.0
 
     def close(self) -> None:

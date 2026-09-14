@@ -34,10 +34,14 @@ prefer the link above or open the files locally.)*
   connection safely — comprehensive per-channel reads, plus an optional,
   deliberately benign write check (a no-op round-trip on the least
   consequential channel) before you ever start a real roast.
-- **Live event auto-detection** (Charge/Turning Point/Dry End/FC Start)
-  from the raw temperature curve, shared by both hardware bridges, since
-  neither a PLC nor a thermocouple meter carries roast-milestone events
-  on its own.
+- **Live rate-of-rise, computed from raw BT/ET either way** — real
+  hardware doesn't carry roast-milestone events on its own (a PLC or a
+  thermocouple meter has no concept of Charge/Dry End/etc.), and this
+  app doesn't guess them from the curve over an operator's own judgment
+  either: every milestone is a manual click for Direct Modbus/USB, with
+  live RoR shown to help time it. (The Artisan Simulator source is the
+  exception — its own thermal model auto-fires milestones, useful as a
+  hands-off demo.)
 - **Real hardware fakes** for both live-hardware modes, so the full
   connection code path is testable without owning a roaster.
 

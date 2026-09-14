@@ -66,9 +66,17 @@ MILESTONE_SEQUENCE = [
     RoastEventType.COOL_END,
 ]
 
-# These two are never manually markable -- always auto-detected (a sharp
-# BT drop, and the BT minimum right after), no human judgment involved.
-ALWAYS_AUTO_EVENT_TYPES = {RoastEventType.CHARGE, RoastEventType.TURNING_POINT}
+# TURNING_POINT is never manually markable. For simulator/alog_playback
+# it's genuinely always auto-detected (no human judgment involved -- the
+# BT minimum right after Charge). For modbus_live/ms6514_live, real
+# hardware now marks every milestone including CHARGE by hand (see
+# modbus_bridge/ms6514_bridge's LiveRoastDetector(detect_milestones=False)),
+# which as a side effect means TURNING_POINT can't fire there either --
+# its own detection is only ever reached via CHARGE's auto-detected phase
+# transition (roast_heuristics/detector.py), which no longer runs. It has
+# no button in the UI for either case (EventButtonRow.jsx), so there's
+# nothing to unblock either way.
+ALWAYS_AUTO_EVENT_TYPES = {RoastEventType.TURNING_POINT}
 
 
 class Device(BaseModel):

@@ -10,12 +10,16 @@ has any concept of roast events at all. Both engines just call
 the detection logic itself lives here once instead of being duplicated
 per data source.
 
-CHARGE is detected from a sharp BT drop (cold beans hitting the hot
-drum); TURNING_POINT as the BT minimum right after; DRY_END/FC_START
-from configurable BT thresholds, since real roasts vary too much by
-bean to hardcode these. DROP/COOL_END aren't threshold-detectable --
-they're roast-level judgment calls -- so those stay manual (mark them
-with this platform's own event buttons), same as a real roaster would.
+When ``detect_milestones`` is on (the default): CHARGE is detected from
+a sharp BT drop (cold beans hitting the hot drum); TURNING_POINT as the
+BT minimum right after; DRY_END/FC_START from configurable BT
+thresholds, since real roasts vary too much by bean to hardcode these.
+DROP/COOL_END aren't threshold-detectable -- they're roast-level
+judgment calls -- so those stay manual (mark them with this platform's
+own event buttons) regardless. With ``detect_milestones`` off, every
+milestone is a manual call instead -- for hardware/operators where an
+algorithmic guess from the temperature curve isn't trusted or wanted;
+RoR is computed the same either way.
 """
 from __future__ import annotations
 
@@ -43,6 +47,7 @@ class LiveRoastDetector:
         turning_point_rebound_c: float = 0.5,
         dry_end_c: Optional[float] = 160.0,
         fc_start_c: Optional[float] = 196.0,
+        detect_milestones: bool = True,
     ):
         # bt_history backs both RoR and charge-drop detection -- keep it
         # wide enough for whichever window is larger.
@@ -52,6 +57,16 @@ class LiveRoastDetector:
         self._turning_point_rebound_c = turning_point_rebound_c
         self._dry_end_c = dry_end_c
         self._fc_start_c = fc_start_c
+        # False for hardware where the operator marks every milestone by
+        # hand (see modbus_bridge/ms6514_bridge's own constructors) -- RoR
+        # is still computed either way, only CHARGE/TURNING_POINT/DRY_END/
+        # FC_START detection is skipped. TURNING_POINT specifically can
+        # only ever fire as a side effect of CHARGE's own auto-detected
+        # phase transition (see _detect_events below), so disabling
+        # CHARGE detection alone already silences it -- this flag just
+        # makes that explicit/skippable in one place instead of relying
+        # on that being an obvious consequence.
+        self._detect_milestones = detect_milestones
 
         self._bt_history: deque = deque()
         self._et_history: deque = deque()
@@ -73,7 +88,7 @@ class LiveRoastDetector:
         while self._et_history and self._et_history[0][0] < cutoff:
             self._et_history.popleft()
 
-        if bt is not None:
+        if bt is not None and self._detect_milestones:
             self._detect_events(time_s, bt)
 
         return {

@@ -367,6 +367,16 @@ class RoastSession:
 
     def add_event(self, req: EventCreateRequest) -> dict:
         if req.type in MILESTONE_SEQUENCE:
+            # Guards against marking a milestone while merely connected/
+            # previewing (status IDLE -- see connect()), not yet recording.
+            # Matters now that CHARGE itself can be manual (real hardware,
+            # detect_milestones=False): profile is empty during preview,
+            # so a click there would get time_s=0.0 and then silently
+            # survive into the real recording once begin_recording() flips
+            # status, landing as a phantom event at the very start of the
+            # timeline instead of being rejected outright.
+            if self.status not in (RoastStatus.ROASTING, RoastStatus.COOLING):
+                raise RoastSessionError(f"roast {self.id} isn't recording yet (status={self.status.value}) -- press START first")
             if req.type in ALWAYS_AUTO_EVENT_TYPES:
                 raise RoastSessionError(f"{req.type.value} is always auto-detected -- it can't be marked manually")
             existing_types = {RoastEventType(e["type"]) for e in self.events if e["type"] != RoastEventType.CUSTOM.value}

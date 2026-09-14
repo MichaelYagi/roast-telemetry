@@ -1,9 +1,13 @@
 """RoastSession.add_event -- milestone event sequencing. This is the rule
 that a milestone can be marked as long as nothing *later* in the roast's
 canonical order has fired yet (skipping ahead is fine; going back once a
-later one is recorded is not), CHARGE/TURNING_POINT are never manually
-markable, and re-marking an already-recorded milestone is rejected. CUSTOM
-events (imported control-channel adjustments) are exempt entirely.
+later one is recorded is not), TURNING_POINT is never manually markable
+(CHARGE now is -- real-hardware modes mark it by hand, see
+roast_heuristics.LiveRoastDetector's detect_milestones=False), a milestone
+can only be marked once the session is actually recording (not merely
+armed/connected), and re-marking an already-recorded milestone is
+rejected. CUSTOM events (imported control-channel adjustments) are exempt
+entirely.
 
 Builds a bare RoastSession directly (SIMULATOR mode, never .start()-ed) so
 this never touches the DB, a WebSocket, or a background task -- add_event
@@ -13,13 +17,19 @@ from __future__ import annotations
 
 import pytest
 
-from backend.app.models import EventCreateRequest, RoastCreateRequest, RoastEventType, RoastMode
+from backend.app.models import EventCreateRequest, RoastCreateRequest, RoastEventType, RoastMode, RoastStatus
 from backend.app.roast_session.session import RoastSession, RoastSessionError
 
 
 def make_session() -> RoastSession:
     request = RoastCreateRequest(title="Test Roast", mode=RoastMode.SIMULATOR)
-    return RoastSession("test-roast-id", request)
+    session = RoastSession("test-roast-id", request)
+    # add_event now requires the session to actually be recording (see its
+    # own status guard) -- these tests are specifically about milestone
+    # sequencing once a roast is underway, not the armed/preview window,
+    # which has its own dedicated test below.
+    session.status = RoastStatus.ROASTING
+    return session
 
 
 def mark_auto(session: RoastSession, event_type: RoastEventType) -> None:
@@ -30,11 +40,31 @@ def mark_auto(session: RoastSession, event_type: RoastEventType) -> None:
     session.events.append({"id": "auto", "time_s": 0.0, "type": event_type.value, "label": event_type.value, "value": None})
 
 
-@pytest.mark.parametrize("event_type", [RoastEventType.CHARGE, RoastEventType.TURNING_POINT])
-def test_always_auto_types_cannot_be_marked_manually(event_type):
+def test_turning_point_cannot_be_marked_manually():
     session = make_session()
     with pytest.raises(RoastSessionError):
-        session.add_event(EventCreateRequest(type=event_type, label="x"))
+        session.add_event(EventCreateRequest(type=RoastEventType.TURNING_POINT, label="x"))
+
+
+def test_charge_can_now_be_marked_manually():
+    # Real-hardware modes (modbus_live/ms6514_live) no longer auto-detect
+    # CHARGE at all -- the operator marks it like any other milestone.
+    session = make_session()
+    event = session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))
+    assert event["type"] == "CHARGE"
+
+
+def test_add_event_rejected_before_recording_starts():
+    # Guards the armed/preview window (status IDLE, see
+    # RoastSession.connect()) -- profile is empty there, so a click would
+    # otherwise land at time_s=0.0 and silently survive into the real
+    # recording once begin_recording() flips status.
+    request = RoastCreateRequest(title="Test Roast", mode=RoastMode.SIMULATOR)
+    session = RoastSession("test-roast-id", request)
+    assert session.status == RoastStatus.IDLE
+
+    with pytest.raises(RoastSessionError):
+        session.add_event(EventCreateRequest(type=RoastEventType.DRY_END, label="Dry End"))
 
 
 def test_milestones_can_be_marked_in_order():

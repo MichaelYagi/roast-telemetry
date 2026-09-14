@@ -102,6 +102,13 @@ npm run dev</code></pre>
     <li><strong>Direct USB (thermocouple meter)</strong> — reads a Mastech MS6514 dual K-type thermocouple meter straight over USB-serial. Read-only (the meter has no command channel); T1 &rarr; BT, T2 &rarr; ET.</li>
   </ol>
   <p>
+    Both live-hardware modes leave every milestone (Charge, Dry End, FC
+    Start, and the rest) to the operator's own click, rather than
+    guessing them from the temperature curve the way the Simulator does
+    &mdash; live RoR is still computed and shown either way, to help time
+    the click.
+  </p>
+  <p>
     Clicking <strong>ON</strong> connects to the device and starts
     streaming live readings (nothing recorded yet); <strong>START</strong>
     begins actually recording that stream into a roast — for
