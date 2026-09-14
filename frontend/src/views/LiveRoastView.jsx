@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api/client.js";
+import { api, settingsStreamUrl } from "../api/client.js";
 import { useRoastStream } from "../api/ws.js";
 import ArtisanToolbar from "../components/ArtisanToolbar.jsx";
 import BreakoutPanel from "../components/BreakoutPanel.jsx";
@@ -10,8 +10,6 @@ import ConnectionTestPanel from "../components/ConnectionTestPanel.jsx";
 import ControlPanel from "../components/ControlPanel.jsx";
 import EventButtonRow from "../components/EventButtonRow.jsx";
 import RoastChart from "../components/RoastChart.jsx";
-
-const SETTINGS_POLL_MS = 5000;
 
 const SAMPLE_ALOG_PATH = "backend/data/sample_roasts/demo_roast.alog";
 
@@ -369,25 +367,28 @@ export default function LiveRoastView() {
   }, []);
 
   // Hot-applies Settings > Big Readout Panel / Small Readout changes to an
-  // already-open tab -- same lightweight polling pattern the device list
-  // elsewhere uses, rather than a dedicated push channel for what's a
-  // rarely-changed, low-stakes display preference.
+  // already-open tab -- server pushes the current settings on connect and
+  // again on every save from any client (see backend/app/api/settings.py's
+  // /settings/stream), rather than this tab polling on a timer.
   useEffect(() => {
-    const load = () =>
-      api
-        .getSettings()
-        .then((s) => {
-          setBrokenOutPanels(s.broken_out_panels || []);
-          setPanelColors(s.breakout_panel_colors || {});
-          // Defensive filter, not just SettingsView's editor-side one -- an
-          // older save (from before "time" was excluded) could still have
-          // it in the array, and this view polls settings independently.
-          setSmallReadoutPanels((s.small_readout_panels || []).filter((k) => !SMALL_READOUT_EXCLUDED_KEYS.includes(k)));
-        })
-        .catch(() => {});
-    load();
-    const interval = setInterval(load, SETTINGS_POLL_MS);
-    return () => clearInterval(interval);
+    const applySettings = (s) => {
+      setBrokenOutPanels(s.broken_out_panels || []);
+      setPanelColors(s.breakout_panel_colors || {});
+      // Defensive filter, not just SettingsView's editor-side one -- an
+      // older save (from before "time" was excluded) could still have it
+      // in the array.
+      setSmallReadoutPanels((s.small_readout_panels || []).filter((k) => !SMALL_READOUT_EXCLUDED_KEYS.includes(k)));
+    };
+    const source = new EventSource(settingsStreamUrl());
+    source.addEventListener("settings", (e) => {
+      try {
+        applySettings(JSON.parse(e.data));
+      } catch {
+        // malformed/partial event -- ignore, next push will self-correct
+      }
+    });
+    // EventSource retries on its own after a drop; nothing else to do here.
+    return () => source.close();
   }, []);
 
   // A roast keeps running server-side across a page refresh -- the

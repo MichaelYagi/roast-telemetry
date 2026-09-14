@@ -62,3 +62,9 @@ export function roastStreamUrl(id) {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
   return `${protocol}://${window.location.host}${BASE}/roasts/${id}/stream`;
 }
+
+// Plain http(s), not ws:// -- EventSource, unlike WebSocket, works fine
+// with a same-origin relative URL.
+export function settingsStreamUrl() {
+  return `${BASE}/settings/stream`;
+}

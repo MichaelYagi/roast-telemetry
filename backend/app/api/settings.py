@@ -5,9 +5,11 @@ from __future__ import annotations
 import re
 
 from fastapi import APIRouter
+from sse_starlette.sse import EventSourceResponse
 
 from .. import ollama_client, storage
 from ..models import BREAKOUT_PANEL_KEYS, AppSettings, OllamaStatus
+from ..ws_manager import settings_pubsub
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -27,8 +29,27 @@ def _filter_colors(colors: dict[str, str]) -> dict[str, str]:
     return {k: v for k, v in colors.items() if k in BREAKOUT_PANEL_KEYS and _HEX_COLOR_RE.match(v)}
 
 
+@router.get("/stream")
+async def stream_settings() -> EventSourceResponse:
+    """Pushes the current settings immediately, then again on every save
+    from any client -- replaces polling for LiveRoastView's Big/Small
+    Readout panel hot-apply (see that view's settings useEffect)."""
+
+    async def event_generator():
+        yield {"event": "settings", "data": AppSettings(**storage.get_settings()).model_dump_json()}
+        queue = settings_pubsub.subscribe()
+        try:
+            while True:
+                message = await queue.get()
+                yield {"event": "settings", "data": message}
+        finally:
+            settings_pubsub.unsubscribe(queue)
+
+    return EventSourceResponse(event_generator())
+
+
 @router.put("", response_model=AppSettings)
-def update_settings(settings: AppSettings) -> AppSettings:
+async def update_settings(settings: AppSettings) -> AppSettings:
     # Silently drop unknown keys/malformed values rather than error --
     # keeps this forward compatible if a stale frontend build sends a key
     # an older/newer backend doesn't know about, instead of failing the
@@ -53,13 +74,15 @@ def update_settings(settings: AppSettings) -> AppSettings:
         breakout_panel_colors=colors,
         small_readout_panels=small_panels,
     )
-    return AppSettings(
+    result = AppSettings(
         ollama_url=settings.ollama_url,
         ollama_model=settings.ollama_model,
         broken_out_panels=panels,
         breakout_panel_colors=colors,
         small_readout_panels=small_panels,
     )
+    await settings_pubsub.publish(result.model_dump_json())
+    return result
 
 
 @router.get("/ollama/status", response_model=OllamaStatus)

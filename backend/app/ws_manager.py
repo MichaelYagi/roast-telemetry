@@ -32,3 +32,35 @@ class RoastPubSub:
 
 
 pubsub = RoastPubSub()
+
+
+class SettingsPubSub:
+    """Single-topic broadcaster for app-wide settings changes -- unlike
+    RoastPubSub there's no per-roast key, just one set of subscribers,
+    since there's only ever one settings object."""
+
+    def __init__(self) -> None:
+        self._subscribers: set[asyncio.Queue] = set()
+
+    def subscribe(self) -> asyncio.Queue:
+        queue: asyncio.Queue = asyncio.Queue(maxsize=10)
+        self._subscribers.add(queue)
+        return queue
+
+    def unsubscribe(self, queue: asyncio.Queue) -> None:
+        self._subscribers.discard(queue)
+
+    async def publish(self, message: str) -> None:
+        """`message` is already a JSON string (AppSettings.model_dump_json())
+        -- passed straight through as an SSE `data` field, unlike
+        RoastPubSub's dict messages which get json.dumps'd per-consumer."""
+        for queue in list(self._subscribers):
+            if queue.full():
+                try:
+                    queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+            await queue.put(message)
+
+
+settings_pubsub = SettingsPubSub()
