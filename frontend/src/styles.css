@@ -865,13 +865,25 @@ button:disabled {
   .live-roast-layout {
     flex-direction: column;
   }
-  .breakout-panel {
+  /* Scoped to the plain (non-split) sidebar Big Readout Panel
+     specifically -- a direct child of .live-roast-layout -- not the bare
+     .breakout-panel class. That class is shared with Small Readout's own
+     .breakout-panel instance (nested inside .small-readout-col, a
+     completely different, much narrower context added later), and an
+     unscoped selector here was leaking into it: between 700-900px, Small
+     Readout's boxes were silently getting flipped to a row layout meant
+     for this sidebar, squeezing every box down to a sliver of its real
+     width and stretching it to the column's full height instead (found
+     live via computed styles -- boxWidth ~22px, boxHeight ~476px, and
+     the panel's own computed flexDirection reporting "row" despite
+     .small-readout-col's own rule never asking for that). */
+  .live-roast-layout > .breakout-panel {
     flex-direction: row;
     flex-wrap: wrap;
     width: 100%;
     position: static;
   }
-  .breakout-box {
+  .live-roast-layout > .breakout-panel .breakout-box {
     flex: 1;
     min-width: 130px;
   }
@@ -1501,6 +1513,12 @@ button:disabled {
      this point .breakout-panel above scrolls instead of the boxes
      continuing to shrink. */
   min-height: 46px;
+  /* Standard flex-item safety net: without this, .breakout-value's own
+     nowrap text (see below) could win out over .breakout-panel's
+     align-items: stretch and force this box wider than the 108px column
+     it's meant to fill exactly, instead of the text just shrinking to
+     fit via its own font-size clamp(). */
+  min-width: 0;
   align-items: stretch;
   padding: 0.3rem 0.4rem;
   container-type: size;
