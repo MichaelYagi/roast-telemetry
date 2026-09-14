@@ -469,8 +469,21 @@ button:disabled {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.6rem;
-  padding: 0.35rem 0;
+  /* Horizontal padding + a matching negative margin -- keeps the row's
+     content flush with where it always sat (against .panel's own
+     padding), while giving the hover highlight below some breathing room
+     instead of a background that touches the swatch/label/buttons edge-on. */
+  padding: 0.35rem 0.4rem;
+  margin: 0 -0.4rem;
   border-bottom: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* --accent-soft, not a hardcoded tint -- same token the header nav's
+   active-link highlight uses, so this stays legible (and in theme) across
+   every theme swap, garbagefire chaos mode included. */
+.breakout-order-list li:hover {
+  background: var(--accent-soft);
 }
 
 /* A native <input type="color"> styled to read as the same small square
