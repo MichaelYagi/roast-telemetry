@@ -166,6 +166,48 @@
     <a href="real-hardware-checklist.html">real-hardware checklist</a>.
   </p>
 
+  <h2 id="milestone-automation">Milestone automation (optional)</h2>
+  <p>
+    Every milestone (Charge, Dry End, First Crack, ...) is a plain manual
+    click by default — see
+    <a href="../getting-started.html#the-four-data-sources">Getting started</a>.
+    You can optionally bind a Burner/Air/Drum command to fire
+    automatically when a specific milestone is marked — either
+    immediately, or after a configurable delay — matching what Artisan
+    calls "Alarms." Two examples: bind Drum speed to Charge so it's set
+    the instant beans go in, or bind Burner/Air to Drop with no delay so
+    the heat cuts and the cooling fan kicks on the moment you mark it.
+    Configured per saved preset, from the "Milestone automation" section
+    of the Configure Roast form — it travels with "Save this
+    configuration as," same as everything else in the form.
+  </p>
+  <ul>
+    <li>
+      <strong>modbus_live only.</strong> ms6514_live has no write
+      capability at all (a read-only thermocouple meter), so there's
+      nothing to bind a command to.
+    </li>
+    <li>
+      <strong>Burner bindings need an extra confirm step</strong> when
+      you add the rule — same caution as Testing Mode's write check
+      above, since a bad Burner setpoint can make the roaster's own
+      bang-bang controller start actually firing heating elements.
+      Air/Drum-only rules save directly.
+    </li>
+    <li>
+      <strong>A delayed rule still pending when you click OFF/STOP is
+      cancelled</strong>, not fired late — it never reaches a device
+      that's already been disconnected.
+    </li>
+    <li>
+      A failed bound action (a device write error, or the roast having
+      already ended) never fails the milestone click itself — the
+      milestone is recorded either way; the Controls panel reflects
+      whatever the roaster's real state actually is either way, same as
+      any other write.
+    </li>
+  </ul>
+
   <h2 id="testing-without-real-hardware-modbus">Testing without real hardware</h2>
   <p>
     <code>modbus_bridge</code> can be exercised end-to-end — through the

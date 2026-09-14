@@ -6,6 +6,7 @@ import ArtisanToolbar from "../components/ArtisanToolbar.jsx";
 import BreakoutPanel from "../components/BreakoutPanel.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 import ConnectionBadge from "../components/ConnectionBadge.jsx";
+import AlarmRulesEditor from "../components/AlarmRulesEditor.jsx";
 import ConnectionTestPanel from "../components/ConnectionTestPanel.jsx";
 import ControlPanel from "../components/ControlPanel.jsx";
 import EventButtonRow from "../components/EventButtonRow.jsx";
@@ -104,6 +105,13 @@ export default function LiveRoastView() {
     heater_pct: 70,
     fan_pct: 20,
     drum_speed_pct: 50,
+    // Milestone-triggered automations (Artisan-style Alarms), modbus_live
+    // only -- see AlarmRulesEditor. Lives inside the roast's own config
+    // (not a separate "controls" field like heater_pct/fan_pct/
+    // drum_speed_pct above), since it rides through saved-preset
+    // config_json automatically that way -- see backend/app/models.py's
+    // AlarmRule/RoastCreateRequest.alarms comment.
+    alarmRules: [],
     // Advanced Modbus register-map overrides -- all blank by default,
     // meaning "use ModbusEngine's own (FZ-94) default". See the New Roast
     // form's "Advanced Modbus register map" section.
@@ -198,7 +206,7 @@ export default function LiveRoastView() {
   const showBreakoutPanel = phase !== "idle" && brokenOutPanels.length > 0;
   const showSplitLayout = showBreakoutPanel && viewportWide;
 
-  const { roast, connectionStatus, latestPreview, lastError } = useRoastStream(roastId);
+  const { roast, connectionStatus, latestPreview, lastError, pendingAlarms } = useRoastStream(roastId);
 
   // Surfaces a server-side read/tick failure (e.g. the real serial link
   // dropping mid-test) into the same banner connect failures already use
@@ -513,6 +521,7 @@ export default function LiveRoastView() {
       payload.modbus_drum_max_pct = numOrNull(form.modbus_drum_max_pct);
       payload.modbus_burner_sv_min_c = numOrNull(form.modbus_burner_sv_min_c);
       payload.modbus_burner_sv_max_c = numOrNull(form.modbus_burner_sv_max_c);
+      payload.alarms = form.alarmRules || [];
     }
     if (form.mode === "ms6514_live") {
       payload.ms6514_port = form.ms6514_port;
@@ -644,6 +653,7 @@ export default function LiveRoastView() {
       modbus_drum_max_pct: c.modbus_drum_max_pct ?? "",
       modbus_burner_sv_min_c: c.modbus_burner_sv_min_c ?? "",
       modbus_burner_sv_max_c: c.modbus_burner_sv_max_c ?? "",
+      alarmRules: c.alarms || [],
     }));
   }
 
@@ -1287,6 +1297,12 @@ export default function LiveRoastView() {
               written to it until you move a slider yourself.
             </p>
           )}
+          {form.mode === "modbus_live" && (
+            <AlarmRulesEditor
+              rules={form.alarmRules}
+              onChange={(rules) => setForm((f) => ({ ...f, alarmRules: rules }))}
+            />
+          )}
           <div className="form-row save-preset-row">
             <label>
               {selectedPresetId ? "Config name" : "Save this configuration as"}
@@ -1366,6 +1382,13 @@ export default function LiveRoastView() {
               onFire={handleFireEvent}
               manualCharge={LIVE_MODES.includes(activeMode)}
             />
+            {pendingAlarms.length > 0 && (
+              <p className="hint alarm-pending-hint">
+                {pendingAlarms
+                  .map((a) => `${a.trigger.replace("_", " ")} automation fires in ~${a.delaySeconds}s`)
+                  .join(" · ")}
+              </p>
+            )}
           </div>
 
           {roast && (

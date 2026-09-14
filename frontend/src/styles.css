@@ -465,6 +465,50 @@ button:disabled {
   gap: 0.5rem;
 }
 
+/* --- Milestone automation (AlarmRulesEditor) -- same collapsible-section
+   look as .advanced-modbus-fields above. */
+.alarm-rules-fields {
+  flex-basis: 100%;
+  border-left: 2px solid var(--border);
+  padding-left: 0.75rem;
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.alarm-rules-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.alarm-rules-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.alarm-rules-trigger {
+  flex: 0 0 auto;
+  font-weight: 600;
+  min-width: 6rem;
+}
+
+.alarm-rules-detail {
+  color: var(--text-muted);
+  flex: 1 1 auto;
+}
+
+.alarm-pending-hint {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .preset-feedback {
   color: #166534;
   font-weight: 600;

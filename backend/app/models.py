@@ -1,6 +1,7 @@
 """Pydantic data models shared across the API."""
 from __future__ import annotations
 
+import uuid
 from enum import Enum
 from typing import Optional
 
@@ -135,6 +136,22 @@ class ControlCommand(BaseModel):
     speed: Optional[float] = Field(default=None, ge=0, description="Playback speed multiplier (alog_playback mode only)")
 
 
+class AlarmRule(BaseModel):
+    """A milestone-triggered automation -- Artisan-style "Alarms": when
+    `trigger` is marked (see RoastSession.add_event), fire this command
+    after `delay_s` (0 = immediately). modbus_live only -- ms6514_live has
+    no write capability at all. TURNING_POINT/CUSTOM aren't valid
+    triggers (TURNING_POINT is never manually markable; CUSTOM isn't a
+    milestone)."""
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    trigger: RoastEventType
+    delay_s: float = Field(default=0.0, ge=0)
+    heater_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    fan_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    drum_speed_pct: Optional[float] = Field(default=None, ge=0, le=100)
+
+
 class RoastCreateRequest(BaseModel):
     title: str
     mode: RoastMode
@@ -187,6 +204,7 @@ class RoastCreateRequest(BaseModel):
     dry_end_c: Optional[float] = Field(default=160.0, description="BT threshold for auto-detecting Dry End; live-bridge modes only. Null disables it.")
     fc_start_c: Optional[float] = Field(default=196.0, description="BT threshold for auto-detecting FC Start; live-bridge modes only. Null disables it.")
     sample_interval_s: float = 1.0
+    alarms: list[AlarmRule] = Field(default=[], description="modbus_live only: milestone-triggered automations (Artisan-style Alarms). Part of the roast's own config, not a runtime command -- rides through saved-preset config_json for free.")
 
 
 class RoastSummary(BaseModel):

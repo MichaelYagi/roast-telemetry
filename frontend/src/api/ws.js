@@ -21,6 +21,12 @@ export function useRoastStream(roastId) {
   // silently dropped before (no "error" case existed here at all), which
   // meant a real connection fault had no way to reach the UI.
   const [lastError, setLastError] = useState(null);
+  // Delayed milestone-triggered automations (AlarmRule with delay_s > 0)
+  // that have been scheduled but haven't fired yet -- see
+  // RoastSession._fire_delayed_alarm's alarm_scheduled/alarm_fired
+  // messages. Keyed by rule_id so a fired one can be removed by id
+  // rather than assuming array order.
+  const [pendingAlarms, setPendingAlarms] = useState([]);
   const wsRef = useRef(null);
 
   useEffect(() => {
@@ -28,6 +34,7 @@ export function useRoastStream(roastId) {
     setConnectionStatus("connecting");
     setLatestPreview(null);
     setLastError(null);
+    setPendingAlarms([]);
     const ws = new WebSocket(roastStreamUrl(roastId));
     wsRef.current = ws;
 
@@ -58,11 +65,18 @@ export function useRoastStream(roastId) {
         setRoast((prev) => (prev ? { ...prev, events: [...prev.events, message.event] } : prev));
       } else if (message.type === "error") {
         setLastError(message.message || "unknown error");
+      } else if (message.type === "alarm_scheduled") {
+        setPendingAlarms((prev) => [
+          ...prev,
+          { ruleId: message.rule_id, trigger: message.trigger, delaySeconds: message.delay_s, scheduledAt: Date.now() },
+        ]);
+      } else if (message.type === "alarm_fired") {
+        setPendingAlarms((prev) => prev.filter((a) => a.ruleId !== message.rule_id));
       }
     };
 
     return () => ws.close();
   }, [roastId]);
 
-  return { roast, connectionStatus, latestPreview, lastError, setRoast };
+  return { roast, connectionStatus, latestPreview, lastError, pendingAlarms, setRoast };
 }

@@ -34,6 +34,11 @@ prefer the link above or open the files locally.)*
   connection safely — comprehensive per-channel reads, plus an optional,
   deliberately benign write check (a no-op round-trip on the least
   consequential channel) before you ever start a real roast.
+- **Optional milestone automation** for Direct Modbus — bind a
+  Burner/Air/Drum command to fire automatically (immediately, or after a
+  delay) when a specific milestone is marked, Artisan-Alarms-style.
+  Burner bindings need an extra explicit confirm step; a pending delayed
+  action is cancelled, not fired late, if you stop the roast first.
 - **Live rate-of-rise, computed from raw BT/ET either way** — real
   hardware doesn't carry roast-milestone events on its own (a PLC or a
   thermocouple meter has no concept of Charge/Dry End/etc.), and this

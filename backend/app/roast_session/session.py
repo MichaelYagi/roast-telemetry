@@ -26,6 +26,7 @@ from .. import storage
 from ..models import (
     ALWAYS_AUTO_EVENT_TYPES,
     MILESTONE_SEQUENCE,
+    AlarmRule,
     ControlCommand,
     EventCreateRequest,
     NoteCreateRequest,
@@ -140,6 +141,11 @@ class RoastSession:
         self.device = MockDevice(device_id=roast_id, engine=engine)
         self._task: Optional[asyncio.Task] = None
         self._stop_requested = asyncio.Event()
+        # modbus_live only in practice (see add_event's own mode check --
+        # ms6514_live has no write capability to bind an action to), but
+        # stored unconditionally same as everything else on the request.
+        self._alarm_rules: list[AlarmRule] = list(request.alarms)
+        self._pending_alarm_tasks: list[asyncio.Task] = []
         # True once this session has an actual DB roast row (set by
         # _persist_new_roast_row(), called from start()/begin_recording()) --
         # modbus_live/ms6514_live can now sit connected+streaming for a
@@ -270,9 +276,20 @@ class RoastSession:
             raise
         except Exception as exc:  # pragma: no cover - defensive
             self.status = RoastStatus.ABORTED
+            self._cancel_pending_alarms()
             if self._recorded:
                 storage.update_roast(self.id, status=self.status.value)
             await pubsub.publish(self.id, {"type": "error", "roast_id": self.id, "message": str(exc)})
+
+    def _cancel_pending_alarms(self) -> None:
+        """Without this, a delayed automation (e.g. "on DROP, wait 60s,
+        then burner off") could still fire after OFF/STOP has already
+        disconnected the device, or after a real error ended the roast --
+        writing to a connection that's already gone, or just plain
+        surprising the operator well after they thought everything had
+        stopped."""
+        for task in self._pending_alarm_tasks:
+            task.cancel()
 
     async def abort(self) -> None:
         """Despite the name (kept for API/method-name stability), this is
@@ -280,6 +297,7 @@ class RoastSession:
         finishes the roast as STOPPED. Real failures (an exception in the
         read/tick loop, above) are what actually produce ABORTED."""
         self._stop_requested.set()
+        self._cancel_pending_alarms()
         if self._task is not None and self._task is not asyncio.current_task():
             await self._task
         if self.status not in (RoastStatus.COMPLETE, RoastStatus.STOPPED, RoastStatus.ABORTED):
@@ -394,7 +412,62 @@ class RoastSession:
             "value": req.value,
         }
         self.events.append(event)
+        if self.mode == RoastMode.MODBUS_LIVE:
+            for rule in self._alarm_rules:
+                if rule.trigger == req.type:
+                    if rule.delay_s <= 0:
+                        self._fire_alarm_command(rule)
+                    else:
+                        task = asyncio.create_task(self._fire_delayed_alarm(rule))
+                        self._pending_alarm_tasks.append(task)
         return event
+
+    def _fire_alarm_command(self, rule: AlarmRule) -> None:
+        """Applies a bound automation's command. Deliberately swallows any
+        failure (a device write error, or the roast having already ended
+        by the time a delayed rule's timer elapses) -- the milestone this
+        was bound to was already successfully recorded by the time this
+        runs, so a failed automation must never turn a successful
+        add_event() call into an error for the caller. Errors just don't
+        get applied; nothing else reports on them today (no pubsub
+        "alarm_failed" message -- the Controls panel already reflects
+        live device state every tick, so a failed write is visible there
+        as "didn't change" rather than needing a separate channel)."""
+        command = ControlCommand(heater_pct=rule.heater_pct, fan_pct=rule.fan_pct, drum_speed_pct=rule.drum_speed_pct)
+        try:
+            self.apply_command(command)
+        except RoastSessionError:
+            pass
+
+    async def _fire_delayed_alarm(self, rule: AlarmRule) -> None:
+        try:
+            # Published before the sleep, not after -- so the frontend
+            # shows "pending" for the actual full delay window, not just
+            # however much of it is left once this task starts running.
+            await pubsub.publish(self.id, {
+                "type": "alarm_scheduled",
+                "roast_id": self.id,
+                "rule_id": rule.id,
+                "trigger": rule.trigger.value,
+                "delay_s": rule.delay_s,
+            })
+            await asyncio.sleep(rule.delay_s)
+            if self._stop_requested.is_set():
+                # abort()/the _run_loop exception handler already cancel
+                # every pending task -- this is a defensive check for the
+                # race between the sleep above completing and that
+                # cancellation actually landing, not the primary guard.
+                return
+            self._fire_alarm_command(rule)
+            await pubsub.publish(self.id, {"type": "alarm_fired", "roast_id": self.id, "rule_id": rule.id})
+        finally:
+            # Needed on the normal-completion path too, not just when
+            # abort()/the exception handler cancel it -- otherwise a long
+            # roast with many delayed rules leaks a finished task
+            # reference per rule forever.
+            current = asyncio.current_task()
+            if current in self._pending_alarm_tasks:
+                self._pending_alarm_tasks.remove(current)
 
     def set_weight_roasted(self, grams: float) -> None:
         self.weight_roasted_g = grams

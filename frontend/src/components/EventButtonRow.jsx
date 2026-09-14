@@ -19,7 +19,11 @@
 // threshold) or unavailable (alog events missing one), and
 // FC_END/SC_START/SC_END/DROP/COOL_END are judgment calls never
 // auto-detected anywhere.
-const EVENT_BUTTONS = [
+// Exported so AlarmRulesEditor.jsx can reuse the exact same trigger list
+// (minus CHARGE's special manualCharge handling, which doesn't apply
+// there) for its own trigger dropdown, instead of drifting out of sync
+// with a second hand-copied list.
+export const EVENT_BUTTONS = [
   { type: "CHARGE", label: "CHARGE" },
   { type: "DRY_END", label: "DRY END" },
   { type: "FC_START", label: "FC START" },
