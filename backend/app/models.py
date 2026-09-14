@@ -285,6 +285,11 @@ class RoastReview(BaseModel):
     completed_at: Optional[str] = None
 
 
+class SerialPortInfo(BaseModel):
+    device: str  # what actually goes in the form's Serial port field, e.g. "COM3" or "/dev/ttyUSB0"
+    description: Optional[str] = None  # driver-reported label, e.g. "USB-SERIAL CH340 (COM3)" -- None if the OS has nothing better than the bare device name
+
+
 class NoteCreateRequest(BaseModel):
     text: str
     author: Optional[str] = None

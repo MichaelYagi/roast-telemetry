@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import storage
-from .api import devices, presets, roasts, settings
+from .api import devices, presets, roasts, serial_ports, settings
 from .models import RoastCreateRequest
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
@@ -77,6 +77,7 @@ app.include_router(roasts.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
 app.include_router(presets.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(serial_ports.router, prefix="/api")
 
 
 @app.get("/api/health")

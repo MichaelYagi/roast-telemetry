@@ -429,6 +429,27 @@ button:disabled {
   cursor: pointer;
 }
 
+.serial-port-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.serial-port-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Reuses .advanced-toggle's look for the refresh button -- same dashed,
+   muted, "secondary action" styling, just without that class's own
+   align-self (irrelevant here; this row's align-items: center already
+   handles it) or width, since it's an icon-only button, not full-row text. */
+.serial-port-input-row .advanced-toggle {
+  align-self: auto;
+  flex: 0 0 auto;
+  padding: 0.3rem 0.5rem;
+}
+
 .advanced-toggle:hover {
   color: var(--text);
   border-color: var(--accent);

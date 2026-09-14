@@ -136,6 +136,21 @@ export default function LiveRoastView() {
     modbus_burner_sv_max_c: "",
   });
   const [showAdvancedModbus, setShowAdvancedModbus] = useState(false);
+  // Populates the Serial port / drive-port fields' <datalist> -- a
+  // convenience list of what the OS currently sees plugged in, not a
+  // whitelist (both fields stay plain text inputs, so a port not
+  // currently enumerated -- unplugged, or the fake hardware's /tmp path
+  // used for testing -- still works by typing it in).
+  const [serialPorts, setSerialPorts] = useState([]);
+  const [serialPortsLoading, setSerialPortsLoading] = useState(false);
+  function refreshSerialPorts() {
+    setSerialPortsLoading(true);
+    api
+      .listSerialPorts()
+      .then(setSerialPorts)
+      .catch(() => setSerialPorts([]))
+      .finally(() => setSerialPortsLoading(false));
+  }
   const [phase, setPhase] = useState("idle"); // idle | armed | roasting | cooling | finished
   const [roastId, setRoastId] = useState(null);
   const [noteText, setNoteText] = useState("");
@@ -341,6 +356,7 @@ export default function LiveRoastView() {
   useEffect(() => {
     refreshPresets();
     reconnectActiveRoast();
+    refreshSerialPorts();
   }, []);
 
   // Hot-applies Settings > Big Readout Panel / Small Readout changes to an
@@ -788,13 +804,43 @@ export default function LiveRoastView() {
           )}
           {form.mode === "modbus_live" && (
             <div className="form-row">
+              {/* Shared by both port fields below via list=. Plain text
+                  inputs, not a <select> -- this is a convenience list of
+                  what the OS currently sees, not a whitelist, so a port
+                  not currently enumerated (unplugged, or the fake
+                  hardware's /tmp path used for testing) still works by
+                  typing it in. label carries the driver's own
+                  description (e.g. "USB-SERIAL CH340") when there is
+                  one; value is the bare device name, so picking a
+                  suggestion fills in exactly what the field needs, not
+                  the description text too. */}
+              <datalist id="serial-ports-list">
+                {serialPorts.map((p) => (
+                  <option key={p.device} value={p.device} label={p.description || undefined} />
+                ))}
+              </datalist>
               <label>
                 Serial port
-                <input
-                  placeholder="COM3"
-                  value={form.modbus_port}
-                  onChange={(e) => setForm({ ...form, modbus_port: e.target.value })}
-                />
+                <span className="serial-port-input-row">
+                  <input
+                    placeholder="COM3"
+                    list="serial-ports-list"
+                    value={form.modbus_port}
+                    onChange={(e) => setForm({ ...form, modbus_port: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    className="advanced-toggle"
+                    onClick={refreshSerialPorts}
+                    disabled={serialPortsLoading}
+                    title="Re-scan for connected serial ports"
+                  >
+                    {serialPortsLoading ? "…" : "⟳"}
+                  </button>
+                </span>
+                {serialPorts.length === 0 && !serialPortsLoading && (
+                  <span className="hint">No serial ports detected -- plug your adapter in, then ⟳.</span>
+                )}
               </label>
               <label>
                 Baud rate
@@ -808,6 +854,7 @@ export default function LiveRoastView() {
                 Separate drive port — optional, uncommon
                 <input
                   placeholder="only if your own wiring needs a 2nd connection for Air/Drum"
+                  list="serial-ports-list"
                   value={form.modbus_control_port}
                   onChange={(e) => setForm({ ...form, modbus_control_port: e.target.value })}
                 />

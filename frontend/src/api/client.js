@@ -20,6 +20,9 @@ export const api = {
   // devices
   listDevices: () => request("/devices"),
 
+  // serial ports (Configure Roast form's port-picker convenience list)
+  listSerialPorts: () => request("/serial-ports"),
+
   // roasts
   listRoasts: (params = {}) => request(`/roasts?${new URLSearchParams(params)}`),
   createRoast: (payload) => request("/roasts", { method: "POST", body: JSON.stringify(payload) }),
