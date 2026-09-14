@@ -61,11 +61,32 @@ def list_roasts(
 
 @router.post("", response_model=RoastSummary, status_code=201)
 async def create_roast(request: RoastCreateRequest) -> RoastSummary:
+    """modbus_live/ms6514_live: this is the ON action -- connects and
+    starts streaming live readings, but doesn't create a roast yet (see
+    begin_recording below for that, the START action). Every other mode
+    doesn't have a real connection worth verifying separately, so this
+    still connects *and* starts recording in one step, exactly as before."""
     try:
         session = session_manager.create(request)
-        await session_manager.start(session.id)
+        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE):
+            await session_manager.connect(session.id)
+        else:
+            await session_manager.start(session.id)
     except RoastSessionError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return session.summary()
+
+
+@router.post("/{roast_id}/start", response_model=RoastSummary)
+async def begin_recording(roast_id: str) -> RoastSummary:
+    """The START action for a session already connect()ed via POST
+    /roasts (ON) -- begins actually recording the live stream that's
+    already flowing into a persisted roast. No body: title/beans/weight
+    were already captured when the connection was made."""
+    try:
+        session = await session_manager.begin_recording(roast_id)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return session.summary()
 
 

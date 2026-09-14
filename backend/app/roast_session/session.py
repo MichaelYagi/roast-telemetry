@@ -140,15 +140,75 @@ class RoastSession:
         self.device = MockDevice(device_id=roast_id, engine=engine)
         self._task: Optional[asyncio.Task] = None
         self._stop_requested = asyncio.Event()
+        # True once this session has an actual DB roast row (set by
+        # _persist_new_roast_row(), called from start()/begin_recording()) --
+        # modbus_live/ms6514_live can now sit connected+streaming for a
+        # while (see connect()) before that ever happens, e.g. while a real
+        # connection is only being verified. Everything that assumes a DB
+        # row exists (writing an .alog, storage.update_roast, ...) needs to
+        # check this first instead of assuming status != IDLE means recorded.
+        self._recorded = False
 
     # -- lifecycle -----------------------------------------------------
+    def _persist_new_roast_row(self) -> None:
+        storage.insert_roast({
+            "id": self.id,
+            "title": self.title,
+            "mode": self.mode.value,
+            "status": self.status.value,
+            "created_at": self.created_at,
+            "beans": self.beans,
+            "weight_green_g": self.weight_green_g,
+            "weight_roasted_g": None,
+            "duration_s": None,
+            "alog_path": None,
+            "source_alog_path": self.source_alog_path,
+            "playback_speed": self.playback_speed,
+        })
+        self._recorded = True
+
     async def start(self) -> None:
+        """simulator/alog_playback only -- connect, start recording, and
+        create the DB row all in one atomic step, same as every mode used
+        to work before modbus_live/ms6514_live got the connect()/
+        begin_recording() split below. Neither engine tolerates sitting
+        "connected but idle" for any length of time before recording
+        starts: SimulatorEngine.start() (below) fires CHARGE and resets its
+        clock synchronously, and AlogPlayer's clock/event pointer starts
+        advancing on its very first tick() with no way to pause it -- so for
+        these two modes, "connect" and "begin recording" have to stay the
+        same moment."""
+        self._persist_new_roast_row()
         await asyncio.to_thread(self.device.connect)
         if isinstance(self._engine, SimulatorEngine):
             self._engine.start()
         self.status = RoastStatus.ROASTING
         storage.update_roast(self.id, status=self.status.value)
         self._task = asyncio.create_task(self._run_loop())
+
+    async def connect(self) -> None:
+        """modbus_live/ms6514_live only -- the ON action. Opens the device
+        and starts the read loop immediately (status stays IDLE, so
+        _run_loop() below runs it in preview mode: samples stream out live
+        but nothing is recorded), without creating a DB row or touching
+        storage at all. See begin_recording() for the separate START
+        action that actually starts recording what's already flowing."""
+        await asyncio.to_thread(self.device.connect)
+        self._task = asyncio.create_task(self._run_loop())
+
+    async def begin_recording(self) -> None:
+        """modbus_live/ms6514_live only -- the START action, once already
+        connect()ed. Flips status to ROASTING; _run_loop() (already
+        running) picks that up on its own next iteration and starts
+        actually persisting samples from this point forward. Discards
+        whatever the milestone detector observed during the preview
+        window first -- see reset_detection()'s own docstring for why
+        that's required, not optional."""
+        self._persist_new_roast_row()
+        self.status = RoastStatus.ROASTING
+        storage.update_roast(self.id, status=self.status.value)
+        if hasattr(self._engine, "reset_detection"):
+            self._engine.reset_detection()
 
     async def _run_loop(self) -> None:
         try:
@@ -166,30 +226,52 @@ class RoastSession:
                     continue
                 tick_dt = self.sample_interval_s / speed if speed else self.sample_interval_s
 
+                # Snapshotted once, before the blocking read -- begin_recording()
+                # can flip self.status concurrently while this iteration's
+                # device.read() is still in flight (it runs in a worker thread
+                # via to_thread). Using a single snapshot for the whole
+                # iteration, instead of re-reading self.status further down,
+                # is what keeps that iteration entirely on one side of the
+                # preview/recording line rather than torn across both.
+                status_snapshot = self.status
                 sample = await asyncio.to_thread(self.device.read, tick_dt)
                 events = sample.pop("events", [])
                 finished = sample.pop("finished", False)
 
-                self.profile.append(sample)
-                self.events.extend(events)
+                if status_snapshot == RoastStatus.IDLE:
+                    # Preview mode (armed, not yet recording) -- publish the
+                    # live reading for the UI's meters, but never append to
+                    # self.profile/self.events and never touch storage. Any
+                    # milestone events the detector fired off `events` here
+                    # are deliberately dropped, not queued -- see
+                    # reset_detection()'s docstring for why that's safe.
+                    await pubsub.publish(self.id, {
+                        "type": "preview",
+                        "roast_id": self.id,
+                        "sample": sample,
+                    })
+                else:
+                    self.profile.append(sample)
+                    self.events.extend(events)
 
-                await pubsub.publish(self.id, {
-                    "type": "sample",
-                    "roast_id": self.id,
-                    "sample": sample,
-                    "events": events,
-                })
+                    await pubsub.publish(self.id, {
+                        "type": "sample",
+                        "roast_id": self.id,
+                        "sample": sample,
+                        "events": events,
+                    })
 
-                if finished:
-                    await self._finish(RoastStatus.COMPLETE)
-                    break
+                    if finished:
+                        await self._finish(RoastStatus.COMPLETE)
+                        break
 
                 await asyncio.sleep(tick_dt)
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # pragma: no cover - defensive
             self.status = RoastStatus.ABORTED
-            storage.update_roast(self.id, status=self.status.value)
+            if self._recorded:
+                storage.update_roast(self.id, status=self.status.value)
             await pubsub.publish(self.id, {"type": "error", "roast_id": self.id, "message": str(exc)})
 
     async def abort(self) -> None:
@@ -201,7 +283,25 @@ class RoastSession:
         if self._task is not None and self._task is not asyncio.current_task():
             await self._task
         if self.status not in (RoastStatus.COMPLETE, RoastStatus.STOPPED, RoastStatus.ABORTED):
-            await self._finish(RoastStatus.STOPPED)
+            if self._recorded:
+                await self._finish(RoastStatus.STOPPED)
+            else:
+                # OFF while merely connected/previewing (see connect()) --
+                # never became a real roast, so there's no DB row, no
+                # profile worth an .alog file, nothing to persist. Still
+                # has to release the real serial port and tell any open
+                # WebSocket the session is gone (RoastSessionManager.abort()
+                # is what actually drops it from .sessions, once this
+                # returns).
+                await self._finish_unrecorded()
+
+    async def _finish_unrecorded(self) -> None:
+        self._stop_requested.set()
+        self.status = RoastStatus.IDLE  # back to idle, not "stopped" -- nothing was ever actually recording
+        await asyncio.to_thread(self.device.disconnect)
+        if isinstance(self._engine, (ModbusEngine, MS6514Engine)):
+            self._engine.close()  # release the serial port
+        await pubsub.publish(self.id, {"type": "finished", "roast_id": self.id, "status": self.status.value})
 
     async def _finish(self, status: RoastStatus) -> None:
         self._stop_requested.set()
@@ -241,7 +341,14 @@ class RoastSession:
 
     # -- interaction ----------------------------------------------------
     def apply_command(self, command: ControlCommand) -> dict:
-        if self.status not in (RoastStatus.ROASTING, RoastStatus.COOLING):
+        # IDLE is included alongside ROASTING/COOLING -- for modbus_live/
+        # ms6514_live specifically, it means "connected via connect(), not
+        # yet recording" (see that method), not "no session at all" (which
+        # isn't a status value, it's simply not having a session/roast_id
+        # to call this on in the first place). Lets Air/Drum/Burner be
+        # exercised -- Testing Mode's write check, or just manually -- while
+        # merely armed, matching Artisan's own control-before-record model.
+        if self.status not in (RoastStatus.IDLE, RoastStatus.ROASTING, RoastStatus.COOLING):
             raise RoastSessionError(f"roast {self.id} is not active (status={self.status.value})")
         payload = command.model_dump(exclude_none=True)
         if "speed" in payload:
@@ -308,23 +415,27 @@ class RoastSessionManager:
         self.sessions: dict[str, RoastSession] = {}
 
     def create(self, request: RoastCreateRequest) -> RoastSession:
+        """Builds the session and, for modbus_live/ms6514_live, makes the
+        real synchronous connect attempt (inside the engine's own
+        __init__) -- but no longer inserts a DB row itself; that now only
+        happens once a roast actually starts recording (see
+        RoastSession.start()/begin_recording()'s _persist_new_roast_row()
+        calls), since a modbus_live/ms6514_live session can now sit
+        connected-but-not-recording for a while first (see connect())."""
         roast_id = str(uuid.uuid4())
         session = RoastSession(roast_id, request)
+        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE):
+            # ModbusEngine/MS6514Engine's __init__ already made the real
+            # connect attempt above and caught/swallowed any failure into
+            # last_error rather than raising -- without this check, a bad
+            # port (wrong COM number, or one Artisan is still holding open)
+            # silently "succeeds" and the caller only ever discovers it by
+            # noticing BT/ET never populate.
+            engine_status = session._engine.status()
+            if not engine_status.get("connected", True):
+                session._engine.close()
+                raise RoastSessionError(engine_status.get("last_error") or "failed to connect to the device")
         self.sessions[roast_id] = session
-        storage.insert_roast({
-            "id": session.id,
-            "title": session.title,
-            "mode": session.mode.value,
-            "status": session.status.value,
-            "created_at": session.created_at,
-            "beans": session.beans,
-            "weight_green_g": session.weight_green_g,
-            "weight_roasted_g": None,
-            "duration_s": None,
-            "alog_path": None,
-            "source_alog_path": session.source_alog_path,
-            "playback_speed": session.playback_speed,
-        })
         return session
 
     def get(self, roast_id: str) -> Optional[RoastSession]:
@@ -337,11 +448,34 @@ class RoastSessionManager:
         await session.start()
         return session
 
+    async def connect(self, roast_id: str) -> RoastSession:
+        session = self.get(roast_id)
+        if session is None:
+            raise RoastSessionError(f"unknown roast {roast_id}")
+        await session.connect()
+        return session
+
+    async def begin_recording(self, roast_id: str) -> RoastSession:
+        session = self.get(roast_id)
+        if session is None:
+            raise RoastSessionError(f"unknown roast {roast_id}")
+        await session.begin_recording()
+        return session
+
     async def abort(self, roast_id: str) -> RoastSession:
         session = self.get(roast_id)
         if session is None:
             raise RoastSessionError(f"unknown roast {roast_id}")
+        was_recorded = session._recorded
         await session.abort()
+        if not was_recorded:
+            # Never became a real roast -- nothing in storage references
+            # it, so nothing else will ever clean it up. A recorded
+            # session's own bookkeeping (DB row, .alog file) already
+            # outlives this dict entry the same way it does today; this
+            # is only about the connected-but-never-recorded case, which
+            # has no such backing and would otherwise leak here forever.
+            self.sessions.pop(roast_id, None)
         return session
 
     def get_roast_detail(self, roast_id: str) -> Optional[Roast]:

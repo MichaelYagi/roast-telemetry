@@ -26,6 +26,10 @@ export const api = {
   // roasts
   listRoasts: (params = {}) => request(`/roasts?${new URLSearchParams(params)}`),
   createRoast: (payload) => request("/roasts", { method: "POST", body: JSON.stringify(payload) }),
+  // modbus_live/ms6514_live only -- START, once already connected via
+  // createRoast above (which, for those two modes, only connects/ARMs;
+  // see backend/app/api/roasts.py's create_roast docstring).
+  beginRecording: (id) => request(`/roasts/${id}/start`, { method: "POST" }),
   getRoast: (id) => request(`/roasts/${id}`),
   deleteRoast: (id) => request(`/roasts/${id}`, { method: "DELETE" }),
   stopRoast: (id) => request(`/roasts/${id}/stop`, { method: "POST" }),

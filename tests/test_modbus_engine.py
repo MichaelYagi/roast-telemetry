@@ -247,3 +247,36 @@ def test_drum_range_clamps_above_70_percent():
     engine.apply_command({"drum_speed_pct": 95.0})  # above the FZ-94's own 0-70% drive limit
 
     assert (8193, 7000, 2) in control.writes  # clamped to 70% -> 7000, not 9500
+
+
+def _feed_charge_sequence(engine, primary):
+    """BT 100.0 -> 90.0 within the detector's 20s charge window -- the
+    default 8C-drop-triggers-CHARGE heuristic (see roast_heuristics.detector)."""
+    primary.register_values[(11, 0)] = 1000  # BT 100.0C
+    engine.tick(1.0)
+    primary.register_values[(11, 0)] = 900  # BT 90.0C -- a 10C drop, over the 8C threshold
+    return engine.tick(1.0)
+
+
+def test_reset_detection_lets_charge_fire_again():
+    """LiveRoastDetector's CHARGE detection is one-shot by design (see its
+    own docstring/_phase machine) -- reset_detection() exists specifically
+    so a roast that starts *recording* after a live connection was already
+    open for a while (see RoastSession.begin_recording()) doesn't
+    permanently lose CHARGE to whatever the detector happened to observe
+    during that earlier window."""
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls)
+    primary = instances["PRIMARY"]
+
+    _feed_charge_sequence(engine, primary)
+    first_events = [e["type"] for e in engine.get_new_events()]
+    assert first_events == ["CHARGE"]
+
+    # Without a reset, the detector's _phase has already moved past
+    # "pre_charge" -- feeding the exact same drop again would fire nothing.
+    engine.reset_detection()
+
+    _feed_charge_sequence(engine, primary)
+    second_events = [e["type"] for e in engine.get_new_events()]
+    assert second_events == ["CHARGE"]

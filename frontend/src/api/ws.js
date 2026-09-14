@@ -9,11 +9,25 @@ import { roastStreamUrl } from "./client.js";
 export function useRoastStream(roastId) {
   const [roast, setRoast] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("connecting");
+  // Live readings while connected but not yet recording (roast.status ===
+  // "idle" -- see RoastSession.connect() in the backend): the server
+  // deliberately never appends these to roast.profile (that's what keeps
+  // the chart showing no curve pre-recording, matching Artisan), so
+  // there's nothing in `roast` itself for a caller to read the latest
+  // BT/ET/etc. from during that window -- this is that value instead.
+  const [latestPreview, setLatestPreview] = useState(null);
+  // The most recent server-side error (a failed read/tick, or anything
+  // else the backend's _run_loop published as type:"error") -- was
+  // silently dropped before (no "error" case existed here at all), which
+  // meant a real connection fault had no way to reach the UI.
+  const [lastError, setLastError] = useState(null);
   const wsRef = useRef(null);
 
   useEffect(() => {
     if (!roastId) return undefined;
     setConnectionStatus("connecting");
+    setLatestPreview(null);
+    setLastError(null);
     const ws = new WebSocket(roastStreamUrl(roastId));
     wsRef.current = ws;
 
@@ -25,6 +39,8 @@ export function useRoastStream(roastId) {
       const message = JSON.parse(event.data);
       if (message.type === "snapshot") {
         setRoast(message.roast);
+      } else if (message.type === "preview") {
+        setLatestPreview(message.sample);
       } else if (message.type === "sample") {
         setRoast((prev) => {
           if (!prev) return prev;
@@ -40,11 +56,13 @@ export function useRoastStream(roastId) {
         setRoast((prev) => (prev ? { ...prev, notes: [...prev.notes, message.note] } : prev));
       } else if (message.type === "event") {
         setRoast((prev) => (prev ? { ...prev, events: [...prev.events, message.event] } : prev));
+      } else if (message.type === "error") {
+        setLastError(message.message || "unknown error");
       }
     };
 
     return () => ws.close();
   }, [roastId]);
 
-  return { roast, connectionStatus, setRoast };
+  return { roast, connectionStatus, latestPreview, lastError, setRoast };
 }

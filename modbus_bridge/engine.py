@@ -221,6 +221,8 @@ class ModbusEngine:
         self.drum_feedback_register = drum_feedback_register
         self.drum_feedback_divisor = drum_feedback_divisor or 1.0
 
+        self._dry_end_c = dry_end_c
+        self._fc_start_c = fc_start_c
         self._detector = LiveRoastDetector(dry_end_c=dry_end_c, fc_start_c=fc_start_c)
         self._last_time_s = 0.0
         self._connected = False
@@ -441,6 +443,26 @@ class ModbusEngine:
             "control_connected": self._control_connected,
             "control_last_error": self._control_last_error,
         }
+
+    def reset_detection(self) -> None:
+        """Called right as a roast actually starts recording (see
+        RoastSession.begin_recording()) to throw away everything the
+        engine accumulated during an earlier preview/verification window
+        (see RoastSession.connect()) and start the recorded roast
+        genuinely fresh, in two ways:
+
+        - Discards whatever CHARGE/TURNING_POINT/etc. state the milestone
+          detector has built up -- not a pause, a clean restart.
+          LiveRoastDetector's own state (_phase, _events_fired) is
+          one-shot and irreversible, so without this a milestone
+          detected-and-discarded during preview could never fire again.
+        - Resets the elapsed-time clock (_last_time_s) back to 0. Without
+          this, a roast that only started recording after e.g. 5 minutes
+          of connection testing would have its very first recorded sample
+          land at time_s=300 instead of 0 -- not just a preview-display
+          quirk, an actually wrong time axis on the persisted roast."""
+        self._detector = LiveRoastDetector(dry_end_c=self._dry_end_c, fc_start_c=self._fc_start_c)
+        self._last_time_s = 0.0
 
     def close(self) -> None:
         try:

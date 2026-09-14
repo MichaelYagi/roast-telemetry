@@ -120,6 +120,8 @@ class MS6514Engine:
         if not port:
             raise ValueError("port (e.g. 'COM5') is required to connect to the MS6514")
         self.port = port
+        self._dry_end_c = dry_end_c
+        self._fc_start_c = fc_start_c
         self._detector = LiveRoastDetector(dry_end_c=dry_end_c, fc_start_c=fc_start_c)
         self._last_time_s = 0.0
         self._last_bt: Optional[float] = None
@@ -191,6 +193,16 @@ class MS6514Engine:
             "connected": self._connected,
             "last_error": self._last_error,
         }
+
+    def reset_detection(self) -> None:
+        """See ModbusEngine.reset_detection() -- same reasoning: discards
+        the one-shot LiveRoastDetector's accumulated phase state, and
+        resets the elapsed-time clock, so a roast that starts recording
+        after a while spent connected/previewing gets a genuinely fresh
+        detector and a time axis starting at 0, not wherever preview left
+        off."""
+        self._detector = LiveRoastDetector(dry_end_c=self._dry_end_c, fc_start_c=self._fc_start_c)
+        self._last_time_s = 0.0
 
     def close(self) -> None:
         if self._serial is not None:

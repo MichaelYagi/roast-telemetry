@@ -199,7 +199,15 @@ export default function LiveRoastView() {
   const showBreakoutPanel = phase !== "idle" && brokenOutPanels.length > 0;
   const showSplitLayout = showBreakoutPanel && viewportWide;
 
-  const { roast, connectionStatus } = useRoastStream(roastId);
+  const { roast, connectionStatus, latestPreview, lastError } = useRoastStream(roastId);
+
+  // Surfaces a server-side read/tick failure (e.g. the real serial link
+  // dropping mid-test) into the same banner connect failures already use
+  // -- useRoastStream's "error" WS message used to be silently dropped
+  // entirely (there was no handler for it at all).
+  useEffect(() => {
+    if (lastError) setError(lastError);
+  }, [lastError]);
 
   useEffect(() => {
     function onResize() {
@@ -428,8 +436,30 @@ export default function LiveRoastView() {
   async function handleToggleConnect() {
     setError(null);
     if (phase === "idle") {
-      setPhase("armed");
+      if (LIVE_MODES.includes(form.mode)) {
+        // modbus_live/ms6514_live: this is the real ON action -- connects
+        // and starts streaming live readings (see api.createRoast's
+        // backend counterpart, which for these two modes only connects,
+        // not records -- see handleStart below for the actual START).
+        // Everything else (simulator/alog_playback) has no real
+        // connection to make here, so stays the plain local flip it's
+        // always been.
+        try {
+          const payload = { ...buildConfigFromForm(), title: form.title || `Roast ${new Date().toLocaleString()}` };
+          const summary = await api.createRoast(payload);
+          setRoastId(summary.id);
+          setPhase("armed");
+        } catch (err) {
+          setError(err.message);
+        }
+      } else {
+        setPhase("armed");
+      }
     } else if (phase === "armed") {
+      if (roastId) {
+        await api.stopRoast(roastId).catch((err) => setError(err.message));
+        setRoastId(null);
+      }
       setPhase("idle");
     } else if (phase === "roasting" || phase === "cooling") {
       await api.stopRoast(roastId);
@@ -505,9 +535,17 @@ export default function LiveRoastView() {
     if (phase !== "armed") return;
     setError(null);
     try {
-      const payload = { ...buildConfigFromForm(), title: form.title || `Roast ${new Date().toLocaleString()}` };
-      const summary = await api.createRoast(payload);
-      setRoastId(summary.id);
+      let summary;
+      if (LIVE_MODES.includes(form.mode)) {
+        // Already connect()ed (see handleToggleConnect's idle branch) --
+        // this is the real START, begin recording what's already flowing
+        // over the existing roastId instead of creating a new connection.
+        summary = await api.beginRecording(roastId);
+      } else {
+        const payload = { ...buildConfigFromForm(), title: form.title || `Roast ${new Date().toLocaleString()}` };
+        summary = await api.createRoast(payload);
+        setRoastId(summary.id);
+      }
       setPhase("roasting");
       if (AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode)) {
         const controls = buildControlsFromForm();
@@ -640,9 +678,26 @@ export default function LiveRoastView() {
     setNoteText("");
   }
 
-  const isActive = roast && (roast.status === "roasting" || roast.status === "cooling");
-  const latest = roast?.profile?.[roast.profile.length - 1];
-  const elapsedLabel = formatElapsed(latest?.time_s);
+  // "idle" here means "connected via connect(), not yet recording" (see
+  // RoastSession.connect()/apply_command() on the backend) -- lets
+  // Air/Drum/Burner controls (and Testing Mode's checks) work while
+  // merely armed, matching Artisan's own control-before-record model, not
+  // just once an actual roast is roasting/cooling.
+  const isActive = roast && (roast.status === "roasting" || roast.status === "cooling" || roast.status === "idle");
+  // While armed (status "idle"), roast.profile is intentionally empty --
+  // the server never appends to it before recording starts (that's what
+  // keeps the chart showing no curve pre-recording) -- so BT/ET/etc. come
+  // from the live preview stream instead during that window.
+  const latest = roast?.status === "idle" ? latestPreview : roast?.profile?.[roast.profile.length - 1];
+  // Stays 00:00 while merely connected/previewing (status "idle") even
+  // though the engine's own clock is already ticking (that's how BT/ET's
+  // RoR gets computed live) -- matches Artisan, where the elapsed timer
+  // starts at Charge, not at connect. The recorded roast's own time axis
+  // genuinely resets to 0 at that point too (see ModbusEngine/MS6514Engine's
+  // reset_detection(), called from begin_recording()) -- this just keeps
+  // the *display* in sync with that reset instead of visibly jumping
+  // backward once recording actually starts.
+  const elapsedLabel = roast?.status === "idle" ? formatElapsed(null) : formatElapsed(latest?.time_s);
 
   // Once a roast exists (including one reattached after a page refresh --
   // see the reconnect effect below), it's the source of truth for which
