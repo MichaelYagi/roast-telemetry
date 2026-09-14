@@ -97,6 +97,18 @@ export default function LiveRoastView() {
     // Advanced Modbus register-map overrides -- all blank by default,
     // meaning "use ModbusEngine's own (FZ-94) default". See the New Roast
     // form's "Advanced Modbus register map" section.
+    modbus_bt_slave_id: "",
+    modbus_bt_register: "",
+    modbus_bt_divisor: "",
+    modbus_et_slave_id: "",
+    modbus_et_register: "",
+    modbus_et_divisor: "",
+    modbus_dt_slave_id: "",
+    modbus_dt_register: "",
+    modbus_dt_divisor: "",
+    modbus_burner_slave_id: "",
+    modbus_burner_register: "",
+    modbus_burner_divisor: "",
     modbus_air_slave_id: "",
     modbus_air_control_register: "",
     modbus_air_frequency_register: "",
@@ -342,6 +354,18 @@ export default function LiveRoastView() {
       payload.modbus_baudrate = Number(form.modbus_baudrate) || 19200;
       payload.modbus_control_port = form.modbus_control_port || null;
       payload.modbus_control_baudrate = Number(form.modbus_control_baudrate) || 19200;
+      payload.modbus_bt_slave_id = numOrNull(form.modbus_bt_slave_id);
+      payload.modbus_bt_register = numOrNull(form.modbus_bt_register);
+      payload.modbus_bt_divisor = numOrNull(form.modbus_bt_divisor);
+      payload.modbus_et_slave_id = numOrNull(form.modbus_et_slave_id);
+      payload.modbus_et_register = numOrNull(form.modbus_et_register);
+      payload.modbus_et_divisor = numOrNull(form.modbus_et_divisor);
+      payload.modbus_dt_slave_id = numOrNull(form.modbus_dt_slave_id);
+      payload.modbus_dt_register = numOrNull(form.modbus_dt_register);
+      payload.modbus_dt_divisor = numOrNull(form.modbus_dt_divisor);
+      payload.modbus_burner_slave_id = numOrNull(form.modbus_burner_slave_id);
+      payload.modbus_burner_register = numOrNull(form.modbus_burner_register);
+      payload.modbus_burner_divisor = numOrNull(form.modbus_burner_divisor);
       payload.modbus_air_slave_id = numOrNull(form.modbus_air_slave_id);
       payload.modbus_air_control_register = numOrNull(form.modbus_air_control_register);
       payload.modbus_air_frequency_register = numOrNull(form.modbus_air_frequency_register);
@@ -453,6 +477,18 @@ export default function LiveRoastView() {
       heater_pct: preset.heater_pct ?? f.heater_pct,
       fan_pct: preset.fan_pct ?? f.fan_pct,
       drum_speed_pct: preset.drum_speed_pct ?? f.drum_speed_pct,
+      modbus_bt_slave_id: c.modbus_bt_slave_id ?? "",
+      modbus_bt_register: c.modbus_bt_register ?? "",
+      modbus_bt_divisor: c.modbus_bt_divisor ?? "",
+      modbus_et_slave_id: c.modbus_et_slave_id ?? "",
+      modbus_et_register: c.modbus_et_register ?? "",
+      modbus_et_divisor: c.modbus_et_divisor ?? "",
+      modbus_dt_slave_id: c.modbus_dt_slave_id ?? "",
+      modbus_dt_register: c.modbus_dt_register ?? "",
+      modbus_dt_divisor: c.modbus_dt_divisor ?? "",
+      modbus_burner_slave_id: c.modbus_burner_slave_id ?? "",
+      modbus_burner_register: c.modbus_burner_register ?? "",
+      modbus_burner_divisor: c.modbus_burner_divisor ?? "",
       modbus_air_slave_id: c.modbus_air_slave_id ?? "",
       modbus_air_control_register: c.modbus_air_control_register ?? "",
       modbus_air_frequency_register: c.modbus_air_frequency_register ?? "",
@@ -721,10 +757,123 @@ export default function LiveRoastView() {
                   <p className="hint">
                     Leave any of these blank to use the FZ-94 defaults above. Only worth touching once you've
                     confirmed your own unit's actual register map differs (see the VFD's own nameplate/front-panel
-                    parameters) — these are BT/ET/DT/Burner's blog-sourced, least-confirmed siblings (Air/Drum
-                    control+feedback registers, operating range, and the Burner SV°C range), not the
-                    Artisan-preset-confirmed values.
+                    parameters, or a real probe's slave ID). BT/ET/DT/Burner are confirmed against Artisan's own
+                    shipped FZ-94 preset — exposed here for a genuinely different Modbus roaster, not because a real
+                    FZ-94 should need them changed. Air/Drum (control+feedback registers, operating range) and the
+                    Burner SV°C range are that engine's least-confirmed, blog-sourced defaults.
                   </p>
+                  <div className="form-row">
+                    <label>
+                      BT slave ID
+                      <input
+                        type="number"
+                        placeholder="11"
+                        value={form.modbus_bt_slave_id}
+                        onChange={(e) => setForm({ ...form, modbus_bt_slave_id: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      BT register
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={form.modbus_bt_register}
+                        onChange={(e) => setForm({ ...form, modbus_bt_register: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      BT divisor
+                      <input
+                        type="number"
+                        placeholder="10"
+                        value={form.modbus_bt_divisor}
+                        onChange={(e) => setForm({ ...form, modbus_bt_divisor: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      ET slave ID
+                      <input
+                        type="number"
+                        placeholder="13"
+                        value={form.modbus_et_slave_id}
+                        onChange={(e) => setForm({ ...form, modbus_et_slave_id: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      ET register
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={form.modbus_et_register}
+                        onChange={(e) => setForm({ ...form, modbus_et_register: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      ET divisor
+                      <input
+                        type="number"
+                        placeholder="10"
+                        value={form.modbus_et_divisor}
+                        onChange={(e) => setForm({ ...form, modbus_et_divisor: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
+                      DT slave ID
+                      <input
+                        type="number"
+                        placeholder="12"
+                        value={form.modbus_dt_slave_id}
+                        onChange={(e) => setForm({ ...form, modbus_dt_slave_id: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      DT register
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={form.modbus_dt_register}
+                        onChange={(e) => setForm({ ...form, modbus_dt_register: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      DT divisor
+                      <input
+                        type="number"
+                        placeholder="10"
+                        value={form.modbus_dt_divisor}
+                        onChange={(e) => setForm({ ...form, modbus_dt_divisor: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Burner slave ID
+                      <input
+                        type="number"
+                        placeholder="12"
+                        value={form.modbus_burner_slave_id}
+                        onChange={(e) => setForm({ ...form, modbus_burner_slave_id: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Burner register
+                      <input
+                        type="number"
+                        placeholder="5"
+                        value={form.modbus_burner_register}
+                        onChange={(e) => setForm({ ...form, modbus_burner_register: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Burner divisor
+                      <input
+                        type="number"
+                        placeholder="10"
+                        value={form.modbus_burner_divisor}
+                        onChange={(e) => setForm({ ...form, modbus_burner_divisor: e.target.value })}
+                      />
+                    </label>
+                  </div>
                   <div className="form-row">
                     <label>
                       Air slave ID

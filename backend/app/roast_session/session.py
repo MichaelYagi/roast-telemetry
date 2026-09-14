@@ -45,15 +45,19 @@ class RoastSessionError(RuntimeError):
 
 def _modbus_register_overrides(request: RoastCreateRequest) -> dict:
     """Builds ModbusEngine kwargs from RoastCreateRequest's optional
-    Air/Drum/Burner-SV-range overrides -- only includes a key when the
-    request actually set it, so leaving them blank keeps ModbusEngine's
-    own defaults exactly as before this override mechanism existed. The
-    two range pairs (air/drum %, burner SV °C) only apply when *both*
-    halves are given together -- a lone min or max is ignored rather than
-    guessing the other half from ModbusEngine's own default, which would
-    silently duplicate (and risk drifting from) that default here."""
+    register-map overrides -- only includes a key when the request
+    actually set it, so leaving them blank keeps ModbusEngine's own
+    defaults exactly as before this override mechanism existed. The range
+    pairs (air/drum %, burner SV °C) only apply when *both* halves are
+    given together -- a lone min or max is ignored rather than guessing
+    the other half from ModbusEngine's own default, which would silently
+    duplicate (and risk drifting from) that default here."""
     overrides: dict = {}
     single_value_fields = (
+        "modbus_bt_slave_id", "modbus_bt_register", "modbus_bt_divisor",
+        "modbus_et_slave_id", "modbus_et_register", "modbus_et_divisor",
+        "modbus_dt_slave_id", "modbus_dt_register", "modbus_dt_divisor",
+        "modbus_burner_slave_id", "modbus_burner_register", "modbus_burner_divisor",
         "modbus_air_slave_id", "modbus_air_control_register", "modbus_air_frequency_register",
         "modbus_air_feedback_register",
         "modbus_drum_slave_id", "modbus_drum_control_register", "modbus_drum_frequency_register",

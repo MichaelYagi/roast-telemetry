@@ -133,16 +133,29 @@ class RoastCreateRequest(BaseModel):
     modbus_baudrate: int = Field(default=19200, description="modbus_live mode only; default matches Artisan's own shipped Coffee-Tech FZ-94 preset (19200/8N2)")
     modbus_control_port: Optional[str] = Field(default=None, description="modbus_live mode only, optional: only set this if your own wiring genuinely needs a *separate* connection for Air/Drum drive control (uncommon) -- e.g. 'COM4'. Leave blank (the normal case) to send Air/Drum over modbus_port along with everything else.")
     modbus_control_baudrate: int = Field(default=19200, description="modbus_live mode only; baud rate for modbus_control_port, if that's set")
-    # Air/Drum + Burner-SV-range overrides -- unlike BT/ET/DT/Burner's own
-    # slave/register (confirmed against Artisan's shipped FZ94.aset and
-    # left un-overridable on purpose), these are ModbusEngine's least-
-    # confirmed defaults (blog-sourced only, one person's own installation
-    # -- see modbus_bridge/engine.py's docstring) and burner_sv_range_c is
-    # this app's own invented mapping. All optional and None by default,
-    # meaning "use ModbusEngine's own default" -- only set what your own
-    # unit actually needs overridden. Air/Drum ranges require both the min
-    # and max of a pair to take effect (a lone one is ignored rather than
-    # guessing the other half).
+    # Full ModbusEngine register-map override set -- all optional and None
+    # by default, meaning "use ModbusEngine's own (FZ-94) default"; only
+    # set what your own unit actually needs overridden. BT/ET/DT/Burner's
+    # own slave/register/divisor are confirmed against Artisan's shipped
+    # FZ94.aset (see modbus_bridge/engine.py's docstring) -- exposed here
+    # anyway for a genuinely different Modbus roaster, not because they're
+    # expected to need changing for an actual FZ-94. Air/Drum and
+    # burner_sv_range_c are that engine's least-confirmed defaults
+    # (blog-sourced only, one person's own installation). Every *_min_c
+    # and *_min_pct/*_max_pct pair requires both halves together to take
+    # effect (a lone one is ignored rather than guessing the other half).
+    modbus_bt_slave_id: Optional[int] = Field(default=None, description="modbus_live, advanced: BT probe Modbus slave ID. Default 11.")
+    modbus_bt_register: Optional[int] = Field(default=None, description="modbus_live, advanced: BT probe register. Default 0.")
+    modbus_bt_divisor: Optional[float] = Field(default=None, description="modbus_live, advanced: BT raw-value divisor (raw/divisor = °C). Default 10.")
+    modbus_et_slave_id: Optional[int] = Field(default=None, description="modbus_live, advanced: ET probe Modbus slave ID. Default 13.")
+    modbus_et_register: Optional[int] = Field(default=None, description="modbus_live, advanced: ET probe register. Default 0.")
+    modbus_et_divisor: Optional[float] = Field(default=None, description="modbus_live, advanced: ET raw-value divisor (raw/divisor = °C). Default 10.")
+    modbus_dt_slave_id: Optional[int] = Field(default=None, description="modbus_live, advanced: DT probe Modbus slave ID. Default 12.")
+    modbus_dt_register: Optional[int] = Field(default=None, description="modbus_live, advanced: DT probe register. Default 0.")
+    modbus_dt_divisor: Optional[float] = Field(default=None, description="modbus_live, advanced: DT raw-value divisor (raw/divisor = °C). Default 10.")
+    modbus_burner_slave_id: Optional[int] = Field(default=None, description="modbus_live, advanced: Burner PID Modbus slave ID. Default 12 (same PID device as DT).")
+    modbus_burner_register: Optional[int] = Field(default=None, description="modbus_live, advanced: Burner SV register (read + write). Default 5.")
+    modbus_burner_divisor: Optional[float] = Field(default=None, description="modbus_live, advanced: Burner SV raw-value divisor (raw/divisor = °C). Default 10.")
     modbus_air_slave_id: Optional[int] = Field(default=None, description="modbus_live, advanced: Air VFD Modbus slave ID. Default 1.")
     modbus_air_control_register: Optional[int] = Field(default=None, description="modbus_live, advanced: Air VFD run/stop register. Default 8192.")
     modbus_air_frequency_register: Optional[int] = Field(default=None, description="modbus_live, advanced: Air VFD frequency-command register. Default 8193.")

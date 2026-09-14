@@ -18,6 +18,13 @@ def test_modbus_live_session_applies_register_overrides():
         title="Test Roast",
         mode=RoastMode.MODBUS_LIVE,
         modbus_port=BOGUS_PORT,
+        modbus_bt_slave_id=21,
+        modbus_bt_register=1,
+        modbus_bt_divisor=100.0,
+        modbus_et_slave_id=23,
+        modbus_dt_register=2,
+        modbus_burner_slave_id=22,
+        modbus_burner_register=6,
         modbus_air_slave_id=9,
         modbus_air_control_register=100,
         modbus_air_frequency_register=101,
@@ -30,6 +37,13 @@ def test_modbus_live_session_applies_register_overrides():
     )
     engine = RoastSession("test-roast-id", request)._engine
 
+    assert engine.bt_slave_id == 21
+    assert engine.bt_register == 1
+    assert engine.bt_divisor == 100.0
+    assert engine.et_slave_id == 23
+    assert engine.dt_register == 2
+    assert engine.burner_slave_id == 22
+    assert engine.burner_register == 6
     assert engine.air_slave_id == 9
     assert engine.air_control_register == 100
     assert engine.air_frequency_register == 101
@@ -39,6 +53,8 @@ def test_modbus_live_session_applies_register_overrides():
     assert engine.burner_sv_range_c == (120.0, 200.0)
 
     # Untouched fields keep ModbusEngine's own defaults.
+    assert engine.et_register == 0
+    assert engine.dt_slave_id == 12
     assert engine.drum_control_register == 8192
     assert engine.drum_range == (0, 70)
 
@@ -58,6 +74,11 @@ def test_modbus_live_session_defaults_match_modbus_engine_when_nothing_overridde
     request = RoastCreateRequest(title="Test Roast", mode=RoastMode.MODBUS_LIVE, modbus_port=BOGUS_PORT)
     engine = RoastSession("test-roast-id", request)._engine
 
+    assert engine.bt_slave_id == 11
+    assert engine.et_slave_id == 13
+    assert engine.dt_slave_id == 12
+    assert engine.burner_slave_id == 12
+    assert engine.burner_register == 5
     assert engine.air_slave_id == 1
     assert engine.drum_slave_id == 2
     assert engine.burner_sv_range_c == (100.0, 250.0)

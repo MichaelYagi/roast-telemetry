@@ -23,8 +23,9 @@ four data sources:
    Artisan's own shipped machine preset and source for this exact model
    (see "Assumptions"), not guessed; every one is also a constructor
    argument, not hardcoded, so it can be repointed at a different Modbus
-   roaster (and the Air/Drum/Burner-range ones are exposed as per-roast
-   overrides in the New Roast form's "Advanced Modbus register map"):
+   roaster — every one (BT/ET/DT/Burner's own slave/register/divisor
+   included, not just Air/Drum/Burner-range) is exposed as a per-roast
+   override in the New Roast form's "Advanced Modbus register map":
    - One serial connection handles everything — BT/ET/DT
      (bean/environment/drum-space temperature) and Burner (a drum-temp
      *setpoint* the roaster's own PID bangs the 3 heating elements
