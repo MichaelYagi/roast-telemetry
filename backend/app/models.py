@@ -94,6 +94,11 @@ class RoastProfilePoint(BaseModel):
     heater_pct: Optional[float] = None
     fan_pct: Optional[float] = None
     drum_speed_pct: Optional[float] = None
+    # Burner's raw setpoint in its native unit (°C) -- heater_pct is that
+    # same value mapped onto burner_sv_range_c for a 0-100% UI slider;
+    # this is what the roaster's own PID controller actually holds.
+    # modbus_live only, None for every other mode.
+    burner_sv_c: Optional[float] = None
 
 
 class RoastEvent(BaseModel):
@@ -229,7 +234,7 @@ class RoastPreset(BaseModel):
 BREAKOUT_PANEL_KEYS = {
     "bt", "et", "dt", "ror_bt", "ror_et", "time",
     "dry_pct", "maillard_pct", "dev_pct", "to_dry", "to_fcs",
-    "heater", "fan", "drum", "playback_speed",
+    "heater", "fan", "drum", "burner_sv", "playback_speed",
 }
 
 

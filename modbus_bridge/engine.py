@@ -325,6 +325,7 @@ class ModbusEngine:
         # reflecting it. See burner_sv_range_c for the inverse of the same
         # mapping _write_burner_sv uses.
         heater_fb = None
+        sv_c = None
         if self.burner_register is not None:
             sv_raw = self._read_register(self.burner_register, self.burner_slave_id)
             if sv_raw is not None:
@@ -332,6 +333,10 @@ class ModbusEngine:
                 sv_lo, sv_hi = self.burner_sv_range_c
                 heater_fb = max(0.0, min(100.0, (sv_c - sv_lo) / (sv_hi - sv_lo) * 100.0))
         sample["heater_pct"] = heater_fb if heater_fb is not None else self._last_values.get("burner")
+        # The raw SV in its native unit (°C), not the 0-100% UI mapping --
+        # lets an operator sanity-check burner_sv_range_c against the
+        # roaster's own real setpoint instead of trusting the % blindly.
+        sample["burner_sv_c"] = sv_c
 
         # Prefer a genuine feedback read over echoing the last command --
         # confirms the drive actually took the write, not just that pymodbus

@@ -20,6 +20,7 @@ function computeValues(latest, milestones, elapsedLabel, roast) {
     to_dry: milestones?.dryTime ?? "—",
     to_fcs: milestones?.fcsTime ?? "—",
     heater: fmt(latest?.heater_pct, 0, "%"),
+    burner_sv: fmt(latest?.burner_sv_c, 1, "°"),
     fan: fmt(latest?.fan_pct, 0, "%"),
     drum: fmt(latest?.drum_speed_pct, 0, "%"),
     playback_speed: roast?.playback_speed != null ? `${roast.playback_speed}x` : "—",

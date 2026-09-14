@@ -85,7 +85,17 @@ def test_tick_reads_burner_sv_back_as_heater_pct_not_just_last_command():
     sample = engine.tick(1.0)
 
     assert sample["heater_pct"] == pytest.approx(85.0)
+    assert sample["burner_sv_c"] == pytest.approx(227.5)  # the raw SV, not the % mapping
     assert (5, 12) in primary.reads
+
+
+def test_tick_reports_no_burner_sv_when_burner_register_disabled():
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", burner_register=None, client_cls=client_cls)
+
+    sample = engine.tick(1.0)
+
+    assert sample["burner_sv_c"] is None
 
 
 def test_tick_reports_no_heater_pct_when_burner_register_disabled():
