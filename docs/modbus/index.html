@@ -166,20 +166,46 @@
     <a href="real-hardware-checklist.html">real-hardware checklist</a>.
   </p>
 
-  <h2 id="milestone-automation">Milestone automation (optional)</h2>
+  <h2 id="milestone-automation">Automation rules (optional)</h2>
   <p>
     Every milestone (Charge, Dry End, First Crack, ...) is a plain manual
     click by default — see
     <a href="../getting-started.html#the-four-data-sources">Getting started</a>.
-    You can optionally bind a Burner/Air/Drum command to fire
-    automatically when a specific milestone is marked — either
-    immediately, or after a configurable delay — matching what Artisan
-    calls "Alarms." Two examples: bind Drum speed to Charge so it's set
-    the instant beans go in, or bind Burner/Air to Drop with no delay so
-    the heat cuts and the cooling fan kicks on the moment you mark it.
-    Configured per saved preset, from the "Milestone automation" section
-    of the Configure Roast form — it travels with "Save this
-    configuration as," same as everything else in the form.
+    You can optionally bind a Burner/Air/Drum command, an in-app banner
+    message, or both, to fire automatically — matching what Artisan calls
+    "Alarms." Configured per saved preset, from the "Automation rules"
+    section of the Configure Roast form — it travels with "Save this
+    configuration as," same as everything else in the form. Three
+    trigger types:
+  </p>
+  <ul>
+    <li>
+      <strong>Milestone</strong> — fires when a specific event is marked
+      (Charge, Dry End, ...). Two examples: bind Drum speed to Charge so
+      it's set the instant beans go in, or bind Burner/Air to Drop so the
+      heat cuts and the cooling fan kicks on the moment you mark it.
+    </li>
+    <li>
+      <strong>Temperature</strong> — fires the first time BT or ET
+      crosses a threshold you set (e.g. "BT ≥ 200°C"), checked every tick
+      while actually recording. One-shot per roast — it won't re-fire on
+      every later tick just because the temperature stays above the
+      threshold.
+    </li>
+    <li>
+      <strong>Elapsed time</strong> — fires once a set number of seconds
+      into the recording has passed, independent of any milestone or
+      temperature. Also one-shot per roast.
+    </li>
+  </ul>
+  <p>
+    Any rule can also add an <strong>extra delay</strong> (seconds) after
+    its trigger condition is met before actually firing — e.g. "Charge,
+    then wait 60 seconds, then Burner to 100%" for a soak period — and an
+    optional <strong>banner message</strong> shown in-app the moment it
+    fires (no sound, no browser push notification — just a visible,
+    click-to-dismiss line on the Live Roast screen), independent of
+    whether the rule also sends a command.
   </p>
   <ul>
     <li>
@@ -192,7 +218,7 @@
       you add the rule — same caution as Testing Mode's write check
       above, since a bad Burner setpoint can make the roaster's own
       bang-bang controller start actually firing heating elements.
-      Air/Drum-only rules save directly.
+      Air/Drum-only (or message-only) rules save directly.
     </li>
     <li>
       <strong>A delayed rule still pending when you click OFF/STOP is

@@ -27,6 +27,12 @@ export function useRoastStream(roastId) {
   // messages. Keyed by rule_id so a fired one can be removed by id
   // rather than assuming array order.
   const [pendingAlarms, setPendingAlarms] = useState([]);
+  // Transient in-app banners from a fired rule's optional `message` (see
+  // AlarmRulesEditor.jsx) -- separate from pendingAlarms above, which
+  // tracks the pre-fire "still waiting" state, not the post-fire
+  // announcement. LiveRoastView.jsx is responsible for auto-dismissing
+  // these after a few seconds; this hook just appends/lets them be removed.
+  const [alarmNotifications, setAlarmNotifications] = useState([]);
   const wsRef = useRef(null);
 
   useEffect(() => {
@@ -35,6 +41,7 @@ export function useRoastStream(roastId) {
     setLatestPreview(null);
     setLastError(null);
     setPendingAlarms([]);
+    setAlarmNotifications([]);
     const ws = new WebSocket(roastStreamUrl(roastId));
     wsRef.current = ws;
 
@@ -72,11 +79,23 @@ export function useRoastStream(roastId) {
         ]);
       } else if (message.type === "alarm_fired") {
         setPendingAlarms((prev) => prev.filter((a) => a.ruleId !== message.rule_id));
+        if (message.message) {
+          const id = `${message.rule_id}-${Date.now()}`;
+          setAlarmNotifications((prev) => [...prev, { id, text: message.message }]);
+          // Self-dismissing -- scheduled once, right here, rather than a
+          // separate effect trying to track "which notifications already
+          // have a pending timer" across re-renders.
+          setTimeout(() => setAlarmNotifications((prev) => prev.filter((n) => n.id !== id)), 8000);
+        }
       }
     };
 
     return () => ws.close();
   }, [roastId]);
 
-  return { roast, connectionStatus, latestPreview, lastError, pendingAlarms, setRoast };
+  function dismissAlarmNotification(id) {
+    setAlarmNotifications((prev) => prev.filter((n) => n.id !== id));
+  }
+
+  return { roast, connectionStatus, latestPreview, lastError, pendingAlarms, alarmNotifications, dismissAlarmNotification, setRoast };
 }

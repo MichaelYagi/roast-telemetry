@@ -136,20 +136,46 @@ class ControlCommand(BaseModel):
     speed: Optional[float] = Field(default=None, ge=0, description="Playback speed multiplier (alog_playback mode only)")
 
 
+class AlarmTriggerKind(str, Enum):
+    EVENT = "event"
+    TEMPERATURE = "temperature"
+    TIME = "time"
+
+
 class AlarmRule(BaseModel):
-    """A milestone-triggered automation -- Artisan-style "Alarms": when
-    `trigger` is marked (see RoastSession.add_event), fire this command
-    after `delay_s` (0 = immediately). modbus_live only -- ms6514_live has
-    no write capability at all. TURNING_POINT/CUSTOM aren't valid
-    triggers (TURNING_POINT is never manually markable; CUSTOM isn't a
-    milestone)."""
+    """An automation -- Artisan-style "Alarms": when the trigger condition
+    is met, fire a bound command (and/or show a banner message) after
+    `delay_s` (0 = as soon as the condition is met, no extra wait).
+    modbus_live only -- ms6514_live has no write capability at all.
+
+    Three trigger kinds, one field set each (no cross-field validation --
+    an internal form always sends a well-formed payload; a rule missing
+    its own kind's field, e.g. a TEMPERATURE rule with threshold_c=None,
+    simply never crosses, same tolerance as settings.py's
+    _filter_colors/_filter_panels):
+    - EVENT: `event_type` is a milestone (see RoastSession.add_event).
+      TURNING_POINT/CUSTOM aren't valid (TURNING_POINT is never manually
+      markable; CUSTOM isn't a milestone).
+    - TEMPERATURE: `channel` ("bt"/"et") crosses `threshold_c`, checked
+      every tick while actually recording (RoastSession._evaluate_ambient_alarms).
+      One-shot per roast, same as EVENT rules effectively are (a
+      milestone can only be marked once) -- doesn't re-fire every tick
+      the condition stays true.
+    - TIME: elapsed roast time crosses `at_time_s`. Same one-shot
+      evaluation as TEMPERATURE.
+    """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    trigger: RoastEventType
-    delay_s: float = Field(default=0.0, ge=0)
+    trigger_kind: AlarmTriggerKind = AlarmTriggerKind.EVENT
+    event_type: Optional[RoastEventType] = None
+    channel: Optional[str] = Field(default=None, description='"bt" or "et" -- TEMPERATURE trigger_kind only')
+    threshold_c: Optional[float] = Field(default=None, description="TEMPERATURE trigger_kind only")
+    at_time_s: Optional[float] = Field(default=None, ge=0, description="Absolute elapsed roast time in seconds -- TIME trigger_kind only")
+    delay_s: float = Field(default=0.0, ge=0, description="Extra grace period after the trigger condition is met, any kind")
     heater_pct: Optional[float] = Field(default=None, ge=0, le=100)
     fan_pct: Optional[float] = Field(default=None, ge=0, le=100)
     drum_speed_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    message: Optional[str] = Field(default=None, max_length=200, description="Optional in-app banner text shown when this rule fires")
 
 
 class RoastCreateRequest(BaseModel):
@@ -204,7 +230,7 @@ class RoastCreateRequest(BaseModel):
     dry_end_c: Optional[float] = Field(default=160.0, description="BT threshold for auto-detecting Dry End; live-bridge modes only. Null disables it.")
     fc_start_c: Optional[float] = Field(default=196.0, description="BT threshold for auto-detecting FC Start; live-bridge modes only. Null disables it.")
     sample_interval_s: float = 1.0
-    alarms: list[AlarmRule] = Field(default=[], description="modbus_live only: milestone-triggered automations (Artisan-style Alarms). Part of the roast's own config, not a runtime command -- rides through saved-preset config_json for free.")
+    alarms: list[AlarmRule] = Field(default=[], description="modbus_live only: event/temperature/time-triggered automations (Artisan-style Alarms). Part of the roast's own config, not a runtime command -- rides through saved-preset config_json for free.")
 
 
 class RoastSummary(BaseModel):
@@ -259,7 +285,7 @@ class RoastPreset(BaseModel):
 # of) their normal small display elsewhere on the page.
 BREAKOUT_PANEL_KEYS = {
     "bt", "et", "dt", "ror_bt", "ror_et", "time",
-    "dry_pct", "maillard_pct", "dev_pct", "to_dry", "to_fcs",
+    "dry_pct", "maillard_pct", "dev_pct", "to_dry", "to_fcs", "to_dev",
     "heater", "fan", "drum", "burner_sv", "playback_speed",
 }
 

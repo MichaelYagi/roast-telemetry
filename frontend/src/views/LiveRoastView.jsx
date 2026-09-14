@@ -206,7 +206,8 @@ export default function LiveRoastView() {
   const showBreakoutPanel = phase !== "idle" && brokenOutPanels.length > 0;
   const showSplitLayout = showBreakoutPanel && viewportWide;
 
-  const { roast, connectionStatus, latestPreview, lastError, pendingAlarms } = useRoastStream(roastId);
+  const { roast, connectionStatus, latestPreview, lastError, pendingAlarms, alarmNotifications, dismissAlarmNotification } =
+    useRoastStream(roastId);
 
   // Surfaces a server-side read/tick failure (e.g. the real serial link
   // dropping mid-test) into the same banner connect failures already use
@@ -725,6 +726,7 @@ export default function LiveRoastView() {
   // local state, which resets to its defaults on every page load.
   const activeMode = roast?.mode || form.mode;
 
+  const chargeEvent = roast?.events?.find((e) => e.type === "CHARGE");
   const dryEndEvent = roast?.events?.find((e) => e.type === "DRY_END");
   const fcStartEvent = roast?.events?.find((e) => e.type === "FC_START");
   const dropEvent = roast?.events?.find((e) => e.type === "DROP");
@@ -762,10 +764,23 @@ export default function LiveRoastView() {
       dryEndEvent && fcStartEvent && latest?.time_s
         ? `${(((fcStartEvent.time_s - dryEndEvent.time_s) / latest.time_s) * 100).toFixed(1)}%`
         : "---",
+    // Unlike dryPercent/maillardPercent above, this one only ever shows
+    // once dropEvent exists -- by then the true Charge-to-Drop total is
+    // already fully known (not still in progress), so unlike those two
+    // this deliberately does NOT divide by latest.time_s (which keeps
+    // growing through cooling, silently shrinking an already-final DTR%
+    // the longer cooling runs) -- matches RoastChart.jsx's own post-hoc
+    // computePhases(), which uses the same drop-minus-charge total.
     devPercent:
-      fcStartEvent && dropEvent && latest?.time_s
-        ? `${(((dropEvent.time_s - fcStartEvent.time_s) / latest.time_s) * 100).toFixed(1)}%`
+      fcStartEvent && dropEvent && chargeEvent
+        ? `${(((dropEvent.time_s - fcStartEvent.time_s) / (dropEvent.time_s - chargeEvent.time_s)) * 100).toFixed(1)}%`
         : "---",
+    devTime:
+      dropEvent && fcStartEvent
+        ? formatElapsed(dropEvent.time_s - fcStartEvent.time_s) // frozen, final
+        : fcStartEvent && latest?.time_s
+          ? formatElapsed(latest.time_s - fcStartEvent.time_s) // live, still growing
+          : "--:--",
   };
 
   // The Configure Roast form (with its "Load saved config" dropdown) only
@@ -1389,6 +1404,11 @@ export default function LiveRoastView() {
                   .join(" · ")}
               </p>
             )}
+            {alarmNotifications.map((n) => (
+              <p key={n.id} className="alarm-notification-banner" onClick={() => dismissAlarmNotification(n.id)}>
+                {n.text}
+              </p>
+            ))}
           </div>
 
           {roast && (

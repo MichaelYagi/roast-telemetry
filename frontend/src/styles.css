@@ -509,6 +509,16 @@ button:disabled {
   font-style: italic;
 }
 
+.alarm-notification-banner {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .preset-feedback {
   color: #166534;
   font-weight: 600;

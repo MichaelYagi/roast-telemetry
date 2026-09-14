@@ -27,6 +27,7 @@ from ..models import (
     ALWAYS_AUTO_EVENT_TYPES,
     MILESTONE_SEQUENCE,
     AlarmRule,
+    AlarmTriggerKind,
     ControlCommand,
     EventCreateRequest,
     NoteCreateRequest,
@@ -146,6 +147,14 @@ class RoastSession:
         # stored unconditionally same as everything else on the request.
         self._alarm_rules: list[AlarmRule] = list(request.alarms)
         self._pending_alarm_tasks: list[asyncio.Task] = []
+        # TEMPERATURE/TIME rules are evaluated every tick (see
+        # _evaluate_ambient_alarms) -- this is what keeps a rule from
+        # re-scheduling itself on every single tick for as long as its
+        # condition stays true (e.g. BT staying above threshold for the
+        # rest of the roast). EVENT rules need no equivalent tracking --
+        # add_event()'s own milestone-sequencing already guarantees each
+        # milestone fires at most once per roast.
+        self._fired_ambient_rule_ids: set[str] = set()
         # True once this session has an actual DB roast row (set by
         # _persist_new_roast_row(), called from start()/begin_recording()) --
         # modbus_live/ms6514_live can now sit connected+streaming for a
@@ -259,6 +268,7 @@ class RoastSession:
                 else:
                     self.profile.append(sample)
                     self.events.extend(events)
+                    self._evaluate_ambient_alarms(sample)
 
                     await pubsub.publish(self.id, {
                         "type": "sample",
@@ -414,13 +424,43 @@ class RoastSession:
         self.events.append(event)
         if self.mode == RoastMode.MODBUS_LIVE:
             for rule in self._alarm_rules:
-                if rule.trigger == req.type:
-                    if rule.delay_s <= 0:
-                        self._fire_alarm_command(rule)
-                    else:
-                        task = asyncio.create_task(self._fire_delayed_alarm(rule))
-                        self._pending_alarm_tasks.append(task)
+                if rule.trigger_kind == AlarmTriggerKind.EVENT and rule.event_type == req.type:
+                    self._schedule_rule(rule)
         return event
+
+    def _evaluate_ambient_alarms(self, sample: dict) -> None:
+        """TEMPERATURE/TIME rules -- checked every tick while actually
+        recording (see _run_loop's call site, ROASTING/COOLING only,
+        never during the armed/preview window). One-shot per roast via
+        _fired_ambient_rule_ids -- without it a rule would reschedule
+        itself on every single tick for as long as its condition stays
+        true (e.g. BT sitting above threshold for the rest of the
+        roast)."""
+        if self.mode != RoastMode.MODBUS_LIVE:
+            return
+        for rule in self._alarm_rules:
+            if rule.trigger_kind == AlarmTriggerKind.EVENT or rule.id in self._fired_ambient_rule_ids:
+                continue
+            crossed = False
+            if rule.trigger_kind == AlarmTriggerKind.TEMPERATURE and rule.threshold_c is not None:
+                value = sample.get(rule.channel)
+                crossed = value is not None and value >= rule.threshold_c
+            elif rule.trigger_kind == AlarmTriggerKind.TIME and rule.at_time_s is not None:
+                crossed = sample.get("time_s", 0.0) >= rule.at_time_s
+            if crossed:
+                self._fired_ambient_rule_ids.add(rule.id)
+                self._schedule_rule(rule)
+
+    def _trigger_label(self, rule: AlarmRule) -> str:
+        if rule.trigger_kind == AlarmTriggerKind.TEMPERATURE:
+            return f"{(rule.channel or '?').upper()}>={rule.threshold_c}°C"
+        if rule.trigger_kind == AlarmTriggerKind.TIME:
+            return f"t>={rule.at_time_s}s"
+        return rule.event_type.value if rule.event_type else "?"
+
+    def _schedule_rule(self, rule: AlarmRule) -> None:
+        task = asyncio.create_task(self._fire_rule(rule))
+        self._pending_alarm_tasks.append(task)
 
     def _fire_alarm_command(self, rule: AlarmRule) -> None:
         """Applies a bound automation's command. Deliberately swallows any
@@ -439,27 +479,34 @@ class RoastSession:
         except RoastSessionError:
             pass
 
-    async def _fire_delayed_alarm(self, rule: AlarmRule) -> None:
+    async def _fire_rule(self, rule: AlarmRule) -> None:
         try:
-            # Published before the sleep, not after -- so the frontend
-            # shows "pending" for the actual full delay window, not just
-            # however much of it is left once this task starts running.
-            await pubsub.publish(self.id, {
-                "type": "alarm_scheduled",
-                "roast_id": self.id,
-                "rule_id": rule.id,
-                "trigger": rule.trigger.value,
-                "delay_s": rule.delay_s,
-            })
-            await asyncio.sleep(rule.delay_s)
-            if self._stop_requested.is_set():
-                # abort()/the _run_loop exception handler already cancel
-                # every pending task -- this is a defensive check for the
-                # race between the sleep above completing and that
-                # cancellation actually landing, not the primary guard.
-                return
+            if rule.delay_s > 0:
+                # Published before the sleep, not after -- so the frontend
+                # shows "pending" for the actual full delay window, not
+                # just however much of it is left once this task starts
+                # running.
+                await pubsub.publish(self.id, {
+                    "type": "alarm_scheduled",
+                    "roast_id": self.id,
+                    "rule_id": rule.id,
+                    "trigger": self._trigger_label(rule),
+                    "delay_s": rule.delay_s,
+                })
+                await asyncio.sleep(rule.delay_s)
+                if self._stop_requested.is_set():
+                    # abort()/the _run_loop exception handler already
+                    # cancel every pending task -- this is a defensive
+                    # check for the race between the sleep above
+                    # completing and that cancellation actually landing,
+                    # not the primary guard.
+                    return
             self._fire_alarm_command(rule)
-            await pubsub.publish(self.id, {"type": "alarm_fired", "roast_id": self.id, "rule_id": rule.id})
+            # Always published, delay_s==0 included -- a rule's optional
+            # `message` needs a way to reach the frontend regardless of
+            # timing, so immediate rules are no longer silent the way
+            # they were before notifications existed.
+            await pubsub.publish(self.id, {"type": "alarm_fired", "roast_id": self.id, "rule_id": rule.id, "message": rule.message})
         finally:
             # Needed on the normal-completion path too, not just when
             # abort()/the exception handler cancel it -- otherwise a long

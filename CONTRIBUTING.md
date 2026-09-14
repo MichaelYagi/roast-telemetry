@@ -27,10 +27,11 @@ matching how the app itself is always run: `PYTHONPATH=. uvicorn ...`).
 Covers the `.alog` reader/writer (including real Artisan's own file
 shape), `AlogPlayer`'s playback/interpolation, milestone event sequencing,
 the modbus/ms6514 engines' register maps and lifecycle (connect vs.
-record, detector reset on recording start), milestone-triggered
-automation (immediate/delayed firing, cancellation on abort, action
-failures never breaking the milestone click), settings persistence, and
-the settings/roasts/serial-ports APIs. Each DB-touching test gets its own
+record, detector reset on recording start), automation rules
+(event/temperature/time triggers, one-shot ambient-trigger evaluation,
+immediate/delayed firing, cancellation on abort, action failures never
+breaking the milestone click), settings persistence, and the
+settings/roasts/serial-ports APIs. Each DB-touching test gets its own
 throwaway SQLite file (see `tests/conftest.py`'s `isolated_db` fixture) —
 none of it touches `backend/data/roasts.db`. There's no frontend test
 suite yet.
