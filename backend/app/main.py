@@ -94,4 +94,12 @@ if FRONTEND_DIST.is_dir():
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_frontend(full_path: str) -> FileResponse:
+        # Files Vite copies verbatim from frontend/public/ (favicon.ico, the
+        # header icon, etc.) live at dist's root next to index.html, not
+        # under /assets -- without this check they fell through to the
+        # index.html fallback below like any SPA route, so the browser got
+        # back HTML instead of the actual image (looked like a blank icon).
+        candidate = (FRONTEND_DIST / full_path).resolve()
+        if full_path and candidate.is_relative_to(FRONTEND_DIST.resolve()) and candidate.is_file():
+            return FileResponse(candidate)
         return FileResponse(FRONTEND_DIST / "index.html")
