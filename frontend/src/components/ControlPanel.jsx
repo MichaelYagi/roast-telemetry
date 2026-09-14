@@ -9,9 +9,18 @@ import { useEffect, useRef, useState } from "react";
 const LOCAL_ECHO_GUARD_MS = 1500;
 
 export default function ControlPanel({ initial, disabled, onSend }) {
-  const [heater, setHeater] = useState(initial?.heater_pct ?? 70);
-  const [fan, setFan] = useState(initial?.fan_pct ?? 20);
-  const [drum, setDrum] = useState(initial?.drum_speed_pct ?? 50);
+  // No numeric fallback (e.g. "?? 70") on purpose -- that would mean a
+  // register that's misconfigured/failing to read (wrong slave ID, wrong
+  // address) shows a plausible-looking made-up number with zero
+  // indication anything's wrong, instead of the honest "unknown" state
+  // below. null here means "no real reading yet" (very brief, resolves
+  // within a tick once things are working) or "reading is failing"
+  // (stays null indefinitely) -- the UI can't tell those apart, so it
+  // treats both the same: shown as "—", slider disabled, until a real
+  // value actually arrives.
+  const [heater, setHeater] = useState(initial?.heater_pct ?? null);
+  const [fan, setFan] = useState(initial?.fan_pct ?? null);
+  const [drum, setDrum] = useState(initial?.drum_speed_pct ?? null);
   const lastLocalChangeAt = useRef({ heater_pct: 0, fan_pct: 0, drum_speed_pct: 0 });
 
   // useState above only seeds from `initial` on first mount -- for
@@ -38,33 +47,37 @@ export default function ControlPanel({ initial, disabled, onSend }) {
     setDrum(initial.drum_speed_pct);
   }, [initial?.drum_speed_pct]);
 
-  const slider = (label, value, setValue, key) => (
-    <label className="control-slider">
-      <span>
-        {label}: <strong>{value}%</strong>
-      </span>
-      <input
-        type="range"
-        min="0"
-        max="100"
-        value={value}
-        disabled={disabled}
-        onChange={(e) => {
-          const v = Number(e.target.value);
-          lastLocalChangeAt.current[key] = Date.now();
-          setValue(v);
-          onSend({ [key]: v });
-        }}
-      />
-    </label>
-  );
+  const slider = (label, value, setValue, key) => {
+    const unknown = value == null;
+    return (
+      <label className="control-slider">
+        <span>
+          {label}: <strong>{unknown ? "—" : `${value}%`}</strong>
+        </span>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={unknown ? 0 : value}
+          disabled={disabled || unknown}
+          title={unknown ? "Waiting for a real reading from the device" : undefined}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            lastLocalChangeAt.current[key] = Date.now();
+            setValue(v);
+            onSend({ [key]: v });
+          }}
+        />
+      </label>
+    );
+  };
 
   return (
     <div className="panel control-panel">
       <h3>Controls</h3>
-      {slider("Heater", heater, setHeater, "heater_pct")}
-      {slider("Fan", fan, setFan, "fan_pct")}
-      {slider("Drum Speed", drum, setDrum, "drum_speed_pct")}
+      {slider("Burner", heater, setHeater, "heater_pct")}
+      {slider("Air", fan, setFan, "fan_pct")}
+      {slider("Drum", drum, setDrum, "drum_speed_pct")}
       {disabled && <p className="hint">Controls are inactive: roast not currently active.</p>}
     </div>
   );

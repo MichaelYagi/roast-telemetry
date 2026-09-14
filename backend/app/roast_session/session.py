@@ -51,6 +51,36 @@ def _format_machine_label(machine: Optional[dict]) -> Optional[str]:
     return label or None
 
 
+def _modbus_register_overrides(request: RoastCreateRequest) -> dict:
+    """Builds ModbusEngine kwargs from RoastCreateRequest's optional
+    Air/Drum/Burner-SV-range overrides -- only includes a key when the
+    request actually set it, so leaving them blank keeps ModbusEngine's
+    own defaults exactly as before this override mechanism existed. The
+    two range pairs (air/drum %, burner SV °C) only apply when *both*
+    halves are given together -- a lone min or max is ignored rather than
+    guessing the other half from ModbusEngine's own default, which would
+    silently duplicate (and risk drifting from) that default here."""
+    overrides: dict = {}
+    single_value_fields = (
+        "modbus_air_slave_id", "modbus_air_control_register", "modbus_air_frequency_register",
+        "modbus_air_feedback_register",
+        "modbus_drum_slave_id", "modbus_drum_control_register", "modbus_drum_frequency_register",
+        "modbus_drum_feedback_register",
+    )
+    for field in single_value_fields:
+        value = getattr(request, field)
+        if value is not None:
+            overrides[field.removeprefix("modbus_")] = value
+
+    if request.modbus_air_min_pct is not None and request.modbus_air_max_pct is not None:
+        overrides["air_range"] = (request.modbus_air_min_pct, request.modbus_air_max_pct)
+    if request.modbus_drum_min_pct is not None and request.modbus_drum_max_pct is not None:
+        overrides["drum_range"] = (request.modbus_drum_min_pct, request.modbus_drum_max_pct)
+    if request.modbus_burner_sv_min_c is not None and request.modbus_burner_sv_max_c is not None:
+        overrides["burner_sv_range_c"] = (request.modbus_burner_sv_min_c, request.modbus_burner_sv_max_c)
+    return overrides
+
+
 class RoastSession:
     def __init__(self, roast_id: str, request: RoastCreateRequest, machine: Optional[dict]):
         self.id = roast_id
@@ -107,6 +137,7 @@ class RoastSession:
                     control_baudrate=request.modbus_control_baudrate,
                     dry_end_c=request.dry_end_c,
                     fc_start_c=request.fc_start_c,
+                    **_modbus_register_overrides(request),
                 )
             except ValueError as exc:
                 raise RoastSessionError(str(exc)) from exc

@@ -14,6 +14,14 @@ const SETTINGS_POLL_MS = 5000;
 
 const SAMPLE_ALOG_PATH = "backend/data/sample_roasts/demo_roast.alog";
 
+// Empty-string form field -> null (meaning "use ModbusEngine's own
+// default"), otherwise the numeric value -- used for all the advanced
+// register-map override fields below, since RoastCreateRequest treats
+// null/omitted the same as never having set them.
+function numOrNull(v) {
+  return v === "" || v == null ? null : Number(v);
+}
+
 function formatElapsed(seconds) {
   if (seconds == null) return "00:00";
   const m = Math.floor(seconds / 60);
@@ -90,7 +98,25 @@ export default function LiveRoastView() {
     heater_pct: 70,
     fan_pct: 20,
     drum_speed_pct: 50,
+    // Advanced Modbus register-map overrides -- all blank by default,
+    // meaning "use ModbusEngine's own (FZ-94) default". See the New Roast
+    // form's "Advanced Modbus register map" section.
+    modbus_air_slave_id: "",
+    modbus_air_control_register: "",
+    modbus_air_frequency_register: "",
+    modbus_air_feedback_register: "",
+    modbus_air_min_pct: "",
+    modbus_air_max_pct: "",
+    modbus_drum_slave_id: "",
+    modbus_drum_control_register: "",
+    modbus_drum_frequency_register: "",
+    modbus_drum_feedback_register: "",
+    modbus_drum_min_pct: "",
+    modbus_drum_max_pct: "",
+    modbus_burner_sv_min_c: "",
+    modbus_burner_sv_max_c: "",
   });
+  const [showAdvancedModbus, setShowAdvancedModbus] = useState(false);
   const [phase, setPhase] = useState("idle"); // idle | armed | roasting | cooling | finished
   const [roastId, setRoastId] = useState(null);
   const [noteText, setNoteText] = useState("");
@@ -322,6 +348,20 @@ export default function LiveRoastView() {
       payload.modbus_baudrate = Number(form.modbus_baudrate) || 19200;
       payload.modbus_control_port = form.modbus_control_port || null;
       payload.modbus_control_baudrate = Number(form.modbus_control_baudrate) || 19200;
+      payload.modbus_air_slave_id = numOrNull(form.modbus_air_slave_id);
+      payload.modbus_air_control_register = numOrNull(form.modbus_air_control_register);
+      payload.modbus_air_frequency_register = numOrNull(form.modbus_air_frequency_register);
+      payload.modbus_air_feedback_register = numOrNull(form.modbus_air_feedback_register);
+      payload.modbus_air_min_pct = numOrNull(form.modbus_air_min_pct);
+      payload.modbus_air_max_pct = numOrNull(form.modbus_air_max_pct);
+      payload.modbus_drum_slave_id = numOrNull(form.modbus_drum_slave_id);
+      payload.modbus_drum_control_register = numOrNull(form.modbus_drum_control_register);
+      payload.modbus_drum_frequency_register = numOrNull(form.modbus_drum_frequency_register);
+      payload.modbus_drum_feedback_register = numOrNull(form.modbus_drum_feedback_register);
+      payload.modbus_drum_min_pct = numOrNull(form.modbus_drum_min_pct);
+      payload.modbus_drum_max_pct = numOrNull(form.modbus_drum_max_pct);
+      payload.modbus_burner_sv_min_c = numOrNull(form.modbus_burner_sv_min_c);
+      payload.modbus_burner_sv_max_c = numOrNull(form.modbus_burner_sv_max_c);
     }
     if (form.mode === "ms6514_live") {
       payload.ms6514_port = form.ms6514_port;
@@ -422,6 +462,20 @@ export default function LiveRoastView() {
       heater_pct: preset.heater_pct ?? f.heater_pct,
       fan_pct: preset.fan_pct ?? f.fan_pct,
       drum_speed_pct: preset.drum_speed_pct ?? f.drum_speed_pct,
+      modbus_air_slave_id: c.modbus_air_slave_id ?? "",
+      modbus_air_control_register: c.modbus_air_control_register ?? "",
+      modbus_air_frequency_register: c.modbus_air_frequency_register ?? "",
+      modbus_air_feedback_register: c.modbus_air_feedback_register ?? "",
+      modbus_air_min_pct: c.modbus_air_min_pct ?? "",
+      modbus_air_max_pct: c.modbus_air_max_pct ?? "",
+      modbus_drum_slave_id: c.modbus_drum_slave_id ?? "",
+      modbus_drum_control_register: c.modbus_drum_control_register ?? "",
+      modbus_drum_frequency_register: c.modbus_drum_frequency_register ?? "",
+      modbus_drum_feedback_register: c.modbus_drum_feedback_register ?? "",
+      modbus_drum_min_pct: c.modbus_drum_min_pct ?? "",
+      modbus_drum_max_pct: c.modbus_drum_max_pct ?? "",
+      modbus_burner_sv_min_c: c.modbus_burner_sv_min_c ?? "",
+      modbus_burner_sv_max_c: c.modbus_burner_sv_max_c ?? "",
     }));
   }
 
@@ -702,6 +756,160 @@ export default function LiveRoastView() {
                 BT/ET/DT/Burner numbers and the single-connection setup are confirmed against Artisan's own
                 shipped machine preset and source code; Air/Drum register numbers are only blog-sourced.
               </p>
+              <button
+                type="button"
+                className="advanced-toggle"
+                onClick={() => setShowAdvancedModbus((v) => !v)}
+              >
+                {showAdvancedModbus ? "▾" : "▸"} Advanced Modbus register map
+              </button>
+              {showAdvancedModbus && (
+                <div className="advanced-modbus-fields">
+                  <p className="hint">
+                    Leave any of these blank to use the FZ-94 defaults above. Only worth touching once you've
+                    confirmed your own unit's actual register map differs (see the VFD's own nameplate/front-panel
+                    parameters) — these are BT/ET/DT/Burner's blog-sourced, least-confirmed siblings (Air/Drum
+                    control+feedback registers, operating range, and the Burner SV°C range), not the
+                    Artisan-preset-confirmed values.
+                  </p>
+                  <div className="form-row">
+                    <label>
+                      Air slave ID
+                      <input
+                        type="number"
+                        placeholder="1"
+                        value={form.modbus_air_slave_id}
+                        onChange={(e) => setForm({ ...form, modbus_air_slave_id: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Air run/stop register
+                      <input
+                        type="number"
+                        placeholder="8192"
+                        value={form.modbus_air_control_register}
+                        onChange={(e) => setForm({ ...form, modbus_air_control_register: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Air frequency register
+                      <input
+                        type="number"
+                        placeholder="8193"
+                        value={form.modbus_air_frequency_register}
+                        onChange={(e) => setForm({ ...form, modbus_air_frequency_register: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Air feedback register
+                      <input
+                        type="number"
+                        placeholder="8451"
+                        value={form.modbus_air_feedback_register}
+                        onChange={(e) => setForm({ ...form, modbus_air_feedback_register: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Air min %
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={form.modbus_air_min_pct}
+                        onChange={(e) => setForm({ ...form, modbus_air_min_pct: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Air max %
+                      <input
+                        type="number"
+                        placeholder="100"
+                        value={form.modbus_air_max_pct}
+                        onChange={(e) => setForm({ ...form, modbus_air_max_pct: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
+                      Drum slave ID
+                      <input
+                        type="number"
+                        placeholder="2"
+                        value={form.modbus_drum_slave_id}
+                        onChange={(e) => setForm({ ...form, modbus_drum_slave_id: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Drum run/stop register
+                      <input
+                        type="number"
+                        placeholder="8192"
+                        value={form.modbus_drum_control_register}
+                        onChange={(e) => setForm({ ...form, modbus_drum_control_register: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Drum frequency register
+                      <input
+                        type="number"
+                        placeholder="8193"
+                        value={form.modbus_drum_frequency_register}
+                        onChange={(e) => setForm({ ...form, modbus_drum_frequency_register: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Drum feedback register
+                      <input
+                        type="number"
+                        placeholder="8451"
+                        value={form.modbus_drum_feedback_register}
+                        onChange={(e) => setForm({ ...form, modbus_drum_feedback_register: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Drum min %
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={form.modbus_drum_min_pct}
+                        onChange={(e) => setForm({ ...form, modbus_drum_min_pct: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Drum max %
+                      <input
+                        type="number"
+                        placeholder="70"
+                        value={form.modbus_drum_max_pct}
+                        onChange={(e) => setForm({ ...form, modbus_drum_max_pct: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                  <div className="form-row">
+                    <label>
+                      Burner SV min °C (0% heater)
+                      <input
+                        type="number"
+                        placeholder="100"
+                        value={form.modbus_burner_sv_min_c}
+                        onChange={(e) => setForm({ ...form, modbus_burner_sv_min_c: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Burner SV max °C (100% heater)
+                      <input
+                        type="number"
+                        placeholder="250"
+                        value={form.modbus_burner_sv_max_c}
+                        onChange={(e) => setForm({ ...form, modbus_burner_sv_max_c: e.target.value })}
+                      />
+                    </label>
+                    <p className="hint" style={{ flexBasis: "100%" }}>
+                      Air/Drum min+max and the Burner SV min+max only take effect as pairs — set both sides or
+                      neither.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {form.mode === "ms6514_live" && (
@@ -745,7 +953,7 @@ export default function LiveRoastView() {
           {AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) && (
             <div className="form-row">
               <label>
-                Heater % at start
+                Burner % at start
                 <input
                   type="number" min="0" max="100"
                   value={form.heater_pct}
@@ -753,7 +961,7 @@ export default function LiveRoastView() {
                 />
               </label>
               <label>
-                Fan % at start
+                Air % at start
                 <input
                   type="number" min="0" max="100"
                   value={form.fan_pct}
@@ -775,7 +983,7 @@ export default function LiveRoastView() {
           )}
           {form.mode === "modbus_live" && (
             <p className="hint">
-              Heater/Fan/Drum aren't set here -- once connected, the Controls panel on the Live Roast page reads and
+              Burner/Air/Drum aren't set here -- once connected, the Controls panel on the Live Roast page reads and
               shows whatever the roaster is actually doing (from the device itself, not a guess), and nothing is
               written to it until you move a slider yourself.
             </p>
@@ -877,10 +1085,16 @@ export default function LiveRoastView() {
               <ControlPanel
                 disabled={!isActive}
                 onSend={handleCommand}
+                // No form-value fallback here (used to be `?? Number(form.heater_pct)`)
+                // -- that silently substituted a plausible-looking made-up number
+                // whenever `latest` hadn't arrived yet, indistinguishable from a
+                // register that's genuinely misconfigured/never going to arrive.
+                // ControlPanel itself now renders null as an honest "—"/disabled
+                // state instead, which resolves the instant a real sample lands.
                 initial={{
-                  heater_pct: latest?.heater_pct ?? Number(form.heater_pct),
-                  fan_pct: latest?.fan_pct ?? Number(form.fan_pct),
-                  drum_speed_pct: latest?.drum_speed_pct ?? Number(form.drum_speed_pct),
+                  heater_pct: latest?.heater_pct,
+                  fan_pct: latest?.fan_pct,
+                  drum_speed_pct: latest?.drum_speed_pct,
                 }}
               />
             )}
@@ -911,11 +1125,13 @@ export default function LiveRoastView() {
             )}
             {activeMode === "modbus_live" && (
               <p className="hint" style={{ gridColumn: "1 / -1" }}>
-                Controls above write directly to the FZ-94 over {form.modbus_port || "the serial port"}:
-                Heater → Burner (register 35, 30–100), Fan → Air (register 20, 30–70), Drum Speed → Drum
-                (register 16, 30–70) — out-of-range values are clamped to the machine's valid range. Charge and
-                Turning Point auto-detect from BT; Dry End/FC Start trigger at your set thresholds. Mark Drop
-                and Cool End yourself when you make the call.
+                Controls above read and write directly over {form.modbus_port || "the serial port"}: Burner is a
+                drum-temperature setpoint (register 5, default 100–250°C — not a power %), Air and Drum are VFD
+                drives (run/stop + frequency registers 8192/8193, default 0–100%/0–70%), each with its own
+                feedback register (8451) reporting the drive's actual current speed. Out-of-range values are
+                clamped to the configured range. See "Advanced Modbus register map" above to override any of
+                these for your own unit. Charge and Turning Point auto-detect from BT; Dry End/FC Start trigger
+                at your set thresholds. Mark Drop and Cool End yourself when you make the call.
               </p>
             )}
             {activeMode === "ms6514_live" && (

@@ -428,6 +428,32 @@ button:disabled {
   font-size: 0.85rem;
 }
 
+.advanced-toggle {
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  align-self: flex-start;
+  cursor: pointer;
+}
+
+.advanced-toggle:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.advanced-modbus-fields {
+  flex-basis: 100%;
+  border-left: 2px solid var(--border);
+  padding-left: 0.75rem;
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .preset-feedback {
   color: #166534;
   font-weight: 600;
