@@ -487,6 +487,7 @@ button:disabled {
 .breakout-order-list li {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.6rem;
   padding: 0.35rem 0;
   border-bottom: 1px solid var(--border);
@@ -539,6 +540,73 @@ button:disabled {
 .breakout-order-swatch-reset:hover {
   color: var(--text);
   border-color: var(--accent);
+}
+
+/* Wraps just the native color input + the preset-palette toggle -- the
+   popover itself is a sibling of this, not nested inside it (see below). */
+.breakout-order-color {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* Specificity note: the generic ".breakout-order-list button" rule below
+   (element+class) would otherwise win over a plain single-class selector
+   here despite coming first in the cascade -- qualifying with the parent
+   class instead of reaching for !important. */
+.breakout-order-list .breakout-order-palette-toggle {
+  padding: 0 0.2rem;
+  font-size: 0.6rem;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.breakout-order-palette-toggle:hover {
+  color: var(--text);
+}
+
+/* In-flow, not position:absolute -- rows in the enabled list above are
+   packed tightly (as little as ~2rem tall each, with up to ~15 of them),
+   so an overlaid popover -- even a short one -- extends far enough past
+   its own row to cover the interactive controls of the row(s) below it,
+   making them unclickable (confirmed: it wins the paint order via
+   z-index, so a click meant for the next row's own toggle button lands
+   on this popover instead, which then swallows it since the target is
+   "inside" the popover from the outside-click-close handler's point of
+   view -- that row's palette can never open with a single click while
+   this one is up). flex-basis: 100% on the parent <li> (which has
+   flex-wrap: wrap) makes this wrap onto its own line within that li
+   instead, growing the li's own height and pushing every row below it
+   down in normal flow -- there's nothing left for it to overlap. */
+.breakout-order-palette {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.4rem;
+  margin-top: 0.3rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.breakout-order-list .breakout-order-palette-swatch {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
+.breakout-order-palette-swatch.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .breakout-order-label {
