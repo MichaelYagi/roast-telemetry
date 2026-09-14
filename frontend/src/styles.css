@@ -168,7 +168,17 @@ body.breakout-split-active .app-header {
      roast starts (confirmed via Playwright: .artisan-toolbar was
      intercepting the click). */
   margin-left: calc(var(--breakout-viewport-width, 100vw) / -2);
-  padding: 1.25rem 1.25rem 0;
+  /* Same top+bottom as the base (non-split) .app-header rule above
+     (1.25rem each, 70px total) -- this used to drop bottom padding to 0
+     to pull the toolbar (which moves inside .live-roast right below the
+     header in split mode) up closer to the title. That shaved 20px off
+     the header's own height, which meant it visibly jumped shorter the
+     instant a roast connects (idle -> armed) and taller again on
+     disconnect -- confirmed live: 70px while idle, 50px the moment
+     body.breakout-split-active applies. A slightly bigger gap above the
+     toolbar is a smaller cost than the header's own height changing
+     under you every time you connect/disconnect. */
+  padding: 1.25rem;
   box-sizing: border-box;
 }
 
