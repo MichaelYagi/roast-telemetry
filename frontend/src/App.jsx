@@ -28,14 +28,6 @@ export default function App() {
             <NavLink to="/settings">Settings</NavLink>
           </nav>
         </div>
-        {/* Purely cosmetic continuation of the content-area split divider
-            (see .breakout-split-divider in LiveRoastView.jsx) up through
-            the header, so the line reads as one continuous divider from
-            the very top of the page. Hidden by CSS unless
-            body.breakout-split-active is set -- always rendered here so
-            App.jsx doesn't need to know about the route-level split state
-            itself (see styles.css for the alignment math). */}
-        <div className="app-header-divider" aria-hidden="true" />
       </header>
       <main className="app-main">
         <Routes>

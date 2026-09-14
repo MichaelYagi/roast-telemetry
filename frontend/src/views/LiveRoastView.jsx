@@ -143,7 +143,16 @@ export default function LiveRoastView() {
     const saved = typeof window !== "undefined" && Number(localStorage.getItem(SPLIT_WIDTH_STORAGE_KEY));
     return saved > 0 ? saved : 780;
   });
+  // Tracked only so the render below can derive a *display* width that's
+  // clamped to whatever room the window currently has -- see
+  // effectiveSplitWidth. Resizing used to clamp splitWidth itself (the
+  // user's actual saved preference) directly, which meant shrinking the
+  // window even briefly below the panel's minimum and then restoring it
+  // left the divider stuck wherever it got squeezed to, instead of back
+  // where the user had put it.
+  const [windowWidth, setWindowWidth] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1400));
   const dragStateRef = useRef(null);
+  const scopeChartRef = useRef(null);
 
   // Must be computed here, before the effects below that depend on them --
   // they used to live much further down near the render return, which put
@@ -159,15 +168,19 @@ export default function LiveRoastView() {
   useEffect(() => {
     function onResize() {
       setViewportWide(window.innerWidth >= BREAKOUT_SPLIT_MIN_VIEWPORT);
-      // Re-clamp in case a split chosen on a wider screen would now
-      // overflow/squeeze the panel pane at this narrower (but still
-      // above-threshold) width -- 40px is .breakout-split-escape's own
-      // left+right padding, an estimate rather than a live measurement.
-      setSplitWidth((w) => clampSplitWidth(w, window.innerWidth - 40));
+      setWindowWidth(window.innerWidth);
     }
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  // Derived, not stored -- clamps the *saved* splitWidth down only for
+  // display when the current window doesn't have room for it (40px is
+  // .breakout-split-escape's own left+right padding, an estimate rather
+  // than a live measurement), without ever overwriting that saved
+  // preference. Recomputes fresh on every resize, so widening the window
+  // back out snaps the divider right back to where the user left it.
+  const effectiveSplitWidth = clampSplitWidth(splitWidth, windowWidth - 40);
 
   // Bridges split-pane state to App.jsx's header, which this route has no
   // prop/context connection to (see the body.breakout-split-active rules
@@ -179,8 +192,8 @@ export default function LiveRoastView() {
   }, [showSplitLayout]);
 
   useEffect(() => {
-    document.documentElement.style.setProperty("--breakout-split-width", `${splitWidth}px`);
-  }, [splitWidth]);
+    document.documentElement.style.setProperty("--breakout-split-width", `${effectiveSplitWidth}px`);
+  }, [effectiveSplitWidth]);
 
   // The main/panel columns need a hard pixel height to fill exactly --
   // guessing "100vh minus some constant" was what let the panel overflow
@@ -226,6 +239,24 @@ export default function LiveRoastView() {
       observer?.disconnect();
     };
   }, [showSplitLayout]);
+
+  // Caps the Small Readout column to the chart's own rendered height (see
+  // .small-readout-col in styles.css) instead of letting it stretch the
+  // whole row taller when enough items are enabled -- RoastChart has a
+  // fixed height (420 by default), but that's a prop, not a CSS constant,
+  // so this measures it rather than hardcoding a number that'd silently
+  // drift out of sync if that default ever changed. Runs independent of
+  // showSplitLayout -- unlike the split-pane measurement above, Small
+  // Readout is shown at any width.
+  useEffect(() => {
+    const el = scopeChartRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      document.documentElement.style.setProperty("--scope-chart-height", `${entry.contentRect.height}px`);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [phase]);
 
   function clampSplitWidth(width, containerWidth) {
     const maxMain = containerWidth - SPLIT_MIN_PANEL_WIDTH - SPLIT_DIVIDER_WIDTH;
@@ -1128,11 +1159,11 @@ export default function LiveRoastView() {
       {phase !== "idle" && (
         <div className={showSplitLayout ? "breakout-split-escape" : undefined}>
         <div className={showSplitLayout ? "breakout-split-row" : "live-roast-layout"}>
-        <div className="live-roast" style={showSplitLayout ? { width: splitWidth } : undefined}>
+        <div className="live-roast" style={showSplitLayout ? { width: effectiveSplitWidth } : undefined}>
           {showSplitLayout && toolbarElement}
           <div className="panel scope-panel">
             <div className="scope-body">
-              <div className="scope-chart">
+              <div className="scope-chart" ref={scopeChartRef}>
                 <RoastChart profile={roast?.profile || []} events={roast?.events || []} title={null} />
               </div>
               {/* Independent from the split breakout panel now (see

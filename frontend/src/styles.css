@@ -130,9 +130,10 @@ body {
    between them without lifting state up or introducing Context for one
    value). Header itself escapes .app-shell's cap; .app-header-inner is
    what actually gets constrained to the split width, so title+nav occupy
-   the same width as .live-roast below, and the divider's line reads as
-   continuous from the very top of the page instead of starting partway
-   down where the roast content begins. */
+   the same width as .live-roast below (the divider itself is a separate,
+   fixed-positioned element that already spans the full page height on
+   its own -- see .breakout-split-divider -- this is just about the
+   header's own content width, not that line). */
 body.breakout-split-active {
   /* Both columns below now size themselves to exactly fill what's left
      of the viewport (see --breakout-available-height, set from JS) and
@@ -173,27 +174,6 @@ body.breakout-split-active .app-header {
 
 body.breakout-split-active .app-header-inner {
   width: var(--breakout-split-width, 780px);
-}
-
-.app-header-divider {
-  display: none;
-}
-
-/* Aligned to land exactly on the content divider's own visible line (see
-   .breakout-split-divider::after below): 1.25rem is .app-header's own
-   left padding (matches .breakout-split-escape's), then splitWidth to
-   reach the end of .app-header-inner/.live-roast, then the divider's
-   0.4rem margin plus half its 8px box (4px) to its centered 2px line. */
-body.breakout-split-active .app-header-divider {
-  display: block;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(1.25rem + var(--breakout-split-width, 780px) + 0.4rem + 4px);
-  width: 2px;
-  transform: translateX(-50%);
-  background: var(--border);
-  pointer-events: none;
 }
 
 .app-header h1 {
@@ -691,12 +671,25 @@ button:disabled {
   overflow-y: auto;
 }
 
+/* Fixed to the true viewport, not the row's flex flow -- same reasoning
+   as .breakout-split-panel-pane below (which this positioning math
+   mirrors exactly: 1.25rem is .breakout-split-escape's own left padding,
+   then splitWidth to reach the end of .live-roast, then this box's old
+   0.4rem left margin, now baked into `left` instead of an actual margin
+   since a fixed box's margin would otherwise apply on top of `left`
+   rather than replacing it). Used to just be `position: relative` and
+   rely on the row's normal flex flow for placement, which only starts
+   below the header -- since the panel pane's boxes visually reach all
+   the way to y=0, that left the top ~header-height strip of the divider
+   ungrabbable (no draggable element there at all), even though the
+   panel's own border lines were visible starting right at the top. */
 .breakout-split-divider {
-  flex: 0 0 8px;
-  align-self: stretch;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: calc(1.25rem + var(--breakout-split-width, 780px) + 0.4rem);
+  width: 8px;
   cursor: col-resize;
-  position: relative;
-  margin: 0 0.4rem;
 }
 
 .breakout-split-divider::after {
@@ -1385,14 +1378,27 @@ button:disabled {
    reuses the exact same auto-scaling approach as the wide split-pane
    Big Readout Panel (.breakout-split-panel-pane below), just with a much
    narrower/shorter ceiling on the clamp()s since this column is nowhere
-   near as roomy. .scope-body's own `align-items: stretch` is what gives
-   this a definite height to divide among boxes, same as the old
-   .readout-col relied on implicitly. */
+   near as roomy.
+   `align-self: flex-start` opts this one item out of .scope-body's
+   `align-items: stretch` -- left on, stretch cuts both ways: with enough
+   items enabled for .breakout-box's own min-height floor (below) to push
+   this column's natural content height past the chart's, stretch doesn't
+   just leave the extra content alone, it grows the whole row (and this
+   column right along with it) to match, pushing the event buttons/notes
+   further down the page instead of clipping. --scope-chart-height (set
+   from JS -- see the ResizeObserver effect in LiveRoastView.jsx, not a
+   hardcoded number since RoastChart's height is a prop, not a CSS
+   constant) gives this an explicit height matching the chart exactly, so
+   it can never inflate the row, with its own scrollbar for whatever
+   doesn't fit at the floor size instead. */
 .small-readout-col {
   display: flex;
   flex-direction: column;
   width: 108px;
   flex-shrink: 0;
+  align-self: flex-start;
+  height: var(--scope-chart-height, 420px);
+  overflow-y: auto;
 }
 
 .small-readout-col .breakout-panel {
@@ -1401,6 +1407,14 @@ button:disabled {
   width: 100%;
   height: 100%;
   gap: 0.4rem;
+  /* With few items enabled, flex:1 below grows every box to fill this
+     height evenly (same auto-scale-up as the split-pane Big Panel). With
+     many, .breakout-box's own min-height floor stops them being squeezed
+     past legible -- once that floor's total exceeds this column's fixed
+     height, the overflow scrolls via .small-readout-col's own
+     overflow-y (not this element's -- one scroll container, not two
+     nested ones). */
+  min-height: 0;
 }
 
 .small-readout-col .breakout-box {
@@ -1414,8 +1428,21 @@ button:disabled {
   background: var(--item-color);
   border-left: none;
   border-color: transparent;
+  /* flex-basis 0% (the "1" shorthand), not auto -- this box has
+     container-type: size below, which needs a layout-imposed size to
+     query against rather than one derived from its own (size-contained,
+     so unavailable anyway) content. min-height is what puts a floor under
+     that, not the basis. */
   flex: 1;
-  min-height: 0;
+  /* A real floor, not 0 -- with enough items enabled at once, letting
+     flex-shrink squeeze every box down to fit the column's fixed height
+     (the original approach here) eventually shrinks label+value past
+     readable, no matter how low their own font-size clamp()s are allowed
+     to go. An explicit min-height is a hard floor flex-shrink can't cross
+     (per spec, it replaces the automatic content-based minimum), so past
+     this point .breakout-panel above scrolls instead of the boxes
+     continuing to shrink. */
+  min-height: 46px;
   align-items: stretch;
   padding: 0.3rem 0.4rem;
   container-type: size;
