@@ -180,3 +180,10 @@ Since re-entering the serial port / thresholds every time gets old fast,
 use the **"Save this configuration as"** field at the bottom of the form
 once you've got it dialed in — it persists to the backend and reappears
 in the **"Load saved config"** dropdown next time.
+
+## Connecting to a real FZ-94
+
+Once you've rehearsed the click-through sequence above, see the
+[real-hardware checklist](real-hardware-checklist.md) for pre-flight
+checks, the actual procedure, and what to do afterward — especially
+relevant if it's not your own machine.
