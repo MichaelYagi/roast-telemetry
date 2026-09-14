@@ -68,6 +68,17 @@ const SPLIT_MIN_PANEL_WIDTH = 200; // floor for the breakout panel pane
 const SPLIT_DIVIDER_WIDTH = 8 + 2 * 0.4 * 16; // .breakout-split-divider's own width + its 0.4rem margins
 const SPLIT_WIDTH_STORAGE_KEY = "roast-telemetry:breakoutSplitWidth";
 
+// Below this the chart still shows a curve and its axes, just cramped --
+// smaller than that starts throwing away the actual point of a chart (on
+// a short phone screen, being able to shrink it well past its 420
+// default is the whole ask; a hard floor just stops a drag from
+// collapsing it to nothing useful). No hard ceiling -- unlike splitWidth,
+// which trades width against a sibling panel with its own floor, height
+// only trades against page scroll, which is the user's own call.
+const CHART_MIN_HEIGHT = 160;
+const CHART_HEIGHT_STORAGE_KEY = "roast-telemetry:chartHeight";
+const CHART_DEFAULT_HEIGHT = 420; // RoastChart's own default -- kept in sync explicitly, see chartHeight state below
+
 const STATUS_TEXT = {
   idle: "Configure a roast, then press ON to connect the device.",
   armed: "Device connected. Press START to begin recording.",
@@ -143,6 +154,16 @@ export default function LiveRoastView() {
     const saved = typeof window !== "undefined" && Number(localStorage.getItem(SPLIT_WIDTH_STORAGE_KEY));
     return saved > 0 ? saved : 780;
   });
+  // Drives both RoastChart's own height prop and, indirectly, the Small
+  // Readout column's height -- that column already tracks the chart's
+  // *rendered* height via --scope-chart-height (a ResizeObserver, not a
+  // copy of this state -- see that effect below), so shrinking the chart
+  // here shrinks Small Readout right along with it for free.
+  const [chartHeight, setChartHeight] = useState(() => {
+    const saved = typeof window !== "undefined" && Number(localStorage.getItem(CHART_HEIGHT_STORAGE_KEY));
+    return saved >= CHART_MIN_HEIGHT ? saved : CHART_DEFAULT_HEIGHT;
+  });
+  const chartDragStateRef = useRef(null);
   // Tracked only so the render below can derive a *display* width that's
   // clamped to whatever room the window currently has -- see
   // effectiveSplitWidth. Resizing used to clamp splitWidth itself (the
@@ -261,6 +282,34 @@ export default function LiveRoastView() {
   function clampSplitWidth(width, containerWidth) {
     const maxMain = containerWidth - SPLIT_MIN_PANEL_WIDTH - SPLIT_DIVIDER_WIDTH;
     return Math.min(Math.max(width, SPLIT_MIN_MAIN_WIDTH), Math.max(SPLIT_MIN_MAIN_WIDTH, maxMain));
+  }
+
+  // Tracks the drag by delta-from-start (start Y + start height), not
+  // recomputed from the pointer's absolute position like the width
+  // divider above -- there's no equivalent of that divider's "distance
+  // from the row's left edge" for a horizontal handle sitting at a
+  // variable Y position, so this is simpler to reason about anyway.
+  function handleChartResizePointerDown(e) {
+    chartDragStateRef.current = { startY: e.clientY, startHeight: chartHeight };
+    e.currentTarget.classList.add("dragging");
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handleChartResizePointerMove(e) {
+    if (!chartDragStateRef.current) return;
+    const { startY, startHeight } = chartDragStateRef.current;
+    setChartHeight(Math.max(CHART_MIN_HEIGHT, startHeight + (e.clientY - startY)));
+  }
+
+  function handleChartResizePointerUp(e) {
+    if (!chartDragStateRef.current) return;
+    chartDragStateRef.current = null;
+    e.currentTarget.classList.remove("dragging");
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    setChartHeight((h) => {
+      localStorage.setItem(CHART_HEIGHT_STORAGE_KEY, String(h));
+      return h;
+    });
   }
 
   function handleDividerPointerDown(e) {
@@ -1164,7 +1213,14 @@ export default function LiveRoastView() {
           <div className="panel scope-panel">
             <div className="scope-body">
               <div className="scope-chart" ref={scopeChartRef}>
-                <RoastChart profile={roast?.profile || []} events={roast?.events || []} title={null} />
+                <RoastChart profile={roast?.profile || []} events={roast?.events || []} title={null} height={chartHeight} />
+                <div
+                  className="scope-chart-resize-handle"
+                  title="Drag to resize the chart (Small Readout follows it)"
+                  onPointerDown={handleChartResizePointerDown}
+                  onPointerMove={handleChartResizePointerMove}
+                  onPointerUp={handleChartResizePointerUp}
+                />
               </div>
               {/* Independent from the split breakout panel now (see
                   Settings > Small Readout) -- always shown regardless of

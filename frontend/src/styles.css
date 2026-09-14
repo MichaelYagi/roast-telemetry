@@ -1383,6 +1383,51 @@ button:disabled {
 .scope-chart {
   flex: 1;
   min-width: 0;
+  /* Opts out of .scope-body's align-items: stretch -- left on, this
+     created a real feedback loop with .small-readout-col below: that
+     column's height is an explicit var(--scope-chart-height) (set by
+     measuring *this* element), but it still counts toward this row's
+     computed cross size regardless of its own align-self, so stretch
+     then grew this element back up to match it -- locking both onto
+     whatever height was first measured, immune to the chart's own
+     height (and thus the resize handle) actually changing afterward.
+     Opting out means this sizes purely to its own content (the chart +
+     its toggles + the resize handle), which is what should be driving
+     --scope-chart-height in the first place, not the other way around. */
+  align-self: flex-start;
+}
+
+/* Drag-to-resize the chart's own height (see handleChartResizePointerDown
+   in LiveRoastView.jsx) -- CHART_MIN_HEIGHT there is the one hard floor;
+   deliberately no CSS max-height either, same reasoning as that
+   constant's own comment: unlike the width divider (which trades space
+   against a sibling panel that has its own floor), height only trades
+   against page scroll, which is the user's call, not this app's. Small
+   Readout (a sibling of .scope-chart, not a child) isn't touched
+   directly -- it already tracks .scope-chart's *rendered* height via
+   --scope-chart-height, so shrinking this shrinks that for free. */
+.scope-chart-resize-handle {
+  height: 10px;
+  margin-top: 0.35rem;
+  border-radius: 4px;
+  cursor: row-resize;
+  position: relative;
+}
+
+.scope-chart-resize-handle::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  background: var(--border);
+}
+
+.scope-chart-resize-handle:hover::after,
+.scope-chart-resize-handle.dragging::after {
+  background: var(--accent);
 }
 
 /* Small Readout -- an independent, user-configured BreakoutPanel instance
