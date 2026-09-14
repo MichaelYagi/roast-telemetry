@@ -21,7 +21,7 @@ Usage::
 
     python -m hardware_fakes.ms6514_device --port /tmp/ttyFAKE_METER
 
-Then point the app's "Direct USB (Mastech MS6514)" port field at the
+Then point the app's "Direct USB (thermocouple meter)" port field at the
 other end of a virtual serial pair (see hardware_fakes/README.md).
 """
 from __future__ import annotations

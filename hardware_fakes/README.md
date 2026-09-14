@@ -29,40 +29,11 @@ sudo apt install socat
 
 ### Modbus (FZ-94)
 
-One serial connection handles BT/ET/DT/Burner *and* Air/Drum together --
-confirmed against Artisan's own shipped machine preset for this model
-(19200 baud, 8N2). A genuinely separate second connection is only needed
-for unusual wiring; skip `--drive-port` below unless you specifically
-need that.
-
-Terminal 1 -- create the virtual pair, keep it running:
-
-```
-socat -d -d pty,raw,echo=0,link=/tmp/ttyFAKE_ROASTER pty,raw,echo=0,link=/tmp/ttyFAKE_ROASTER_APP
-```
-
-Terminal 2 -- start the fake slave:
-
-```
-python -m hardware_fakes.modbus_fz94 --port /tmp/ttyFAKE_ROASTER
-```
-
-In the app, choose **Direct Modbus (FZ-94, USB)**, serial port
-`/tmp/ttyFAKE_ROASTER_APP` (the *other* end of the pair), and leave the
-drive-port field blank. Once connected, the Heater/Fan/Drum sliders write
-real Modbus registers that this fake decodes and feeds back into the
-thermal model -- so turning the burner up should actually show BT/ET/DT
-climbing faster.
-
-If you specifically need to test the separate-connection case
-(`modbus_control_port`), add a second virtual pair and pass
-`--drive-port` to the fake -- see `python -m hardware_fakes.modbus_fz94
---help`.
-
-The thermal clock starts on the fake's *first* received request on
-*either* bus, not at process launch -- it's fine to leave it sitting
-idle for a while before connecting; Charge happens right when the app
-actually starts talking to it.
+See [docs/modbus/fz-94-usb.md](../docs/modbus/fz-94-usb.md#testing-without-real-hardware)
+-- the fake's own setup (socat pair, `--drive-port` for the
+separate-connection case, suggested test-settings timeline, Windows
+notes) now lives there alongside the rest of the FZ-94-specific detail,
+rather than duplicated in both places.
 
 ### MS6514
 
@@ -76,7 +47,7 @@ socat -d -d pty,raw,echo=0,link=/tmp/ttyFAKE_METER pty,raw,echo=0,link=/tmp/ttyF
 python -m hardware_fakes.ms6514_device --port /tmp/ttyFAKE_METER
 ```
 
-In the app, choose **Direct USB (Mastech MS6514)**, serial port
+In the app, choose **Direct USB (thermocouple meter)**, serial port
 `/tmp/ttyFAKE_METER_APP`. This one's read-only in real life too, so
 there's nothing to control -- just BT/ET streaming in.
 

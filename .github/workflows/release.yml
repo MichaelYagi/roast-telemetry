@@ -67,9 +67,10 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           STAGE="roast-telemetry-${VERSION}"
           mkdir "$STAGE"
-          cp -r backend simulator mock_device alog_playback artisan_bridge \
+          cp -r backend simulator mock_device alog_playback \
             modbus_bridge ms6514_bridge roast_heuristics hardware_fakes \
-            frontend requirements-dev.txt pytest.ini README.md "$STAGE"/
+            frontend requirements-dev.txt pytest.ini README.md \
+            CONTRIBUTING.md docs "$STAGE"/
           rm -f "$STAGE"/backend/data/roasts.db
           rm -rf "$STAGE"/backend/data/roasts/*.alog
           rm -rf "$STAGE"/frontend/node_modules
