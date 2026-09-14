@@ -8,6 +8,7 @@ export default function SettingsView() {
   const [url, setUrl] = useState("");
   const [model, setModel] = useState("");
   const [brokenOutPanels, setBrokenOutPanels] = useState([]); // ordered -- display order == array order
+  const [panelColors, setPanelColors] = useState({}); // key -> hex, only for items overridden from their built-in default
   const [loaded, setLoaded] = useState(false);
   const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState(null); // { connected, models, error } | null
@@ -19,9 +20,22 @@ export default function SettingsView() {
       setUrl(s.ollama_url || "");
       setModel(s.ollama_model || "");
       setBrokenOutPanels(s.broken_out_panels || []);
+      setPanelColors(s.breakout_panel_colors || {});
       setLoaded(true);
     });
   }, []);
+
+  function setPanelColor(key, hex) {
+    setPanelColors((prev) => ({ ...prev, [key]: hex }));
+  }
+
+  function resetPanelColor(key) {
+    setPanelColors((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
 
   function enablePanel(key) {
     setBrokenOutPanels((prev) => (prev.includes(key) ? prev : [...prev, key]));
@@ -69,6 +83,7 @@ export default function SettingsView() {
         ollama_url: url.trim() || null,
         ollama_model: model.trim() || null,
         broken_out_panels: brokenOutPanels,
+        breakout_panel_colors: panelColors,
       });
       setSaveFeedback("Saved.");
     } catch (err) {
@@ -143,9 +158,27 @@ export default function SettingsView() {
               {brokenOutPanels.map((key, i) => {
                 const item = BREAKOUT_PANEL_ITEMS.find((it) => it.key === key);
                 if (!item) return null;
+                const color = panelColors[key] || item.color;
+                const isCustom = Boolean(panelColors[key]);
                 return (
                   <li key={key}>
-                    <span className="breakout-order-swatch" style={{ background: item.color }} />
+                    <input
+                      type="color"
+                      className="breakout-order-swatch"
+                      value={color}
+                      title={`${item.label} color`}
+                      onChange={(e) => setPanelColor(key, e.target.value)}
+                    />
+                    {isCustom && (
+                      <button
+                        type="button"
+                        className="breakout-order-swatch-reset"
+                        onClick={() => resetPanelColor(key)}
+                        title="Reset to default color"
+                      >
+                        ↺
+                      </button>
+                    )}
                     <span className="breakout-order-label">{item.label}</span>
                     <button type="button" onClick={() => movePanel(key, -1)} disabled={i === 0} title="Move up">
                       ▲

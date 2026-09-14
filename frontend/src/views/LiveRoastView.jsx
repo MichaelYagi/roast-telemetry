@@ -126,6 +126,7 @@ export default function LiveRoastView() {
   const [presetName, setPresetName] = useState("");
   const [presetFeedback, setPresetFeedback] = useState(null);
   const [brokenOutPanels, setBrokenOutPanels] = useState([]); // ordered array, matches Settings' display order
+  const [panelColors, setPanelColors] = useState({}); // key -> hex override, from Settings' color pickers
   const [viewportWide, setViewportWide] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= BREAKOUT_SPLIT_MIN_VIEWPORT
   );
@@ -262,7 +263,10 @@ export default function LiveRoastView() {
     const load = () =>
       api
         .getSettings()
-        .then((s) => setBrokenOutPanels(s.broken_out_panels || []))
+        .then((s) => {
+          setBrokenOutPanels(s.broken_out_panels || []);
+          setPanelColors(s.breakout_panel_colors || {});
+        })
         .catch(() => {});
     load();
     const interval = setInterval(load, SETTINGS_POLL_MS);
@@ -1197,6 +1201,7 @@ export default function LiveRoastView() {
               milestones={milestones}
               elapsedLabel={elapsedLabel}
               roast={roast}
+              colorOverrides={panelColors}
             />
           </div>
         ) : (
@@ -1206,6 +1211,7 @@ export default function LiveRoastView() {
             milestones={milestones}
             elapsedLabel={elapsedLabel}
             roast={roast}
+            colorOverrides={panelColors}
           />
         )}
         </div>

@@ -11,6 +11,7 @@ def test_settings_roundtrip_including_panel_list(isolated_db):
         ollama_url="http://localhost:11434",
         ollama_model="llama3.1",
         broken_out_panels=["bt", "et", "time"],
+        breakout_panel_colors={"bt": "#112233"},
     )
 
     result = isolated_db.get_settings()
@@ -19,6 +20,7 @@ def test_settings_roundtrip_including_panel_list(isolated_db):
         "ollama_url": "http://localhost:11434",
         "ollama_model": "llama3.1",
         "broken_out_panels": ["bt", "et", "time"],
+        "breakout_panel_colors": {"bt": "#112233"},
     }
 
 
@@ -27,7 +29,19 @@ def test_get_settings_defaults_on_empty_db(isolated_db):
         "ollama_url": None,
         "ollama_model": None,
         "broken_out_panels": [],
+        "breakout_panel_colors": {},
     }
+
+
+def test_get_settings_tolerates_corrupt_panel_colors_json(isolated_db):
+    with sqlite3.connect(isolated_db.DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES ('breakout_panel_colors', 'not valid json')"
+        )
+        conn.commit()
+
+    result = isolated_db.get_settings()
+    assert result["breakout_panel_colors"] == {}
 
 
 def test_set_settings_only_updates_given_keys(isolated_db):

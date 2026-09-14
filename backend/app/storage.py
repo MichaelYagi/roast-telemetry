@@ -229,16 +229,25 @@ def get_settings() -> dict:
         broken_out_panels = json.loads(values["broken_out_panels"]) if values.get("broken_out_panels") else []
     except (json.JSONDecodeError, TypeError):
         broken_out_panels = []
+    try:
+        breakout_panel_colors = (
+            json.loads(values["breakout_panel_colors"]) if values.get("breakout_panel_colors") else {}
+        )
+    except (json.JSONDecodeError, TypeError):
+        breakout_panel_colors = {}
     return {
         "ollama_url": values.get("ollama_url"),
         "ollama_model": values.get("ollama_model"),
         "broken_out_panels": broken_out_panels,
+        "breakout_panel_colors": breakout_panel_colors,
     }
 
 
 def set_settings(**kv) -> None:
     if "broken_out_panels" in kv:
         kv["broken_out_panels"] = json.dumps(kv["broken_out_panels"])
+    if "breakout_panel_colors" in kv:
+        kv["breakout_panel_colors"] = json.dumps(kv["breakout_panel_colors"])
     with _conn() as c:
         for key, value in kv.items():
             c.execute(

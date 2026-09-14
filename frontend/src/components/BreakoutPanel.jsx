@@ -29,7 +29,7 @@ function computeValues(latest, milestones, elapsedLabel, roast) {
 // `enabledKeys` is an ordered array (from Settings' "Big Readout Panel" ▲▼
 // reordering) -- render in that order, not BREAKOUT_PANEL_ITEMS' fixed
 // declaration order.
-export default function BreakoutPanel({ enabledKeys, latest, milestones, elapsedLabel, roast }) {
+export default function BreakoutPanel({ enabledKeys, latest, milestones, elapsedLabel, roast, colorOverrides }) {
   const items = enabledKeys.map((key) => BREAKOUT_PANEL_ITEMS.find((item) => item.key === key)).filter(Boolean);
   if (items.length === 0) return null;
 
@@ -37,17 +37,17 @@ export default function BreakoutPanel({ enabledKeys, latest, milestones, elapsed
 
   return (
     <div className="breakout-panel">
-      {items.map((item) => (
-        <div key={item.key} className="breakout-box" style={{ borderColor: item.color }}>
-          <span className="breakout-label">{item.label}</span>
-          <span
-            className="breakout-value"
-            style={{ color: item.color, "--value-chars": String(values[item.key]).length }}
-          >
-            {values[item.key]}
-          </span>
-        </div>
-      ))}
+      {items.map((item) => {
+        const color = colorOverrides?.[item.key] || item.color;
+        return (
+          <div key={item.key} className="breakout-box" style={{ borderColor: color }}>
+            <span className="breakout-label">{item.label}</span>
+            <span className="breakout-value" style={{ color, "--value-chars": String(values[item.key]).length }}>
+              {values[item.key]}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

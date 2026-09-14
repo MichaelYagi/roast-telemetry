@@ -492,11 +492,53 @@ button:disabled {
   border-bottom: 1px solid var(--border);
 }
 
+/* A native <input type="color"> styled to read as the same small square
+   the old plain <span> swatch was -- clicking it opens the browser's own
+   color picker (a modal popover, so "only one open at a time" is free).
+   Chrome/Edge and Firefox each wrap the actual color swatch in their own
+   pseudo-elements with their own padding/border, so both need stripping
+   to get a clean, borderless square instead of the browser's default
+   button-with-padding chrome. */
 .breakout-order-swatch {
-  width: 0.8rem;
-  height: 0.8rem;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: none;
   border-radius: 3px;
   flex-shrink: 0;
+  cursor: pointer;
+  background: none;
+}
+
+.breakout-order-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.breakout-order-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
+.breakout-order-swatch::-moz-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
+.breakout-order-swatch-reset {
+  flex-shrink: 0;
+  padding: 0 0.3rem;
+  font-size: 0.8rem;
+  line-height: 1;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.breakout-order-swatch-reset:hover {
+  color: var(--text);
+  border-color: var(--accent);
 }
 
 .breakout-order-label {

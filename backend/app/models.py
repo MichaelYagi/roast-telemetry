@@ -244,6 +244,11 @@ class AppSettings(BaseModel):
     ollama_url: Optional[str] = None
     ollama_model: Optional[str] = None
     broken_out_panels: list[str] = []
+    # BREAKOUT_PANEL_KEYS -> hex color, overriding that item's own default
+    # in frontend/src/breakoutPanels.js's BREAKOUT_PANEL_ITEMS. A key
+    # absent here just means "use the built-in default" -- this only
+    # needs to hold actual overrides, not a full copy of every item.
+    breakout_panel_colors: dict[str, str] = {}
 
 
 class OllamaStatus(BaseModel):
