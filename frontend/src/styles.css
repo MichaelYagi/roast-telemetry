@@ -1278,6 +1278,11 @@ button:disabled {
   color: white;
 }
 
+.power-btn-reset {
+  background: #57534e;
+  color: white;
+}
+
 .power-btn-start {
   background: #d6d3d1;
   color: #57534e;

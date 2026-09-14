@@ -73,7 +73,7 @@ const STATUS_TEXT = {
   armed: "Device connected. Press START to begin recording.",
   roasting: "Scope recording…",
   cooling: "Cooling…",
-  finished: "Roast finished. Press OFF to reset.",
+  finished: "Roast finished. Press RESET to configure a new one.",
 };
 
 export default function LiveRoastView() {
