@@ -1624,6 +1624,71 @@ button:disabled {
   color: white !important;
 }
 
+/* --- Test Connection (ConnectionTestPanel) -- shown only while armed
+   (connected, not yet recording); see that component for the actual
+   read/write check logic. Reuses .ollama-status-ok/-bad's exact green/red
+   (#166534/#b91c1c), the only pass/fail color pair already established
+   elsewhere in this app, rather than inventing a second one. */
+.connection-test-results {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.connection-test-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.connection-test-icon {
+  flex: 0 0 auto;
+  font-weight: 700;
+  width: 1.1em;
+  text-align: center;
+}
+
+.connection-test-pass .connection-test-icon,
+.connection-test-write.connection-test-pass {
+  color: #166534;
+}
+
+.connection-test-fail .connection-test-icon,
+.connection-test-write.connection-test-fail {
+  color: #b91c1c;
+}
+
+.connection-test-warn .connection-test-icon {
+  color: var(--text-muted);
+}
+
+.connection-test-write.connection-test-pending {
+  color: var(--text-muted);
+}
+
+.connection-test-label {
+  flex: 0 0 auto;
+  font-weight: 600;
+  min-width: 5.5rem;
+}
+
+.connection-test-detail {
+  color: var(--text-muted);
+}
+
+.connection-test-write {
+  margin: 0.75rem 0 0;
+  font-weight: 600;
+}
+
+.connection-test-nudge {
+  margin-top: 0.75rem;
+}
+
 .event-button-row {
   display: flex;
   gap: 0.5rem;

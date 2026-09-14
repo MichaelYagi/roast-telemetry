@@ -6,6 +6,7 @@ import ArtisanToolbar from "../components/ArtisanToolbar.jsx";
 import BreakoutPanel from "../components/BreakoutPanel.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 import ConnectionBadge from "../components/ConnectionBadge.jsx";
+import ConnectionTestPanel from "../components/ConnectionTestPanel.jsx";
 import ControlPanel from "../components/ControlPanel.jsx";
 import EventButtonRow from "../components/EventButtonRow.jsx";
 import RoastChart from "../components/RoastChart.jsx";
@@ -1312,6 +1313,13 @@ export default function LiveRoastView() {
         <div className={showSplitLayout ? "breakout-split-row" : "live-roast-layout"}>
         <div className="live-roast" style={showSplitLayout ? { width: effectiveSplitWidth } : undefined}>
           {showSplitLayout && toolbarElement}
+          {/* Only while armed (connected via ON, not yet recording -- see
+              handleToggleConnect/RoastSession.connect()) and only for the
+              two modes that have a real connection worth verifying before
+              committing to a roast. */}
+          {phase === "armed" && LIVE_MODES.includes(activeMode) && (
+            <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} />
+          )}
           <div className="panel scope-panel">
             <div className="scope-body">
               <div className="scope-chart" ref={scopeChartRef}>
