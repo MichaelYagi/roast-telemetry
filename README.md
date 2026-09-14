@@ -5,11 +5,12 @@ An API-first coffee roasting platform that reuses Artisan Scope's concepts
 *direct* connections to a data source — no dependency on a separately
 running Artisan instance for any of them.
 
-**Docs**: [michaelyagi.github.io/roast-telemetry](http://michaelyagi.github.io/roast-telemetry)
-*(eventual home for these docs, once GitHub Pages is set up — the same
-content already lives in [docs/](docs/index.html) in this repo; GitHub's
-file browser shows those as raw HTML source rather than rendering them,
-so open them locally or wait for Pages to view them properly.)*
+**Docs**: [michaelyagi.github.io/roast-telemetry](https://michaelyagi.github.io/roast-telemetry)
+*(this repo is private, so GitHub Pages can't be enabled directly on it —
+the same content lives in [docs/](docs/index.html) here too, and is kept
+in sync manually with the published copy above; GitHub's file browser
+shows the local copy as raw HTML source rather than rendering it, so
+prefer the link above or open the files locally.)*
 
 ## Major features
 
