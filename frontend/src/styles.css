@@ -796,7 +796,15 @@ button:disabled {
 
 .breakout-split-panel-pane .breakout-label {
   flex: 0 0 auto;
-  font-size: clamp(0.6rem, min(14cqh, 18cqw), 2.8rem);
+  /* Ceiling lowered from 2.8rem -- each box still grows to fill its
+     even share of the pane's full viewport height regardless of how few
+     items are enabled (that's the deliberate "auto-scale up" behavior
+     this panel has always had), but with very few items that share can
+     be most of the screen (confirmed live: a single enabled item's box
+     was the full 1080px viewport tall), and 14cqh of that is enormous --
+     the ceiling is what actually keeps the label from ballooning into a
+     giant heading just because the box around it is huge. */
+  font-size: clamp(0.6rem, min(14cqh, 18cqw), 1.75rem);
 }
 
 .breakout-split-panel-pane .breakout-value {
@@ -823,8 +831,14 @@ button:disabled {
      share of the available height can be shorter than a bigger floor
      could ever shrink to fit, which forced an overflow (see the sibling
      .breakout-box's own overflow:hidden, added as a second line of
-     defense, not a substitute for actually being able to shrink here). */
-  font-size: clamp(0.85rem, min(80cqh, calc(140cqw / var(--value-chars, 6))), 32rem);
+     defense, not a substitute for actually being able to shrink here).
+     Ceiling lowered from 32rem (512px!) -- same reasoning as the label
+     above: this box still fills its even share of the pane's full
+     viewport height no matter how few items are enabled, and with just
+     one or two, 80cqh of that share is a genuinely huge number past any
+     point of being more *useful*, just more screen-filling. 9rem is
+     still large enough to read at a glance from across the room. */
+  font-size: clamp(0.85rem, min(80cqh, calc(140cqw / var(--value-chars, 6))), 9rem);
   line-height: 1;
   white-space: nowrap;
 }
