@@ -16,6 +16,7 @@ export default function App() {
             (non-split) layout is unaffected either way. */}
         <div className="app-header-inner">
           <div className="app-title-group">
+            <img className="app-logo" src="/icon-48x48.png" alt="" width="28" height="28" />
             <h1>Roast Telemetry</h1>
             <ThemePicker />
           </div>
