@@ -664,8 +664,8 @@ export default function LiveRoastView() {
               <select value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
                 <option value="simulator">Artisan Simulator</option>
                 <option value="alog_playback">.alog Playback</option>
-                <option value="modbus_live">Direct Modbus (FZ-94, USB)</option>
-                <option value="ms6514_live">Direct USB (Mastech MS6514)</option>
+                <option value="modbus_live">Direct Modbus (USB)</option>
+                <option value="ms6514_live">Direct USB (thermocouple meter)</option>
               </select>
             </label>
           </div>

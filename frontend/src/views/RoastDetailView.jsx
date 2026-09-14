@@ -9,8 +9,8 @@ import RoastReviewCard from "../components/RoastReviewCard.jsx";
 const MODE_LABELS = {
   simulator: "Artisan Simulator",
   alog_playback: ".alog Playback",
-  modbus_live: "Direct Modbus (FZ-94, USB)",
-  ms6514_live: "Direct USB (Mastech MS6514)",
+  modbus_live: "Direct Modbus (USB)",
+  ms6514_live: "Direct USB (thermocouple meter)",
 };
 
 // Mirrors backend/app/api/roasts.py's alog_filename() exactly -- same
