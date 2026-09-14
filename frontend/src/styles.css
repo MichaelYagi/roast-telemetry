@@ -878,6 +878,19 @@ button:disabled {
 @media (max-width: 900px) {
   .live-roast-layout {
     flex-direction: column;
+    /* .live-roast-layout's own align-items: flex-start (base rule) means
+       "don't stretch the sidebar Big Panel to the chart's height" in the
+       normal row layout -- cross axis there is height. Flipping to
+       column above turns that same flex-start into "don't stretch
+       width" instead, which nothing intended: .live-roast (flex:1,
+       min-width:0) stopped filling the column and shrank to whatever
+       its widest child preferred instead (confirmed live at 353px:
+       .live-grid's own auto-fit grid-template-columns resolved to
+       342px, and .live-roast followed it right out past its own
+       313px-wide parent -- the actual cause of the header/toolbar vs.
+       chart-panel misalignment reported here). Restoring stretch for
+       this axis is what column layout actually needs. */
+    align-items: stretch;
   }
   /* Scoped to the plain (non-split) sidebar Big Readout Panel
      specifically -- a direct child of .live-roast-layout -- not the bare
@@ -1039,10 +1052,23 @@ button:disabled {
   word-break: break-all;
 }
 
+/* min(260px, 100%), not a bare 260px -- a bare pixel minimum in an
+   auto-fit track is a well-known CSS Grid trap: on a narrow container
+   without a clean definite width flowing down to it (this grid sits in a
+   flex *column* -- .live-roast-layout flips to that under 900px -- not
+   a row, so its own available width isn't as directly definite), the
+   grid can lock onto that minimum as its own intrinsic size instead of
+   actually shrinking to fit, and everything above it (up through
+   .live-roast) gets pulled wider right along with it (confirmed live at
+   353px: this grid alone was rendering 342px wide, overflowing its own
+   313px-wide ancestor -- exactly the width mismatch reported between the
+   header/toolbar above and the chart panel below). Wrapping the minimum
+   caps it at the container's own actual width when that's the smaller of
+   the two, which is what lets it shrink like every other panel here. */
 .live-grid,
 .detail-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 1rem;
 }
 
