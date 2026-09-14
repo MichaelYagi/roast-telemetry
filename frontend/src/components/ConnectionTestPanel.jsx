@@ -143,13 +143,33 @@ export default function ConnectionTestPanel({ roastId, latest, mode }) {
     const before = latestRef.current?.fan_pct ?? 0;
     const nudged = Math.min(100, before + NUDGE_PCT);
     setNudgeResult({ status: "pending", detail: `nudging Air to ${nudged.toFixed(0)}% -- watch/listen for it…` });
+    // The nudge-up and restore writes are deliberately two separate
+    // try/catches, not one -- if the FIRST fails, nothing changed at all
+    // (safe, nothing to say beyond "it failed"). If the SECOND fails,
+    // Air is now genuinely sitting at the nudged value with nothing
+    // automatically fixing that -- that case needs its own, clearly
+    // different message (with a retry) rather than a generic error that
+    // reads the same either way.
     try {
       await api.sendCommand(roastId, { fan_pct: nudged });
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+    } catch (err) {
+      setNudgeResult({ status: "failed", detail: `nudge failed, nothing changed -- ${err.message}` });
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await restoreAirTo(before);
+  }
+
+  async function restoreAirTo(before) {
+    try {
       await api.sendCommand(roastId, { fan_pct: before });
       setNudgeResult({ status: "done", detail: `set back to ${before.toFixed(0)}%` });
     } catch (err) {
-      setNudgeResult({ status: "failed", detail: err.message });
+      setNudgeResult({
+        status: "failed",
+        detail: `Air is still nudged up -- restoring it to ${before.toFixed(0)}% failed: ${err.message}. Set it back yourself with the Air slider below, or retry.`,
+        retryTo: before,
+      });
     }
   }
 
@@ -228,9 +248,16 @@ export default function ConnectionTestPanel({ roastId, latest, mode }) {
         </div>
       )}
       {nudgeResult && (
-        <p className={`connection-test-write connection-test-${nudgeResult.status === "done" ? "pass" : nudgeResult.status === "failed" ? "fail" : "pending"}`}>
-          {nudgeResult.detail}
-        </p>
+        <>
+          <p className={`connection-test-write connection-test-${nudgeResult.status === "done" ? "pass" : nudgeResult.status === "failed" ? "fail" : "pending"}`}>
+            {nudgeResult.detail}
+          </p>
+          {nudgeResult.retryTo != null && (
+            <button type="button" onClick={() => restoreAirTo(nudgeResult.retryTo)}>
+              Retry restoring Air to {nudgeResult.retryTo.toFixed(0)}%
+            </button>
+          )}
+        </>
       )}
     </div>
   );
