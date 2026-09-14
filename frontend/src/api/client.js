@@ -17,10 +17,6 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  // machines
-  listMachines: (params = {}) => request(`/machines?${new URLSearchParams(params)}`),
-  getMachine: (id) => request(`/machines/${id}`),
-
   // devices
   listDevices: () => request("/devices"),
 

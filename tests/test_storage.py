@@ -69,8 +69,7 @@ def test_get_settings_tolerates_corrupt_panel_json(isolated_db):
 
 def test_insert_get_update_delete_roast_row(isolated_db):
     isolated_db.insert_roast({
-        "id": "r1", "title": "Roast 1", "mode": "simulator", "machine_id": None,
-        "machine_label": None, "status": "roasting", "created_at": "2026-01-01T00:00:00",
+        "id": "r1", "title": "Roast 1", "mode": "simulator", "status": "roasting", "created_at": "2026-01-01T00:00:00",
         "beans": "Guatemala", "weight_green_g": 200.0, "weight_roasted_g": None,
         "duration_s": None, "alog_path": None,
     })
@@ -91,8 +90,7 @@ def test_insert_get_update_delete_roast_row(isolated_db):
 def test_list_roast_rows_filters_by_status_and_mode(isolated_db):
     for i, (status, mode) in enumerate([("roasting", "simulator"), ("complete", "simulator"), ("complete", "alog_playback")]):
         isolated_db.insert_roast({
-            "id": f"r{i}", "title": f"Roast {i}", "mode": mode, "machine_id": None,
-            "machine_label": None, "status": status, "created_at": f"2026-01-0{i + 1}T00:00:00",
+            "id": f"r{i}", "title": f"Roast {i}", "mode": mode, "status": status, "created_at": f"2026-01-0{i + 1}T00:00:00",
             "beans": None, "weight_green_g": None, "weight_roasted_g": None,
             "duration_s": None, "alog_path": None,
         })
@@ -107,8 +105,7 @@ def test_list_roast_rows_filters_by_status_and_mode(isolated_db):
 def test_abort_stale_roasts_only_touches_active_statuses(isolated_db):
     for roast_id, status in [("active1", "roasting"), ("active2", "cooling"), ("done", "complete")]:
         isolated_db.insert_roast({
-            "id": roast_id, "title": roast_id, "mode": "simulator", "machine_id": None,
-            "machine_label": None, "status": status, "created_at": "2026-01-01T00:00:00",
+            "id": roast_id, "title": roast_id, "mode": "simulator", "status": status, "created_at": "2026-01-01T00:00:00",
             "beans": None, "weight_green_g": None, "weight_roasted_g": None,
             "duration_s": None, "alog_path": None,
         })
@@ -142,6 +139,66 @@ def test_preset_crud(isolated_db):
 
     assert len(isolated_db.list_preset_rows()) == 1
 
-    isolated_db.delete_preset_row("p1")
-    assert isolated_db.get_preset_row("p1") is None
+
+def _seed(isolated_db, preset_id="default-fz94-usb"):
+    isolated_db.seed_default_presets([
+        {"id": preset_id, "name": "FZ-94, USB", "created_at": "2026-01-01T00:00:00", "config_json": "{}"},
+    ])
+
+
+def test_seed_default_presets_inserts_once(isolated_db):
+    _seed(isolated_db)
+
+    rows = isolated_db.list_preset_rows()
+    assert len(rows) == 1
+    assert rows[0]["id"] == "default-fz94-usb"
+
+
+def test_seed_default_presets_does_not_duplicate_on_repeat_calls(isolated_db):
+    _seed(isolated_db)
+    _seed(isolated_db)
+
+    assert len(isolated_db.list_preset_rows()) == 1
+
+
+def test_seed_default_presets_does_not_resurrect_a_deleted_preset(isolated_db):
+    # A seeded preset is a starting point, not something the app should
+    # keep forcing back -- deleting it must be permanent across restarts
+    # (a second "startup", simulated here by calling seed again).
+    _seed(isolated_db)
+    isolated_db.delete_preset_row("default-fz94-usb")
+
+    _seed(isolated_db)
+
     assert isolated_db.list_preset_rows() == []
+
+
+def test_seed_default_presets_still_seeds_a_newly_added_one(isolated_db):
+    # Simulates an existing install upgrading to a version that ships an
+    # additional default preset -- its own marker is separate, so it
+    # should still get seeded even though the first one's marker already
+    # exists from an earlier "startup".
+    _seed(isolated_db, preset_id="default-fz94-usb")
+
+    isolated_db.seed_default_presets([
+        {"id": "default-fz94-usb", "name": "FZ-94, USB", "created_at": "2026-01-01T00:00:00", "config_json": "{}"},
+        {"id": "default-ms6514-usb", "name": "Mastech MS6514, USB", "created_at": "2026-01-01T00:00:00", "config_json": "{}"},
+    ])
+
+    ids = {r["id"] for r in isolated_db.list_preset_rows()}
+    assert ids == {"default-fz94-usb", "default-ms6514-usb"}
+
+
+def test_seed_default_presets_tolerates_a_row_that_exists_without_its_marker(isolated_db):
+    # An install that ran an earlier version of this function (one global
+    # marker for the whole batch, not per-id) can already have this row
+    # even though its new per-id marker doesn't exist yet -- must not
+    # crash on the primary-key collision, and must still set the marker
+    # so it doesn't keep re-checking every startup.
+    isolated_db.insert_preset({
+        "id": "default-fz94-usb", "name": "FZ-94, USB", "created_at": "2026-01-01T00:00:00", "config_json": "{}",
+    })
+
+    _seed(isolated_db, preset_id="default-fz94-usb")  # does not raise
+
+    assert len(isolated_db.list_preset_rows()) == 1

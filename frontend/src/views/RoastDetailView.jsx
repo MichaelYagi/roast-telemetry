@@ -9,7 +9,6 @@ import RoastReviewCard from "../components/RoastReviewCard.jsx";
 const MODE_LABELS = {
   simulator: "Artisan Simulator",
   alog_playback: ".alog Playback",
-  artisan_live: "Artisan Live Bridge",
   modbus_live: "Direct Modbus (FZ-94, USB)",
   ms6514_live: "Direct USB (Mastech MS6514)",
 };
@@ -27,7 +26,6 @@ function alogFilename(title, createdAt) {
 export default function RoastDetailView() {
   const { id } = useParams();
   const [roast, setRoast] = useState(null);
-  const [machine, setMachine] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -36,12 +34,6 @@ export default function RoastDetailView() {
       .then(setRoast)
       .catch((err) => setError(err.message));
   }, [id]);
-
-  useEffect(() => {
-    if (roast?.machine_id) {
-      api.getMachine(roast.machine_id).then(setMachine).catch(() => setMachine(null));
-    }
-  }, [roast?.machine_id]);
 
   if (error) return <p className="error panel">{error}</p>;
   if (!roast) return <p className="panel">Loading…</p>;
@@ -93,36 +85,6 @@ export default function RoastDetailView() {
             )}
           </ul>
 
-          <h3>Machine</h3>
-          {machine ? (
-            <ul className="kv-list">
-              <li>
-                <span>Brand</span>
-                <span>{machine.brand}</span>
-              </li>
-              <li>
-                <span>Model</span>
-                <span>{machine.model}</span>
-              </li>
-              <li>
-                <span>Connection</span>
-                <span>{machine.connection_type}</span>
-              </li>
-              <li>
-                <span>Control capable</span>
-                <span>{machine.control_capable ? "Yes" : "No"}</span>
-              </li>
-            </ul>
-          ) : roast.machine_label ? (
-            <ul className="kv-list">
-              <li>
-                <span>Roaster</span>
-                <span>{roast.machine_label}</span>
-              </li>
-            </ul>
-          ) : (
-            <p>No machine associated with this roast.</p>
-          )}
           <h3>Batch</h3>
           <ul className="kv-list">
             <li>

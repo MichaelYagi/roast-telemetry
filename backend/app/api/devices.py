@@ -34,7 +34,6 @@ def _to_device(session) -> Device:
         id=session.id,
         name=f"{session.mode.value}:{session.id[:8]}",
         mode=session.mode,
-        machine_id=session.machine_id,
         status=DeviceStatus(status["state"]),
         connected_at=status["connected_at"],
         last_error=last_error,

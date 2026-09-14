@@ -17,7 +17,6 @@ from alog_playback import (
     roast_to_artisan_native_dict,
     save_artisan_native_alog,
 )
-from artisan_bridge import ArtisanBridgeEngine
 from mock_device import MockDevice
 from modbus_bridge import ModbusEngine
 from ms6514_bridge import MS6514Engine
@@ -42,13 +41,6 @@ from ..ws_manager import pubsub
 
 class RoastSessionError(RuntimeError):
     pass
-
-
-def _format_machine_label(machine: Optional[dict]) -> Optional[str]:
-    if not machine:
-        return None
-    label = " ".join(part for part in (machine.get("brand"), machine.get("model")) if part)
-    return label or None
 
 
 def _modbus_register_overrides(request: RoastCreateRequest) -> dict:
@@ -82,13 +74,10 @@ def _modbus_register_overrides(request: RoastCreateRequest) -> dict:
 
 
 class RoastSession:
-    def __init__(self, roast_id: str, request: RoastCreateRequest, machine: Optional[dict]):
+    def __init__(self, roast_id: str, request: RoastCreateRequest):
         self.id = roast_id
         self.title = request.title
         self.mode = request.mode
-        self.machine_id = request.machine_id
-        self.machine = machine
-        self.machine_label = _format_machine_label(machine)
         self.beans = request.beans
         self.weight_green_g = request.weight_green_g
         self.weight_roasted_g: Optional[float] = None
@@ -114,18 +103,6 @@ class RoastSession:
             if not request.alog_path:
                 raise RoastSessionError("alog_path is required for alog_playback mode")
             engine = AlogPlayer(request.alog_path, speed=request.playback_speed)
-        elif request.mode == RoastMode.ARTISAN_LIVE:
-            if not request.artisan_host:
-                raise RoastSessionError("artisan_host is required for artisan_live mode")
-            try:
-                engine = ArtisanBridgeEngine(
-                    request.artisan_host,
-                    request.artisan_port,
-                    dry_end_c=request.dry_end_c,
-                    fc_start_c=request.fc_start_c,
-                )
-            except ValueError as exc:
-                raise RoastSessionError(str(exc)) from exc
         elif request.mode == RoastMode.MODBUS_LIVE:
             if not request.modbus_port:
                 raise RoastSessionError("modbus_port is required for modbus_live mode")
@@ -227,9 +204,7 @@ class RoastSession:
         self.status = status
         self.duration_s = self.profile[-1]["time_s"] if self.profile else 0.0
         await asyncio.to_thread(self.device.disconnect)
-        if isinstance(self._engine, ArtisanBridgeEngine):
-            self._engine.close()  # stop its background WebSocket thread
-        elif isinstance(self._engine, (ModbusEngine, MS6514Engine)):
+        if isinstance(self._engine, (ModbusEngine, MS6514Engine)):
             self._engine.close()  # release the serial port
 
         # Written in real Artisan's own native shape (Python-literal syntax
@@ -246,7 +221,6 @@ class RoastSession:
             beans=self.beans,
             weight_green_g=self.weight_green_g,
             weight_roasted_g=self.weight_roasted_g,
-            roastertype=self.machine_label,
             roastdate=self.created_at,
         )
         save_artisan_native_alog(self.alog_path, alog_dict)
@@ -310,8 +284,6 @@ class RoastSession:
             id=self.id,
             title=self.title,
             mode=self.mode,
-            machine_id=self.machine_id,
-            machine_label=self.machine_label,
             status=self.status,
             created_at=self.created_at,
             beans=self.beans,
@@ -331,16 +303,14 @@ class RoastSessionManager:
     def __init__(self) -> None:
         self.sessions: dict[str, RoastSession] = {}
 
-    def create(self, request: RoastCreateRequest, machine: Optional[dict]) -> RoastSession:
+    def create(self, request: RoastCreateRequest) -> RoastSession:
         roast_id = str(uuid.uuid4())
-        session = RoastSession(roast_id, request, machine)
+        session = RoastSession(roast_id, request)
         self.sessions[roast_id] = session
         storage.insert_roast({
             "id": session.id,
             "title": session.title,
             "mode": session.mode.value,
-            "machine_id": session.machine_id,
-            "machine_label": session.machine_label,
             "status": session.status.value,
             "created_at": session.created_at,
             "beans": session.beans,
@@ -383,8 +353,6 @@ class RoastSessionManager:
             id=row["id"],
             title=row["title"],
             mode=RoastMode(row["mode"]),
-            machine_id=row["machine_id"],
-            machine_label=row["machine_label"],
             status=RoastStatus(row["status"]),
             created_at=row["created_at"],
             beans=row["beans"],
@@ -419,8 +387,7 @@ class RoastSessionManager:
         rows = storage.list_roast_rows(**filters)
         return [
             RoastSummary(
-                id=r["id"], title=r["title"], mode=RoastMode(r["mode"]), machine_id=r["machine_id"],
-                machine_label=r["machine_label"],
+                id=r["id"], title=r["title"], mode=RoastMode(r["mode"]),
                 status=RoastStatus(r["status"]), created_at=r["created_at"], beans=r["beans"],
                 weight_green_g=r["weight_green_g"], weight_roasted_g=r["weight_roasted_g"],
                 duration_s=r["duration_s"], alog_path=r["alog_path"],
@@ -444,8 +411,6 @@ class RoastSessionManager:
             "id": roast_id,
             "title": title or data.get("title") or "Imported roast",
             "mode": RoastMode.ALOG_PLAYBACK.value,
-            "machine_id": None,
-            "machine_label": _format_machine_label(parsed["machine"]),
             "status": RoastStatus.COMPLETE.value,
             "created_at": data.get("roastdate") or datetime.now(timezone.utc).isoformat(),
             "beans": parsed["beans"],

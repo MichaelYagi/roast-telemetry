@@ -157,7 +157,7 @@ class MS6514Engine:
             self._connected = False
             return None
 
-    # -- engine contract (matches simulator.SimulatorEngine / ArtisanBridgeEngine / ModbusEngine) --
+    # -- engine contract (matches simulator.SimulatorEngine / AlogPlayer / ModbusEngine) --
     def tick(self, dt: float) -> dict:
         self._last_time_s += dt
         time_s = self._last_time_s

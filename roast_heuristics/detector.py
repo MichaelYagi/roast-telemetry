@@ -3,12 +3,12 @@ auto-detection of Charge/Turning Point/Dry End/FC Start from a raw BT/ET
 stream.
 
 Used by any engine that receives live temperature readings but no event
-data of its own -- e.g. ``artisan_bridge`` (mirroring a real Artisan's
-WebLCDs, which carries no event data) and ``modbus_bridge`` (talking
-straight to a roaster's PLC, which has no concept of roast events at
-all). Both engines just call ``observe(time_s, bt, et)`` each tick and
-drain ``get_new_events()`` -- the detection logic itself lives here once
-instead of being duplicated per data source.
+data of its own -- ``modbus_bridge`` (talking straight to a roaster's
+PLC) and ``ms6514_bridge`` (a raw thermocouple meter), neither of which
+has any concept of roast events at all. Both engines just call
+``observe(time_s, bt, et)`` each tick and drain ``get_new_events()`` --
+the detection logic itself lives here once instead of being duplicated
+per data source.
 
 CHARGE is detected from a sharp BT drop (cold beans hitting the hot
 drum); TURNING_POINT as the BT minimum right after; DRY_END/FC_START

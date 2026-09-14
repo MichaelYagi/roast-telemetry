@@ -29,7 +29,7 @@ function formatElapsed(seconds) {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-const LIVE_MODES = ["artisan_live", "modbus_live", "ms6514_live"];
+const LIVE_MODES = ["modbus_live", "ms6514_live"];
 const CONTROLLABLE_MODES = ["simulator", "modbus_live"];
 // modbus_live reads Heater/Fan/Drum back from the device itself (genuine
 // PLC/VFD registers, not an echo of this app's own commands -- see
@@ -77,17 +77,13 @@ const STATUS_TEXT = {
 };
 
 export default function LiveRoastView() {
-  const [machines, setMachines] = useState([]);
   const [form, setForm] = useState({
     title: "",
     mode: "simulator",
-    machine_id: "",
     beans: "",
     weight_green_g: "",
     alog_path: SAMPLE_ALOG_PATH,
     playback_speed: 4,
-    artisan_host: "",
-    artisan_port: 8080,
     modbus_port: "",
     modbus_baudrate: 19200,
     modbus_control_port: "",
@@ -250,14 +246,13 @@ export default function LiveRoastView() {
   }
 
   useEffect(() => {
-    api.listMachines().then(setMachines).catch(() => setMachines([]));
     refreshPresets();
     reconnectActiveRoast();
   }, []);
 
   // Hot-applies Settings > Big Readout Panel changes to an already-open
-  // tab -- same lightweight polling pattern MachineConfigView already
-  // uses for its device list, rather than a dedicated push channel for
+  // tab -- same lightweight polling pattern the device list elsewhere
+  // uses, rather than a dedicated push channel for
   // what's a rarely-changed, low-stakes display preference.
   useEffect(() => {
     const load = () =>
@@ -334,7 +329,6 @@ export default function LiveRoastView() {
     const payload = {
       title: form.title,
       mode: form.mode,
-      machine_id: form.machine_id || null,
       beans: form.beans || null,
       weight_green_g: form.weight_green_g ? Number(form.weight_green_g) : null,
       sample_interval_s: 1.0,
@@ -342,10 +336,6 @@ export default function LiveRoastView() {
     if (form.mode === "alog_playback") {
       payload.alog_path = form.alog_path;
       payload.playback_speed = Number(form.playback_speed) || 1;
-    }
-    if (form.mode === "artisan_live") {
-      payload.artisan_host = form.artisan_host;
-      payload.artisan_port = Number(form.artisan_port) || 8080;
     }
     if (form.mode === "modbus_live") {
       payload.modbus_port = form.modbus_port;
@@ -449,13 +439,10 @@ export default function LiveRoastView() {
       ...f,
       title: c.title || "",
       mode: c.mode,
-      machine_id: c.machine_id || "",
       beans: c.beans || "",
       weight_green_g: c.weight_green_g ?? "",
       alog_path: c.alog_path || f.alog_path,
       playback_speed: c.playback_speed ?? f.playback_speed,
-      artisan_host: c.artisan_host || "",
-      artisan_port: c.artisan_port ?? f.artisan_port,
       modbus_port: c.modbus_port || "",
       modbus_baudrate: c.modbus_baudrate ?? f.modbus_baudrate,
       modbus_control_port: c.modbus_control_port || "",
@@ -641,24 +628,12 @@ export default function LiveRoastView() {
               <select value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
                 <option value="simulator">Artisan Simulator</option>
                 <option value="alog_playback">.alog Playback</option>
-                <option value="artisan_live">Artisan Live Bridge</option>
                 <option value="modbus_live">Direct Modbus (FZ-94, USB)</option>
                 <option value="ms6514_live">Direct USB (Mastech MS6514)</option>
               </select>
             </label>
           </div>
           <div className="form-row">
-            <label>
-              Machine
-              <select value={form.machine_id} onChange={(e) => setForm({ ...form, machine_id: e.target.value })}>
-                <option value="">(unspecified)</option>
-                {machines.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.brand} {m.model} {m.control_capable ? "· controllable" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
             <label>
               Beans
               <input value={form.beans} onChange={(e) => setForm({ ...form, beans: e.target.value })} />
@@ -688,32 +663,6 @@ export default function LiveRoastView() {
                   onChange={(e) => setForm({ ...form, playback_speed: e.target.value })}
                 />
               </label>
-            </div>
-          )}
-          {form.mode === "artisan_live" && (
-            <div className="form-row">
-              <label>
-                Artisan host / IP
-                <input
-                  placeholder="192.168.1.50"
-                  value={form.artisan_host}
-                  onChange={(e) => setForm({ ...form, artisan_host: e.target.value })}
-                />
-              </label>
-              <label>
-                WebLCDs port
-                <input
-                  type="number"
-                  value={form.artisan_port}
-                  onChange={(e) => setForm({ ...form, artisan_port: e.target.value })}
-                />
-              </label>
-              <p className="hint">
-                On the machine running Artisan and connected to the real roaster: Config → Curves → UI tab →
-                enable WebLCDs on this port. This mirrors BT/ET/RoR live and auto-detects Charge/Turning Point
-                from the BT curve. Drop and Cool End are judgment calls, not thresholds — mark those yourself
-                with the buttons below, like a real roaster would. This can't control the roaster.
-              </p>
             </div>
           )}
           {form.mode === "modbus_live" && (
@@ -1069,12 +1018,6 @@ export default function LiveRoastView() {
                       <span className="meta-value">{roast.weight_green_g} g</span>
                     </li>
                   )}
-                  {roast.machine_label && (
-                    <li>
-                      <span className="meta-label">Machine</span>
-                      <span className="meta-value">{roast.machine_label}</span>
-                    </li>
-                  )}
                 </ul>
               </div>
               <div className="live-header-actions">
@@ -1114,17 +1057,6 @@ export default function LiveRoastView() {
                   disabled={!isActive}
                   onChange={(e) => handleCommand({ speed: Number(e.target.value) })}
                 />
-              </div>
-            )}
-            {activeMode === "artisan_live" && (
-              <div className="panel control-panel">
-                <h3>Artisan Live Bridge</h3>
-                <p className="hint">
-                  Mirroring {form.artisan_host || "the configured host"}:{form.artisan_port}. Read-only — no
-                  control commands go back to the real roaster. Charge and Turning Point auto-detect from the BT
-                  curve; Dry End/FC Start trigger at the thresholds you set. Mark Drop and Cool End yourself
-                  below when you make the call.
-                </p>
               </div>
             )}
             {activeMode === "modbus_live" && (

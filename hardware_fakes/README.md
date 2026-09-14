@@ -1,27 +1,18 @@
 # Hardware fakes
 
 Standalone scripts that stand in for real roasting hardware, so
-`modbus_live`, `artisan_live`, and `ms6514_live` can each be tested
-end-to-end through the app's actual connection code without owning a
-roaster. All three are driven by the same roast physics as the app's own
-"Artisan Simulator" mode (`_thermal.py`, wrapping `simulator.SimulatorEngine`)
-so BT/ET behave like a real roast no matter which one you're using.
+`modbus_live` and `ms6514_live` can each be tested end-to-end through the
+app's actual connection code without owning a roaster. Both are driven by
+the same roast physics as the app's own "Artisan Simulator" mode
+(`_thermal.py`, wrapping `simulator.SimulatorEngine`) so BT/ET behave like
+a real roast no matter which one you're using.
 
 | Fake | Stands in for | Protocol | Needs a virtual serial port? |
 |---|---|---|---|
 | `modbus_fz94.py` | Coffee-Tech FZ-94 (plain, not EVO) | Modbus RTU (hand-rolled framing) | Yes — one (two only for unusual wiring) |
-| `weblcds_server.py` | A running Artisan (WebLCDs) | WebSocket/JSON | No — plain TCP |
 | `ms6514_device.py` | Mastech MS6514 meter | Raw 18-byte serial frames | Yes |
 
-## WebLCDs fake (easiest -- no serial setup needed)
-
-```
-python -m hardware_fakes.weblcds_server --port 8080
-```
-
-In the app, choose **Artisan Live Bridge**, host `127.0.0.1`, port `8080`.
-
-## Modbus + MS6514 fakes -- virtual serial port setup
+## Virtual serial port setup
 
 `ModbusSerialClient` and `pyserial.Serial` (used by the real engines)
 both need an actual OS serial device -- they can't be pointed at a

@@ -28,7 +28,7 @@ def test_modbus_live_session_applies_register_overrides():
         modbus_burner_sv_min_c=120.0,
         modbus_burner_sv_max_c=200.0,
     )
-    engine = RoastSession("test-roast-id", request, machine=None)._engine
+    engine = RoastSession("test-roast-id", request)._engine
 
     assert engine.air_slave_id == 9
     assert engine.air_control_register == 100
@@ -49,14 +49,14 @@ def test_modbus_live_session_ignores_a_lone_half_of_a_range_pair():
     request = RoastCreateRequest(
         title="Test Roast", mode=RoastMode.MODBUS_LIVE, modbus_port=BOGUS_PORT, modbus_air_min_pct=5.0,
     )
-    engine = RoastSession("test-roast-id", request, machine=None)._engine
+    engine = RoastSession("test-roast-id", request)._engine
 
     assert engine.air_range == (0, 100)  # default, not (5.0, 100)
 
 
 def test_modbus_live_session_defaults_match_modbus_engine_when_nothing_overridden():
     request = RoastCreateRequest(title="Test Roast", mode=RoastMode.MODBUS_LIVE, modbus_port=BOGUS_PORT)
-    engine = RoastSession("test-roast-id", request, machine=None)._engine
+    engine = RoastSession("test-roast-id", request)._engine
 
     assert engine.air_slave_id == 1
     assert engine.drum_slave_id == 2

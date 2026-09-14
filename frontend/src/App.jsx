@@ -2,7 +2,6 @@ import { NavLink, Route, Routes } from "react-router-dom";
 import ThemePicker from "./components/ThemePicker.jsx";
 import HistoryDashboard from "./views/HistoryDashboard.jsx";
 import LiveRoastView from "./views/LiveRoastView.jsx";
-import MachineConfigView from "./views/MachineConfigView.jsx";
 import RoastComparisonView from "./views/RoastComparisonView.jsx";
 import RoastDetailView from "./views/RoastDetailView.jsx";
 import SettingsView from "./views/SettingsView.jsx";
@@ -26,7 +25,6 @@ export default function App() {
             </NavLink>
             <NavLink to="/history">History</NavLink>
             <NavLink to="/compare">Compare</NavLink>
-            <NavLink to="/machines">Machines</NavLink>
             <NavLink to="/settings">Settings</NavLink>
           </nav>
         </div>
@@ -45,7 +43,6 @@ export default function App() {
           <Route path="/history" element={<HistoryDashboard />} />
           <Route path="/roasts/:id" element={<RoastDetailView />} />
           <Route path="/compare" element={<RoastComparisonView />} />
-          <Route path="/machines" element={<MachineConfigView />} />
           <Route path="/settings" element={<SettingsView />} />
         </Routes>
       </main>

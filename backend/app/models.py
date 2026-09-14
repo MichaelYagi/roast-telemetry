@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 class RoastMode(str, Enum):
     SIMULATOR = "simulator"
     ALOG_PLAYBACK = "alog_playback"
-    ARTISAN_LIVE = "artisan_live"
     MODBUS_LIVE = "modbus_live"
     MS6514_LIVE = "ms6514_live"
 
@@ -72,22 +71,10 @@ MILESTONE_SEQUENCE = [
 ALWAYS_AUTO_EVENT_TYPES = {RoastEventType.CHARGE, RoastEventType.TURNING_POINT}
 
 
-class Machine(BaseModel):
-    id: str
-    brand: str
-    model: str
-    capabilities: list[str]
-    control_capable: bool
-    connection_type: str
-    simulated: bool = True
-    notes: Optional[str] = None
-
-
 class Device(BaseModel):
     id: str
     name: str
     mode: RoastMode
-    machine_id: Optional[str] = None
     status: DeviceStatus
     connected_at: Optional[float] = None
     last_error: Optional[str] = None
@@ -138,13 +125,10 @@ class ControlCommand(BaseModel):
 class RoastCreateRequest(BaseModel):
     title: str
     mode: RoastMode
-    machine_id: Optional[str] = None
     beans: Optional[str] = None
     weight_green_g: Optional[float] = None
     alog_path: Optional[str] = Field(default=None, description="Required when mode=alog_playback")
     playback_speed: float = 1.0
-    artisan_host: Optional[str] = Field(default=None, description="Required when mode=artisan_live: host/IP running Artisan with WebLCDs enabled")
-    artisan_port: int = Field(default=8080, description="Artisan's WebLCDs port (Config > Curves > UI tab); artisan_live mode only")
     modbus_port: Optional[str] = Field(default=None, description="Required when mode=modbus_live: serial port the roaster is on, e.g. 'COM3'. One connection handles BT/ET/DT/Burner and Air/Drum together, matching Artisan's own shipped Coffee-Tech FZ-94 preset.")
     modbus_baudrate: int = Field(default=19200, description="modbus_live mode only; default matches Artisan's own shipped Coffee-Tech FZ-94 preset (19200/8N2)")
     modbus_control_port: Optional[str] = Field(default=None, description="modbus_live mode only, optional: only set this if your own wiring genuinely needs a *separate* connection for Air/Drum drive control (uncommon) -- e.g. 'COM4'. Leave blank (the normal case) to send Air/Drum over modbus_port along with everything else.")
@@ -183,10 +167,6 @@ class RoastSummary(BaseModel):
     id: str
     title: str
     mode: RoastMode
-    machine_id: Optional[str] = None
-    # Freeform roaster name/model, e.g. from a real .alog's `roastertype`
-    # field, for roasts with no catalog `machine_id` to look up.
-    machine_label: Optional[str] = None
     status: RoastStatus
     created_at: str
     beans: Optional[str] = None

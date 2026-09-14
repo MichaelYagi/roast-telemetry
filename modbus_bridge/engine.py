@@ -96,15 +96,13 @@ every address, slave ID, and range is a constructor argument; the
 defaults just happen to be this machine's.
 
 RoR and CHARGE/TURNING_POINT/DRY_END/FC_START auto-detection reuse
-``roast_heuristics.LiveRoastDetector``, the same logic ``artisan_bridge``
-uses, since a PLC's raw registers carry temperatures only -- no roast
-events, same situation as WebLCDs.
+``roast_heuristics.LiveRoastDetector``, since a PLC's raw registers carry
+temperatures only -- no roast events.
 
 Mutually exclusive with a running Artisan on the same connection: a
-serial Modbus RTU port only accepts one client at a time. If your
-operator is running Artisan against this same roaster, use
-``artisan_bridge`` (mirrors Artisan, view-only, no port conflict)
-instead of this engine (owns the port, but can control).
+serial Modbus RTU port only accepts one client at a time. If Artisan is
+also running against this same roaster, pick one owner of the port --
+this engine can't share it.
 
 Not tested against real FZ-94 hardware (none available in this
 environment) -- verified against a mocked pymodbus client instead. The
@@ -295,7 +293,7 @@ class ModbusEngine:
                 self._connected = False
             return None
 
-    # -- engine contract (matches simulator.SimulatorEngine / AlogPlayer / ArtisanBridgeEngine) --
+    # -- engine contract (matches simulator.SimulatorEngine / AlogPlayer / MS6514Engine) --
     def tick(self, dt: float) -> dict:
         self._last_time_s += dt
         time_s = self._last_time_s

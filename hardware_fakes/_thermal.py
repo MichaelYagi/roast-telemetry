@@ -1,7 +1,7 @@
-"""Shared roast physics for all three hardware fakes.
+"""Shared roast physics for both hardware fakes.
 
-Rather than each fake (Modbus, WebLCDs, MS6514) inventing its own ad hoc
-BT/ET behavior, they all drive the same ``simulator.SimulatorEngine`` --
+Rather than each fake (Modbus, MS6514) inventing its own ad hoc
+BT/ET behavior, they both drive the same ``simulator.SimulatorEngine`` --
 the same thermal model the app's own "Artisan Simulator" mode uses. This
 means a fake roast looks and behaves consistently regardless of which
 hardware path you're exercising through it, and control writes (where

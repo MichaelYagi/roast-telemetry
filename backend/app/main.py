@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -9,9 +10,27 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import storage
-from .api import devices, machines, presets, roasts, settings
+from .api import devices, presets, roasts, settings
+from .models import RoastCreateRequest
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+
+# Ships as ready-to-use "Load saved config" entries instead of an empty
+# dropdown -- port is deliberately left blank on each (no sensible
+# universal default, same reasoning as presets.py's own docstring),
+# everything else is exactly that engine's own confirmed defaults (see
+# modbus_bridge/engine.py and ms6514_bridge/engine.py). Only the two
+# direct-hardware bridges get one -- simulator/alog_playback need no
+# connection fields to begin with, so a preset for either would just be
+# an empty form.
+_DEFAULT_PRESETS = [
+    {"id": "default-fz94-usb", "name": "FZ-94, USB", "config": RoastCreateRequest(title="", mode="modbus_live")},
+    {
+        "id": "default-ms6514-usb",
+        "name": "Mastech MS6514, USB",
+        "config": RoastCreateRequest(title="", mode="ms6514_live"),
+    },
+]
 
 
 @asynccontextmanager
@@ -23,6 +42,15 @@ async def lifespan(app: FastAPI):
     # make it permanently unreachable and unstoppable. See
     # storage.abort_stale_roasts for the full rationale.
     storage.abort_stale_roasts()
+    storage.seed_default_presets([
+        {
+            "id": p["id"],
+            "name": p["name"],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "config_json": p["config"].model_dump_json(),
+        }
+        for p in _DEFAULT_PRESETS
+    ])
     yield
 
 
@@ -46,7 +74,6 @@ app.add_middleware(
 )
 
 app.include_router(roasts.router, prefix="/api")
-app.include_router(machines.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
 app.include_router(presets.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")

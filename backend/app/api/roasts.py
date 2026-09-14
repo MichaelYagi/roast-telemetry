@@ -26,7 +26,6 @@ from ..models import (
 from ..roast_review import build_prompt, build_summary
 from ..roast_session import RoastSessionError, session_manager
 from ..ws_manager import pubsub
-from .machines import resolve_machine
 
 router = APIRouter(prefix="/roasts", tags=["roasts"])
 
@@ -49,14 +48,12 @@ def alog_filename(title: str, created_at: str) -> str:
 def list_roasts(
     mode: Optional[RoastMode] = None,
     status: Optional[RoastStatus] = None,
-    machine_id: Optional[str] = None,
     limit: int = Query(default=100, le=500),
     offset: int = 0,
 ) -> list[RoastSummary]:
     return session_manager.list_summaries(
         mode=mode.value if mode else None,
         status=status.value if status else None,
-        machine_id=machine_id,
         limit=limit,
         offset=offset,
     )
@@ -64,11 +61,8 @@ def list_roasts(
 
 @router.post("", response_model=RoastSummary, status_code=201)
 async def create_roast(request: RoastCreateRequest) -> RoastSummary:
-    machine = resolve_machine(request.machine_id)
-    if request.machine_id and machine is None:
-        raise HTTPException(status_code=404, detail=f"machine {request.machine_id!r} not found")
     try:
-        session = session_manager.create(request, machine)
+        session = session_manager.create(request)
         await session_manager.start(session.id)
     except RoastSessionError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

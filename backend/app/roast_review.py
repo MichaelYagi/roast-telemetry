@@ -143,7 +143,6 @@ def build_summary(roast: Roast) -> dict:
     return {
         "coffee_bean_roast_title": roast.title,
         "green_coffee_beans": roast.beans,
-        "coffee_roasting_machine": roast.machine_label,
         "green_bean_weight_g": roast.weight_green_g,
         "roasted_bean_weight_g": roast.weight_roasted_g,
         "roast_weight_loss_pct": weight_loss_pct,

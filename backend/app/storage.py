@@ -27,8 +27,6 @@ CREATE TABLE IF NOT EXISTS roasts (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     mode TEXT NOT NULL,
-    machine_id TEXT,
-    machine_label TEXT,
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
     beans TEXT,
@@ -84,10 +82,12 @@ def _conn() -> Iterator[sqlite3.Connection]:
 def init_db() -> None:
     with _conn() as c:
         c.executescript(_SCHEMA)
-        # Idempotent migration for DBs created before machine_label existed.
+        # Idempotent migrations for DBs created before these columns
+        # existed. machine_id/machine_label were dropped entirely (no
+        # migration needed for those -- an existing DB just keeps its own
+        # now-unused columns, harmless leftovers, nothing reads or writes
+        # them anymore).
         existing_cols = {row[1] for row in c.execute("PRAGMA table_info(roasts)")}
-        if "machine_label" not in existing_cols:
-            c.execute("ALTER TABLE roasts ADD COLUMN machine_label TEXT")
         if "source_alog_path" not in existing_cols:
             c.execute("ALTER TABLE roasts ADD COLUMN source_alog_path TEXT")
         if "playback_speed" not in existing_cols:
@@ -108,9 +108,9 @@ def insert_roast(summary: dict) -> None:
     with _conn() as c:
         c.execute(
             """INSERT INTO roasts
-               (id, title, mode, machine_id, machine_label, status, created_at, beans,
+               (id, title, mode, status, created_at, beans,
                 weight_green_g, weight_roasted_g, duration_s, alog_path, source_alog_path, playback_speed)
-               VALUES (:id, :title, :mode, :machine_id, :machine_label, :status, :created_at, :beans,
+               VALUES (:id, :title, :mode, :status, :created_at, :beans,
                        :weight_green_g, :weight_roasted_g, :duration_s, :alog_path, :source_alog_path,
                        :playback_speed)""",
             {"source_alog_path": None, "playback_speed": None, **summary},
@@ -135,7 +135,6 @@ def list_roast_rows(
     *,
     mode: Optional[str] = None,
     status: Optional[str] = None,
-    machine_id: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict]:
@@ -146,9 +145,6 @@ def list_roast_rows(
     if status:
         clauses.append("status = :status")
         params["status"] = status
-    if machine_id:
-        clauses.append("machine_id = :machine_id")
-        params["machine_id"] = machine_id
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     params["limit"] = limit
     params["offset"] = offset
@@ -182,6 +178,38 @@ def abort_stale_roasts() -> list[str]:
                 ids,
             )
         return ids
+
+
+def seed_default_presets(seeds: list[dict]) -> None:
+    """Ships a couple of ready-to-use starter presets (see main.py's
+    lifespan for what) instead of an empty "Load saved config" dropdown on
+    first run. Runs on *every* startup but only actually inserts a given
+    preset once ever -- tracked per preset id via its own marker row in
+    `settings` (not "does a row with this id still exist"), so deleting a
+    seeded preset stays deleted; this won't silently resurrect it just
+    because its own row is gone next time the app starts. Per-id (not one
+    marker for the whole batch) so adding a *new* default preset in a
+    later version still gets seeded for existing installs that already
+    have the marker for earlier ones."""
+    with _conn() as c:
+        for preset in seeds:
+            marker_key = f"seeded_default_preset:{preset['id']}"
+            already_seeded = c.execute("SELECT 1 FROM settings WHERE key = ?", (marker_key,)).fetchone()
+            if already_seeded is not None:
+                continue
+            # OR IGNORE, not a plain INSERT: an earlier version of this
+            # function tracked seeding with one marker for the whole
+            # batch, so on an install that already ran that version, this
+            # preset's row can already exist even though its own new
+            # per-id marker doesn't -- a plain INSERT there would hit the
+            # existing primary key and crash startup.
+            c.execute(
+                """INSERT OR IGNORE INTO roast_presets
+                   (id, name, created_at, config_json, heater_pct, fan_pct, drum_speed_pct)
+                   VALUES (:id, :name, :created_at, :config_json, :heater_pct, :fan_pct, :drum_speed_pct)""",
+                {"heater_pct": None, "fan_pct": None, "drum_speed_pct": None, **preset},
+            )
+            c.execute("INSERT INTO settings (key, value) VALUES (:key, :value)", {"key": marker_key, "value": "1"})
 
 
 def insert_preset(preset: dict) -> None:

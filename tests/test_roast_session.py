@@ -19,7 +19,7 @@ from backend.app.roast_session.session import RoastSession, RoastSessionError
 
 def make_session() -> RoastSession:
     request = RoastCreateRequest(title="Test Roast", mode=RoastMode.SIMULATOR)
-    return RoastSession("test-roast-id", request, machine=None)
+    return RoastSession("test-roast-id", request)
 
 
 def mark_auto(session: RoastSession, event_type: RoastEventType) -> None:

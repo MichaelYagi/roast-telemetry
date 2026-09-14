@@ -31,7 +31,7 @@ cd frontend && npm install && cd ..
   existing file for the tone.
 - Keep PRs scoped to one change. A bug fix doesn't need an accompanying
   refactor.
-- If you're touching `modbus_bridge/`, `artisan_bridge/`, or anything
+- If you're touching `modbus_bridge/`, `ms6514_bridge/`, or anything
   claiming to match real Artisan/hardware behavior, cite your source
   (Artisan's own GitHub source, a shipped `.aset` preset, a manufacturer
   manual) in a comment or the PR description — this codebase has been
@@ -48,6 +48,6 @@ isn't something a PR needs to worry about.
 ## Reporting bugs / proposing features
 
 Open a GitHub issue. For a bug, include: what you did, what you expected,
-what happened instead, and which of the five roast-data-source modes
-(simulator / alog_playback / artisan_live / modbus_live / ms6514_live) you
-were using, since a lot of behavior is mode-specific.
+what happened instead, and which of the four roast-data-source modes
+(simulator / alog_playback / modbus_live / ms6514_live) you were using,
+since a lot of behavior is mode-specific.
