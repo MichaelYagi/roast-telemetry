@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Direct Modbus Bridge — Roast Telemetry</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="../index.html">Roast Telemetry</a>
+  <nav>
+    <a href="../index.html">Docs</a>
+    <a href="../getting-started.html">Getting Started</a>
+    <a href="index.html" aria-current="page">Direct Modbus</a>
+    <a href="../architecture.html">Architecture</a>
+    <a href="https://github.com/MichaelYagi/roast-telemetry">GitHub</a>
+  </nav>
+</header>
+<main>
+  <h1>Direct Modbus Bridge</h1>
+  <p>
+    <code>modbus_bridge</code> (<code>ModbusEngine</code>) talks straight
+    to a real roaster's PLC over Modbus RTU (USB/serial), bypassing
+    Artisan entirely. It can also <em>control</em> the roaster
+    (Burner/Air/Drum), since that's just standard Modbus register reads
+    and writes — the only one of the four data sources that can, besides
+    the Simulator.
+  </p>
+  <p>
+    This page covers what's true for <em>any</em> Modbus-connected
+    roaster. For a specific, already-confirmed model, see:
+  </p>
+  <ul>
+    <li><a href="fz-94-usb.html">FZ-94 (USB)</a> — Coffee-Tech Engineering's plain FZ-94, the only model this app ships defaults for today.</li>
+  </ul>
+  <p>
+    About to actually connect to a real machine? See the
+    <a href="real-hardware-checklist.html">real-hardware checklist</a> —
+    pre-flight checks, the click-through sequence, and what to do
+    afterward.
+  </p>
+
+  <h2>The register map is fully overridable</h2>
+  <p>
+    Nothing about the Modbus wiring is hardcoded to one machine. Every
+    slave ID, register, and divisor <code>ModbusEngine</code> uses —
+    BT/ET/DT/Burner's own, not just Air/Drum/Burner-range — is a
+    constructor argument, and every one of those is in turn exposed as a
+    per-roast override in the Configure Roast form's "Advanced Modbus
+    register map":
+  </p>
+  <table>
+    <thead><tr><th>Channel</th><th>What it needs</th></tr></thead>
+    <tbody>
+      <tr><td>BT / ET / DT</td><td>Slave ID, register, divisor (each independent)</td></tr>
+      <tr><td>Burner</td><td>Slave ID, register, divisor, plus the SV range (°C) the 0–100% UI slider maps onto</td></tr>
+      <tr><td>Air / Drum</td><td>Slave ID, control register, frequency register, feedback register, plus the 0–100% operating range</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Leave any of these blank to fall back to whatever defaults are
+    configured for the selected model (FZ-94's, currently the only
+    shipped set) — only worth touching once you've confirmed your own
+    unit's actual register map genuinely differs, e.g. from the VFD
+    drive's own nameplate/front-panel parameters, or a probe's real slave
+    ID.
+  </p>
+
+  <h2>Connection basics that apply regardless of model</h2>
+  <ul>
+    <li>
+      <strong>One serial connection usually handles everything</strong> —
+      temperature probes, Burner, and the Air/Drum drives together, at
+      whatever baud rate/framing the specific model uses (see that
+      model's own page). A genuinely separate second connection
+      (<code>modbus_control_port</code>) is supported for the uncommon
+      case where a unit's own wiring splits drives onto a different
+      physical link — leave it blank unless you've confirmed that's
+      actually the case for your machine.
+    </li>
+    <li>
+      <strong>Mutually exclusive with anything else holding the same
+      port</strong> — Modbus RTU assumes one master per bus. If Artisan
+      (or any other software) is already connected to the same serial
+      port, disconnect it first; two masters polling the same bus
+      concurrently produces garbled reads on both sides, not a clean
+      error.
+    </li>
+    <li>
+      <strong>ON connects and starts reading; START begins
+      recording.</strong> These are two separate steps for Modbus
+      specifically (see
+      <a href="../getting-started.html#the-four-data-sources">Getting started</a>)
+      — clicking ON opens the connection and streams live values
+      immediately, with nothing recorded and no roast created yet; a Test
+      Connection panel appears at that point to verify reads (and
+      optionally one benign write) before you commit to an actual roast.
+    </li>
+    <li>
+      <strong>Controls only ever show the machine's real current
+      state.</strong> Since Burner/Air/Drum are all genuinely read back
+      from the PLC (not just echoed from the last command sent),
+      connecting never writes a "starting value" on your behalf — the
+      Controls panel's sliders reflect whatever the roaster is actually
+      doing (an operator's own manual setting, or state left over from a
+      previous session), and nothing changes on the machine until you
+      move a slider yourself.
+    </li>
+  </ul>
+
+  <h2 id="testing-mode">Testing Mode</h2>
+  <p>
+    Once connected (armed — see above), a <strong>Test Connection</strong>
+    panel appears with two options, meant for verifying a real connection
+    is actually working before you commit to recording a roast:
+  </p>
+  <ul>
+    <li>
+      <strong>Read-only</strong> — samples every configured channel
+      (BT/ET/DT, Burner SV, Air/Drum feedback) for about 4 seconds and
+      checks each one: is it present at all, is it within a plausible
+      range (a loose sanity check against reading garbage or nothing, not
+      a calibration check), and does it vary at all across samples (a
+      real live reading almost always jitters slightly; dead-flat isn't
+      necessarily wrong — fine if the roaster is genuinely idle — but
+      worth a second look if you expected motion). A channel with no data
+      at all shows a neutral warning, not a failure — most units don't
+      have every channel wired (DT, for instance, is often absent), so
+      "never populated" is frequently the <em>correct</em> shape, not a
+      fault.
+    </li>
+    <li>
+      <strong>Read + write</strong> (only offered when the connection can
+      write at all — a pure read-only meter like the MS6514 never gets
+      this option) — does everything read-only does, plus one write
+      check: reads Air's own current value and writes that exact same
+      value straight back. On an idle machine (Air almost always already
+      off) this is a genuine no-op — zero physical effect — while still
+      exercising the real write path end to end and confirming the
+      round-trip through the feedback register, not just that the call
+      didn't error.
+    </li>
+  </ul>
+  <p>
+    <strong>Burner and Drum are never touched by either check,
+    automatically or otherwise.</strong> Burner because any nonzero
+    setpoint can make the machine's own bang-bang controller start
+    actually firing heating elements if DT reads below it; Drum because
+    it's a moving mechanical part. If the write check passes, an
+    optional, separately-confirmed <strong>"nudge"</strong> is offered for
+    anyone who wants a <em>visible</em> confirmation instead of just a
+    silent round-trip — it bumps Air by 5% for about 2 seconds, then sets
+    it back, with its own explicit confirm step and up-front description
+    of exactly what will happen before it runs.
+  </p>
+  <p>
+    None of this ever creates a roast record — the whole panel only
+    exists during the armed-not-recording window, and both checks work
+    purely through the same connection/command paths a manual
+    Controls-panel slider adjustment would use.
+  </p>
+  <p>
+    For the actual procedure — what to check before you even connect, and
+    what to do once you're done — see the
+    <a href="real-hardware-checklist.html">real-hardware checklist</a>.
+  </p>
+
+  <h2 id="testing-without-real-hardware-modbus">Testing without real hardware</h2>
+  <p>
+    <code>modbus_bridge</code> can be exercised end-to-end — through the
+    app's actual connection code, not a mock of it — against a fake
+    standing in for the real PLC. See each model's own page for the
+    specific fake and register values;
+    <a href="fz-94-usb.html#testing-without-real-hardware">FZ-94 (USB) → Testing without real hardware</a>
+    is the one currently available.
+  </p>
+
+  <div class="page-nav"><a href="../index.html">&larr; Back to docs home</a></div>
+</main>
+</body>
+</html>

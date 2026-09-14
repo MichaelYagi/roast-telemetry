@@ -29,7 +29,7 @@ sudo apt install socat
 
 ### Modbus (FZ-94)
 
-See [docs/modbus/fz-94-usb.md](../docs/modbus/fz-94-usb.md#testing-without-real-hardware)
+See [docs/modbus/fz-94-usb.html](../docs/modbus/fz-94-usb.html#testing-without-real-hardware)
 -- the fake's own setup (socat pair, `--drive-port` for the
 separate-connection case, suggested test-settings timeline, Windows
 notes) now lives there alongside the rest of the FZ-94-specific detail,

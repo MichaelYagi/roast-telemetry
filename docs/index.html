@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roast Telemetry Docs</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="index.html">Roast Telemetry</a>
+  <nav>
+    <a href="index.html" aria-current="page">Docs</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="modbus/index.html">Direct Modbus</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="https://github.com/MichaelYagi/roast-telemetry">GitHub</a>
+  </nav>
+</header>
+<main>
+  <h1>Roast Telemetry</h1>
+  <p>
+    An API-first coffee roasting platform that reuses Artisan Scope's
+    concepts (BT/ET/RoR curves, roast events, <code>.alog</code> logs),
+    focused entirely on <em>direct</em> connections to a data source —
+    no dependency on a separately running Artisan instance for any of
+    them.
+  </p>
+
+  <h2>Major features</h2>
+  <ul class="feature-list">
+    <li>
+      <strong>Four interchangeable data sources</strong>, picked per roast:
+      <ul>
+        <li><strong>Artisan Simulator</strong> — a thermal model producing realistic BT/ET/RoR curves and auto-detected roast events. No hardware needed.</li>
+        <li><strong>.alog Playback</strong> — replays a real roast log, including events and notes, at real or accelerated speed. Reads genuine Artisan-exported <code>.alog</code> files too, not just this project's own.</li>
+        <li><strong>Direct Modbus</strong> — talks straight to a real roaster's PLC over Modbus RTU, bypassing Artisan entirely, with full read <em>and</em> write control (Burner/Air/Drum). Ships configured for Coffee-Tech's FZ-94; every register is overridable for a different Modbus roaster.</li>
+        <li><strong>Direct USB (thermocouple meter)</strong> — reads a Mastech MS6514 dual K-type thermocouple meter straight over USB-serial.</li>
+      </ul>
+    </li>
+    <li><strong>Artisan-style connect-then-record flow</strong> for the two live-hardware modes — ON connects and streams live readings so you can verify a connection before committing to a roast; START begins actually recording.</li>
+    <li><strong>A guided Test Connection panel</strong> for verifying a fresh Modbus connection safely — comprehensive per-channel reads, plus an optional, deliberately benign write check (a no-op round-trip on the least consequential channel) before you ever start a real roast.</li>
+    <li><strong>Live event auto-detection</strong> (Charge/Turning Point/Dry End/FC Start) from the raw temperature curve, shared by both hardware bridges, since neither a PLC nor a thermocouple meter carries roast-milestone events on its own.</li>
+    <li><strong>Real hardware fakes</strong> for both live-hardware modes, so the full connection code path is testable without owning a roaster.</li>
+  </ul>
+
+  <h2>Where to start</h2>
+  <ul>
+    <li><a href="getting-started.html">Getting started</a> — install, run, the four data sources, saving a roast, testing without real hardware.</li>
+    <li><a href="modbus/index.html">Direct Modbus Bridge</a> — connection basics and the register-override mechanism, for any Modbus-connected roaster.
+      <ul>
+        <li><a href="modbus/fz-94-usb.html">FZ-94 (USB)</a> — the specific register map, source citations, and fake-hardware test setup for this model.</li>
+        <li><a href="modbus/real-hardware-checklist.html">Real-hardware checklist</a> — pre-flight checks, the click-through sequence, and post-flight cleanup for connecting to an actual machine.</li>
+      </ul>
+    </li>
+    <li><a href="architecture.html">Architecture reference</a> — layout, storage, API summary, assumptions.</li>
+    <li><a href="https://github.com/MichaelYagi/roast-telemetry/blob/main/CONTRIBUTING.md">Contributing</a> — running tests, code style, releasing.</li>
+  </ul>
+</main>
+</body>
+</html>

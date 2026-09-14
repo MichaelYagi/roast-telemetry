@@ -6,7 +6,10 @@ An API-first coffee roasting platform that reuses Artisan Scope's concepts
 running Artisan instance for any of them.
 
 **Docs**: [michaelyagi.github.io/roast-telemetry](http://michaelyagi.github.io/roast-telemetry)
-*(eventual home for these docs — for now, see [docs/](docs/getting-started.md) in this repo.)*
+*(eventual home for these docs, once GitHub Pages is set up — the same
+content already lives in [docs/](docs/index.html) in this repo; GitHub's
+file browser shows those as raw HTML source rather than rendering them,
+so open them locally or wait for Pages to view them properly.)*
 
 ## Major features
 
@@ -39,12 +42,14 @@ running Artisan instance for any of them.
 
 ## Getting started
 
-See [docs/getting-started.md](docs/getting-started.md) for installation
-and running it. Full docs:
+See [docs/getting-started.html](docs/getting-started.html) for
+installation and running it. Full docs:
 
-- [Getting started](docs/getting-started.md)
-- [Direct Modbus Bridge](docs/modbus/README.md), and
-  [FZ-94 (USB)](docs/modbus/fz-94-usb.md) specifically
-- [Architecture reference](docs/architecture.md) — layout, storage, API
+- [Getting started](docs/getting-started.html)
+- [Direct Modbus Bridge](docs/modbus/index.html), and
+  [FZ-94 (USB)](docs/modbus/fz-94-usb.html) specifically
+- [Real-hardware checklist](docs/modbus/real-hardware-checklist.html) —
+  connecting to an actual machine safely
+- [Architecture reference](docs/architecture.html) — layout, storage, API
   summary, assumptions
 - [Contributing](CONTRIBUTING.md) — running tests, code style, releasing

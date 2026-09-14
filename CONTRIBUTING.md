@@ -5,7 +5,7 @@ outside contributions are welcome — here's what to know before sending a PR.
 
 ## Getting set up
 
-See [docs/getting-started.md](docs/getting-started.md) for the two ways
+See [docs/getting-started.html](docs/getting-started.html) for the two ways
 to run this locally (one-port demo build vs. two-port frontend dev with
 hot reload). The short version:
 
@@ -53,7 +53,7 @@ suite yet.
   manual) in a comment or the PR description — this codebase has been
   burned before by blog-sourced assumptions that turned out wrong once
   checked against Artisan's actual source. See
-  [docs/modbus/fz-94-usb.md](docs/modbus/fz-94-usb.md) for the existing
+  [docs/modbus/fz-94-usb.html](docs/modbus/fz-94-usb.html) for the existing
   citation style.
 
 ## What happens on a PR

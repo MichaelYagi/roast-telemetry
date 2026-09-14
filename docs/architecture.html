@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture Reference — Roast Telemetry</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="index.html">Roast Telemetry</a>
+  <nav>
+    <a href="index.html">Docs</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="modbus/index.html">Direct Modbus</a>
+    <a href="architecture.html" aria-current="page">Architecture</a>
+    <a href="https://github.com/MichaelYagi/roast-telemetry">GitHub</a>
+  </nav>
+</header>
+<main>
+  <h1>Architecture reference</h1>
+
+  <h2>Layout</h2>
+  <pre><code>/backend           FastAPI app: REST + WebSocket/SSE API, roast session
+                    orchestration, SQLite metadata store
+/simulator          Standalone package: SimulatorEngine (thermal model)
+/mock_device        Standalone package: MockDevice (fake serial/USB)
+/alog_playback      Standalone package: .alog read/write + AlogPlayer
+/modbus_bridge      Standalone package: ModbusEngine (direct roaster control)
+/ms6514_bridge      Standalone package: MS6514Engine (direct USB meter reader)
+/roast_heuristics   Standalone package: shared RoR + event auto-detection
+/frontend           React + Vite + Chart.js single-page app
+/docs               This documentation site</code></pre>
+  <p>
+    <code>backend</code> imports <code>simulator</code>,
+    <code>mock_device</code>, <code>alog_playback</code>,
+    <code>modbus_bridge</code> and <code>ms6514_bridge</code> as plain
+    top-level Python packages (no cross-package inheritance — they share
+    a small duck-typed contract: <code>tick(dt)</code> /
+    <code>get_new_events()</code> / <code>apply_command(cmd)</code> /
+    <code>is_finished()</code> / <code>status()</code>), so each can be
+    developed, tested, or reused independently of the web backend.
+    <code>modbus_bridge</code> and <code>ms6514_bridge</code> both depend
+    on <code>roast_heuristics</code> for the shared detection logic.
+  </p>
+
+  <h2 id="whats-stored-where">What's stored where</h2>
+  <p>
+    <strong>Backend, <code>backend/data/roasts.db</code> (SQLite)</strong>
+    — shared across every browser/device pointed at this server:
+  </p>
+  <table>
+    <thead><tr><th>Table</th><th>Holds</th></tr></thead>
+    <tbody>
+      <tr><td><code>roasts</code></td><td>Per-roast metadata: title, mode, status, beans, weights, duration, playback speed, and the path to its <code>.alog</code> file. The full per-second profile/events/notes live in that <code>.alog</code> file on disk (<code>backend/data/roasts/&lt;id&gt;.alog</code>), not in SQLite — this table just indexes it for fast history listing/filtering.</td></tr>
+      <tr><td><code>roast_presets</code></td><td>"Load saved config" entries — the full Configure Roast form plus its starting Burner/Air/Drum values.</td></tr>
+      <tr><td><code>settings</code></td><td>Ollama URL/model (AI Roast Review), and which panels are enabled/ordered in the Big Readout Panel / Small Readout column.</td></tr>
+      <tr><td><code>roast_reviews</code></td><td>The latest AI-generated review per roast (one row each, overwritten on regenerate).</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    <strong>Browser <code>localStorage</code></strong> — per-browser,
+    never sent to the server, doesn't sync across devices or tabs on a
+    different machine:
+  </p>
+  <table>
+    <thead><tr><th>Key</th><th>Holds</th></tr></thead>
+    <tbody>
+      <tr><td><code>roast-telemetry:theme</code></td><td>Selected theme (Light/Dark/Coffee/Croissant/Matcha)</td></tr>
+      <tr><td><code>roast-telemetry:breakoutSplitWidth</code></td><td>Dragged divider position in the Big Readout Panel's split-pane layout</td></tr>
+      <tr><td><code>roast-telemetry:chartHeight</code></td><td>Dragged chart height</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Rule of thumb: anything that should look the same for anyone opening
+    the app, or that a roast's own record needs, goes in the DB.
+    Anything that's just "how do I like my own browser to look right
+    now" goes in <code>localStorage</code>.
+  </p>
+
+  <h2>API summary</h2>
+  <p>
+    All routes live under <code>/api</code> (e.g. <code>/api/roasts</code>);
+    omitted below for brevity. <code>/docs</code>, <code>/redoc</code> and
+    <code>/openapi.json</code> stay at the root, unprefixed.
+  </p>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/devices</code></td><td>Mock devices currently bound to active roasts</td></tr>
+      <tr><td>POST</td><td><code>/devices/{id}/fault</code></td><td>Testing hook: force a device into an error state</td></tr>
+      <tr><td>GET</td><td><code>/serial-ports</code></td><td>Serial ports currently visible to the OS, for the Configure Roast form's port picker</td></tr>
+      <tr><td>GET</td><td><code>/roasts</code></td><td>Roast history (filter: <code>mode</code>, <code>status</code>)</td></tr>
+      <tr><td>POST</td><td><code>/roasts</code></td><td><code>simulator</code>/<code>alog_playback</code>: create <strong>and start</strong> a roast. <code>modbus_live</code>/<code>ms6514_live</code>: <strong>connect only</strong> (ON) — see <code>/roasts/{id}/start</code></td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/start</code></td><td><code>modbus_live</code>/<code>ms6514_live</code> only: begin recording a connection already made via <code>POST /roasts</code> (START)</td></tr>
+      <tr><td>GET</td><td><code>/roasts/{id}</code></td><td>Full roast detail (profile, events, notes) — live or historical</td></tr>
+      <tr><td>DELETE</td><td><code>/roasts/{id}</code></td><td>Delete a roast + its <code>.alog</code> file (409 if still roasting/cooling)</td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/stop</code></td><td>Deliberately stop a roast (status <code>stopped</code>), persist its <code>.alog</code></td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/commands</code></td><td><code>heater_pct</code> / <code>fan_pct</code> / <code>drum_speed_pct</code> (simulator, modbus_live) or <code>speed</code> (playback)</td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/notes</code></td><td>Append a timestamped note</td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/events</code></td><td>Append a custom event marker</td></tr>
+      <tr><td>GET</td><td><code>/roasts/{id}/alog</code></td><td>Download the roast's <code>.alog</code> file</td></tr>
+      <tr><td>POST</td><td><code>/roasts/import</code></td><td>Import an existing <code>.alog</code> file as history (<code>path</code>, optional <code>title</code>)</td></tr>
+      <tr><td>WS</td><td><code>/roasts/{id}/stream</code></td><td>Live sample/event stream (sends a <code>snapshot</code> first)</td></tr>
+      <tr><td>GET</td><td><code>/roasts/{id}/stream/sse</code></td><td>Same stream over Server-Sent Events</td></tr>
+      <tr><td>GET</td><td><code>/presets</code></td><td>List saved roast configurations</td></tr>
+      <tr><td>POST</td><td><code>/presets</code></td><td>Save the current Configure-Roast form as a named preset</td></tr>
+      <tr><td>GET</td><td><code>/presets/{id}</code></td><td>One saved preset's full config</td></tr>
+      <tr><td>DELETE</td><td><code>/presets/{id}</code></td><td>Delete a saved preset</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Assumptions worth knowing about</h2>
+  <ul>
+    <li>
+      <strong>.alog schema</strong>: reading real Artisan files is now
+      verified, not guessed — <code>alog_playback/alog_io.py</code> was
+      checked against an actual Kaleido-exported <code>.alog</code>. Two
+      things worth knowing: (1) real Artisan writes the file as a Python
+      dict literal (<code>str(dict)</code>, single quotes, meant to be
+      <code>eval</code>'d) rather than strict JSON — the loader tries
+      <code>json</code> first and falls back to
+      <code>ast.literal_eval</code> (safe, no code execution); (2) named
+      roast-phase markers (Charge/Dry End/FC start&amp;end/SC
+      start&amp;end/Drop/Cool End) live in an 8-element
+      <code>timeindex</code> array of <code>timex</code> indices (0 = not
+      recorded), with Turning Point computed separately at
+      <code>computed['TP_idx']</code> — confirmed by cross-checking every
+      populated index's ET/BT against the file's own <code>computed</code>
+      block, so this isn't a guess. Manual burner/air/damper/drum
+      adjustments come through as <code>CUSTOM</code> events from the
+      <code>specialevents</code>/<code>specialeventstype</code>/
+      <code>specialeventsvalue</code>/<code>specialeventsStrings</code>
+      parallel arrays. Writing still uses this project's own simpler JSON
+      shape (events/notes as plain objects) — round-trips perfectly
+      within itself, but isn't byte-for-byte what Artisan's own exporter
+      would produce. Real Artisan files also don't store a per-sample RoR
+      array (only phase-average RoR in <code>computed</code>) —
+      <code>alog_io.py</code> reconstructs RoR from the BT/ET curve itself
+      (24s trailing-window derivative) whenever the source doesn't
+      provide one, so RoR is always available regardless of source.
+    </li>
+    <li>
+      <strong>Direct Modbus Bridge register map</strong>: see
+      <a href="modbus/fz-94-usb.html">docs/modbus/fz-94-usb.html</a> for
+      the full citation trail and what's actually been verified vs.
+      blog-sourced.
+    </li>
+    <li>
+      <strong>Simulator physics</strong>: <code>simulator/engine.py</code>
+      is a first-order thermal model (ET chases a heater-driven setpoint;
+      BT lags ET with an explicit charge-dip/turning-point phase) tuned
+      to produce a ~10-11 minute roast with realistic event timing, not a
+      reproduction of Artisan's actual simulator internals (which we
+      don't have source access to).
+    </li>
+    <li>
+      <strong>Persistence</strong>: SQLite indexes roast metadata for
+      fast history listing/filtering; full per-second profiles live in
+      each roast's <code>.alog</code> file and are read from disk on
+      demand. Swapping to Postgres is isolated to
+      <code>backend/app/storage.py</code>.
+    </li>
+    <li>
+      <strong>.alog import</strong> takes a server-side file path rather
+      than a multipart upload, to keep the skeleton simple — swap
+      <code>POST /roasts/import</code> for a multipart endpoint if the
+      frontend needs to upload files directly from a client machine.
+    </li>
+  </ul>
+
+  <div class="page-nav"><a href="index.html">&larr; Back to docs home</a></div>
+</main>
+</body>
+</html>

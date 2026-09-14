@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Getting Started — Roast Telemetry</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="index.html">Roast Telemetry</a>
+  <nav>
+    <a href="index.html">Docs</a>
+    <a href="getting-started.html" aria-current="page">Getting Started</a>
+    <a href="modbus/index.html">Direct Modbus</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="https://github.com/MichaelYagi/roast-telemetry">GitHub</a>
+  </nav>
+</header>
+<main>
+  <h1>Getting started</h1>
+
+  <h2>One port (recommended for demos)</h2>
+  <p>
+    Build the frontend once, then run only the backend — it serves the
+    compiled UI itself:
+  </p>
+  <pre><code>cd roast-telemetry
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate   # first time only
+pip install -r backend/requirements.txt               # first time only
+cd frontend &amp;&amp; npm install &amp;&amp; npm run build &amp;&amp; cd ..   # first time / after UI changes
+PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code></pre>
+  <p>
+    Open <code>http://localhost:8000</code> — that's it, one process, one
+    port. The API lives under <code>/api/*</code> on the same port (docs
+    still at <code>/docs</code>), and any other path falls back to the
+    React app's <code>index.html</code> so client-side routing
+    (<code>/roasts/:id</code>, <code>/compare</code>, etc.) works on a
+    hard refresh too. Re-run <code>npm run build</code> after frontend
+    changes; the backend doesn't rebuild it for you, and this fallback
+    only activates when <code>frontend/dist/</code> exists — without it,
+    the backend just runs as an API-only server (handy for the two-port
+    dev flow below).
+  </p>
+
+  <h2>Two ports (for frontend development)</h2>
+  <p>
+    Use this instead when you're actively editing the frontend and want
+    Vite's hot-reload rather than rebuilding on every change.
+  </p>
+
+  <h3>Backend</h3>
+  <pre><code>cd roast-telemetry
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r backend/requirements.txt
+PYTHONPATH=. uvicorn backend.app.main:app --reload --port 8000</code></pre>
+  <p>
+    Docs at <code>http://localhost:8000/docs</code>. Roast data persists
+    to <code>backend/data/roasts.db</code> (SQLite index) and
+    <code>backend/data/roasts/*.alog</code> (full profiles). A pre-baked
+    example lives at
+    <code>backend/data/sample_roasts/demo_roast.alog</code> for
+    exercising playback mode.
+  </p>
+
+  <h3>Frontend</h3>
+  <pre><code>cd frontend
+npm install
+npm run dev</code></pre>
+  <p>
+    Opens on <code>http://localhost:5173</code> and proxies
+    <code>/api/*</code> (including WebSockets) to the backend on port
+    8000 — see <code>frontend/vite.config.js</code>.
+  </p>
+  <p>
+    The Live Roast screen deliberately mirrors Artisan desktop's own
+    layout: the icon toolbar, ON/OFF device toggle + START recording
+    button, digital elapsed-time clock, DRY%/&raquo;DRY/&raquo;FCs
+    milestone boxes, the banded "Roaster Scope" chart with color-coded ET
+    (crimson) / BT (blue) curves and a matching ET/BT/&Delta;BT readout
+    column, and the CHARGE/DRY END/FC START/FC END/SC START/DROP manual
+    event-marker buttons underneath the chart.
+  </p>
+  <div class="callout">
+    <strong>Note:</strong> if this repo lives under a Windows-mounted
+    path in WSL (e.g. <code>/mnt/c/...</code>), filesystem change events
+    don't propagate to Vite's watcher, so Hot Module Reload can silently
+    serve stale code after an edit. <code>vite.config.js</code> already
+    sets <code>server.watch.usePolling</code> to work around this — if
+    you still see stale behavior, restart <code>npm run dev</code>.
+  </div>
+
+  <h2 id="the-four-data-sources">The four data sources</h2>
+  <p>
+    Every roast is driven by one of four modes, picked from the
+    Configure Roast form's "Data source" dropdown:
+  </p>
+  <ol>
+    <li><strong>Artisan Simulator</strong> — a small thermal model that generates realistic BT/ET/RoR curves and auto-detects roast events (turning point, dry end, first crack, drop). No hardware needed.</li>
+    <li><strong>.alog Playback</strong> — loads a real roast log and replays it at real (or accelerated) speed, including its events and notes. Also reads genuine Artisan-exported <code>.alog</code> files, not just this project's own.</li>
+    <li><strong>Direct Modbus (USB)</strong> — talks straight to a real roaster's PLC over Modbus RTU, bypassing Artisan entirely. Ships with defaults for Coffee-Tech's FZ-94; every register is overridable for a different Modbus roaster. See <a href="modbus/index.html">docs/modbus/</a>.</li>
+    <li><strong>Direct USB (thermocouple meter)</strong> — reads a Mastech MS6514 dual K-type thermocouple meter straight over USB-serial. Read-only (the meter has no command channel); T1 &rarr; BT, T2 &rarr; ET.</li>
+  </ol>
+  <p>
+    Clicking <strong>ON</strong> connects to the device and starts
+    streaming live readings (nothing recorded yet); <strong>START</strong>
+    begins actually recording that stream into a roast — for
+    <code>modbus_live</code>/<code>ms6514_live</code> these are two
+    genuinely separate steps (verify the connection before committing to
+    a roast), matching real Artisan's own connect-then-record model. For
+    <code>simulator</code>/<code>alog_playback</code>, connecting and
+    recording happen together in one step, since there's no real
+    external connection to verify first.
+  </p>
+
+  <h2>Saving a roast</h2>
+  <p>
+    Automatic — nothing extra to do. Click <strong>OFF</strong> once
+    you're done: that stops the roast and writes its <code>.alog</code>
+    file to <code>backend/data/roasts/&lt;roast_id&gt;.alog</code>,
+    regardless of how it ends ("complete" if the engine itself signaled
+    done, "stopped" if you clicked OFF yourself, "aborted" if something
+    actually went wrong). To get the file:
+  </p>
+  <ol>
+    <li>Click <strong>View detail</strong> (next to the toolbar once finished), or find the roast under <strong>History</strong>.</li>
+    <li>Click <strong>Download .alog</strong> at the top of the detail page.</li>
+  </ol>
+
+  <h2>Testing without real hardware</h2>
+  <p>
+    <code>simulator</code> and <code>alog_playback</code> need nothing
+    extra — fully self-contained. The two modes that talk to real
+    hardware (<code>modbus_live</code>, <code>ms6514_live</code>) can
+    each be exercised end-to-end, through the app's actual connection
+    code, using a fake standing in for the real device — see the
+    project's <code>hardware_fakes/README.md</code> for the MS6514 fake,
+    and
+    <a href="modbus/fz-94-usb.html#testing-without-real-hardware">docs/modbus/fz-94-usb.html</a>
+    for the FZ-94 one specifically, since it's the one that can also be
+    <em>controlled</em> (Burner/Air/Drum), not just read.
+  </p>
+
+  <h2>Next steps</h2>
+  <ul>
+    <li>Setting up and running the backend test suite, and cutting a release: see <a href="https://github.com/MichaelYagi/roast-telemetry/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</li>
+    <li>What each data source actually stores, and the full API surface: see <a href="architecture.html#whats-stored-where">Architecture reference</a>.</li>
+  </ul>
+
+  <div class="page-nav"><a href="index.html">&larr; Back to docs home</a></div>
+</main>
+</body>
+</html>
