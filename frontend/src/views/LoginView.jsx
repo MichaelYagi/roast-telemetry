@@ -122,9 +122,6 @@ export default function LoginView() {
             The very first account registered on this install becomes its admin, with immediate access.
           </p>
         )}
-        {mode === "register" && hasAdmin === true && (
-          <p className="hint">This install already has an admin -- registering here needs their approval before you can log in.</p>
-        )}
         {error && <p className="error">{error}</p>}
         {pendingMessage && <p className="hint">{pendingMessage}</p>}
 
