@@ -21,6 +21,17 @@ const READ_CHANNELS = [
 const SAMPLE_WINDOW_MS = 4000;
 const SAMPLE_INTERVAL_MS = 250; // just samples the already-live `latest` prop -- no extra network calls
 const NUDGE_PCT = 5;
+// Air/Drum share identical register-map confidence (see
+// modbus_bridge/engine.py's own docstring: same registers 8192/8193/
+// 8451, same blog-sourced-only origin, just different slave IDs) --
+// Drum is a genuine differential test if Air's nudge doesn't visibly
+// move anything, not a "more trustworthy" alternative. Max mirrors the
+// FZ-94 built-in profile's own default operating ranges (Air 0-100%,
+// Drum 0-70%) purely so the nudge target shown here doesn't overstate
+// what the drive will actually accept -- the backend clamps to
+// whatever's really configured regardless.
+const CHANNEL_LABEL = { fan_pct: "Air", drum_speed_pct: "Drum" };
+const CHANNEL_NUDGE_MAX = { fan_pct: 100, drum_speed_pct: 70 };
 
 function analyzeReadSamples(samples, channels, tempUnit) {
   return channels.map((ch) => {
@@ -69,8 +80,17 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
   const [readResults, setReadResults] = useState(null);
   const [writeStep, setWriteStep] = useState("idle"); // idle | running | done | failed
   const [writeDetail, setWriteDetail] = useState(null);
-  const [nudgeConfirming, setNudgeConfirming] = useState(false);
-  const [nudgeResult, setNudgeResult] = useState(null);
+  // "fan_pct" | "drum_speed_pct" | null -- which channel's nudge the
+  // "are you sure" prompt is currently showing for (null = not showing).
+  const [nudgeConfirming, setNudgeConfirming] = useState(null);
+  const [nudgeResult, setNudgeResult] = useState(null); // { channel, status, detail, retryTo? } | null
+  // Whether the operator actually saw/heard the channel respond, once
+  // asked directly -- the write-succeeding-per-feedback check above
+  // can't tell a genuine mechanical response from a drive that just
+  // updates its own feedback register without the fan physically
+  // spinning, so this is a separate, explicit question, one answer at a
+  // time for whatever nudgeResult currently holds.
+  const [visibleConfirm, setVisibleConfirm] = useState(null); // "yes" | "no" | null, for the *current* nudgeResult
   const samplesRef = useRef([]);
   const latestRef = useRef(latest);
 
@@ -145,36 +165,41 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     }
   }
 
-  async function runNudge() {
-    setNudgeConfirming(false);
-    const before = latestRef.current?.fan_pct ?? 0;
-    const nudged = Math.min(100, before + NUDGE_PCT);
-    setNudgeResult({ status: "pending", detail: `nudging Air to ${nudged.toFixed(0)}% -- watch/listen for it…` });
+  async function runNudge(channel) {
+    setNudgeConfirming(null);
+    setVisibleConfirm(null);
+    const label = CHANNEL_LABEL[channel];
+    const max = CHANNEL_NUDGE_MAX[channel];
+    const before = latestRef.current?.[channel] ?? 0;
+    const nudged = Math.min(max, before + NUDGE_PCT);
+    setNudgeResult({ channel, status: "pending", detail: `nudging ${label} to ${nudged.toFixed(0)}% -- watch/listen for it…` });
     // The nudge-up and restore writes are deliberately two separate
     // try/catches, not one -- if the FIRST fails, nothing changed at all
     // (safe, nothing to say beyond "it failed"). If the SECOND fails,
-    // Air is now genuinely sitting at the nudged value with nothing
-    // automatically fixing that -- that case needs its own, clearly
-    // different message (with a retry) rather than a generic error that
-    // reads the same either way.
+    // the channel is now genuinely sitting at the nudged value with
+    // nothing automatically fixing that -- that case needs its own,
+    // clearly different message (with a retry) rather than a generic
+    // error that reads the same either way.
     try {
-      await api.sendCommand(roastId, { fan_pct: nudged });
+      await api.sendCommand(roastId, { [channel]: nudged });
     } catch (err) {
-      setNudgeResult({ status: "failed", detail: `nudge failed, nothing changed -- ${err.message}` });
+      setNudgeResult({ channel, status: "failed", detail: `nudge failed, nothing changed -- ${err.message}` });
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    await restoreAirTo(before);
+    await restoreChannelTo(channel, before);
   }
 
-  async function restoreAirTo(before) {
+  async function restoreChannelTo(channel, before) {
+    const label = CHANNEL_LABEL[channel];
     try {
-      await api.sendCommand(roastId, { fan_pct: before });
-      setNudgeResult({ status: "done", detail: `set back to ${before.toFixed(0)}%` });
+      await api.sendCommand(roastId, { [channel]: before });
+      setNudgeResult({ channel, status: "done", detail: `set back to ${before.toFixed(0)}%` });
     } catch (err) {
       setNudgeResult({
+        channel,
         status: "failed",
-        detail: `Air is still nudged up -- restoring it to ${before.toFixed(0)}% failed: ${err.message}. Set it back yourself with the Air slider below, or retry.`,
+        detail: `${label} is still nudged up -- restoring it to ${before.toFixed(0)}% failed: ${err.message}. Set it back yourself with the ${label} slider below, or retry.`,
         retryTo: before,
       });
     }
@@ -185,8 +210,9 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     setReadResults(null);
     setWriteStep("idle");
     setWriteDetail(null);
-    setNudgeConfirming(false);
+    setNudgeConfirming(null);
     setNudgeResult(null);
+    setVisibleConfirm(null);
     setRunning(true);
   }
 
@@ -233,20 +259,21 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
       {testMode === "read_write" && writeStep === "done" && !nudgeResult && (
         <div className="connection-test-nudge">
           {!nudgeConfirming ? (
-            <button type="button" className="advanced-toggle" onClick={() => setNudgeConfirming(true)}>
+            <button type="button" className="advanced-toggle" onClick={() => setNudgeConfirming("fan_pct")}>
               Want a visible confirmation instead? (optional)
             </button>
           ) : (
             <>
               <p className="hint">
-                This will briefly bump Air up by {NUDGE_PCT}% for about 2 seconds (you should hear/see the fan
-                respond), then set it back to exactly what it was. Only do this if that's fine right now.
+                This will briefly bump {CHANNEL_LABEL[nudgeConfirming]} up by {NUDGE_PCT}% for about 2 seconds (you
+                should hear/see it respond), then set it back to exactly what it was. Only do this if that's fine
+                right now.
               </p>
               <div className="event-button-row">
-                <button type="button" onClick={runNudge}>
-                  Confirm: nudge Air +{NUDGE_PCT}% and back
+                <button type="button" onClick={() => runNudge(nudgeConfirming)}>
+                  Confirm: nudge {CHANNEL_LABEL[nudgeConfirming]} +{NUDGE_PCT}% and back
                 </button>
-                <button type="button" className="danger" onClick={() => setNudgeConfirming(false)}>
+                <button type="button" className="danger" onClick={() => setNudgeConfirming(null)}>
                   Cancel
                 </button>
               </div>
@@ -260,9 +287,69 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
             {nudgeResult.detail}
           </p>
           {nudgeResult.retryTo != null && (
-            <button type="button" onClick={() => restoreAirTo(nudgeResult.retryTo)}>
-              Retry restoring Air to {nudgeResult.retryTo.toFixed(0)}%
+            <button type="button" onClick={() => restoreChannelTo(nudgeResult.channel, nudgeResult.retryTo)}>
+              Retry restoring {CHANNEL_LABEL[nudgeResult.channel]} to {nudgeResult.retryTo.toFixed(0)}%
             </button>
+          )}
+
+          {/* The register write reporting "done" only proves the feedback
+              register echoed the commanded value back -- a drive that
+              updates its own feedback without the fan/motor physically
+              spinning would still land here. This is the actual human
+              confirmation, asked directly rather than inferred. */}
+          {nudgeResult.status === "done" && visibleConfirm === null && (
+            <div className="connection-test-visible-confirm">
+              <p className="hint">Did the {nudgeResult.channel === "fan_pct" ? "fan" : "drum motor"} actually move?</p>
+              <div className="event-button-row">
+                <button type="button" onClick={() => setVisibleConfirm("yes")}>
+                  Yes, it moved
+                </button>
+                <button type="button" className="danger" onClick={() => setVisibleConfirm("no")}>
+                  No, nothing happened
+                </button>
+              </div>
+            </div>
+          )}
+
+          {nudgeResult.status === "done" && visibleConfirm === "yes" && (
+            <p className="connection-test-write connection-test-pass">
+              ✓ confirmed -- the write path genuinely reaches the hardware, not just its own feedback register.
+            </p>
+          )}
+
+          {nudgeResult.status === "done" && visibleConfirm === "no" && (
+            <div className="connection-test-visible-confirm-no">
+              {nudgeResult.channel === "fan_pct" ? (
+                <>
+                  <p className="connection-test-write connection-test-fail">
+                    ✗ The register write succeeded but nothing physically moved. Air and Drum share identical
+                    register numbers and confidence (both blog-sourced only, not independently confirmed) -- Drum is
+                    a genuine differential test, not just "try something else."
+                  </p>
+                  {/* Also clears nudgeResult -- the confirm/cancel dialog
+                      below only renders while it's null (see the block
+                      above, gated on !nudgeResult), so leaving Air's
+                      result in place here would silently swallow this
+                      click: the dialog would never appear. */}
+                  <button
+                    type="button"
+                    className="advanced-toggle"
+                    onClick={() => {
+                      setNudgeResult(null);
+                      setNudgeConfirming("drum_speed_pct");
+                    }}
+                  >
+                    Try Drum instead
+                  </button>
+                </>
+              ) : (
+                <p className="connection-test-write connection-test-fail">
+                  ✗ Drum didn't respond either -- that's real evidence the shared register scheme (8192/8193) is
+                  wrong for this unit, not just something specific to Air/slave 1. Worth checking your VFD's own
+                  nameplate/front-panel parameters against those numbers.
+                </p>
+              )}
+            </div>
           )}
         </>
       )}

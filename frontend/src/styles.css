@@ -1869,7 +1869,9 @@ button:disabled {
   font-weight: 600;
 }
 
-.connection-test-nudge {
+.connection-test-nudge,
+.connection-test-visible-confirm,
+.connection-test-visible-confirm-no {
   margin-top: 0.75rem;
 }
 
