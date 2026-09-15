@@ -1305,6 +1305,15 @@ button:disabled {
   flex-direction: column;
   align-self: flex-start;
   flex-shrink: 0;
+  /* Overrides .panel's own left/right 1.25rem -- this panel's whole point
+     is to sit beside the chart without eating into its space, so its own
+     horizontal footprint should be as tight as the content allows. Top/
+     bottom stays .panel's default 1rem -- .vertical-control-stack's own
+     height calc subtracts exactly that (plus the border) to keep this
+     box's outer height matched to .scope-chart/.small-readout-col, so
+     changing the vertical half here would need that calc updated too. */
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
 }
 
 .vertical-control-stack {
@@ -1378,26 +1387,26 @@ button:disabled {
      is there to catch, as one shared scrollbar for the whole panel,
      instead of overlapping text. */
   width: 100%;
-  padding: 0 0.2rem;
+  padding: 0 0.15rem;
 }
 
 .vertical-slider-value {
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.7rem;
   white-space: nowrap;
 }
 
 .vertical-slider-label {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
 }
 
 .vertical-slider-arrow {
   flex-shrink: 0;
-  width: 1.6rem;
-  padding: 0.1rem 0;
+  width: 1.2rem;
+  padding: 0.05rem 0;
   line-height: 1;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   background: none;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1428,7 +1437,7 @@ button:disabled {
   direction: rtl;
   -webkit-appearance: slider-vertical;
   appearance: slider-vertical;
-  width: 22px;
+  width: 16px;
   flex: 1;
   /* Lower than it might look -- deliberately small so two members
      stacked in one lane (each needing their own value/arrows/label
