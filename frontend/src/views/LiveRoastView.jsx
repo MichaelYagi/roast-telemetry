@@ -868,7 +868,6 @@ export default function LiveRoastView() {
       phase={phase}
       elapsedLabel={elapsedLabel}
       statusText={STATUS_TEXT[phase] + presetHint}
-      milestones={milestones}
       onToggleConnect={handleToggleConnect}
       onStart={handleStart}
     />

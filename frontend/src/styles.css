@@ -370,10 +370,10 @@ button {
   padding: 0.45rem 0.6rem;
   border-radius: 6px;
   border: 1px solid var(--border);
-  /* Was a hardcoded white -- same bug as .milestone-box above: text here
-     inherits var(--text), which goes light in dark themes, so a
-     background that never changed made every text field and dropdown
-     unreadable (light text on white) as soon as a dark theme was picked. */
+  /* Was a hardcoded white -- text here inherits var(--text), which goes
+     light in dark themes, so a background that never changed made every
+     text field and dropdown unreadable (light text on white) as soon as
+     a dark theme was picked. */
   background: var(--panel);
   color: var(--text);
 }
@@ -1485,41 +1485,6 @@ button:disabled {
   gap: 1.25rem;
   padding: 0.6rem 1rem;
   flex-wrap: wrap;
-}
-
-.artisan-toolbar-milestones {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.milestone-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  /* Was a hardcoded light grey -- its label/value text color comes from
-     var(--text)/var(--text-muted), which flip to near-white in dark
-     themes, so a background that never changed made them unreadable
-     (near-white text on a background that stayed light). var(--bg) tracks
-     the theme and (in every theme so far) reads as a subtle inset against
-     the surrounding var(--panel) wrapper either way. */
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.25rem 0.6rem;
-  min-width: 64px;
-}
-
-.milestone-label {
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.02em;
-}
-
-.milestone-value {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 
 .artisan-toolbar-power {

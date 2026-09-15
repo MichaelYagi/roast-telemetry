@@ -1,12 +1,14 @@
-// Mirrors Artisan desktop's top toolbar during a roast: milestone
-// readouts (DRY%, time-to-dry, time-to-first-crack), the ON/OFF device
-// toggle + START recording button, and a big digital elapsed-time clock.
+// Mirrors Artisan desktop's top toolbar during a roast: the ON/OFF
+// device toggle + START recording button, and a big digital
+// elapsed-time clock. Used to also carry a fixed DRY%/»DRY/»FCs
+// milestone-box row, but those are just as available (and freely
+// choosable alongside DEV%/DEV TIME/etc.) via the Big/Small Readout
+// Panel now, so hardcoding this one fixed trio here was redundant.
 export default function ArtisanToolbar({
   title,
   phase,
   elapsedLabel,
   statusText,
-  milestones,
   onToggleConnect,
   onStart,
 }) {
@@ -24,21 +26,6 @@ export default function ArtisanToolbar({
           toolbarElement / split-pane placement). */}
       <h2 className="artisan-toolbar-title">{title || "Untitled roast"}</h2>
       <div className="artisan-toolbar">
-        <div className="artisan-toolbar-milestones">
-          <div className="milestone-box">
-            <span className="milestone-label">DRY%</span>
-            <span className="milestone-value">{milestones.dryPercent}</span>
-          </div>
-          <div className="milestone-box">
-            <span className="milestone-label">&raquo;DRY</span>
-            <span className="milestone-value">{milestones.dryTime}</span>
-          </div>
-          <div className="milestone-box">
-            <span className="milestone-label">&raquo;FCs</span>
-            <span className="milestone-value">{milestones.fcsTime}</span>
-          </div>
-        </div>
-
         <div className="artisan-toolbar-power">
           <button
             type="button"
