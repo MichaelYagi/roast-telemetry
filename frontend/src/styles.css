@@ -1314,15 +1314,21 @@ button:disabled {
      sit at its own natural content size pinned to the bottom. */
   align-items: stretch;
   gap: 1.1rem;
-  /* Plain --scope-chart-height, same as .scope-chart/.small-readout-col
-     read directly -- an earlier version gave this its own taller floor
-     so a stacked lane wouldn't need to scroll in the common case, but a
-     flex row's height follows its tallest child regardless of
-     align-self, so that floor dragged the whole .scope-body row taller
-     than the chart's own real height, misaligning it from its siblings.
-     Staying matched to the chart takes priority; overflow-y below is
-     what absorbs a lane that doesn't fit instead. */
-  height: var(--scope-chart-height, 420px);
+  /* --scope-chart-height minus .panel's own vertical chrome (this stack's
+     parent is .panel.vertical-control-panel -- see below -- 1rem top +
+     1rem bottom padding plus a 1px top/bottom border, .panel's own rule)
+     -- .scope-chart has no such wrapper, so without subtracting it here,
+     the *outer* .vertical-control-panel box ends up measurably taller
+     than .scope-chart by exactly that padding+border (confirmed via
+     devtools: 319px vs 285px, a 34px gap -- 2rem + 2px), even though this
+     inner stack itself matched the shared height correctly. Subtracting
+     it is what makes the two OUTER boxes -- not just this inner one --
+     actually line up. An earlier version tried giving this its own
+     taller floor instead, which dragged the whole .scope-body row taller
+     than the chart (a flex row's height follows its tallest child
+     regardless of align-self) -- staying matched to the chart takes
+     priority; overflow-y below is what absorbs a lane that doesn't fit. */
+  height: calc(var(--scope-chart-height, 420px) - 2rem - 2px);
   /* ONE scroll surface for the whole panel, not one per lane -- a lane
      that fits (Drum/Air/every siloed single-member lane, in practice
      always) never triggers this at all, since scrolling only engages
