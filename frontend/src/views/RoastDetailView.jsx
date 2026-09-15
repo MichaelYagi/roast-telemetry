@@ -62,7 +62,7 @@ export default function RoastDetailView() {
           {roast.mode} · status: <strong>{roast.status}</strong> · duration:{" "}
           {roast.duration_s ? `${Math.floor(roast.duration_s / 60)}:${String(Math.round(roast.duration_s % 60)).padStart(2, "0")}` : "—"}
         </p>
-        <p>
+        <div className="detail-download-list">
           {roast.alog_path && (
             // No target="_blank" -- the response is Content-Disposition:
             // attachment, so it downloads without navigating away; adding
@@ -70,23 +70,25 @@ export default function RoastDetailView() {
             // file downloads silently in the background, looking like a
             // no-op click. Real Artisan's own native format -- File > Open
             // in Artisan itself opens this directly, no conversion needed.
-            <>
+            <p>
               Download <a href={api.alogDownloadUrl(roast.id)}>{alogFilename(roast.title, roast.created_at)}</a>
-              {" · "}
-            </>
+            </p>
           )}
-          Download <a href={api.csvDownloadUrl(roast.id)}>{csvFilename(roast.title, roast.created_at)}</a>
-          {" · "}
-          {/* Browser-native print-to-PDF rather than a generated file --
-              no new dependency, and "Save as PDF" in the print dialog is
-              already a real PDF export. The report itself is just this
-              page with .no-print-marked chrome (this whole block, nav
-              controls elsewhere on the page) hidden via the @media print
-              rules in styles.css -- see those for what stays visible. */}
-          <button type="button" className="link-like" onClick={() => window.print()}>
-            Print report
-          </button>
-        </p>
+          <p>
+            Download <a href={api.csvDownloadUrl(roast.id)}>{csvFilename(roast.title, roast.created_at)}</a>
+          </p>
+          <p>
+            {/* Browser-native print-to-PDF rather than a generated file --
+                no new dependency, and "Save as PDF" in the print dialog is
+                already a real PDF export. The report itself is just this
+                page with .no-print-marked chrome (this whole block, nav
+                controls elsewhere on the page) hidden via the @media print
+                rules in styles.css -- see those for what stays visible. */}
+            <button type="button" className="link-like" onClick={() => window.print()}>
+              Print report
+            </button>
+          </p>
+        </div>
       </div>
 
       {/* Print-only header -- the interactive one above (with its

@@ -1264,6 +1264,10 @@ button:disabled {
    header/toolbar above and the chart panel below). Wrapping the minimum
    caps it at the container's own actual width when that's the smaller of
    the two, which is what lets it shrink like every other panel here. */
+.detail-download-list p {
+  margin: 0.35rem 0;
+}
+
 .live-grid,
 .detail-grid {
   display: grid;
