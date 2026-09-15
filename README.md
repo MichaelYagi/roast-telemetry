@@ -57,6 +57,12 @@ prefer the link above or open the files locally.)*
   model auto-fires every milestone, useful as a hands-off demo.)
 - **Real hardware fakes** for both live-hardware modes, so the full
   connection code path is testable without owning a roaster.
+- **Login, with the first registrant becoming admin.** No built-in
+  default account — the first person to register gets immediate admin
+  access; everyone after that is pending until the admin allows them
+  from the Manage Access page. Every allowed account, admin or not, has
+  full access to everything else — no per-feature permissions, just the
+  one gate.
 
 ## Getting started
 

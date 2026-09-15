@@ -1,12 +1,32 @@
-import { NavLink, Route, Routes } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider, useAuth } from "./AuthContext.jsx";
 import ThemePicker from "./components/ThemePicker.jsx";
 import HistoryDashboard from "./views/HistoryDashboard.jsx";
 import LiveRoastView from "./views/LiveRoastView.jsx";
+import LoginView from "./views/LoginView.jsx";
 import RoastComparisonView from "./views/RoastComparisonView.jsx";
 import RoastDetailView from "./views/RoastDetailView.jsx";
 import SettingsView from "./views/SettingsView.jsx";
+import UsersView from "./views/UsersView.jsx";
 
 export default function App() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
+  );
+}
+
+function AppShell() {
+  const { user, loading, logout } = useAuth();
+
+  // Nothing rendered yet during the one-time /auth/me check on mount --
+  // faster than a spinner for what's normally a same-machine round trip,
+  // and avoids a flash of the login form for someone who's already
+  // logged in.
+  if (loading) return null;
+  if (!user) return <LoginView />;
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -27,7 +47,14 @@ export default function App() {
             <NavLink to="/history">History</NavLink>
             <NavLink to="/compare">Compare</NavLink>
             <NavLink to="/settings">Settings</NavLink>
+            {user.role === "admin" && <NavLink to="/users">Manage Access</NavLink>}
           </nav>
+          <div className="app-user-group">
+            <span className="app-username">{user.username}</span>
+            <button type="button" className="logout-button" onClick={logout}>
+              Log out
+            </button>
+          </div>
         </div>
       </header>
       <main className="app-main">
@@ -37,6 +64,7 @@ export default function App() {
           <Route path="/roasts/:id" element={<RoastDetailView />} />
           <Route path="/compare" element={<RoastComparisonView />} />
           <Route path="/settings" element={<SettingsView />} />
+          <Route path="/users" element={user.role === "admin" ? <UsersView /> : <Navigate to="/" replace />} />
         </Routes>
       </main>
     </div>

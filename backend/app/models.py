@@ -383,6 +383,49 @@ class RoastReview(BaseModel):
     completed_at: Optional[str] = None
 
 
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    USER = "user"
+
+
+class UserStatus(str, Enum):
+    # PENDING -> ALLOWED (Allow) or DENIED (Deny); ALLOWED -> DENIED (Deny,
+    # revokes access immediately -- see api/auth.py's deny_user, which also
+    # kills that user's active sessions); DENIED -> PENDING only (Reset to
+    # pending -- an admin reconsidering a denial goes back through the
+    # normal approval step rather than being allowed directly). Delete is
+    # separate and always available, from any status.
+    PENDING = "pending"
+    ALLOWED = "allowed"
+    DENIED = "denied"
+
+
+class RegisterRequest(BaseModel):
+    """The very first account ever created becomes the admin and is
+    auto-approved (see api/auth.py's register()); every account after
+    that starts PENDING and can't log in until the admin allows it."""
+
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=8, max_length=200)
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UserPublic(BaseModel):
+    """A user row with password_hash stripped -- the only shape ever sent
+    to a client, whether that's the logged-in user's own /auth/me or the
+    admin-only /auth/users list."""
+
+    id: str
+    username: str
+    role: UserRole
+    status: UserStatus
+    created_at: str
+
+
 class SerialPortInfo(BaseModel):
     device: str  # what actually goes in the form's Serial port field, e.g. "COM3" or "/dev/ttyUSB0"
     description: Optional[str] = None  # driver-reported label, e.g. "USB-SERIAL CH340 (COM3)" -- None if the OS has nothing better than the bare device name

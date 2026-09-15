@@ -90,6 +90,30 @@ npm run dev</code></pre>
     you still see stale behavior, restart <code>npm run dev</code>.
   </div>
 
+  <h2 id="accounts-and-access">Accounts and access</h2>
+  <p>
+    Opening the app for the first time shows a login/register screen —
+    there's no built-in default account. <strong>The very first person to
+    register becomes the admin</strong>, with immediate access; every
+    account registered after that starts <strong>pending</strong> and
+    can't log in until the admin approves it from the <strong>Manage
+    Access</strong> page (only visible to the admin). From there the admin
+    can <strong>Allow</strong> a pending registration, <strong>Deny</strong>
+    one (pending or already-allowed — denying an already-logged-in user
+    ends their session immediately, not just on their next login attempt),
+    send a denied account back to <strong>pending</strong> for
+    reconsideration, or <strong>Delete</strong> an account outright.
+  </p>
+  <p>
+    There's no per-feature permission system beyond this one gate —
+    every allowed account, admin or not, has full access to everything
+    else in the app (all roast modes, history, settings, automation
+    rules). Sessions are a plain httponly cookie, not a token stored in
+    the browser's own JS-accessible storage, and login persists across a
+    backend restart (accounts and sessions are both in the same SQLite
+    file as everything else, <code>backend/data/roasts.db</code>).
+  </p>
+
   <h2 id="the-four-data-sources">The four data sources</h2>
   <p>
     Every roast is driven by one of four modes, picked from the

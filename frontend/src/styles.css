@@ -1790,6 +1790,123 @@ button:disabled {
   }
 }
 
+/* --- Auth: login/register screen + header user controls + Manage Access
+   table ------------------------------------------------------------- */
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.login-panel {
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-panel h1 {
+  font-size: 1.3rem;
+  margin: 0 0 1rem;
+  text-align: center;
+}
+
+.login-mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.login-mode-toggle button {
+  flex: 1;
+  background: var(--panel);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.login-mode-toggle button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.login-panel button[type="submit"] {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.app-user-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+
+.app-username {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.logout-button {
+  background: none;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-weight: 600;
+  padding: 0.35rem 0.6rem;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+}
+
+.users-table th,
+.users-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.users-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.users-table-actions button {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.85rem;
+}
+
+.user-status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.user-status-pending {
+  background: color-mix(in srgb, orange 25%, transparent);
+  color: #9a5b00;
+}
+
+.user-status-allowed {
+  background: color-mix(in srgb, #16a34a 25%, transparent);
+  color: #15803d;
+}
+
+.user-status-denied {
+  background: color-mix(in srgb, #b91c1c 20%, transparent);
+  color: #b91c1c;
+}
+
 /* ============================================================
    GARBAGEFIRE CHAOS MODE -- not just recolored, actually offensive.
    Ported techniques (not literal selectors -- this app's components are

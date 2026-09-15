@@ -65,6 +65,27 @@ CREATE TABLE IF NOT EXISTS roast_reviews (
     created_at TEXT NOT NULL,
     completed_at TEXT
 );
+
+-- The first row ever inserted (by created_at) is the admin, auto-allowed;
+-- every account after that starts 'pending' (see api/auth.py's register()).
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+-- An opaque bearer token in an httponly cookie (see auth.py), not a JWT --
+-- deleting a row here immediately revokes that one session, e.g. on
+-- logout or when an admin deletes the account it belongs to.
+CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 """
 
 
@@ -319,3 +340,80 @@ def get_review_row(roast_id: str) -> Optional[dict]:
     with _conn() as c:
         row = c.execute("SELECT * FROM roast_reviews WHERE roast_id = ?", (roast_id,)).fetchone()
         return dict(row) if row else None
+
+
+def insert_user(user: dict) -> None:
+    with _conn() as c:
+        c.execute(
+            """INSERT INTO users (id, username, password_hash, role, status, created_at)
+               VALUES (:id, :username, :password_hash, :role, :status, :created_at)""",
+            user,
+        )
+
+
+def count_users() -> int:
+    with _conn() as c:
+        return c.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
+
+def get_user_by_username(username: str) -> Optional[dict]:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_by_id(user_id: str) -> Optional[dict]:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def list_users() -> list[dict]:
+    with _conn() as c:
+        rows = c.execute("SELECT * FROM users ORDER BY created_at ASC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def set_user_status(user_id: str, status: str) -> None:
+    with _conn() as c:
+        c.execute("UPDATE users SET status = ? WHERE id = ?", (status, user_id))
+
+
+def delete_sessions_for_user(user_id: str) -> None:
+    """Kills every active session for one account -- without this, a
+    browser holding a still-valid cookie for a just-denied/deleted user
+    would keep passing the auth gate until that row happened to expire on
+    its own (it never does -- sessions have no TTL today). Called on
+    delete_user, and separately from api/auth.py's deny_user (denying an
+    already-logged-in user has to end their session too, not just block
+    future logins)."""
+    with _conn() as c:
+        c.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+
+
+def delete_user(user_id: str) -> None:
+    with _conn() as c:
+        c.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    delete_sessions_for_user(user_id)
+
+
+def insert_session(token: str, user_id: str, created_at: str) -> None:
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)",
+            (token, user_id, created_at),
+        )
+
+
+def get_session_user(token: str) -> Optional[dict]:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT users.* FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token = ?",
+            (token,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def delete_session(token: str) -> None:
+    with _conn() as c:
+        c.execute("DELETE FROM sessions WHERE token = ?", (token,))

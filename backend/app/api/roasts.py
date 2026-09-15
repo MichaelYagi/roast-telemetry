@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, WebSocket,
 from fastapi.responses import FileResponse
 from sse_starlette.sse import EventSourceResponse
 
-from .. import ollama_client, storage
+from .. import auth, ollama_client, storage
 from ..models import (
     ControlCommand,
     EventCreateRequest,
@@ -22,6 +22,7 @@ from ..models import (
     RoastReview,
     RoastStatus,
     RoastSummary,
+    UserStatus,
 )
 from ..roast_review import build_prompt, build_summary
 from ..roast_session import RoastSessionError, session_manager
@@ -245,6 +246,14 @@ def import_alog(path: str, title: Optional[str] = None) -> RoastSummary:
 
 @router.websocket("/{roast_id}/stream")
 async def stream_roast_ws(websocket: WebSocket, roast_id: str) -> None:
+    # main.py's require_login middleware is plain HTTP-scope only --
+    # Starlette's BaseHTTPMiddleware never runs for a websocket upgrade,
+    # so this route has to check the same session cookie itself instead
+    # of inheriting the gate for free like every other route here does.
+    user = auth.get_user_for_token(websocket.cookies.get(auth.SESSION_COOKIE))
+    if user is None or user["status"] != UserStatus.ALLOWED.value:
+        await websocket.close(code=4401)
+        return
     await websocket.accept()
     roast = session_manager.get_roast_detail(roast_id)
     if roast is None:

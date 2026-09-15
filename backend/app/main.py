@@ -4,14 +4,15 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import storage
+from . import auth, storage
+from .api import auth as auth_api
 from .api import devices, presets, roasts, serial_ports, settings
-from .models import RoastCreateRequest
+from .models import RoastCreateRequest, UserStatus
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
@@ -73,6 +74,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Every other /api/* route requires a logged-in, ALLOWED account -- see
+# this middleware below. Everything past login is shared: there's no
+# per-user data ownership anywhere in this app (roasts, presets, settings
+# are all global), so "logged in" is the only gate that exists; the sole
+# extra restriction is auth_api's own /auth/users* endpoints, which check
+# admin role for themselves via auth.require_admin.
+_PUBLIC_API_PATHS = {"/api/health", "/api/auth/register", "/api/auth/login", "/api/auth/logout"}
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    path = request.url.path
+    if not path.startswith("/api/") or path in _PUBLIC_API_PATHS:
+        return await call_next(request)
+    user = auth.get_user_for_token(request.cookies.get(auth.SESSION_COOKIE))
+    if user is None or user["status"] != UserStatus.ALLOWED.value:
+        return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+    request.state.user = user
+    return await call_next(request)
+
+
+app.include_router(auth_api.router, prefix="/api")
 app.include_router(roasts.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
 app.include_router(presets.router, prefix="/api")

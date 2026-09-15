@@ -19,14 +19,29 @@ def isolated_db(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def client(isolated_db):
-    """A FastAPI TestClient wired to the isolated DB above. Imported lazily
-    (after the DB_PATH monkeypatch) so the app's lifespan startup -- which
-    calls storage.init_db()/abort_stale_roasts() -- runs against the
-    throwaway DB, never the real one."""
+def anon_client(isolated_db):
+    """A FastAPI TestClient wired to the isolated DB above, with no
+    account registered and no session cookie -- for auth tests that need
+    to exercise the logged-out gate itself. Imported lazily (after the
+    DB_PATH monkeypatch) so the app's lifespan startup -- which calls
+    storage.init_db()/abort_stale_roasts() -- runs against the throwaway
+    DB, never the real one."""
     from fastapi.testclient import TestClient
 
     from backend.app.main import app
 
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture
+def client(anon_client):
+    """Every other test file in this suite predates login existing at
+    all and has no reason to exercise it -- this registers the first
+    (thus admin, thus auto-allowed) account and keeps its session cookie
+    on the TestClient's own cookie jar for the rest of the test, so every
+    existing call through `client` stays authenticated exactly like a
+    real logged-in browser, without every one of those tests needing its
+    own login boilerplate."""
+    anon_client.post("/api/auth/register", json={"username": "test-admin", "password": "test-password-1"})
+    return anon_client
