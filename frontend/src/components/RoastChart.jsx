@@ -7,7 +7,7 @@ import {
   PointElement,
   Tooltip,
 } from "chart.js";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 
@@ -53,6 +53,24 @@ const SERIES_DEFS = [
   { key: "Drum", label: "Drum", color: "#16a34a", axis: "yControl", source: "channel", defaultOn: false },
   { key: "Damper", label: "Damper", color: "#7c3aed", axis: "yControl", source: "channel", defaultOn: false },
 ];
+
+// A reference roast's own BT/ET, time-aligned to Charge just like the
+// live curves (both are already plotted against time_s from their own
+// Charge event, so no re-alignment math is needed -- putting both on the
+// same x-axis is the entire trick). Lighter/dashed so they read as "the
+// thing you're chasing," not a second live curve -- Artisan's own
+// Background Profile feature does the same visual distinction. Only
+// built when a background roast is actually loaded (see
+// backgroundSeriesDefs below), not part of the static SERIES_DEFS list
+// above, so they never show up as an empty/disabled toggle when nothing's
+// loaded.
+function backgroundSeriesDefs(label) {
+  const suffix = label ? ` (${label})` : " (bg)";
+  return [
+    { key: "BG_BT", label: `BT${suffix}`, color: "#93c5fd", axis: "yTemp", source: "background", field: "bt", defaultOn: true },
+    { key: "BG_ET", label: `ET${suffix}`, color: "#fda4af", axis: "yTemp", source: "background", field: "et", defaultOn: true },
+  ];
+}
 
 // The three classic roast phases, each bounded by a pair of named
 // milestone events. Colors follow the common green/yellow/red convention
@@ -252,19 +270,57 @@ const eventMarkersPlugin = {
 
 ChartJS.register(eventMarkersPlugin, scopeBandsPlugin, axisUnitLabelsPlugin, phaseBandsPlugin);
 
-export default function RoastChart({ profile = [], events = [], height = 420, title = "Roaster Scope", tempUnit = "c" }) {
+export default function RoastChart({
+  profile = [],
+  events = [],
+  background = [],
+  backgroundLabel = null,
+  height = 420,
+  title = "Roaster Scope",
+  tempUnit = "c",
+}) {
+  // Static live channels plus, only while a background roast is actually
+  // loaded, its two reference curves -- see backgroundSeriesDefs above
+  // for why those aren't just always part of SERIES_DEFS.
+  const seriesDefs = useMemo(
+    () => (background.length ? [...SERIES_DEFS, ...backgroundSeriesDefs(backgroundLabel)] : SERIES_DEFS),
+    [background.length, backgroundLabel]
+  );
+
   const [visible, setVisible] = useState(() =>
     Object.fromEntries(SERIES_DEFS.map((s) => [s.key, s.defaultOn]))
   );
+
+  // Loading (or clearing) a background roast after mount introduces (or
+  // drops) BG_BT/BG_ET keys -- this seeds any newly-appeared key at its
+  // own defaultOn without touching whatever the user's already chosen
+  // for every other channel. A key that disappears (background cleared)
+  // is just left stale and unused in `visible`, harmless since the data
+  // useMemo below only ever iterates the *current* seriesDefs.
+  useEffect(() => {
+    setVisible((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const s of seriesDefs) {
+        if (!(s.key in next)) {
+          next[s.key] = s.defaultOn;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [seriesDefs]);
 
   const endTime = profile.length ? profile[profile.length - 1].time_s : null;
   const phases = useMemo(() => computePhases(events), [events]);
 
   const availability = useMemo(() => {
     const out = {};
-    for (const s of SERIES_DEFS) {
+    for (const s of seriesDefs) {
       if (s.source === "profile") {
         out[s.key] = profile.some((p) => p[s.field] != null);
+      } else if (s.source === "background") {
+        out[s.key] = background.some((p) => p[s.field] != null);
       } else {
         const continuousField = CONTINUOUS_FIELD_BY_CHANNEL[s.key];
         const hasContinuous = continuousField && profile.some((p) => p[continuousField] != null);
@@ -273,7 +329,7 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
       }
     }
     return out;
-  }, [profile, events]);
+  }, [seriesDefs, profile, events, background]);
 
   function toggle(key) {
     setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -285,12 +341,18 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
     // temperature". Absolute temperatures (BT/ET/DT) use the real
     // celsiusToUnit conversion instead.
     const convertRor = (v) => (v == null ? null : tempUnit === "f" ? v * 1.8 : v);
-    const datasets = SERIES_DEFS.filter((s) => visible[s.key]).map((s) => {
+    const datasets = seriesDefs.filter((s) => visible[s.key]).map((s) => {
       let points;
       let stepped = false;
       if (s.source === "profile") {
         const convert = s.axis === "yTemp" ? (v) => celsiusToUnit(v, tempUnit) : s.axis === "yRor" ? convertRor : (v) => v;
         points = profile.map((p) => ({ x: p.time_s, y: p[s.field] == null ? null : convert(p[s.field]) }));
+      } else if (s.source === "background") {
+        // Time-aligned to Charge (x = time_s), same as the live profile
+        // above -- both roasts already measure time from their own
+        // Charge event, so plotting them on the same x-axis is the whole
+        // trick, no extra alignment needed.
+        points = background.map((p) => ({ x: p.time_s, y: p[s.field] == null ? null : celsiusToUnit(p[s.field], tempUnit) }));
       } else {
         const continuousField = CONTINUOUS_FIELD_BY_CHANNEL[s.key];
         const hasContinuous = continuousField && profile.some((p) => p[continuousField] != null);
@@ -308,14 +370,14 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
         backgroundColor: s.color,
         pointRadius: 0,
         borderWidth: s.axis === "yTemp" ? 2.5 : 1.5,
-        borderDash: s.axis === "yRor" ? [2, 2] : undefined,
+        borderDash: s.source === "background" ? [6, 3] : s.axis === "yRor" ? [2, 2] : undefined,
         stepped,
         yAxisID: s.axis,
         tension: stepped ? 0 : 0.15,
       };
     });
     return { datasets };
-  }, [profile, events, visible, endTime, tempUnit]);
+  }, [seriesDefs, profile, events, background, visible, endTime, tempUnit]);
 
   const showTemp = visible.BT || visible.ET;
   const showRor = visible.ROR_BT || visible.ROR_ET;
@@ -416,7 +478,7 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
         </div>
       )}
       <div className="scope-toggles">
-        {SERIES_DEFS.map((s) => (
+        {seriesDefs.map((s) => (
           <label
             key={s.key}
             className={`scope-toggle ${visible[s.key] ? "scope-toggle-on" : ""} ${!availability[s.key] ? "scope-toggle-empty" : ""}`}

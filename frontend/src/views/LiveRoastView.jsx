@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, settingsStreamUrl } from "../api/client.js";
 import { useRoastStream } from "../api/ws.js";
 import ArtisanToolbar from "../components/ArtisanToolbar.jsx";
+import BackgroundProfilePicker from "../components/BackgroundProfilePicker.jsx";
 import BreakoutPanel from "../components/BreakoutPanel.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 import ConnectionBadge from "../components/ConnectionBadge.jsx";
@@ -166,6 +167,15 @@ export default function LiveRoastView() {
   }
   const [phase, setPhase] = useState("idle"); // idle | armed | roasting | cooling | finished
   const [roastId, setRoastId] = useState(null);
+  // Background Profile (see BackgroundProfilePicker.jsx/RoastChart.jsx) --
+  // a purely visual reference overlay, never touched by anything else in
+  // this view (no automation, no control writes read this). Not tied to
+  // roastId -- cleared explicitly by the user or a fresh mount, not by
+  // starting a new roast, so you can keep pacing against the same
+  // reference across several attempts without re-picking it every time.
+  const [backgroundRoastId, setBackgroundRoastId] = useState(null);
+  const [backgroundProfile, setBackgroundProfile] = useState([]);
+  const [backgroundLabel, setBackgroundLabel] = useState(null);
   const [noteText, setNoteText] = useState("");
   const [error, setError] = useState(null);
   const [presets, setPresets] = useState([]);
@@ -687,6 +697,12 @@ export default function LiveRoastView() {
   async function handleCommand(partial) {
     if (!roastId) return;
     api.sendCommand(roastId, partial).catch((err) => setError(err.message));
+  }
+
+  function handleSelectBackground(id, roastDetail) {
+    setBackgroundRoastId(id);
+    setBackgroundProfile(roastDetail?.profile || []);
+    setBackgroundLabel(roastDetail?.title || null);
   }
 
   async function handleFireEvent(type, label) {
@@ -1390,11 +1406,19 @@ export default function LiveRoastView() {
             <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} />
           )}
           <div className="panel scope-panel">
+            <BackgroundProfilePicker
+              excludeId={roastId}
+              selectedId={backgroundRoastId}
+              selectedTitle={backgroundLabel}
+              onSelect={handleSelectBackground}
+            />
             <div className="scope-body">
               <div className="scope-chart" ref={scopeChartRef}>
                 <RoastChart
                   profile={roast?.profile || []}
                   events={roast?.events || []}
+                  background={backgroundProfile}
+                  backgroundLabel={backgroundLabel}
                   title={null}
                   height={chartHeight}
                   tempUnit={tempUnit}

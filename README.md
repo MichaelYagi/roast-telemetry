@@ -57,6 +57,12 @@ prefer the link above or open the files locally.)*
   model auto-fires every milestone, useful as a hands-off demo.)
 - **Real hardware fakes** for both live-hardware modes, so the full
   connection code path is testable without owning a roaster.
+- **Background Profile overlay** — load any previously recorded, finished
+  roast onto the live chart as a dashed BT/ET reference to pace against,
+  same idea as Artisan's own Background Profile. Both curves are already
+  measured from their own Charge event, so no realignment is needed —
+  purely a visual overlay picked per session; it never reads from or
+  affects the live roast's own recording, automation, or control state.
 - **Login, with the first registrant becoming admin.** No built-in
   default account — the first person to register gets immediate admin
   access; everyone after that is pending until the admin allows them
