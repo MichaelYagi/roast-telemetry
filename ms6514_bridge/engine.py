@@ -115,6 +115,9 @@ class MS6514Engine:
         timeout: float = 0.7,
         dry_end_c: Optional[float] = 160.0,
         fc_start_c: Optional[float] = 196.0,
+        # Opt-in -- off by default. See ModbusEngine's identical parameter
+        # for the full rationale.
+        detect_milestones: bool = False,
         serial_cls=pyserial.Serial,  # injectable for testing without real hardware
     ):
         if not port:
@@ -123,10 +126,12 @@ class MS6514Engine:
         self._dry_end_c = dry_end_c
         self._fc_start_c = fc_start_c
         # Real hardware means a real operator standing at the machine --
-        # milestones are marked by hand (this platform's own event
-        # buttons), not guessed from the temperature curve. See
+        # milestones are marked by hand by default (this platform's own
+        # event buttons), not guessed from the temperature curve. Opt-in
+        # per roast (detect_milestones above) to auto-fire instead. See
         # roast_heuristics.LiveRoastDetector's own docstring.
-        self._detector = LiveRoastDetector(dry_end_c=dry_end_c, fc_start_c=fc_start_c, detect_milestones=False)
+        self._detect_milestones = detect_milestones
+        self._detector = LiveRoastDetector(dry_end_c=dry_end_c, fc_start_c=fc_start_c, detect_milestones=detect_milestones)
         self._last_time_s = 0.0
         self._last_bt: Optional[float] = None
         self._last_et: Optional[float] = None
@@ -205,8 +210,12 @@ class MS6514Engine:
         after a while spent connected/previewing gets a genuinely fresh
         detector and a time axis starting at 0, not wherever preview left
         off."""
-        self._detector = LiveRoastDetector(dry_end_c=self._dry_end_c, fc_start_c=self._fc_start_c, detect_milestones=False)
+        self._detector = LiveRoastDetector(dry_end_c=self._dry_end_c, fc_start_c=self._fc_start_c, detect_milestones=self._detect_milestones)
         self._last_time_s = 0.0
+
+    def mark_milestone_fired(self, event_type: str) -> None:
+        """See ModbusEngine.mark_milestone_fired -- same forwarding."""
+        self._detector.mark_milestone_fired(event_type)
 
     def notify_manual_charge(self, time_s: float, bt: float) -> None:
         """See ModbusEngine.notify_manual_charge -- same forwarding."""

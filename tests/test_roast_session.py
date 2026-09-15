@@ -187,3 +187,35 @@ def test_engine_without_notify_manual_charge_is_fine():
     session = make_session()
     event = session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge", value=96.0))
     assert event["type"] == "CHARGE"
+
+
+def test_manual_dry_end_and_fc_start_mark_the_engine_fired():
+    """Only matters when auto_detect_milestones is on -- prevents a later
+    independent auto-fire of the same type from landing as a duplicate
+    (see roast_heuristics.LiveRoastDetector.mark_milestone_fired's own
+    docstring). Confirms add_event() actually forwards for both types."""
+    session = make_session()
+    calls = []
+    session._engine.mark_milestone_fired = lambda event_type: calls.append(event_type)
+
+    session.add_event(EventCreateRequest(type=RoastEventType.DRY_END, label="Dry End"))
+    session.add_event(EventCreateRequest(type=RoastEventType.FC_START, label="FC Start"))
+
+    assert calls == ["DRY_END", "FC_START"]
+
+
+def test_other_milestones_do_not_mark_milestone_fired():
+    session = make_session()
+    calls = []
+    session._engine.mark_milestone_fired = lambda event_type: calls.append(event_type)
+
+    session.add_event(EventCreateRequest(type=RoastEventType.DROP, label="Drop"))
+
+    assert calls == []
+
+
+def test_engine_without_mark_milestone_fired_is_fine():
+    # SimulatorEngine has no such method -- add_event() must not crash.
+    session = make_session()
+    event = session.add_event(EventCreateRequest(type=RoastEventType.DRY_END, label="Dry End"))
+    assert event["type"] == "DRY_END"

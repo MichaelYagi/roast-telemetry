@@ -132,6 +132,21 @@ class LiveRoastDetector:
         self._bt_min_since_charge = bt
         self._bt_min_time_since_charge = time_s
 
+    def mark_milestone_fired(self, event_type: str) -> None:
+        """Called when DRY_END or FC_START was marked manually -- with
+        detect_milestones=True (opt-in auto-detection), the operator can
+        still override/click early, same as real Artisan. Without this,
+        the detector would have no way to know that happened (its own
+        _events_fired only tracks what *it* emitted) and would still
+        independently fire its own copy once BT crosses the configured
+        threshold -- landing as a genuine duplicate, since the
+        auto-fired path merges straight into RoastSession.events via
+        _run_loop's get_new_events(), bypassing add_event()'s own
+        "already marked" check entirely. CHARGE doesn't need this --
+        notify_manual_charge's phase transition already fully prevents
+        _detect_charge from ever running again on its own."""
+        self._events_fired.add(event_type)
+
     def _detect_charge(self, time_s: float, bt: float) -> None:
         # CHARGE: BT fell by charge_drop_c within charge_window_s -- the
         # classic signature of cold beans hitting the hot drum.

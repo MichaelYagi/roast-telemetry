@@ -101,6 +101,11 @@ export default function LiveRoastView() {
     modbus_control_port: "",
     modbus_control_baudrate: 19200,
     ms6514_port: "",
+    // Off by default -- real hardware means a real operator marking
+    // milestones by hand, not an algorithm guessing, unless explicitly
+    // opted in. Manual clicks still work as an override even when on
+    // (see backend's RoastCreateRequest.auto_detect_milestones).
+    auto_detect_milestones: false,
     dry_end_c: 160,
     fc_start_c: 196,
     heater_pct: 70,
@@ -531,6 +536,7 @@ export default function LiveRoastView() {
       payload.ms6514_port = form.ms6514_port;
     }
     if (LIVE_MODES.includes(form.mode)) {
+      payload.auto_detect_milestones = form.auto_detect_milestones;
       payload.dry_end_c = form.dry_end_c === "" ? null : Number(form.dry_end_c);
       payload.fc_start_c = form.fc_start_c === "" ? null : Number(form.fc_start_c);
     }
@@ -626,6 +632,7 @@ export default function LiveRoastView() {
       modbus_control_port: c.modbus_control_port || "",
       modbus_control_baudrate: c.modbus_control_baudrate ?? f.modbus_control_baudrate,
       ms6514_port: c.ms6514_port || "",
+      auto_detect_milestones: c.auto_detect_milestones ?? false,
       dry_end_c: c.dry_end_c ?? "",
       fc_start_c: c.fc_start_c ?? "",
       heater_pct: preset.heater_pct ?? f.heater_pct,
@@ -1261,11 +1268,27 @@ export default function LiveRoastView() {
           )}
           {LIVE_MODES.includes(form.mode) && (
             <div className="form-row">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={form.auto_detect_milestones}
+                  onChange={(e) => setForm({ ...form, auto_detect_milestones: e.target.checked })}
+                />
+                Auto-detect Charge/Dry End/FC Start from BT (opt-in)
+              </label>
+              <p className="hint" style={{ flexBasis: "100%" }}>
+                Off by default — every milestone is a manual click, matching how most real roasters are
+                actually run. Turn this on to have Charge/Dry End/FC Start fire automatically from the
+                thresholds below instead (Turning Point always auto-fires either way — it's a pure
+                observation, not a judgment call). Manual clicks still work as an override even with this
+                on — click early yourself if you disagree with the algorithm.
+              </p>
               <label>
                 Dry End BT threshold (°C, blank to disable)
                 <input
                   type="number"
                   value={form.dry_end_c}
+                  disabled={!form.auto_detect_milestones}
                   onChange={(e) => setForm({ ...form, dry_end_c: e.target.value })}
                 />
               </label>
@@ -1274,6 +1297,7 @@ export default function LiveRoastView() {
                 <input
                   type="number"
                   value={form.fc_start_c}
+                  disabled={!form.auto_detect_milestones}
                   onChange={(e) => setForm({ ...form, fc_start_c: e.target.value })}
                 />
               </label>

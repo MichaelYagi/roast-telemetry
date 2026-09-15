@@ -45,12 +45,14 @@ prefer the link above or open the files locally.)*
   everything is still stored and sent as Celsius.
 - **Live rate-of-rise, computed from raw BT/ET either way** — real
   hardware doesn't carry roast-milestone events on its own (a PLC or a
-  thermocouple meter has no concept of Charge/Dry End/etc.), and this
-  app doesn't guess them from the curve over an operator's own judgment
-  either: every milestone is a manual click for Direct Modbus/USB, with
-  live RoR shown to help time it. (The Artisan Simulator source is the
-  exception — its own thermal model auto-fires milestones, useful as a
-  hands-off demo.)
+  thermocouple meter has no concept of Charge/Dry End/etc.), so every
+  milestone is a manual click for Direct Modbus/USB by default, with
+  live RoR shown to help time it. Charge/Dry End/FC Start can optionally
+  be switched to auto-detect from BT instead (opt-in, off by default —
+  manual clicks still work as an override); Turning Point always
+  auto-fires either way, since it's a pure observation, not a judgment
+  call. (The Artisan Simulator source is the exception — its own thermal
+  model auto-fires every milestone, useful as a hands-off demo.)
 - **Real hardware fakes** for both live-hardware modes, so the full
   connection code path is testable without owning a roaster.
 

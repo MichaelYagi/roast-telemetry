@@ -318,3 +318,50 @@ def test_notify_manual_charge_lets_turning_point_fire_despite_no_auto_charge():
     events = engine.get_new_events()
 
     assert [e["type"] for e in events] == ["TURNING_POINT"]
+
+
+def test_detect_milestones_true_opts_into_auto_charge():
+    # Opt-in (RoastCreateRequest.auto_detect_milestones) -- the flag
+    # this engine forwards to its LiveRoastDetector at construction.
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls, detect_milestones=True)
+    primary = instances["PRIMARY"]
+
+    _feed_charge_sequence(engine, primary)
+
+    assert [e["type"] for e in engine.get_new_events()] == ["CHARGE"]
+
+
+def test_reset_detection_preserves_the_opted_in_detect_milestones_flag():
+    # reset_detection() rebuilds the detector from scratch (see its own
+    # docstring) -- must carry the constructor's own detect_milestones
+    # setting forward, not silently reset it back to the False default.
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls, detect_milestones=True)
+    primary = instances["PRIMARY"]
+
+    engine.reset_detection()
+    _feed_charge_sequence(engine, primary)
+
+    assert [e["type"] for e in engine.get_new_events()] == ["CHARGE"]
+
+
+def test_mark_milestone_fired_forwards_to_the_detector():
+    """Confirms the engine's own wrapper actually forwards (the
+    detector's own dedup logic is covered in isolation in
+    tests/test_live_roast_detector.py)."""
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls, detect_milestones=True)
+    primary = instances["PRIMARY"]
+    _feed_charge_sequence(engine, primary)
+    engine.get_new_events()  # drain CHARGE
+    primary.register_values[(11, 0)] = 906  # rebounds -- fires TURNING_POINT
+    engine.tick(1.0)
+    engine.get_new_events()  # drain TURNING_POINT
+
+    engine.mark_milestone_fired("DRY_END")  # operator clicked it manually, early
+
+    primary.register_values[(11, 0)] = 1650  # BT 165.0C -- crosses the 160C default
+    engine.tick(1.0)
+
+    assert engine.get_new_events() == []

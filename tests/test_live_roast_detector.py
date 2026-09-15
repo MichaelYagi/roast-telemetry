@@ -1,7 +1,11 @@
 """Direct unit tests for roast_heuristics.LiveRoastDetector -- CHARGE
-auto-detection (the BT-drop heuristic other milestones chain off of) and
-the detect_milestones off switch real-hardware engines now use by
-default (see modbus_bridge/ms6514_bridge's own constructors)."""
+auto-detection (the BT-drop heuristic other milestones chain off of),
+the detect_milestones flag real-hardware engines default to False but
+can opt into per roast (see modbus_bridge/ms6514_bridge's own
+constructors and RoastCreateRequest.auto_detect_milestones), and the
+manual-override bookkeeping (notify_manual_charge/mark_milestone_fired)
+that keeps a manual click and auto-detection from ever double-firing
+the same milestone."""
 from __future__ import annotations
 
 from roast_heuristics import LiveRoastDetector
@@ -115,3 +119,41 @@ def test_notify_manual_charge_is_a_noop_once_past_pre_charge():
     detector.observe(7.0, 90.0, None)
     events = [e for e in detector.get_new_events() if e["type"] == "TURNING_POINT"]
     assert events and events[0]["value"] == 89.0  # not 999.0
+
+
+def test_detect_milestones_true_auto_fires_dry_end_and_fc_start():
+    # Opt-in auto-detection (RoastCreateRequest.auto_detect_milestones) --
+    # confirms the whole chain works end to end, not just CHARGE/TP.
+    detector = LiveRoastDetector(dry_end_c=160.0, fc_start_c=196.0)
+    _feed_charge_drop(detector)
+    detector.get_new_events()  # drain CHARGE
+    detector.observe(2.0, 91.0, None)  # rebounds -- fires TURNING_POINT
+    detector.get_new_events()
+
+    detector.observe(3.0, 161.0, None)
+    dry_end = [e for e in detector.get_new_events() if e["type"] == "DRY_END"]
+    assert dry_end and dry_end[0]["value"] == 161.0
+
+    detector.observe(4.0, 197.0, None)
+    fc_start = [e for e in detector.get_new_events() if e["type"] == "FC_START"]
+    assert fc_start and fc_start[0]["value"] == 197.0
+
+
+def test_mark_milestone_fired_prevents_a_later_duplicate_auto_fire():
+    """The scenario this exists for: auto-detection is on, but the
+    operator clicks DRY_END manually before BT actually crosses the
+    threshold. Without mark_milestone_fired, the detector would have no
+    idea that happened and would still independently fire its own DRY_END
+    once BT crosses 160 -- a real duplicate (see RoastSession.add_event's
+    own docstring for why the auto-fired path can't self-dedupe)."""
+    detector = LiveRoastDetector(dry_end_c=160.0)
+    _feed_charge_drop(detector)
+    detector.get_new_events()
+    detector.observe(2.0, 91.0, None)  # fires TURNING_POINT, moves to post_tp
+    detector.get_new_events()
+
+    detector.mark_milestone_fired("DRY_END")  # operator clicked it manually, early
+
+    detector.observe(3.0, 165.0, None)  # crosses 160 -- would auto-fire if not for the above
+
+    assert detector.get_new_events() == []

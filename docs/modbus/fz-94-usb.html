@@ -200,12 +200,15 @@ PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code></pre>
   <p>
     Right after clicking START, set <strong>Burner=85%, Air=15%</strong>
     (Drum at the default 50%) in the Controls panel. Every milestone is a
-    manual click for <code>modbus_live</code> (real hardware means a real
-    operator marking them by hand, not an algorithm guessing from the
-    curve — see <a href="index.html#testing-mode">Testing Mode</a> and
-    the <a href="real-hardware-checklist.html">real-hardware
+    manual click by default for <code>modbus_live</code> (real hardware
+    means a real operator marking them by hand, not an algorithm guessing
+    from the curve — see <a href="index.html#testing-mode">Testing
+    Mode</a> and the <a href="real-hardware-checklist.html">real-hardware
     checklist</a>) — the fake's thermal model isn't a guess, though, so
-    the times below tell you exactly when to click each one:
+    the times below tell you exactly when to click each one, and are
+    exactly when Charge/Dry End/FC Start would auto-fire too if you turn
+    on the Configure Roast form's opt-in "Auto-detect Charge/Dry End/FC
+    Start from BT" checkbox instead of clicking them yourself.
   </p>
   <table>
     <thead><tr><th>Milestone</th><th>Click it around</th><th>°C</th><th>°F</th></tr></thead>

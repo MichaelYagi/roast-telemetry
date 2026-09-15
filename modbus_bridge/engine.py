@@ -189,6 +189,14 @@ class ModbusEngine:
         drum_feedback_divisor: float = 100.0,
         dry_end_c: Optional[float] = 160.0,
         fc_start_c: Optional[float] = 196.0,
+        # Opt-in -- off by default, matching real hardware meaning a real
+        # operator marking milestones by hand. When on, Charge/Dry End/FC
+        # Start auto-fire from the BT curve same as simulator/alog_playback
+        # do, but manual clicks still work as an override (see
+        # RoastSession.add_event's notify_manual_charge/mark_milestone_fired
+        # calls, which keep the detector's own state in sync either way so
+        # a manual override never also produces a duplicate auto-fired copy).
+        detect_milestones: bool = False,
         client_cls=ModbusSerialClient,  # injectable for testing without real hardware
     ):
         if not port:
@@ -224,10 +232,13 @@ class ModbusEngine:
         self._dry_end_c = dry_end_c
         self._fc_start_c = fc_start_c
         # Real hardware means a real operator standing at the machine --
-        # milestones are marked by hand (this platform's own event
-        # buttons), not guessed from the temperature curve. See
+        # milestones are marked by hand by default (this platform's own
+        # event buttons), not guessed from the temperature curve. Opt-in
+        # per roast (detect_milestones above) to auto-fire from the BT
+        # curve instead, same as simulator/alog_playback do. See
         # roast_heuristics.LiveRoastDetector's own docstring.
-        self._detector = LiveRoastDetector(dry_end_c=dry_end_c, fc_start_c=fc_start_c, detect_milestones=False)
+        self._detect_milestones = detect_milestones
+        self._detector = LiveRoastDetector(dry_end_c=dry_end_c, fc_start_c=fc_start_c, detect_milestones=detect_milestones)
         self._last_time_s = 0.0
         self._connected = False
         self._last_error: Optional[str] = None
@@ -465,8 +476,15 @@ class ModbusEngine:
           of connection testing would have its very first recorded sample
           land at time_s=300 instead of 0 -- not just a preview-display
           quirk, an actually wrong time axis on the persisted roast."""
-        self._detector = LiveRoastDetector(dry_end_c=self._dry_end_c, fc_start_c=self._fc_start_c, detect_milestones=False)
+        self._detector = LiveRoastDetector(dry_end_c=self._dry_end_c, fc_start_c=self._fc_start_c, detect_milestones=self._detect_milestones)
         self._last_time_s = 0.0
+
+    def mark_milestone_fired(self, event_type: str) -> None:
+        """Forwards to the detector -- see its own mark_milestone_fired
+        docstring. Called from RoastSession.add_event() when DRY_END/
+        FC_START is marked manually, so a later auto-fire (if
+        detect_milestones is on) doesn't produce a duplicate."""
+        self._detector.mark_milestone_fired(event_type)
 
     def notify_manual_charge(self, time_s: float, bt: float) -> None:
         """Forwards to the detector -- see its own notify_manual_charge

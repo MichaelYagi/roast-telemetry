@@ -120,6 +120,7 @@ class RoastSession:
                     control_baudrate=request.modbus_control_baudrate,
                     dry_end_c=request.dry_end_c,
                     fc_start_c=request.fc_start_c,
+                    detect_milestones=request.auto_detect_milestones,
                     **_modbus_register_overrides(request),
                 )
             except ValueError as exc:
@@ -132,6 +133,7 @@ class RoastSession:
                     request.ms6514_port,
                     dry_end_c=request.dry_end_c,
                     fc_start_c=request.fc_start_c,
+                    detect_milestones=request.auto_detect_milestones,
                 )
             except ValueError as exc:
                 raise RoastSessionError(str(exc)) from exc
@@ -437,15 +439,28 @@ class RoastSession:
         self.events.append(event)
         if req.type == RoastEventType.CHARGE and event["value"] is not None:
             # Turning Point stays auto-detected even when CHARGE itself is
-            # a manual click (modbus_live/ms6514_live, detect_milestones=
-            # False) -- confirmed against a real FZ-94 roast in Artisan,
-            # which auto-plots Turning Point on the chart despite every
-            # other milestone being marked by hand. Both live-hardware
+            # a manual click -- confirmed against a real FZ-94 roast in
+            # Artisan, which auto-plots Turning Point on the chart despite
+            # every other milestone being marked by hand. Both live-hardware
             # engines expose this; simulator/alog_playback don't (and
             # don't need to -- CHARGE is never manual there).
             notify = getattr(self._engine, "notify_manual_charge", None)
             if notify is not None:
                 notify(event["time_s"], event["value"])
+        elif req.type in (RoastEventType.DRY_END, RoastEventType.FC_START):
+            # Only matters when auto_detect_milestones is on (opt-in) --
+            # tells the detector this was already marked, so it doesn't
+            # also independently fire its own copy once BT crosses the
+            # configured threshold. Without this, that auto-fired copy
+            # would land as a genuine duplicate: it merges straight into
+            # self.events via _run_loop's get_new_events(), bypassing this
+            # method's own "already marked" check entirely (see
+            # MILESTONE_SEQUENCE handling above). Harmless no-op when
+            # auto-detection is off -- the detector would never have fired
+            # this on its own anyway.
+            mark_fired = getattr(self._engine, "mark_milestone_fired", None)
+            if mark_fired is not None:
+                mark_fired(req.type.value)
         if self.mode == RoastMode.MODBUS_LIVE:
             for rule in self._alarm_rules:
                 if rule.trigger_kind == AlarmTriggerKind.EVENT and rule.event_type == req.type:

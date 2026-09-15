@@ -103,10 +103,14 @@ npm run dev</code></pre>
   </ol>
   <p>
     Both live-hardware modes leave every milestone (Charge, Dry End, FC
-    Start, and the rest) to the operator's own click, rather than
-    guessing them from the temperature curve the way the Simulator does
-    &mdash; live RoR is still computed and shown either way, to help time
-    the click.
+    Start, and the rest) to the operator's own click by default, rather
+    than guessing them from the temperature curve the way the Simulator
+    does &mdash; live RoR is still computed and shown either way, to help
+    time the click. Charge/Dry End/FC Start can optionally be switched to
+    auto-detect from BT instead (Configure Roast form, opt-in, off by
+    default) &mdash; manual clicks still work as an override even with
+    that on. Turning Point always auto-fires either way; it's a pure
+    observation (the BT minimum right after Charge), not a judgment call.
   </p>
   <p>
     Clicking <strong>ON</strong> connects to the device and starts
