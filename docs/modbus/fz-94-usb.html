@@ -50,7 +50,12 @@
     specifically, Air/Drum speed <em>feedback</em> from
     <a href="https://artisan-roasterscope.blogspot.com/2016/08/fz-94-3-connecting-drives.html">part 3</a>
     specifically — different posts in the same 5-part series, not one
-    post covering both directions.
+    post covering both directions. BT/ET/DT/Burner and Air/Drum's
+    <em>feedback</em> register have also been visually confirmed straight
+    from Artisan's Ports Configuration dialog with the shipped FZ-94
+    preset selected (Modbus tab's Input 1-6 + the PID block) — matching
+    this table exactly, independent of this app's own source reading of
+    the <code>.aset</code> file.
   </p>
   <p>
     <strong>One serial connection handles everything</strong> — 19200
@@ -93,10 +98,18 @@
     for speed), plus a separate read-only feedback register reporting the
     drive's <em>actual</em> current speed — used instead of just echoing
     the last command back, so a rejected/misrouted write doesn't silently
-    look identical to a successful one. This part is blog-sourced only —
-    the <code>.aset</code>'s own <code>[Sliders]</code> block ships
-    without a configured write command for it, so it's the
-    least-confirmed piece of this register map.
+    look identical to a successful one. Confidence differs by direction:
+    the <strong>feedback register (8451, slave 1/Air, slave 2/Drum)</strong>
+    is confirmed the same way BT/ET/DT/Burner are — it's actually
+    configured in Artisan's shipped FZ-94 preset (visible as Input 5/6 in
+    Artisan's own Ports Configuration dialog). The
+    <strong>write side (control 8192, frequency 8193) is still
+    blog-sourced only</strong> — the <code>.aset</code>'s own
+    <code>[Sliders]</code> block genuinely ships with no write command
+    configured for it (confirmed by that same dialog having nothing set
+    up for it either), so if Artisan is actually moving Air/Drum on a
+    given installation, whoever set it up configured those write commands
+    themselves, separately from the stock preset.
   </p>
   <p>
     <code>modbus_control_port</code> exists only for wiring that
