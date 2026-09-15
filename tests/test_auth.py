@@ -13,6 +13,14 @@ def register(client, username, password="a-fine-password"):
     return client.post("/api/auth/register", json={"username": username, "password": password})
 
 
+def test_auth_status_reports_whether_an_admin_exists_yet(anon_client):
+    # Public -- no login required (see main.py's _PUBLIC_API_PATHS) --
+    # since the login screen needs this before anyone's typed anything.
+    assert anon_client.get("/api/auth/status").json() == {"has_admin": False}
+    register(anon_client, "alice")
+    assert anon_client.get("/api/auth/status").json() == {"has_admin": True}
+
+
 def test_first_registration_becomes_an_auto_allowed_admin_and_is_logged_in(anon_client):
     resp = register(anon_client, "alice")
     assert resp.status_code == 201

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../AuthContext.jsx";
 import { api } from "../api/client.js";
 
@@ -16,6 +16,17 @@ export default function LoginView() {
   const [error, setError] = useState(null);
   const [pendingMessage, setPendingMessage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  // null while loading -- the register-mode hint below waits for this
+  // rather than assuming "no admin yet" and flashing the wrong copy for
+  // every registration after the first one.
+  const [hasAdmin, setHasAdmin] = useState(null);
+
+  useEffect(() => {
+    api
+      .authStatus()
+      .then((s) => setHasAdmin(s.has_admin))
+      .catch(() => setHasAdmin(true)); // can't tell -- assume the safer, more common case
+  }, []);
 
   function switchMode(next) {
     setMode(next);
@@ -106,11 +117,13 @@ export default function LoginView() {
               : "Signed out automatically when you close this browser."}
           </p>
         )}
-        {mode === "register" && (
+        {mode === "register" && hasAdmin === false && (
           <p className="hint">
-            The very first account registered on this install becomes its admin, with immediate access. Every
-            account after that needs the admin's approval before it can log in.
+            The very first account registered on this install becomes its admin, with immediate access.
           </p>
+        )}
+        {mode === "register" && hasAdmin === true && (
+          <p className="hint">This install already has an admin -- registering here needs their approval before you can log in.</p>
         )}
         {error && <p className="error">{error}</p>}
         {pendingMessage && <p className="hint">{pendingMessage}</p>}

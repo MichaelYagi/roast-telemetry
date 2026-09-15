@@ -80,7 +80,13 @@ app.add_middleware(
 # are all global), so "logged in" is the only gate that exists; the sole
 # extra restriction is auth_api's own /auth/users* endpoints, which check
 # admin role for themselves via auth.require_admin.
-_PUBLIC_API_PATHS = {"/api/health", "/api/auth/register", "/api/auth/login", "/api/auth/logout"}
+_PUBLIC_API_PATHS = {
+    "/api/health",
+    "/api/auth/status",
+    "/api/auth/register",
+    "/api/auth/login",
+    "/api/auth/logout",
+}
 
 
 @app.middleware("http")

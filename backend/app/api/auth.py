@@ -23,6 +23,15 @@ def _public(user: dict) -> UserPublic:
     return UserPublic(**{k: v for k, v in user.items() if k != "password_hash"})
 
 
+@router.get("/status")
+def auth_status() -> dict:
+    """Public (see main.py's _PUBLIC_API_PATHS) -- just enough for the
+    login screen to know whether registering here will become the admin
+    or land as a plain pending request, before the user has typed
+    anything. Deliberately leaks nothing else (no usernames, no count)."""
+    return {"has_admin": storage.count_users() > 0}
+
+
 @router.post("/register", response_model=UserPublic, status_code=201)
 def register(payload: RegisterRequest, response: Response) -> UserPublic:
     username = payload.username.strip()
