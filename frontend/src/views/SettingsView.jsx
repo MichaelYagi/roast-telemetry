@@ -113,7 +113,7 @@ export default function SettingsView() {
       </div>
 
       <div className="panel">
-        <h2>Settings</h2>
+        <h2>AI Roast Review (Ollama)</h2>
         <p className="hint">
           Configures the local Ollama server used for AI roast reviews (Roast detail → Review card).
           Nothing here is required for the rest of the app to work.
