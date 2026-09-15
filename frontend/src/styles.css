@@ -1325,6 +1325,22 @@ button:disabled {
   height: 100%;
 }
 
+/* .vertical-slider-col's own left/right padding (below) still applies
+   between two *different* groups -- that's what actually reads as a gap
+   there, .vertical-control-stack's own `gap` on top of it. Within one
+   group that padding would leave real visible space between grouped
+   columns despite `gap: 0` above, undercutting the entire point of
+   "stacked" -- stripping it off the touching sides is what makes grouped
+   sliders actually read as one merged block instead of just a slightly
+   smaller gap than ungrouped ones. */
+.vertical-control-group > .vertical-slider-col:not(:first-child) {
+  padding-left: 0;
+}
+
+.vertical-control-group > .vertical-slider-col:not(:last-child) {
+  padding-right: 0;
+}
+
 .vertical-slider-col {
   display: flex;
   flex-direction: column;
