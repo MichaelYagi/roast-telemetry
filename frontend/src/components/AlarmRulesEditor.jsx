@@ -37,7 +37,6 @@ function summarizeTrigger(rule) {
 // buildConfigFromForm/handleLoadPreset) -- modbus_live only, since
 // ms6514_live has no write capability to bind a command to at all.
 export default function AlarmRulesEditor({ rules, onChange }) {
-  const [expanded, setExpanded] = useState(false);
   const [draftKind, setDraftKind] = useState("event");
   const [draftEventType, setDraftEventType] = useState(EVENT_TRIGGER_OPTIONS[0]);
   const [draftChannel, setDraftChannel] = useState("bt");
@@ -113,11 +112,8 @@ export default function AlarmRulesEditor({ rules, onChange }) {
 
   return (
     <div className="alarm-rules-editor">
-      <button type="button" className="advanced-toggle" onClick={() => setExpanded((v) => !v)}>
-        {expanded ? "▾" : "▸"} Automation rules (optional)
-      </button>
-      {expanded && (
-        <div className="alarm-rules-fields">
+      <h4>Automation rules (optional)</h4>
+      <div className="alarm-rules-fields">
           <p className="hint">
             Fire a Burner/Air/Drum command and/or show an in-app banner automatically when a milestone is marked, a
             temperature threshold is crossed, or a set amount of roast time has elapsed — immediately, or after a
@@ -299,8 +295,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
               Add rule
             </button>
           )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

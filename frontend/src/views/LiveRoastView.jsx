@@ -155,7 +155,6 @@ export default function LiveRoastView() {
     modbus_burner_sv_min_c: "",
     modbus_burner_sv_max_c: "",
   });
-  const [showAdvancedModbus, setShowAdvancedModbus] = useState(false);
   const [deviceProfiles, setDeviceProfiles] = useState([]);
 
   function refreshDeviceProfiles() {
@@ -1046,23 +1045,15 @@ export default function LiveRoastView() {
                   ))}
                 </select>
               </label>
-              {form.modbus_device_profile_id ? (
+              {form.modbus_device_profile_id && (
                 <p className="hint">
                   Using the "{deviceProfiles.find((p) => p.id === form.modbus_device_profile_id)?.name}" register
                   map -- the advanced fields below don't apply while a profile is selected. Pick "Custom" above to
                   go back to setting individual registers by hand.
                 </p>
-              ) : (
-                <button
-                  type="button"
-                  className="advanced-toggle"
-                  onClick={() => setShowAdvancedModbus((v) => !v)}
-                >
-                  {showAdvancedModbus ? "▾" : "▸"} Advanced Modbus register map
-                </button>
               )}
               <DeviceProfileEditor onChange={refreshDeviceProfiles} />
-              {!form.modbus_device_profile_id && showAdvancedModbus && (
+              {!form.modbus_device_profile_id && (
                 <div className="advanced-modbus-fields">
                   <p className="hint">
                     Leave any of these blank to use the FZ-94 defaults above. Only worth touching once you've

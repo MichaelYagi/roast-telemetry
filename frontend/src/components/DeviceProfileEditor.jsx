@@ -37,7 +37,6 @@ function summarizeControlChannel(ch) {
 // the custom ones (built-in profiles aren't editable here or anywhere,
 // see api/device_profiles.py).
 export default function DeviceProfileEditor({ onChange }) {
-  const [expanded, setExpanded] = useState(false);
   const [profiles, setProfiles] = useState([]);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -74,9 +73,7 @@ export default function DeviceProfileEditor({ onChange }) {
       .catch((err) => setError(err.message));
   }
 
-  useEffect(() => {
-    if (expanded) loadProfiles();
-  }, [expanded]);
+  useEffect(loadProfiles, []);
 
   function resetDraftProfile() {
     setName("");
@@ -181,11 +178,8 @@ export default function DeviceProfileEditor({ onChange }) {
 
   return (
     <div className="device-profile-editor">
-      <button type="button" className="advanced-toggle" onClick={() => setExpanded((v) => !v)}>
-        {expanded ? "▾" : "▸"} Device profiles (build a config for a different roaster brand)
-      </button>
-      {expanded && (
-        <div className="device-profile-editor-fields">
+      <h4>Device profiles (build a config for a different roaster brand)</h4>
+      <div className="device-profile-editor-fields">
           <p className="hint">
             A device profile is a full Modbus register map for one roaster brand/model, saved once and reusable
             across roasts (see the "Device profile" dropdown above). Built-in profiles can't be edited here. At
@@ -384,8 +378,7 @@ export default function DeviceProfileEditor({ onChange }) {
           >
             Save device profile
           </button>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
