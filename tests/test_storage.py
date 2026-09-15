@@ -4,6 +4,8 @@ via the `isolated_db` fixture (see tests/conftest.py)."""
 from __future__ import annotations
 
 import sqlite3
+import threading
+import uuid
 
 
 def test_settings_roundtrip_including_panel_list(isolated_db):
@@ -293,3 +295,53 @@ def test_seed_default_device_profiles_does_not_resurrect_a_deleted_one(isolated_
     _seed_device_profile(isolated_db)
 
     assert isolated_db.list_device_profile_rows() == []
+
+
+def _register_user(isolated_db, username, results, index):
+    user = {
+        "id": str(uuid.uuid4()), "username": username,
+        "password_hash": "x", "created_at": "2026-01-01T00:00:00",
+    }
+    try:
+        results[index] = ("ok", isolated_db.insert_user_and_check_first(user))
+    except isolated_db.DuplicateUsernameError:
+        results[index] = ("duplicate", None)
+
+
+def test_concurrent_registrations_only_one_becomes_admin(isolated_db):
+    # Real OS threads, not sequential calls -- exercises the actual
+    # BEGIN IMMEDIATE serialization, not just the Python-level logic.
+    # Without it, two concurrent first-ever registrations could both
+    # read count()==0 before either committed, making both admin.
+    results = [None, None]
+    threads = [
+        threading.Thread(target=_register_user, args=(isolated_db, "alice", results, 0)),
+        threading.Thread(target=_register_user, args=(isolated_db, "bob", results, 1)),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert results[0][0] == "ok"
+    assert results[1][0] == "ok"
+    is_first_flags = [results[0][1], results[1][1]]
+    assert sorted(is_first_flags) == [False, True]  # exactly one admin, not zero or two
+
+    admins = [r for r in isolated_db.list_users() if r["role"] == "admin"]
+    assert len(admins) == 1
+
+
+def test_concurrent_same_username_registration_one_wins_one_is_duplicate(isolated_db):
+    results = [None, None]
+    threads = [
+        threading.Thread(target=_register_user, args=(isolated_db, "sameuser", results, 0)),
+        threading.Thread(target=_register_user, args=(isolated_db, "sameuser", results, 1)),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    outcomes = sorted(r[0] for r in results)
+    assert outcomes == ["duplicate", "ok"]  # never both "ok" (two rows), never both erroring unhandled

@@ -461,7 +461,18 @@ export default function LiveRoastView() {
       ]);
       const active = roasting[0] || cooling[0];
       if (active) {
-        setForm((f) => ({ ...f, mode: active.mode }));
+        setForm((f) => ({
+          ...f,
+          mode: active.mode,
+          // Without these, a page refresh mid-roast silently fell back
+          // to the form's own mount-time defaults (160/196) instead of
+          // whatever this roast was actually configured with -- the ETA
+          // estimate below would then quietly compute against the wrong
+          // threshold for the rest of the roast.
+          auto_detect_milestones: active.auto_detect_milestones ?? f.auto_detect_milestones,
+          dry_end_c: active.dry_end_c ?? f.dry_end_c,
+          fc_start_c: active.fc_start_c ?? f.fc_start_c,
+        }));
         setRoastId(active.id);
         setPhase(active.status); // "roasting" | "cooling"
       }
@@ -480,6 +491,12 @@ export default function LiveRoastView() {
       setPhase("finished");
     } else if (roast?.status === "cooling") {
       setPhase("cooling");
+    } else if (roast?.status === "roasting") {
+      // Without this, a second tab/client connected to the same roast
+      // never notices when START fires elsewhere -- the tab that calls
+      // handleStart() itself already sets this directly, but any other
+      // tab only ever learns about status changes through this effect.
+      setPhase("roasting");
     }
   }, [roast?.status]);
 
@@ -806,10 +823,13 @@ export default function LiveRoastView() {
   // Thresholds only exist as a concept for simulator + the live-hardware
   // modes (auto-detected from a BT threshold); alog_playback just replays
   // whatever events the file already has, so there's nothing to estimate.
+  // numOrNull, not `Number(x) || null` -- the latter treats a threshold
+  // of exactly 0 the same as blank/unset, silently disabling it instead
+  // of respecting a genuinely-typed 0.
   const dryEndThreshold =
-    activeMode === "simulator" ? SIMULATOR_DRY_END_C : LIVE_MODES.includes(activeMode) ? Number(form.dry_end_c) || null : null;
+    activeMode === "simulator" ? SIMULATOR_DRY_END_C : LIVE_MODES.includes(activeMode) ? numOrNull(form.dry_end_c) : null;
   const fcStartThreshold =
-    activeMode === "simulator" ? SIMULATOR_FC_START_C : LIVE_MODES.includes(activeMode) ? Number(form.fc_start_c) || null : null;
+    activeMode === "simulator" ? SIMULATOR_FC_START_C : LIVE_MODES.includes(activeMode) ? numOrNull(form.fc_start_c) : null;
 
   const dryEndEtaS = !dryEndEvent && isActive ? estimateEtaSeconds(latest?.bt, latest?.ror_bt, dryEndThreshold) : null;
   const fcStartEtaS = !fcStartEvent && isActive ? estimateEtaSeconds(latest?.bt, latest?.ror_bt, fcStartThreshold) : null;

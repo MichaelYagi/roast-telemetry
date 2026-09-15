@@ -137,7 +137,11 @@ def build_summary(roast: Roast) -> dict:
     events = _events_by_type(roast)
     profile = [p.model_dump() for p in roast.profile]
     weight_loss_pct = None
-    if roast.weight_green_g and roast.weight_roasted_g:
+    # weight_green_g keeps its truthy check (0 or None both make the
+    # division meaningless) -- weight_roasted_g needs `is not None`
+    # specifically, since 0 is a real, legitimate value there (a
+    # total-loss/scorched batch), not the same as "never measured".
+    if roast.weight_green_g and roast.weight_roasted_g is not None:
         weight_loss_pct = round((1 - roast.weight_roasted_g / roast.weight_green_g) * 100, 1)
 
     return {

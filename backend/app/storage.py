@@ -419,6 +419,56 @@ def insert_user(user: dict) -> None:
         )
 
 
+class DuplicateUsernameError(Exception):
+    pass
+
+
+def insert_user_and_check_first(user: dict) -> bool:
+    """Atomically inserts a new user (`user` without role/status -- this
+    fills those in itself once it knows) and reports whether it was the
+    very first account ever (thus admin, auto-allowed).
+
+    Deliberately NOT "count_users() == 0, then separately insert_user()"
+    -- two of those as separate calls/transactions race: two concurrent
+    registrations can both read count()==0 before either commits its
+    insert, so both become admin. `_conn()`'s default deferred-transaction
+    mode doesn't close this either (the SELECT itself doesn't take a
+    write lock, so it still runs before either connection contends for
+    one) -- BEGIN IMMEDIATE below acquires the write lock *before* the
+    SELECT, so a second concurrent call genuinely blocks at its own BEGIN
+    IMMEDIATE until this whole read-decide-write sequence has committed,
+    and then correctly sees the first call's row already there.
+
+    Also closes a second race the same way: two concurrent registrations
+    with the *same* username used to both pass an earlier, separate
+    get_user_by_username() pre-check before either inserted, so the
+    second's INSERT hit the UNIQUE constraint as an unhandled
+    IntegrityError (a 500, not the intended 409) -- now caught here and
+    raised as DuplicateUsernameError for the API layer to translate."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        is_first = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0
+        try:
+            conn.execute(
+                """INSERT INTO users (id, username, password_hash, role, status, created_at)
+                   VALUES (:id, :username, :password_hash, :role, :status, :created_at)""",
+                {
+                    **user,
+                    "role": "admin" if is_first else "user",
+                    "status": "allowed" if is_first else "pending",
+                },
+            )
+        except sqlite3.IntegrityError as exc:
+            conn.rollback()
+            raise DuplicateUsernameError(str(exc)) from exc
+        conn.commit()
+        return is_first
+    finally:
+        conn.close()
+
+
 def count_users() -> int:
     with _conn() as c:
         return c.execute("SELECT COUNT(*) FROM users").fetchone()[0]

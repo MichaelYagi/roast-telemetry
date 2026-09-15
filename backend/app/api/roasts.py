@@ -34,7 +34,15 @@ from ..ws_manager import pubsub
 
 router = APIRouter(prefix="/roasts", tags=["roasts"])
 
-_UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|]')
+# \x00-\x1f (all C0 control characters, including \r\n) matters beyond
+# just filesystem safety for csv_filename below -- that one goes straight
+# into a raw Content-Disposition header string (download_csv), and an
+# embedded CRLF there is a genuine header-injection surface, not just a
+# cosmetic filename issue. alog_filename's own use (FileResponse's
+# filename= kwarg) is already safe either way -- Starlette percent-encodes
+# that internally -- but there's no reason for the two helpers sharing
+# this regex to have different safety guarantees.
+_UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 
 
 def alog_filename(title: str, created_at: str) -> str:

@@ -88,6 +88,17 @@ class RoastSession:
         self.mode = request.mode
         self.beans = request.beans
         self.weight_green_g = request.weight_green_g
+        # Exposed via summary()/to_roast() so a client that only has the
+        # roast id (e.g. LiveRoastView's reconnectActiveRoast, reattaching
+        # after a page refresh) can recover the thresholds this roast was
+        # actually configured with -- these previously only lived inside
+        # the engine's own private state (ModbusEngine._dry_end_c etc.),
+        # invisible to any API response, so a refresh silently fell back
+        # to the form's mount-time defaults instead of the roast's real
+        # configured values.
+        self.auto_detect_milestones = request.auto_detect_milestones
+        self.dry_end_c = request.dry_end_c
+        self.fc_start_c = request.fc_start_c
         self.weight_roasted_g: Optional[float] = None
         self.sample_interval_s = max(0.1, request.sample_interval_s)
         self.created_at = datetime.now(timezone.utc).isoformat()
@@ -469,16 +480,29 @@ class RoastSession:
             "value": req.value,
         }
         self.events.append(event)
-        if req.type == RoastEventType.CHARGE and event["value"] is not None:
+        if req.type == RoastEventType.CHARGE:
             # Turning Point stays auto-detected even when CHARGE itself is
             # a manual click -- confirmed against a real FZ-94 roast in
             # Artisan, which auto-plots Turning Point on the chart despite
             # every other milestone being marked by hand. Both live-hardware
             # engines expose this; simulator/alog_playback don't (and
             # don't need to -- CHARGE is never manual there).
-            notify = getattr(self._engine, "notify_manual_charge", None)
-            if notify is not None:
-                notify(event["time_s"], event["value"])
+            #
+            # charge_bt prefers the client-supplied value but falls back to
+            # this session's own last-known BT reading -- the frontend
+            # sends whatever its own local `latest` websocket state
+            # happens to hold at click time, which can still be null if
+            # the very first live sample hasn't reached it yet even
+            # though the backend's own profile already has one (a real
+            # race, not hypothetical: clicking CHARGE right as a roast
+            # starts is the normal workflow, not an edge case). Without
+            # this fallback, that race permanently and silently disables
+            # Turning Point detection for the rest of the roast.
+            charge_bt = event["value"] if event["value"] is not None else (self.profile[-1]["bt"] if self.profile else None)
+            if charge_bt is not None:
+                notify = getattr(self._engine, "notify_manual_charge", None)
+                if notify is not None:
+                    notify(event["time_s"], charge_bt)
         elif req.type in (RoastEventType.DRY_END, RoastEventType.FC_START):
             # Only matters when auto_detect_milestones is on (opt-in) --
             # tells the detector this was already marked, so it doesn't
@@ -629,6 +653,9 @@ class RoastSession:
             alog_path=self.alog_path if self.status in (RoastStatus.COMPLETE, RoastStatus.STOPPED, RoastStatus.ABORTED) else None,
             source_alog_path=self.source_alog_path,
             playback_speed=self.playback_speed,
+            auto_detect_milestones=self.auto_detect_milestones,
+            dry_end_c=self.dry_end_c,
+            fc_start_c=self.fc_start_c,
         )
 
     def to_roast(self) -> Roast:

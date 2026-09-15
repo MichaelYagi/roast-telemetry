@@ -18,15 +18,22 @@ const MODE_LABELS = {
 // input (title + the raw created_at ISO string, sliced not reformatted),
 // so this label always matches the filename the browser actually saves,
 // without a round trip to ask the server what it named it.
+// eslint-disable-next-line no-control-regex -- deliberate: matches
+// backend/app/api/roasts.py's _UNSAFE_FILENAME_CHARS exactly, including
+// C0 control characters (a title with an embedded CR/LF is a real
+// header-injection surface server-side, not just a cosmetic filename
+// issue -- see that file's own comment on the shared regex).
+const UNSAFE_FILENAME_CHARS = /[\\/:*?"<>|\x00-\x1f]/g;
+
 function alogFilename(title, createdAt) {
-  const safeTitle = title.replace(/[\\/:*?"<>|]/g, "_").trim() || "roast";
+  const safeTitle = title.replace(UNSAFE_FILENAME_CHARS, "_").trim() || "roast";
   const timestamp = createdAt.slice(0, 16).replace("T", "_").replace(":", "");
   return `${safeTitle}_${timestamp}.alog`;
 }
 
 // Same convention, mirrors backend/app/api/roasts.py's csv_filename().
 function csvFilename(title, createdAt) {
-  const safeTitle = title.replace(/[\\/:*?"<>|]/g, "_").trim() || "roast";
+  const safeTitle = title.replace(UNSAFE_FILENAME_CHARS, "_").trim() || "roast";
   const timestamp = createdAt.slice(0, 16).replace("T", "_").replace(":", "");
   return `${safeTitle}_${timestamp}.csv`;
 }

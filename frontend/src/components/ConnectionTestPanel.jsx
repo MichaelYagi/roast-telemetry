@@ -50,7 +50,13 @@ function analyzeReadSamples(samples, channels, tempUnit) {
       return { ...ch, status: "warn", detail: "no data (not configured, or not reading)" };
     }
     const min = Math.min(...values);
-    const max = Math.min(300, Math.max(...values));
+    // No artificial cap here -- this feeds the "out of plausible range"
+    // detail text below, which exists specifically to show *how far* out
+    // of range a bad reading actually is. A hardcoded ceiling (this used
+    // to be `Math.min(300, ...)`, understating anything above 300 even
+    // for Burner SV's real 400 ceiling) defeats that purpose by hiding
+    // the true severity of the out-of-range value.
+    const max = Math.max(...values);
     const inRange = values.every((v) => v >= ch.min && v <= ch.max);
     if (!inRange) {
       return { ...ch, status: "fail", detail: `out of plausible range (${display(min).toFixed(1)}-${display(max).toFixed(1)})` };
@@ -171,8 +177,18 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     const label = CHANNEL_LABEL[channel];
     const max = CHANNEL_NUDGE_MAX[channel];
     const before = latestRef.current?.[channel] ?? 0;
-    const nudged = Math.min(max, before + NUDGE_PCT);
-    setNudgeResult({ channel, status: "pending", detail: `nudging ${label} to ${nudged.toFixed(0)}% -- watch/listen for it…` });
+    // Real bug: clamping a nudge-up to `max` silently no-ops when already
+    // at/near the ceiling (before === nudged), which then reports "done"
+    // with nothing having actually moved -- a false "the write path/drive
+    // doesn't work" diagnosis for a channel that's simply already maxed
+    // out. Nudge down instead whenever nudging up would clamp to a no-op.
+    const direction = before + NUDGE_PCT > max ? -1 : 1;
+    const nudged = Math.max(0, Math.min(max, before + direction * NUDGE_PCT));
+    setNudgeResult({
+      channel,
+      status: "pending",
+      detail: `nudging ${label} ${direction > 0 ? "up" : "down"} to ${nudged.toFixed(0)}% -- watch/listen for it…`,
+    });
     // The nudge-up and restore writes are deliberately two separate
     // try/catches, not one -- if the FIRST fails, nothing changed at all
     // (safe, nothing to say beyond "it failed"). If the SECOND fails,
@@ -265,13 +281,16 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
           ) : (
             <>
               <p className="hint">
-                This will briefly bump {CHANNEL_LABEL[nudgeConfirming]} up by {NUDGE_PCT}% for about 2 seconds (you
-                should hear/see it respond), then set it back to exactly what it was. Only do this if that's fine
-                right now.
+                This will briefly bump {CHANNEL_LABEL[nudgeConfirming]}{" "}
+                {(latestRef.current?.[nudgeConfirming] ?? 0) + NUDGE_PCT > CHANNEL_NUDGE_MAX[nudgeConfirming] ? "down" : "up"}{" "}
+                by {NUDGE_PCT}% for about 2 seconds (you should hear/see it respond), then set it back to exactly
+                what it was. Only do this if that's fine right now.
               </p>
               <div className="event-button-row">
                 <button type="button" onClick={() => runNudge(nudgeConfirming)}>
-                  Confirm: nudge {CHANNEL_LABEL[nudgeConfirming]} +{NUDGE_PCT}% and back
+                  Confirm: nudge {CHANNEL_LABEL[nudgeConfirming]}{" "}
+                  {(latestRef.current?.[nudgeConfirming] ?? 0) + NUDGE_PCT > CHANNEL_NUDGE_MAX[nudgeConfirming] ? "-" : "+"}
+                  {NUDGE_PCT}% and back
                 </button>
                 <button type="button" className="danger" onClick={() => setNudgeConfirming(null)}>
                   Cancel

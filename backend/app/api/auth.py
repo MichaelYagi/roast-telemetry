@@ -37,18 +37,23 @@ def register(payload: RegisterRequest, response: Response) -> UserPublic:
     username = payload.username.strip()
     if not username:
         raise HTTPException(400, "Username is required")
-    if storage.get_user_by_username(username):
-        raise HTTPException(409, "That username is already taken")
-    is_first = storage.count_users() == 0
     user = {
         "id": str(uuid.uuid4()),
         "username": username,
         "password_hash": auth.hash_password(payload.password),
-        "role": "admin" if is_first else "user",
-        "status": UserStatus.ALLOWED.value if is_first else UserStatus.PENDING.value,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    storage.insert_user(user)
+    # Checking-then-inserting as two separate calls let two concurrent
+    # registrations both see "no admin yet" and both become admin, or
+    # both pass a uniqueness pre-check for the same username before
+    # either committed -- see storage.insert_user_and_check_first's own
+    # docstring for the full race and why this has to be one atomic call.
+    try:
+        is_first = storage.insert_user_and_check_first(user)
+    except storage.DuplicateUsernameError:
+        raise HTTPException(409, "That username is already taken")
+    user["role"] = "admin" if is_first else "user"
+    user["status"] = UserStatus.ALLOWED.value if is_first else UserStatus.PENDING.value
     if is_first:
         # The very first account is auto-approved and logged straight in --
         # there's no admin yet to click Allow, so requiring approval here

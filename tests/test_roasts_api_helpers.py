@@ -27,6 +27,19 @@ def test_csv_filename_basic():
     assert csv_filename("My Roast", "2026-03-05T14:32:10") == "My Roast_2026-03-05_1432.csv"
 
 
+def test_filename_strips_embedded_crlf():
+    # A title with an embedded CRLF used to survive straight into
+    # download_csv's raw Content-Disposition header -- a real
+    # header-injection surface, not just a filename cosmetic. Both
+    # helpers share the same sanitizer, so one check covers both.
+    name = csv_filename("Evil\r\nX-Injected: yes", "2026-03-05T14:32:10")
+    assert "\r" not in name
+    assert "\n" not in name
+    name = alog_filename("Evil\r\nX-Injected: yes", "2026-03-05T14:32:10")
+    assert "\r" not in name
+    assert "\n" not in name
+
+
 def _make_roast(profile, events=None) -> Roast:
     return Roast(
         id="r1", title="Test Roast", mode=RoastMode.SIMULATOR, status=RoastStatus.STOPPED,

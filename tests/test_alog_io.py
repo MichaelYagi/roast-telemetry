@@ -78,6 +78,26 @@ def test_extra_channels_roundtrip_through_the_extraname2_bank(tmp_path):
     assert [p["extra"]["Ambient"] for p in profile_points] == [18.0, 18.0, 18.5]
 
 
+def test_dt_less_roast_does_not_export_a_fake_flat_dt_curve(tmp_path):
+    # Real bug: a roast with no third probe at all (simulator,
+    # alog_playback, or any Modbus profile without a dt channel) used to
+    # still get an extraname2 "DT" slot, because _fill_and_floatify
+    # defaults an all-None series to a flat 0.0 -- indistinguishable, on
+    # read-back, from a genuine probe that read exactly 0C the whole
+    # roast. No real dt data anywhere in the profile must mean no DT
+    # entry in the read-back profile at all.
+    profile = [
+        {"time_s": 0.0, "bt": 20.0, "et": 25.0},
+        {"time_s": 1.0, "bt": 21.0, "et": 26.0},
+    ]
+    alog_dict = roast_to_artisan_native_dict(title="No DT probe", profile=profile, events=[], notes=[])
+    path = str(tmp_path / "roast.alog")
+    save_artisan_native_alog(path, alog_dict)
+
+    points = alog_dict_to_points(load_alog(path))
+    assert all(p.get("dt") is None for p in points["profile"])
+
+
 def test_a_third_extra_channel_beyond_the_two_free_slots_does_not_export(tmp_path):
     # Documents the real, fixed ceiling (donor template has exactly 3
     # extraname2 slots: DT + 2 more) rather than silently corrupting

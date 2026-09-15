@@ -171,6 +171,24 @@ def test_manual_charge_with_no_bt_value_does_not_notify():
     assert calls == []
 
 
+def test_manual_charge_with_no_value_falls_back_to_the_sessions_own_last_bt():
+    # Real bug: the frontend sends value=null whenever its own local
+    # websocket `latest` state hasn't caught up yet, even if the
+    # backend's own profile already has a real sample (clicking CHARGE
+    # right as a roast starts is the normal workflow, not a rare edge
+    # case). Falling back to the session's own last-known BT instead of
+    # skipping outright is what keeps Turning Point detection from
+    # silently disabling itself in that race.
+    session = make_session()
+    calls = []
+    session._engine.notify_manual_charge = lambda time_s, bt: calls.append((time_s, bt))
+    session.profile.append({"time_s": 3.0, "bt": 94.5})
+
+    session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))  # no value
+
+    assert calls == [(3.0, 94.5)]
+
+
 def test_other_milestones_do_not_notify_manual_charge():
     session = make_session()
     calls = []

@@ -406,6 +406,13 @@ class RoastSummary(BaseModel):
     # saved) and the speed it was started at.
     source_alog_path: Optional[str] = None
     playback_speed: Optional[float] = None
+    # live-bridge modes only: whatever this roast was actually configured
+    # with at creation time -- lets a client that only has the roast id
+    # (a reconnect after a page refresh, say) recover the real thresholds
+    # instead of falling back to a form's own mount-time defaults.
+    auto_detect_milestones: bool = False
+    dry_end_c: Optional[float] = None
+    fc_start_c: Optional[float] = None
 
 
 class Roast(RoastSummary):

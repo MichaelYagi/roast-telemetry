@@ -242,7 +242,12 @@ def roast_to_artisan_native_dict(
 
     if weight_green_g:
         computed["weightin"] = weight_green_g
-        if weight_roasted_g:
+        # is not None, not a truthy check -- weight_roasted_g == 0 is a
+        # real, legitimate measurement (a total-loss/scorched batch),
+        # not the same as "never weighed". A truthy check here silently
+        # dropped weight-loss/yield data from the export for exactly the
+        # roasts where it's most worth recording.
+        if weight_roasted_g is not None:
             computed["weightout"] = weight_roasted_g
             loss_pct = (weight_green_g - weight_roasted_g) / weight_green_g * 100
             computed["weight_loss"] = round(loss_pct, 1)
@@ -299,13 +304,23 @@ def roast_to_artisan_native_dict(
             if label not in extra_labels:
                 extra_labels.append(label)
 
+    # _fill_and_floatify defaults an all-None series to a flat 0.0 (see
+    # its own docstring -- correct for Heater/Fan/Drum, which legitimately
+    # start at 0% before an operator touches anything, but wrong for DT:
+    # a roast with no third probe at all (simulator, alog_playback, or
+    # any Modbus profile without a dt channel) must not come out the
+    # other end looking like a real probe reading a flat 0C the whole
+    # roast. Only claim slot 0 as "DT" when there's genuinely at least
+    # one real reading to back it up; otherwise it's just another unused
+    # placeholder slot, same as the else branch below.
+    has_dt = any(p.get("dt") is not None for p in export_profile)
     extraname2 = list(data.get("extraname2") or [])
     extratemp2 = []
     for i in range(len(extraname2)):
-        if i == 0:
+        if i == 0 and has_dt:
             extraname2[0] = "DT"
             extratemp2.append(_fill_and_floatify([p.get("dt") for p in export_profile]))
-        elif i - 1 < len(extra_labels):
+        elif i >= 1 and i - 1 < len(extra_labels):
             label = extra_labels[i - 1]
             extraname2[i] = label
             extratemp2.append(_fill_and_floatify([(p.get("extra") or {}).get(label) for p in export_profile]))
