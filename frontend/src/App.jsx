@@ -67,6 +67,9 @@ function AppShell() {
           <Route path="/users" element={user.role === "admin" ? <UsersView /> : <Navigate to="/" replace />} />
         </Routes>
       </main>
+      <footer className="app-footer no-print">
+        v{__APP_VERSION__} · build {__APP_BUILD__}
+      </footer>
     </div>
   );
 }
