@@ -6,8 +6,10 @@ import { normalizeLayout, verticalControlItem } from "../verticalControl.js";
 // Drum/Air are always shown here specifically so there's never a roast
 // with zero way to touch a control, even before Settings has been
 // visited). Sits beside the chart (LiveRoastView.jsx's .scope-body, before
-// .scope-chart), one vertical slider per configured channel, grouped into
-// zero-gap "stacks" per the settings' ordered-groups layout.
+// .scope-chart), one vertical slider per configured channel, arranged into
+// lanes per the settings' ordered-groups layout -- a lane with more than
+// one channel splits its height between them, stacked top to bottom,
+// rather than each getting its own lane.
 const LOCAL_ECHO_GUARD_MS = 1500;
 const STEP = 1;
 

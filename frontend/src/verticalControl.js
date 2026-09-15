@@ -22,9 +22,10 @@ export function verticalControlItem(key) {
   return VERTICAL_CONTROL_ITEMS.find((i) => i.key === key);
 }
 
-// Flattens the settings' ordered-groups shape (string[][], a group with
-// 1 key = siloed, 2+ = stacked with no gap between them -- see AppSettings.
-// vertical_control_layout's own docstring) into a single ordered list with
+// Flattens the settings' ordered-groups shape (string[][], a group with 1
+// key = siloed/full-height, 2+ = a shared lane split into stacked top/
+// bottom (and so on) segments -- see AppSettings.vertical_control_layout's
+// own docstring) into a single ordered list with
 // a per-item `joinsPrevious` flag, and back again -- the editor works
 // entirely in this flat shape (one linear reorderable list + a "stack with
 // the one above" toggle per row) since a full 2D drag-and-drop grouping UI

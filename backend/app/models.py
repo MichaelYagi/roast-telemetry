@@ -509,15 +509,18 @@ class AppSettings(BaseModel):
     temperature_unit: str = "c"
     # Vertical control panel (left of the live chart, replaces the old
     # always-visible horizontal Controls panel entirely -- see
-    # VerticalControlPanel.jsx). Ordered list of "columns", each column an
-    # ordered list of 1+ VERTICAL_CONTROL_KEYS -- a column with one key
-    # renders as its own siloed slider/readout; a column with multiple
-    # keys renders them grouped with no gap between them (visually
-    # "stacked" together, each still its own independent draggable
-    # control -- not a literal shared-scale overlay). storage.get_settings()
-    # seeds this to [["drum_speed_pct"], ["fan_pct"], ["heater_pct"]] only
-    # the first time (key never saved before), matching what the old
-    # Controls panel always showed -- SV stays opt-in.
+    # VerticalControlPanel.jsx). Ordered list of "lanes" (left to right),
+    # each lane an ordered list of 1+ VERTICAL_CONTROL_KEYS -- a lane with
+    # one key renders as its own siloed, full-height slider; a lane with
+    # multiple keys splits that lane's height between them, stacked one
+    # above the other top to bottom (confirmed against a real Artisan
+    # screenshot: Drum sits in the top half of its lane, Fan in the bottom
+    # half, same x-position throughout) -- each still its own independent
+    # draggable control, just sharing width with its lane-mates instead of
+    # getting a lane of its own. storage.get_settings() seeds this to
+    # [["drum_speed_pct"], ["fan_pct"], ["heater_pct"]] only the first time
+    # (key never saved before), matching what the old Controls panel always
+    # showed -- SV stays opt-in.
     vertical_control_layout: list[list[str]] = []
     # Per-channel: show +/- increment/decrement buttons above and below
     # that slider. Missing key (the default -- "default to all off") means

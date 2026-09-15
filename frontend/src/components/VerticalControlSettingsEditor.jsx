@@ -73,8 +73,9 @@ export default function VerticalControlSettingsEditor({ layout, setLayout, arrow
     <>
       <h3>Stack order</h3>
       <p className="hint">
-        "Stack with the one above" removes the gap between two adjacent sliders so they read as one merged
-        block, without changing how they're controlled -- each stays its own independent slider either way.
+        "Stack with the one above" puts this slider in the same lane as the one above it, splitting that
+        lane's height between them (top half / bottom half, and so on) instead of giving it a separate lane
+        of its own -- each still stays its own independent slider either way.
       </p>
       <ul className="breakout-order-list">
         {flat.map((item, i) => {
