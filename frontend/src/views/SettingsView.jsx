@@ -113,6 +113,40 @@ export default function SettingsView() {
       </div>
 
       <div className="panel">
+        <h2>Big Readout Panel</h2>
+        <p className="hint">
+          Pick which live values also show large in a dedicated panel next to the chart on the Live
+          Roast screen (only above ~1400px wide), alongside (not instead of) their normal small
+          display. Off by default. Changes here apply to an already-open Live Roast tab within a few
+          seconds, no refresh needed.
+        </p>
+        <BreakoutSettingsEditor
+          enabledKeys={brokenOutPanels}
+          setEnabledKeys={setBrokenOutPanels}
+          colors={panelColors}
+          setColors={setPanelColors}
+        />
+      </div>
+
+      <div className="panel">
+        <h2>Small Readout</h2>
+        <p className="hint">
+          Independent from the Big Readout Panel above -- its own set of values, shown as a compact
+          scaled column right beside the chart at any screen width (used to be a fixed ET/BT/ΔBT
+          legend; now it's whatever you pick here). Which items are enabled can differ freely between
+          the two, but colors are shared -- recoloring an item here also changes it in the Big Readout
+          Panel, and vice versa.
+        </p>
+        <BreakoutSettingsEditor
+          enabledKeys={smallReadoutPanels}
+          setEnabledKeys={setSmallReadoutPanels}
+          colors={panelColors}
+          setColors={setPanelColors}
+          excludeKeys={SMALL_READOUT_EXCLUDED_KEYS}
+        />
+      </div>
+
+      <div className="panel">
         <h2>AI Roast Review (Ollama)</h2>
         <p className="hint">
           Configures the local Ollama server used for AI roast reviews (Roast detail → Review card).
@@ -158,40 +192,6 @@ export default function SettingsView() {
                 ? `Connected — ${status.models.length} model${status.models.length === 1 ? "" : "s"} available.`
                 : `Not connected${status?.error ? `: ${status.error}` : ""}`}
         </p>
-      </div>
-
-      <div className="panel">
-        <h2>Big Readout Panel</h2>
-        <p className="hint">
-          Pick which live values also show large in a dedicated panel next to the chart on the Live
-          Roast screen (only above ~1400px wide), alongside (not instead of) their normal small
-          display. Off by default. Changes here apply to an already-open Live Roast tab within a few
-          seconds, no refresh needed.
-        </p>
-        <BreakoutSettingsEditor
-          enabledKeys={brokenOutPanels}
-          setEnabledKeys={setBrokenOutPanels}
-          colors={panelColors}
-          setColors={setPanelColors}
-        />
-      </div>
-
-      <div className="panel">
-        <h2>Small Readout</h2>
-        <p className="hint">
-          Independent from the Big Readout Panel above -- its own set of values, shown as a compact
-          scaled column right beside the chart at any screen width (used to be a fixed ET/BT/ΔBT
-          legend; now it's whatever you pick here). Which items are enabled can differ freely between
-          the two, but colors are shared -- recoloring an item here also changes it in the Big Readout
-          Panel, and vice versa.
-        </p>
-        <BreakoutSettingsEditor
-          enabledKeys={smallReadoutPanels}
-          setEnabledKeys={setSmallReadoutPanels}
-          colors={panelColors}
-          setColors={setPanelColors}
-          excludeKeys={SMALL_READOUT_EXCLUDED_KEYS}
-        />
       </div>
 
       <div className="panel">
