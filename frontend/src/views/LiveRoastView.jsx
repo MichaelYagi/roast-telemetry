@@ -75,10 +75,19 @@ const SPLIT_WIDTH_STORAGE_KEY = "roast-telemetry:breakoutSplitWidth";
 // smaller than that starts throwing away the actual point of a chart (on
 // a short phone screen, being able to shrink it well past its 420
 // default is the whole ask; a hard floor just stops a drag from
-// collapsing it to nothing useful). No hard ceiling -- unlike splitWidth,
+// collapsing it to nothing useful). Also the floor for the vertical
+// control panel and Small Readout column beside it -- both size off this
+// same chartHeight/--scope-chart-height value (see the ResizeObserver
+// effect below), so raising it here is what keeps all three visually
+// aligned at a shared minimum instead of the chart shrinking further
+// than a 2-member stacked control lane can stay legible at (a CSS-only
+// floor on just the control panel was tried and reverted -- a flex row's
+// height follows its tallest child regardless of align-self, so that
+// dragged the whole row taller than the chart's own real height instead
+// of keeping the three in sync). No hard ceiling -- unlike splitWidth,
 // which trades width against a sibling panel with its own floor, height
 // only trades against page scroll, which is the user's own call.
-const CHART_MIN_HEIGHT = 160;
+const CHART_MIN_HEIGHT = 260;
 const CHART_HEIGHT_STORAGE_KEY = "roast-telemetry:chartHeight";
 const CHART_DEFAULT_HEIGHT = 420; // RoastChart's own default -- kept in sync explicitly, see chartHeight state below
 
