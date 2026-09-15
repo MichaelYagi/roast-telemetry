@@ -66,3 +66,52 @@ def test_charge_is_one_shot_but_a_fresh_detector_can_fire_it_again():
     fresh = LiveRoastDetector()
     _feed_charge_drop(fresh)
     assert [e["type"] for e in fresh.get_new_events()] == ["CHARGE"]
+
+
+def test_notify_manual_charge_still_lets_turning_point_auto_fire():
+    """Turning Point is a pure observation (the BT minimum right after
+    Charge), not a judgment call -- so it stays auto-detected even with
+    detect_milestones off, as long as the caller tells the detector CHARGE
+    happened (see notify_manual_charge's own docstring). Confirmed against
+    a real FZ-94 roast in Artisan, which auto-plots Turning Point despite
+    every other milestone being a manual click there too."""
+    detector = LiveRoastDetector(detect_milestones=False)
+    detector.notify_manual_charge(0.0, 96.0)
+
+    detector.observe(1.0, 90.0, None)  # dips further
+    assert detector.get_new_events() == []  # still tracking the minimum, not yet rebounded
+
+    detector.observe(2.0, 91.0, None)  # rebounds by 1.0C >= the 0.5C default threshold
+    events = detector.get_new_events()
+
+    assert [e["type"] for e in events] == ["TURNING_POINT"]
+    assert events[0]["value"] == 90.0  # the actual minimum, not the rebound reading
+
+
+def test_notify_manual_charge_does_not_reopen_dry_end_fc_start_detection():
+    # detect_milestones=False must still block DRY_END/FC_START even once
+    # we're past Turning Point -- only the dip-phase tracking is exempt.
+    detector = LiveRoastDetector(detect_milestones=False, dry_end_c=160.0)
+    detector.notify_manual_charge(0.0, 96.0)
+    detector.observe(1.0, 90.0, None)
+    detector.observe(2.0, 91.0, None)  # fires TURNING_POINT, moves to post_tp
+    detector.get_new_events()
+
+    detector.observe(3.0, 165.0, None)  # would cross dry_end_c if detection were on
+
+    assert detector.get_new_events() == []
+
+
+def test_notify_manual_charge_is_a_noop_once_past_pre_charge():
+    detector = LiveRoastDetector()
+    detector.observe(0.0, 100.0, None)
+    detector.observe(1.0, 90.0, None)  # auto-fires CHARGE, moves to "dip"
+    detector.get_new_events()
+
+    detector.notify_manual_charge(5.0, 999.0)  # should be ignored -- not pre_charge anymore
+
+    # bt_min tracking is untouched by the ignored call above.
+    detector.observe(6.0, 89.0, None)
+    detector.observe(7.0, 90.0, None)
+    events = [e for e in detector.get_new_events() if e["type"] == "TURNING_POINT"]
+    assert events and events[0]["value"] == 89.0  # not 999.0

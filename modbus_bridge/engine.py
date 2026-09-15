@@ -468,6 +468,13 @@ class ModbusEngine:
         self._detector = LiveRoastDetector(dry_end_c=self._dry_end_c, fc_start_c=self._fc_start_c, detect_milestones=False)
         self._last_time_s = 0.0
 
+    def notify_manual_charge(self, time_s: float, bt: float) -> None:
+        """Forwards to the detector -- see its own notify_manual_charge
+        docstring. Called from RoastSession.add_event() right after a
+        manual CHARGE is recorded, so Turning Point still gets tracked
+        and auto-plotted even though CHARGE itself was a manual click."""
+        self._detector.notify_manual_charge(time_s, bt)
+
     def close(self) -> None:
         try:
             self._client.close()

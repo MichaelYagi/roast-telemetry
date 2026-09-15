@@ -16,10 +16,19 @@ BT minimum right after; DRY_END/FC_START from configurable BT
 thresholds, since real roasts vary too much by bean to hardcode these.
 DROP/COOL_END aren't threshold-detectable -- they're roast-level
 judgment calls -- so those stay manual (mark them with this platform's
-own event buttons) regardless. With ``detect_milestones`` off, every
-milestone is a manual call instead -- for hardware/operators where an
-algorithmic guess from the temperature curve isn't trusted or wanted;
-RoR is computed the same either way.
+own event buttons) regardless. With ``detect_milestones`` off, CHARGE/
+DRY_END/FC_START all become manual calls instead -- for hardware/
+operators where an algorithmic guess from the temperature curve isn't
+trusted or wanted; RoR is computed the same either way.
+
+TURNING_POINT is the one exception, even with ``detect_milestones``
+off: it's a pure observation (the BT minimum right after Charge), no
+operator judgment involved, so it's tracked and auto-emitted regardless
+-- confirmed against a real FZ-94 roast in Artisan, which auto-plots it
+on the chart even with every other milestone marked by hand. See
+``notify_manual_charge()`` -- when CHARGE is marked manually rather
+than auto-detected, the caller tells the detector it happened, which
+starts Turning Point tracking exactly as if CHARGE had auto-fired.
 """
 from __future__ import annotations
 
@@ -88,8 +97,16 @@ class LiveRoastDetector:
         while self._et_history and self._et_history[0][0] < cutoff:
             self._et_history.popleft()
 
-        if bt is not None and self._detect_milestones:
-            self._detect_events(time_s, bt)
+        if bt is not None:
+            if self._phase == "dip":
+                # Always runs, regardless of detect_milestones -- a pure
+                # observation, not a judgment call (see module docstring).
+                self._detect_turning_point(time_s, bt)
+            elif self._detect_milestones:
+                if self._phase == "pre_charge":
+                    self._detect_charge(time_s, bt)
+                elif self._phase == "post_tp":
+                    self._detect_dry_end_and_fc_start(time_s, bt)
 
         return {
             "time_s": round(time_s, 1),
@@ -99,31 +116,48 @@ class LiveRoastDetector:
             "ror_et": _ror(self._et_history),
         }
 
-    def _detect_events(self, time_s: float, bt: float) -> None:
-        if self._phase == "pre_charge":
-            # CHARGE: BT fell by charge_drop_c within charge_window_s -- the
-            # classic signature of cold beans hitting the hot drum.
-            window_start = time_s - self._charge_window_s
-            recent = [(t, v) for t, v in self._bt_history if t >= window_start]
-            if recent:
-                peak_t, peak_bt = max(recent, key=lambda tv: tv[1])
-                if peak_bt - bt >= self._charge_drop_c:
-                    self._emit_event("CHARGE", "Charge", peak_bt, peak_t)
-                    self._phase = "dip"
-                    self._bt_min_since_charge = bt
-                    self._bt_min_time_since_charge = time_s
-        elif self._phase == "dip":
-            if self._bt_min_since_charge is None or bt < self._bt_min_since_charge:
+    def notify_manual_charge(self, time_s: float, bt: float) -> None:
+        """Called by the engine when CHARGE was marked manually rather
+        than auto-detected (detect_milestones=False -- see
+        modbus_bridge/ms6514_bridge's own constructors and
+        RoastSession.add_event). Starts tracking toward Turning Point
+        from this point on, exactly as if CHARGE had auto-fired here --
+        see the module docstring for why Turning Point stays automatic
+        even then. No-op if we're not still in "pre_charge" (e.g. this
+        somehow got called twice, or the detector already auto-detected
+        its own CHARGE first)."""
+        if self._phase != "pre_charge":
+            return
+        self._phase = "dip"
+        self._bt_min_since_charge = bt
+        self._bt_min_time_since_charge = time_s
+
+    def _detect_charge(self, time_s: float, bt: float) -> None:
+        # CHARGE: BT fell by charge_drop_c within charge_window_s -- the
+        # classic signature of cold beans hitting the hot drum.
+        window_start = time_s - self._charge_window_s
+        recent = [(t, v) for t, v in self._bt_history if t >= window_start]
+        if recent:
+            peak_t, peak_bt = max(recent, key=lambda tv: tv[1])
+            if peak_bt - bt >= self._charge_drop_c:
+                self._emit_event("CHARGE", "Charge", peak_bt, peak_t)
+                self._phase = "dip"
                 self._bt_min_since_charge = bt
                 self._bt_min_time_since_charge = time_s
-            elif bt >= self._bt_min_since_charge + self._turning_point_rebound_c:
-                self._emit_event("TURNING_POINT", "Turning Point", self._bt_min_since_charge, self._bt_min_time_since_charge)
-                self._phase = "post_tp"
-        elif self._phase == "post_tp":
-            if self._dry_end_c is not None and "DRY_END" not in self._events_fired and bt >= self._dry_end_c:
-                self._emit_event("DRY_END", "Dry End", bt, time_s)
-            if self._fc_start_c is not None and "FC_START" not in self._events_fired and bt >= self._fc_start_c:
-                self._emit_event("FC_START", "First Crack Start", bt, time_s)
+
+    def _detect_turning_point(self, time_s: float, bt: float) -> None:
+        if self._bt_min_since_charge is None or bt < self._bt_min_since_charge:
+            self._bt_min_since_charge = bt
+            self._bt_min_time_since_charge = time_s
+        elif bt >= self._bt_min_since_charge + self._turning_point_rebound_c:
+            self._emit_event("TURNING_POINT", "Turning Point", self._bt_min_since_charge, self._bt_min_time_since_charge)
+            self._phase = "post_tp"
+
+    def _detect_dry_end_and_fc_start(self, time_s: float, bt: float) -> None:
+        if self._dry_end_c is not None and "DRY_END" not in self._events_fired and bt >= self._dry_end_c:
+            self._emit_event("DRY_END", "Dry End", bt, time_s)
+        if self._fc_start_c is not None and "FC_START" not in self._events_fired and bt >= self._fc_start_c:
+            self._emit_event("FC_START", "First Crack Start", bt, time_s)
 
     def _emit_event(self, event_type: str, label: str, value: float, time_s: float) -> None:
         self._events_fired.add(event_type)

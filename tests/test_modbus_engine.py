@@ -294,3 +294,27 @@ def test_reset_detection_restarts_the_elapsed_time_clock():
 
     sample = engine.tick(1.0)
     assert sample["time_s"] == 1.0
+
+
+def test_notify_manual_charge_lets_turning_point_fire_despite_no_auto_charge():
+    """Confirms the engine's own wrapper method actually forwards to its
+    detector (test_live_roast_detector.py already covers the detector's
+    own logic in isolation) -- CHARGE never auto-fires here
+    (detect_milestones=False, confirmed by test_charge_is_never_auto_detected
+    above), but Turning Point still should once notify_manual_charge tells
+    the engine CHARGE happened."""
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls)
+    primary = instances["PRIMARY"]
+
+    engine.notify_manual_charge(0.0, 96.0)
+
+    primary.register_values[(11, 0)] = 900  # BT 90.0C -- dips further
+    engine.tick(1.0)
+    assert engine.get_new_events() == []
+
+    primary.register_values[(11, 0)] = 906  # BT 90.6C -- rebounds 0.6C, over the 0.5C default
+    engine.tick(1.0)
+    events = engine.get_new_events()
+
+    assert [e["type"] for e in events] == ["TURNING_POINT"]

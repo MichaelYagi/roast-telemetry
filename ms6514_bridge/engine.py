@@ -208,6 +208,10 @@ class MS6514Engine:
         self._detector = LiveRoastDetector(dry_end_c=self._dry_end_c, fc_start_c=self._fc_start_c, detect_milestones=False)
         self._last_time_s = 0.0
 
+    def notify_manual_charge(self, time_s: float, bt: float) -> None:
+        """See ModbusEngine.notify_manual_charge -- same forwarding."""
+        self._detector.notify_manual_charge(time_s, bt)
+
     def close(self) -> None:
         if self._serial is not None:
             try:

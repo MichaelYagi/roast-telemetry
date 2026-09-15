@@ -9,12 +9,17 @@
 // see modbus_bridge/ms6514_bridge), so there the operator clicks it
 // like everything else -- pass `manualCharge` for those two modes.
 // TURNING_POINT is auto-detected the same way as CHARGE for
-// simulator/alog_playback, and for modbus_live/ms6514_live can't fire at
-// all any more (its detection is only ever reached via CHARGE's own
-// auto-detected phase transition, which no longer runs there) -- either
-// way it has no button here at all, omitted by request to match a
-// reference setup that doesn't surface it either; still recorded as a
-// real event server-side when it does fire, just not given a row entry.
+// simulator/alog_playback. For modbus_live/ms6514_live it still
+// auto-fires too, even with CHARGE itself manual -- RoastSession.
+// add_event() forwards a manual CHARGE to the engine's
+// notify_manual_charge(), which starts Turning Point tracking the same
+// way CHARGE's own auto-detected phase transition would have (see
+// roast_heuristics/detector.py) -- confirmed against a real FZ-94 roast,
+// which auto-plots Turning Point the same way despite every other
+// milestone being manual there too. No button for any mode though,
+// omitted by request to match a reference setup that doesn't surface it
+// either; still recorded as a real event server-side, just not given a
+// row entry.
 // DRY_END/FC_START auto-fire in some modes but can be disabled (blank
 // threshold) or unavailable (alog events missing one), and
 // FC_END/SC_START/SC_END/DROP/COOL_END are judgment calls never

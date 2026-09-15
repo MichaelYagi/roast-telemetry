@@ -67,16 +67,18 @@ MILESTONE_SEQUENCE = [
     RoastEventType.COOL_END,
 ]
 
-# TURNING_POINT is never manually markable. For simulator/alog_playback
-# it's genuinely always auto-detected (no human judgment involved -- the
-# BT minimum right after Charge). For modbus_live/ms6514_live, real
-# hardware now marks every milestone including CHARGE by hand (see
-# modbus_bridge/ms6514_bridge's LiveRoastDetector(detect_milestones=False)),
-# which as a side effect means TURNING_POINT can't fire there either --
-# its own detection is only ever reached via CHARGE's auto-detected phase
-# transition (roast_heuristics/detector.py), which no longer runs. It has
-# no button in the UI for either case (EventButtonRow.jsx), so there's
-# nothing to unblock either way.
+# TURNING_POINT is never manually markable -- it's a pure observation
+# (the BT minimum right after Charge), no human judgment involved, so
+# it stays auto-detected for every mode. For modbus_live/ms6514_live,
+# where CHARGE itself is a manual click (detect_milestones=False --
+# see modbus_bridge/ms6514_bridge), RoastSession.add_event() forwards
+# a manual CHARGE to the engine's notify_manual_charge(), which starts
+# Turning Point tracking exactly as if CHARGE had auto-fired (see
+# roast_heuristics/detector.py) -- confirmed against a real FZ-94 roast
+# in Artisan, which auto-plots Turning Point the same way despite every
+# other milestone being marked by hand there too. It has no button in
+# the UI for any mode (EventButtonRow.jsx), so there's nothing to
+# unblock regardless.
 ALWAYS_AUTO_EVENT_TYPES = {RoastEventType.TURNING_POINT}
 
 

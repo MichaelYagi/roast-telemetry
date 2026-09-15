@@ -140,3 +140,50 @@ def test_add_event_with_empty_profile_defaults_to_zero():
     session = make_session()
     event = session.add_event(EventCreateRequest(type=RoastEventType.DROP, label="Drop"))
     assert event["time_s"] == 0.0
+
+
+def test_manual_charge_notifies_an_engine_that_supports_it():
+    """Turning Point stays auto-detected even when CHARGE is a manual
+    click (see roast_heuristics.LiveRoastDetector.notify_manual_charge) --
+    this confirms add_event() actually forwards to the engine, not just
+    that the detector-level behavior is correct in isolation (already
+    covered by tests/test_live_roast_detector.py)."""
+    session = make_session()
+    calls = []
+    session._engine.notify_manual_charge = lambda time_s, bt: calls.append((time_s, bt))
+    session.profile.append({"time_s": 12.5, "bt": 96.0})
+
+    session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge", value=96.0))
+
+    assert calls == [(12.5, 96.0)]
+
+
+def test_manual_charge_with_no_bt_value_does_not_notify():
+    # value is optional on EventCreateRequest -- can't seed Turning Point
+    # tracking without a real BT reading, so this must be skipped, not
+    # crash on None.
+    session = make_session()
+    calls = []
+    session._engine.notify_manual_charge = lambda time_s, bt: calls.append((time_s, bt))
+
+    session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))
+
+    assert calls == []
+
+
+def test_other_milestones_do_not_notify_manual_charge():
+    session = make_session()
+    calls = []
+    session._engine.notify_manual_charge = lambda time_s, bt: calls.append((time_s, bt))
+
+    session.add_event(EventCreateRequest(type=RoastEventType.DROP, label="Drop", value=217.0))
+
+    assert calls == []
+
+
+def test_engine_without_notify_manual_charge_is_fine():
+    # SimulatorEngine (what make_session() actually builds) has no such
+    # method -- add_event() must not crash just because CHARGE was marked.
+    session = make_session()
+    event = session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge", value=96.0))
+    assert event["type"] == "CHARGE"

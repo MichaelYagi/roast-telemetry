@@ -435,6 +435,17 @@ class RoastSession:
             "value": req.value,
         }
         self.events.append(event)
+        if req.type == RoastEventType.CHARGE and event["value"] is not None:
+            # Turning Point stays auto-detected even when CHARGE itself is
+            # a manual click (modbus_live/ms6514_live, detect_milestones=
+            # False) -- confirmed against a real FZ-94 roast in Artisan,
+            # which auto-plots Turning Point on the chart despite every
+            # other milestone being marked by hand. Both live-hardware
+            # engines expose this; simulator/alog_playback don't (and
+            # don't need to -- CHARGE is never manual there).
+            notify = getattr(self._engine, "notify_manual_charge", None)
+            if notify is not None:
+                notify(event["time_s"], event["value"])
         if self.mode == RoastMode.MODBUS_LIVE:
             for rule in self._alarm_rules:
                 if rule.trigger_kind == AlarmTriggerKind.EVENT and rule.event_type == req.type:
