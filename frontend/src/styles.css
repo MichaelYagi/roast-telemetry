@@ -1467,30 +1467,43 @@ button:disabled {
   overflow: hidden;
 }
 
+.artisan-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 0.75rem 1rem;
+  flex-wrap: wrap;
+}
+
+.artisan-toolbar-title-group {
+  /* Lets the title/status text actually wrap/shrink instead of forcing
+     the row wider -- a flex item's default min-width is auto (its
+     content's own natural width), which ignores overflow-wrap entirely. */
+  min-width: 0;
+}
+
 .artisan-toolbar-title {
   margin: 0;
-  padding: 0.5rem 1rem 0;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--text);
   /* Long titles shouldn't force the whole toolbar wider on a phone --
-     wrap rather than push the milestone boxes/power buttons/clock row
-     below into horizontal scroll territory. */
+     wrap rather than push the controls/clock into horizontal scroll
+     territory. */
   overflow-wrap: break-word;
 }
 
-.artisan-toolbar {
+.artisan-toolbar-controls {
   display: flex;
   align-items: center;
   gap: 1.25rem;
-  padding: 0.6rem 1rem;
-  flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .artisan-toolbar-power {
   display: flex;
   gap: 0.5rem;
-  margin-left: auto;
 }
 
 .power-btn {
@@ -1542,10 +1555,9 @@ button:disabled {
 }
 
 .status-line {
-  padding: 0.4rem 1rem 0.7rem;
+  margin-top: 0.2rem;
   font-size: 0.85rem;
   color: var(--text-muted);
-  border-top: 1px solid var(--border);
 }
 
 /* --- Scope (chart + live readouts + event buttons) ---------------------- */
@@ -1890,7 +1902,7 @@ button:disabled {
   .small-readout-col .breakout-panel {
     flex-direction: row;
   }
-  .artisan-toolbar-power {
+  .artisan-toolbar-controls {
     margin-left: 0;
   }
 }
