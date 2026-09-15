@@ -12,6 +12,7 @@ export default function LoginView() {
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState(null);
   const [pendingMessage, setPendingMessage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -37,7 +38,7 @@ export default function LoginView() {
           setPassword("");
         }
       } else {
-        await api.login(username.trim(), password);
+        await api.login(username.trim(), password, rememberMe);
         await refresh();
       }
     } catch (err) {
@@ -90,6 +91,21 @@ export default function LoginView() {
           </label>
         </div>
 
+        {mode === "login" && (
+          <div className="form-row">
+            <label className="checkbox-label">
+              <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+              Remember me
+            </label>
+          </div>
+        )}
+        {mode === "login" && (
+          <p className="hint">
+            {rememberMe
+              ? "Stays signed in on this browser until you log out."
+              : "Signed out automatically when you close this browser."}
+          </p>
+        )}
         {mode === "register" && (
           <p className="hint">
             The very first account registered on this install becomes its admin, with immediate access. Every

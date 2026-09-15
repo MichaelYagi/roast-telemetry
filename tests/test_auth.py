@@ -187,6 +187,40 @@ def test_admin_can_delete_a_user_and_it_ends_their_session(anon_client):
     assert anon_client.post("/api/auth/login", json={"username": "bob", "password": "bobs-password"}).status_code == 401
 
 
+def test_remember_me_unchecked_sets_a_plain_session_cookie(anon_client):
+    register(anon_client, "alice", password="alices-password")
+    anon_client.post("/api/auth/logout")
+    resp = anon_client.post(
+        "/api/auth/login", json={"username": "alice", "password": "alices-password", "remember_me": False}
+    )
+    set_cookie = resp.headers.get("set-cookie")
+    assert "rt_session=" in set_cookie
+    # No Max-Age/Expires at all -- that's what makes it a session cookie
+    # the browser itself drops on close, not something this test can
+    # observe any other way (TestClient has no real browser to close).
+    assert "max-age" not in set_cookie.lower()
+    assert "expires" not in set_cookie.lower()
+
+
+def test_remember_me_checked_sets_a_long_lived_cookie(anon_client):
+    register(anon_client, "alice", password="alices-password")
+    anon_client.post("/api/auth/logout")
+    resp = anon_client.post(
+        "/api/auth/login", json={"username": "alice", "password": "alices-password", "remember_me": True}
+    )
+    set_cookie = resp.headers.get("set-cookie")
+    assert "max-age=" in set_cookie.lower()
+
+
+def test_first_admin_auto_login_is_remembered_by_default(anon_client):
+    # No login form was involved (see register()'s auto-login) -- there's
+    # no "Remember me" checkbox to have left unchecked, so this always
+    # gets the persistent cookie.
+    resp = register(anon_client, "alice")
+    set_cookie = resp.headers.get("set-cookie")
+    assert "max-age=" in set_cookie.lower()
+
+
 def test_logout_clears_the_session_so_the_gate_blocks_again(anon_client):
     register(anon_client, "alice")
     assert anon_client.get("/api/auth/me").status_code == 200

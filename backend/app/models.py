@@ -412,6 +412,11 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+    # Unchecked (the default) -- a plain session cookie, gone as soon as
+    # the browser closes. Checked -- stays signed in until an explicit
+    # Log out, not just until the browser happens to close (see
+    # auth.start_session).
+    remember_me: bool = False
 
 
 class UserPublic(BaseModel):

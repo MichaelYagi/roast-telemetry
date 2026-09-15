@@ -57,7 +57,7 @@ def login(payload: LoginRequest, response: Response) -> UserPublic:
         raise HTTPException(403, "Your account is awaiting admin approval")
     if user["status"] == UserStatus.DENIED.value:
         raise HTTPException(403, "Your account has been denied access")
-    auth.start_session(response, user["id"])
+    auth.start_session(response, user["id"], remember_me=payload.remember_me)
     return _public(user)
 
 

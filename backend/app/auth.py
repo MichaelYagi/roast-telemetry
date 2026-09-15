@@ -22,7 +22,10 @@ from . import storage
 
 SESSION_COOKIE = "rt_session"
 _PBKDF2_ITERATIONS = 260_000  # in line with OWASP's current PBKDF2-SHA256 guidance
-_COOKIE_MAX_AGE_S = 60 * 60 * 24 * 30  # 30 days -- a LAN roasting-log app, not a bank; long-lived is the right trade
+# "Remember me" checked -- 400 days, the longest Max-Age Chrome will honor
+# without silently capping it itself; as close to "until you sign out" as
+# a cookie attribute can actually promise.
+_REMEMBER_ME_MAX_AGE_S = 60 * 60 * 24 * 400
 
 
 def hash_password(password: str) -> str:
@@ -40,16 +43,24 @@ def verify_password(password: str, stored: str) -> bool:
     return secrets.compare_digest(digest.hex(), hex_digest)
 
 
-def start_session(response: Response, user_id: str) -> None:
+def start_session(response: Response, user_id: str, remember_me: bool = True) -> None:
+    """remember_me=True (the default -- used for the auto-login on the
+    very first, admin-creating registration, where there's no login form
+    to have asked the question) sets a long-lived cookie that survives
+    closing the browser. False (an explicit login with "Remember me"
+    left unchecked) sets a plain session cookie instead -- no Max-Age/
+    Expires attribute at all, so the browser itself drops it as soon as
+    it closes; storage.get_session_user would otherwise still honor a
+    stale row for a token no browser has anymore, but there's nothing
+    left to send it with."""
     token = secrets.token_urlsafe(32)
     storage.insert_session(token, user_id, datetime.now(timezone.utc).isoformat())
+    max_age = _REMEMBER_ME_MAX_AGE_S if remember_me else None
     # httponly -- JS never touches this, so it isn't readable by an XSS
     # payload; no `secure` flag since this app is plain http on a LAN (see
     # the getting-started LAN-exposure instructions) -- requiring https
     # here would just silently break the cookie on every real deployment.
-    response.set_cookie(
-        SESSION_COOKIE, token, httponly=True, samesite="lax", path="/", max_age=_COOKIE_MAX_AGE_S
-    )
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="lax", path="/", max_age=max_age)
 
 
 def end_session(request: Request, response: Response) -> None:
