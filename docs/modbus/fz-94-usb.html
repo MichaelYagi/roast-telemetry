@@ -208,27 +208,27 @@ PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code></pre>
     the times below tell you exactly when to click each one:
   </p>
   <table>
-    <thead><tr><th>Event</th><th>Click it around</th><th>BT</th></tr></thead>
+    <thead><tr><th>Milestone</th><th>Click it around</th><th>°C</th><th>°F</th></tr></thead>
     <tbody>
-      <tr><td>Charge</td><td>right when you press START</td><td>96.0°C</td></tr>
-      <tr><td>Dry End</td><td>~3:35</td><td>~160°C</td></tr>
-      <tr><td>FC Start</td><td>~5:27</td><td>~196°C</td></tr>
-      <tr><td>FC End</td><td>~6:00</td><td>~205°C</td></tr>
-      <tr><td>SC Start</td><td>~6:30</td><td>~211°C</td></tr>
-      <tr><td>Drop</td><td>by ~6:50–6:54</td><td>~217–218°C</td></tr>
-      <tr><td>Cool End</td><td>by ~9:50, then stop the roast</td><td>falling</td></tr>
+      <tr><td>Charge</td><td>right when you press START</td><td>96.0°</td><td>204.8°</td></tr>
+      <tr><td>Turning Point</td><td><em>(auto — no click)</em> ~0:45</td><td>82.0°</td><td>179.6°</td></tr>
+      <tr><td>Dry End</td><td>~3:35</td><td>~160°</td><td>~320.0°</td></tr>
+      <tr><td>FC Start</td><td>~5:27</td><td>~196°</td><td>~384.8°</td></tr>
+      <tr><td>FC End</td><td>~6:00</td><td>~205°</td><td>~401.0°</td></tr>
+      <tr><td>SC Start</td><td>~6:30</td><td>~211°</td><td>~411.8°</td></tr>
+      <tr><td>Drop</td><td>by ~6:50–6:54</td><td>~217–218°</td><td>~422.6–424.4°</td></tr>
+      <tr><td>Cool End</td><td>by ~9:50, then stop the roast</td><td>falling</td><td>falling</td></tr>
     </tbody>
   </table>
   <p>
-    Turning Point isn't in this table — it has no button at all (see
-    Testing Mode), but it still auto-appears on the chart once you click
-    Charge: it's a pure observation (the BT minimum right after Charge),
-    not a judgment call, so it stays automatic even though Charge itself
-    is a manual click — confirmed against a real FZ-94 roast in Artisan,
-    which auto-plots Turning Point on the chart the same way despite
-    every other milestone being marked by hand there too. Every other
-    row in the table above is a genuine judgment call in real roasting,
-    same as FC End/SC Start/Drop/Cool End always were — the times above
+    Turning Point has no button at all (see Testing Mode) — it's a pure
+    observation (the BT minimum right after Charge), not a judgment
+    call, so it stays automatic even though Charge itself is a manual
+    click — confirmed against a real FZ-94 roast in Artisan, which
+    auto-plots Turning Point on the chart the same way despite every
+    other milestone being marked by hand there too. Every other row in
+    the table above is a genuine judgment call in real roasting, same
+    as FC End/SC Start/Drop/Cool End always were — the times above
     just tell you <em>when the underlying fake's own physics hit those
     points</em>, so your manual clicks land in the right place on the
     curve.
