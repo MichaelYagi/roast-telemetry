@@ -160,13 +160,13 @@ export default function AlarmRulesEditor({ rules, onChange }) {
                 const enabled = rule.enabled !== false;
                 return (
                   <li key={rule.id || i} className={`alarm-rules-row${enabled ? "" : " alarm-rules-row-disabled"}`}>
-                    <label className="checkbox-label alarm-rules-enabled-toggle" title={enabled ? "Disable this rule" : "Enable this rule"}>
-                      <input type="checkbox" checked={enabled} onChange={() => toggleEnabled(i)} />
-                    </label>
                     <span className="alarm-rules-trigger">{summarizeTrigger(rule)}</span>
                     <span className="alarm-rules-detail">
                       {rule.delay_s > 0 ? `+${rule.delay_s}s` : "immediately"} → {summarizeCommand(rule)}
                     </span>
+                    <button type="button" onClick={() => toggleEnabled(i)}>
+                      {enabled ? "Disable" : "Enable"}
+                    </button>
                     <button type="button" onClick={() => startEdit(i)} disabled={editingIndex === i}>
                       {editingIndex === i ? "Editing…" : "Edit"}
                     </button>
