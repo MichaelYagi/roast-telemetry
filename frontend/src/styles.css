@@ -1467,6 +1467,18 @@ button:disabled {
   overflow: hidden;
 }
 
+.artisan-toolbar-title {
+  margin: 0;
+  padding: 0.5rem 1rem 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  /* Long titles shouldn't force the whole toolbar wider on a phone --
+     wrap rather than push the milestone boxes/power buttons/clock row
+     below into horizontal scroll territory. */
+  overflow-wrap: break-word;
+}
+
 .artisan-toolbar {
   display: flex;
   align-items: center;

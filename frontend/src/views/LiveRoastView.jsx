@@ -490,6 +490,16 @@ export default function LiveRoastView() {
     setForm((f) => ({ ...f, title: "" }));
   }
 
+  // Required, not auto-generated -- this used to silently fall back to
+  // "Roast <timestamp>" when left blank, which meant it was never
+  // actually possible to notice you forgot to name a roast until you
+  // were looking at an unhelpfully-titled entry in History later.
+  function requireTitle() {
+    if (form.title.trim()) return true;
+    setError("Title is required.");
+    return false;
+  }
+
   async function handleToggleConnect() {
     setError(null);
     if (phase === "idle") {
@@ -501,8 +511,9 @@ export default function LiveRoastView() {
         // Everything else (simulator/alog_playback) has no real
         // connection to make here, so stays the plain local flip it's
         // always been.
+        if (!requireTitle()) return;
         try {
-          const payload = { ...buildConfigFromForm(), title: form.title || `Roast ${new Date().toLocaleString()}` };
+          const payload = { ...buildConfigFromForm(), title: form.title };
           const summary = await api.createRoast(payload);
           setRoastId(summary.id);
           setPhase("armed");
@@ -510,6 +521,7 @@ export default function LiveRoastView() {
           setError(err.message);
         }
       } else {
+        if (!requireTitle()) return;
         setPhase("armed");
       }
     } else if (phase === "armed") {
@@ -602,7 +614,11 @@ export default function LiveRoastView() {
         // over the existing roastId instead of creating a new connection.
         summary = await api.beginRecording(roastId);
       } else {
-        const payload = { ...buildConfigFromForm(), title: form.title || `Roast ${new Date().toLocaleString()}` };
+        // Title is already guaranteed non-blank by the time this runs --
+        // the Configure Roast form only exists while phase === "idle",
+        // and armed (required to get here) is only reachable past
+        // handleToggleConnect's own requireTitle() check.
+        const payload = { ...buildConfigFromForm(), title: form.title };
         summary = await api.createRoast(payload);
         setRoastId(summary.id);
       }
@@ -848,6 +864,7 @@ export default function LiveRoastView() {
   const presetHint = presetName && (phase === "idle" || phase === "armed") ? ` Loaded config: "${presetName}".` : "";
   const toolbarElement = (
     <ArtisanToolbar
+      title={roast?.title || form.title}
       phase={phase}
       elapsedLabel={elapsedLabel}
       statusText={STATUS_TEXT[phase] + presetHint}
@@ -918,8 +935,12 @@ export default function LiveRoastView() {
             <>
               <div className="form-row">
                 <label>
-                  Title
-                  <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                  Title *
+                  <input
+                    required
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  />
                 </label>
                 <label>
                   Data source

@@ -2,6 +2,7 @@
 // readouts (DRY%, time-to-dry, time-to-first-crack), the ON/OFF device
 // toggle + START recording button, and a big digital elapsed-time clock.
 export default function ArtisanToolbar({
+  title,
   phase,
   elapsedLabel,
   statusText,
@@ -14,6 +15,14 @@ export default function ArtisanToolbar({
 
   return (
     <div className="artisan-toolbar-wrap">
+      {/* Title is a required field (see LiveRoastView.jsx's
+          requireTitle()), so this is live -- what you're currently
+          typing in Configure Roast's General tab, then whatever the
+          roast was actually created with once connected. Sits above
+          everything else in the toolbar, itself already the first thing
+          on the page (see LiveRoastView's own !showSplitLayout &&
+          toolbarElement / split-pane placement). */}
+      <h2 className="artisan-toolbar-title">{title || "Untitled roast"}</h2>
       <div className="artisan-toolbar">
         <div className="artisan-toolbar-milestones">
           <div className="milestone-box">
