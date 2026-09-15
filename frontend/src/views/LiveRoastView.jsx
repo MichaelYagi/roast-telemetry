@@ -162,6 +162,23 @@ export default function LiveRoastView() {
     api.listDeviceProfiles().then(setDeviceProfiles).catch(() => {});
   }
   useEffect(refreshDeviceProfiles, []);
+
+  // Configure Roast form tabs -- General/Device always exist (every data
+  // source has *some* Device-tab content: connection fields, an .alog
+  // path, or the simulator's starting %s), Milestone/Automation only for
+  // the two live-hardware modes (auto-detect + Automation Rules are both
+  // meaningless for simulator/alog_playback, which just replay/generate
+  // events on their own). The tab bar itself changes shape with the data
+  // source rather than ever showing an empty tab.
+  const [activeTab, setActiveTab] = useState("general");
+  const availableTabs = LIVE_MODES.includes(form.mode) ? ["general", "device", "milestones"] : ["general", "device"];
+  useEffect(() => {
+    // Lands back on General, not Device -- if Milestone/Automation just
+    // disappeared out from under you (switched to Simulator while on
+    // it), General is the tab you'd expect after a data-source change,
+    // not wherever you happened to be.
+    if (!availableTabs.includes(activeTab)) setActiveTab("general");
+  }, [availableTabs, activeTab]);
   // Populates the Serial port / drive-port fields' <datalist> -- a
   // convenience list of what the OS currently sees plugged in, not a
   // whitelist (both fields stay plain text inputs, so a port not
@@ -885,36 +902,53 @@ export default function LiveRoastView() {
               )}
             </div>
           )}
-          <div className="form-row">
-            <label>
-              Title
-              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            </label>
-            <label>
-              Data source
-              <select value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
-                <option value="simulator">Simulator</option>
-                <option value="alog_playback">.alog Playback</option>
-                <option value="modbus_live">Direct Modbus (USB)</option>
-                <option value="ms6514_live">Direct USB (thermocouple meter)</option>
-              </select>
-            </label>
+          <div className="roast-form-tabs">
+            <button type="button" className={activeTab === "general" ? "active" : ""} onClick={() => setActiveTab("general")}>
+              General
+            </button>
+            <button type="button" className={activeTab === "device" ? "active" : ""} onClick={() => setActiveTab("device")}>
+              Device
+            </button>
+            {availableTabs.includes("milestones") && (
+              <button type="button" className={activeTab === "milestones" ? "active" : ""} onClick={() => setActiveTab("milestones")}>
+                Milestone / Automation
+              </button>
+            )}
           </div>
-          <div className="form-row">
-            <label>
-              Beans
-              <input value={form.beans} onChange={(e) => setForm({ ...form, beans: e.target.value })} />
-            </label>
-            <label>
-              Green weight (g)
-              <input
-                type="number"
-                value={form.weight_green_g}
-                onChange={(e) => setForm({ ...form, weight_green_g: e.target.value })}
-              />
-            </label>
-          </div>
-          {form.mode === "alog_playback" && (
+          {activeTab === "general" && (
+            <>
+              <div className="form-row">
+                <label>
+                  Title
+                  <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                </label>
+                <label>
+                  Data source
+                  <select value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
+                    <option value="simulator">Simulator</option>
+                    <option value="alog_playback">.alog Playback</option>
+                    <option value="modbus_live">Direct Modbus (USB)</option>
+                    <option value="ms6514_live">Direct USB (thermocouple meter)</option>
+                  </select>
+                </label>
+              </div>
+              <div className="form-row">
+                <label>
+                  Beans
+                  <input value={form.beans} onChange={(e) => setForm({ ...form, beans: e.target.value })} />
+                </label>
+                <label>
+                  Green weight (g)
+                  <input
+                    type="number"
+                    value={form.weight_green_g}
+                    onChange={(e) => setForm({ ...form, weight_green_g: e.target.value })}
+                  />
+                </label>
+              </div>
+            </>
+          )}
+          {activeTab === "device" && form.mode === "alog_playback" && (
             <div className="form-row">
               <label>
                 .alog file path (server-side)
@@ -932,7 +966,7 @@ export default function LiveRoastView() {
               </label>
             </div>
           )}
-          {form.mode === "modbus_live" && (
+          {activeTab === "device" && form.mode === "modbus_live" && (
             <div className="form-row">
               {/* Shared by both port fields below via list=. Plain text
                   inputs, not a <select> -- this is a convenience list of
@@ -997,17 +1031,6 @@ export default function LiveRoastView() {
                   onChange={(e) => setForm({ ...form, modbus_control_baudrate: e.target.value })}
                 />
               </label>
-              <p className="hint">
-                Direct Modbus RTU to the FZ-94 over USB (not the EVO, which is network/Ethernet) — talks
-                straight to the roaster's own PLC. One connection handles BT/ET/DT/Burner (a drum-temp
-                setpoint, not a power %) and Air/Drum together (19200 baud, 8N2) — the "separate drive port"
-                field only matters if your own wiring genuinely needs a second connection, which is
-                uncommon; leave it blank otherwise. Mutually exclusive with any other software already
-                connected to the same port(s). Not tested against real FZ-94 hardware; the BT/ET/DT/Burner
-                numbers and the single-connection setup are confirmed against a shipped machine preset and
-                its interpreting source code for this exact model; Air/Drum register numbers are only
-                blog-sourced.
-              </p>
               <label>
                 Device profile
                 <select
@@ -1302,7 +1325,7 @@ export default function LiveRoastView() {
               )}
             </div>
           )}
-          {form.mode === "ms6514_live" && (
+          {activeTab === "device" && form.mode === "ms6514_live" && (
             <div className="form-row">
               <label>
                 Serial port
@@ -1320,7 +1343,7 @@ export default function LiveRoastView() {
               </p>
             </div>
           )}
-          {LIVE_MODES.includes(form.mode) && (
+          {activeTab === "milestones" && LIVE_MODES.includes(form.mode) && (
             <div className="form-row">
               <label className="checkbox-label">
                 <input
@@ -1330,13 +1353,6 @@ export default function LiveRoastView() {
                 />
                 Auto-detect Charge/Dry End/FC Start from BT (opt-in)
               </label>
-              <p className="hint" style={{ flexBasis: "100%" }}>
-                Off by default — every milestone is a manual click, matching how most real roasters are
-                actually run. Turn this on to have Charge/Dry End/FC Start fire automatically from the
-                thresholds below instead (Turning Point always auto-fires either way — it's a pure
-                observation, not a judgment call). Manual clicks still work as an override even with this
-                on — click early yourself if you disagree with the algorithm.
-              </p>
               <label>
                 Dry End BT threshold (°C, blank to disable)
                 <input
@@ -1357,7 +1373,7 @@ export default function LiveRoastView() {
               </label>
             </div>
           )}
-          {AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) && (
+          {activeTab === "device" && AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) && (
             <div className="form-row">
               <label>
                 Burner % at start
@@ -1388,14 +1404,14 @@ export default function LiveRoastView() {
               </p>
             </div>
           )}
-          {form.mode === "modbus_live" && (
+          {activeTab === "milestones" && form.mode === "modbus_live" && (
             <p className="hint">
               Burner/Air/Drum aren't set here -- once connected, the Controls panel on the Live Roast page reads and
               shows whatever the roaster is actually doing (from the device itself, not a guess), and nothing is
               written to it until you move a slider yourself.
             </p>
           )}
-          {form.mode === "modbus_live" && (
+          {activeTab === "milestones" && form.mode === "modbus_live" && (
             <AlarmRulesEditor
               rules={form.alarmRules}
               onChange={(rules) => setForm((f) => ({ ...f, alarmRules: rules }))}

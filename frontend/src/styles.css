@@ -455,6 +455,53 @@ button:disabled {
   border-color: var(--accent);
 }
 
+/* Configure Roast form tabs (General/Device/Milestone-Automation) --
+   same active/inactive visual language as .login-mode-toggle, but the
+   button set can be 2 or 3 wide depending on the selected data source
+   (see LiveRoastView.jsx's availableTabs), so this wraps rather than
+   assuming a fixed count fits one row. */
+.roast-form-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.roast-form-tabs button {
+  flex: 1 1 auto;
+  min-width: 7rem;
+  background: var(--panel);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.roast-form-tabs button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .roast-form-tabs button {
+    padding: 0.3rem 0.45rem;
+    font-size: 0.9rem;
+    min-width: 6rem;
+  }
+  /* Config name + Update + Save as new config otherwise squeeze three
+     things onto one line on a phone -- full-width stacked instead. */
+  .save-preset-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .save-preset-row label,
+  .save-preset-row button {
+    width: 100%;
+  }
+  .save-preset-row button {
+    align-self: stretch;
+  }
+}
+
 .advanced-modbus-fields {
   flex-basis: 100%;
   border-left: 2px solid var(--border);
