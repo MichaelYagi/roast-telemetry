@@ -116,8 +116,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
           <p className="hint">
             Fire a Burner/Air/Drum command and/or show an in-app banner automatically when a milestone is marked, a
             temperature threshold is crossed, or a set amount of roast time has elapsed — immediately, or after a
-            delay (Artisan calls this "Alarms"). Saved as part of this configuration, so it travels with "Save this
-            configuration as" below.
+            delay. Saved as part of this configuration, so it travels with "Save this configuration as" below.
           </p>
 
           {rules.length > 0 && (

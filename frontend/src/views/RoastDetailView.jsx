@@ -8,7 +8,7 @@ import { formatTemp } from "../tempUnits.js";
 // Mirrors the Configure Roast form's <option> labels (LiveRoastView.jsx)
 // so history shows the same human-readable name, not the raw mode enum.
 const MODE_LABELS = {
-  simulator: "Artisan Simulator",
+  simulator: "Simulator",
   alog_playback: ".alog Playback",
   modbus_live: "Direct Modbus (USB)",
   ms6514_live: "Direct USB (thermocouple meter)",

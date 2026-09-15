@@ -85,10 +85,10 @@ export default function SettingsView() {
       <div className="panel">
         <h2>Temperature Unit</h2>
         <p className="hint">
-          Display only, same idea as Artisan's own Celsius/Fahrenheit Mode toggle -- everything is still
-          stored and sent as Celsius; this only changes how live readings (readouts, chart, event history)
-          are shown. Threshold/config fields (Dry End, FC Start, SV ranges, alarm rule temperatures) stay
-          in Celsius regardless, so what you type there always means the same thing.
+          Display only -- everything is still stored and sent as Celsius; this only changes how live
+          readings (readouts, chart, event history) are shown. Threshold/config fields (Dry End, FC Start,
+          SV ranges, alarm rule temperatures) stay in Celsius regardless, so what you type there always
+          means the same thing.
         </p>
         <div className="form-row">
           <label className="checkbox-label">

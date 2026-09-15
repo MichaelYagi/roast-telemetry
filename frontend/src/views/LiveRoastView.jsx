@@ -856,7 +856,7 @@ export default function LiveRoastView() {
             <label>
               Data source
               <select value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
-                <option value="simulator">Artisan Simulator</option>
+                <option value="simulator">Simulator</option>
                 <option value="alog_playback">.alog Playback</option>
                 <option value="modbus_live">Direct Modbus (USB)</option>
                 <option value="ms6514_live">Direct USB (thermocouple meter)</option>
@@ -961,14 +961,15 @@ export default function LiveRoastView() {
                 />
               </label>
               <p className="hint">
-                Direct Modbus RTU to the FZ-94 over USB (not the EVO, which is network/Ethernet) — bypasses
-                Artisan entirely. One connection handles BT/ET/DT/Burner (a drum-temp setpoint, not a power %)
-                and Air/Drum together, matching Artisan's own shipped preset for this machine (19200 baud,
-                8N2) — the "separate drive port" field only matters if your own wiring genuinely needs a
-                second connection, which is uncommon; leave it blank otherwise. Mutually exclusive with
-                Artisan also connected to the same port(s). Not tested against real FZ-94 hardware; the
-                BT/ET/DT/Burner numbers and the single-connection setup are confirmed against Artisan's own
-                shipped machine preset and source code; Air/Drum register numbers are only blog-sourced.
+                Direct Modbus RTU to the FZ-94 over USB (not the EVO, which is network/Ethernet) — talks
+                straight to the roaster's own PLC. One connection handles BT/ET/DT/Burner (a drum-temp
+                setpoint, not a power %) and Air/Drum together (19200 baud, 8N2) — the "separate drive port"
+                field only matters if your own wiring genuinely needs a second connection, which is
+                uncommon; leave it blank otherwise. Mutually exclusive with any other software already
+                connected to the same port(s). Not tested against real FZ-94 hardware; the BT/ET/DT/Burner
+                numbers and the single-connection setup are confirmed against a shipped machine preset and
+                its interpreting source code for this exact model; Air/Drum register numbers are only
+                blog-sourced.
               </p>
               <button
                 type="button"
@@ -982,10 +983,11 @@ export default function LiveRoastView() {
                   <p className="hint">
                     Leave any of these blank to use the FZ-94 defaults above. Only worth touching once you've
                     confirmed your own unit's actual register map differs (see the VFD's own nameplate/front-panel
-                    parameters, or a real probe's slave ID). BT/ET/DT/Burner are confirmed against Artisan's own
-                    shipped FZ-94 preset — exposed here for a genuinely different Modbus roaster, not because a real
-                    FZ-94 should need them changed. Air/Drum (control+feedback registers, operating range) and the
-                    Burner SV°C range are that engine's least-confirmed, blog-sourced defaults.
+                    parameters, or a real probe's slave ID). BT/ET/DT/Burner are confirmed against a shipped
+                    FZ-94 machine preset and its interpreting source code — exposed here for a genuinely different
+                    Modbus roaster, not because a real FZ-94 should need them changed. Air/Drum (control+feedback
+                    registers, operating range) and the Burner SV°C range are that engine's least-confirmed,
+                    blog-sourced defaults.
                   </p>
                   <div className="form-row">
                     <label>
@@ -1250,10 +1252,10 @@ export default function LiveRoastView() {
                 />
               </label>
               <p className="hint">
-                Direct USB read of the Mastech MS6514 — bypasses Artisan entirely (no Artisan needed at all for
-                this mode). Read-only. T1 → BT, T2 → ET. Keep the meter's display set to "T1" or "T2" (not
-                "T1-T2") for reliable dual-channel reading. Charge/Turning Point auto-detect from BT; Dry
-                End/FC Start trigger at your set thresholds. Mark Drop and Cool End yourself when you make the call.
+                Direct USB read of the Mastech MS6514 — reads straight over USB, no other software needed.
+                Read-only. T1 → BT, T2 → ET. Keep the meter's display set to "T1" or "T2" (not "T1-T2") for
+                reliable dual-channel reading. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a
+                manual click — mark them yourself as the roast happens.
               </p>
             </div>
           )}
@@ -1501,17 +1503,17 @@ export default function LiveRoastView() {
                 drives (run/stop + frequency registers 8192/8193, default 0–100%/0–70%), each with its own
                 feedback register (8451) reporting the drive's actual current speed. Out-of-range values are
                 clamped to the configured range. See "Advanced Modbus register map" above to override any of
-                these for your own unit. Charge and Turning Point auto-detect from BT; Dry End/FC Start trigger
-                at your set thresholds. Mark Drop and Cool End yourself when you make the call.
+                these for your own unit. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual
+                click — mark them yourself as the roast happens.
               </p>
             )}
             {activeMode === "ms6514_live" && (
               <div className="panel control-panel">
                 <h3>Mastech MS6514</h3>
                 <p className="hint">
-                  Reading {form.ms6514_port || "the serial port"} directly — no Artisan needed. Read-only,
-                  this meter has no command to control anything. Charge and Turning Point auto-detect from BT;
-                  Dry End/FC Start trigger at your set thresholds. Mark Drop and Cool End yourself below.
+                  Reading {form.ms6514_port || "the serial port"} directly — no other software needed.
+                  Read-only, this meter has no command to control anything. Every milestone (Charge, Dry
+                  End, FC Start, Drop, etc.) is a manual click — mark them yourself below.
                 </p>
               </div>
             )}
