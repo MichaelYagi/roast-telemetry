@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import RoastChart from "../components/RoastChart.jsx";
 import RoastReviewCard from "../components/RoastReviewCard.jsx";
+import { formatTemp } from "../tempUnits.js";
 
 // Mirrors the Configure Roast form's <option> labels (LiveRoastView.jsx)
 // so history shows the same human-readable name, not the raw mode enum.
@@ -27,6 +28,7 @@ export default function RoastDetailView() {
   const { id } = useParams();
   const [roast, setRoast] = useState(null);
   const [error, setError] = useState(null);
+  const [tempUnit, setTempUnit] = useState("c"); // display only, see Settings > Temperature Unit
 
   useEffect(() => {
     api
@@ -34,6 +36,13 @@ export default function RoastDetailView() {
       .then(setRoast)
       .catch((err) => setError(err.message));
   }, [id]);
+
+  // One-time fetch, not the live SSE subscription LiveRoastView uses --
+  // a finished roast's page doesn't need to react to a setting saved in
+  // another tab while it's open.
+  useEffect(() => {
+    api.getSettings().then((s) => setTempUnit(s.temperature_unit || "c"));
+  }, []);
 
   if (error) return <p className="error panel">{error}</p>;
   if (!roast) return <p className="panel">Loading…</p>;
@@ -60,7 +69,7 @@ export default function RoastDetailView() {
       </div>
 
       <div className="panel">
-        <RoastChart profile={roast.profile} events={roast.events} />
+        <RoastChart profile={roast.profile} events={roast.events} tempUnit={tempUnit} />
       </div>
 
       <div className="detail-grid">
@@ -109,7 +118,7 @@ export default function RoastDetailView() {
               <li key={ev.id}>
                 <strong>{ev.label}</strong> @ {Math.floor(ev.time_s / 60)}:
                 {String(Math.round(ev.time_s % 60)).padStart(2, "0")}
-                {ev.value != null && ev.channel ? ` (${ev.channel}: ${ev.value})` : ev.value != null ? ` (${ev.value}°C)` : ""}
+                {ev.value != null && ev.channel ? ` (${ev.channel}: ${ev.value})` : ev.value != null ? ` (${formatTemp(ev.value, tempUnit)})` : ""}
               </li>
             ))}
           </ul>

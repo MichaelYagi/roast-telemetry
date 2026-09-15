@@ -9,6 +9,7 @@ import {
 } from "chart.js";
 import { useMemo, useState } from "react";
 import { Line } from "react-chartjs-2";
+import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -198,6 +199,7 @@ const eventMarkersPlugin = {
   afterDatasetsDraw(chart, _args, opts) {
     const events = (opts?.events || []).filter((e) => e.type !== "CUSTOM");
     if (!events.length) return;
+    const tempUnit = opts?.tempUnit || "c";
     const { ctx, chartArea, scales } = chart;
     const xScale = scales.x;
     const yScale = scales.yTemp;
@@ -206,9 +208,14 @@ const eventMarkersPlugin = {
       const x = xScale.getPixelForValue(ev.time_s);
       if (x < chartArea.left || x > chartArea.right) return;
       const color = EVENT_COLORS[ev.type] || EVENT_COLORS.CUSTOM;
-      const dotY = ev.value != null && yScale ? yScale.getPixelForValue(ev.value) : chartArea.bottom;
+      // ev.value is always raw Celsius (events aren't part of the
+      // already-converted chart datasets below) -- must convert before
+      // using it against a scale whose own values are now in tempUnit,
+      // or the dot lands at a wildly wrong pixel position.
+      const displayValue = ev.value != null ? celsiusToUnit(ev.value, tempUnit) : null;
+      const dotY = displayValue != null && yScale ? yScale.getPixelForValue(displayValue) : chartArea.bottom;
 
-      const lines = [ev.label, formatTime(ev.time_s), ev.value != null ? `${ev.value.toFixed(1)}°C` : null].filter(Boolean);
+      const lines = [ev.label, formatTime(ev.time_s), displayValue != null ? `${displayValue.toFixed(1)}${unitSuffix(tempUnit)}` : null].filter(Boolean);
       ctx.font = "9px system-ui, sans-serif";
       const boxWidth = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 14;
       const boxHeight = lines.length * 11 + 6;
@@ -245,7 +252,7 @@ const eventMarkersPlugin = {
 
 ChartJS.register(eventMarkersPlugin, scopeBandsPlugin, axisUnitLabelsPlugin, phaseBandsPlugin);
 
-export default function RoastChart({ profile = [], events = [], height = 420, title = "Roaster Scope" }) {
+export default function RoastChart({ profile = [], events = [], height = 420, title = "Roaster Scope", tempUnit = "c" }) {
   const [visible, setVisible] = useState(() =>
     Object.fromEntries(SERIES_DEFS.map((s) => [s.key, s.defaultOn]))
   );
@@ -273,11 +280,17 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
   }
 
   const data = useMemo(() => {
+    // Rates (°C/min) convert by scale only, no +32 offset -- a 5°C/min
+    // rise is an 9°F/min rise, not "5°C/min converted as if it were a
+    // temperature". Absolute temperatures (BT/ET/DT) use the real
+    // celsiusToUnit conversion instead.
+    const convertRor = (v) => (v == null ? null : tempUnit === "f" ? v * 1.8 : v);
     const datasets = SERIES_DEFS.filter((s) => visible[s.key]).map((s) => {
       let points;
       let stepped = false;
       if (s.source === "profile") {
-        points = profile.map((p) => ({ x: p.time_s, y: p[s.field] }));
+        const convert = s.axis === "yTemp" ? (v) => celsiusToUnit(v, tempUnit) : s.axis === "yRor" ? convertRor : (v) => v;
+        points = profile.map((p) => ({ x: p.time_s, y: p[s.field] == null ? null : convert(p[s.field]) }));
       } else {
         const continuousField = CONTINUOUS_FIELD_BY_CHANNEL[s.key];
         const hasContinuous = continuousField && profile.some((p) => p[continuousField] != null);
@@ -302,7 +315,7 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
       };
     });
     return { datasets };
-  }, [profile, events, visible, endTime]);
+  }, [profile, events, visible, endTime, tempUnit]);
 
   const showTemp = visible.BT || visible.ET;
   const showRor = visible.ROR_BT || visible.ROR_ET;
@@ -323,15 +336,18 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
           callbacks: {
             title: (items) => (items.length ? formatTime(items[0].parsed.x) : ""),
             label: (item) => {
-              const suffix = item.dataset.yAxisID === "yTemp" ? "°C" : item.dataset.yAxisID === "yRor" ? "°C/min" : "";
+              // Data is already converted to tempUnit at the dataset level
+              // (see the `data` useMemo above) -- only the unit suffix
+              // needs to reflect that here, not the value itself.
+              const suffix = item.dataset.yAxisID === "yTemp" ? unitSuffix(tempUnit) : item.dataset.yAxisID === "yRor" ? `${unitSuffix(tempUnit)}/min` : "";
               const value = item.parsed.y;
               return ` ${item.dataset.label}: ${value == null ? "—" : `${value.toFixed(1)}${suffix}`}`;
             },
           },
         },
-        eventMarkers: { events },
+        eventMarkers: { events, tempUnit },
         phaseBands: { phases },
-        axisUnitLabels: { leftUnit: showTemp ? "°C" : null, rightUnit: showRor ? "°C/min" : null },
+        axisUnitLabels: { leftUnit: showTemp ? unitSuffix(tempUnit) : null, rightUnit: showRor ? `${unitSuffix(tempUnit)}/min` : null },
       },
       scales: {
         x: {
@@ -348,8 +364,9 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
           display: showTemp,
           // Without an explicit floor, Chart.js auto-fits to the visible
           // data's own min (e.g. ~82C at Turning Point), starting the
-          // axis mid-way up rather than at a real baseline.
-          min: 0,
+          // axis mid-way up rather than at a real baseline. 32 (not 0) in
+          // Fahrenheit mode -- same physical floor (0°C), converted.
+          min: tempUnit === "f" ? 32 : 0,
         },
         yRor: {
           type: "linear",
@@ -360,9 +377,11 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
           // Fixed range (matches typical Artisan RoR scope bounds) so a
           // single transient spike -- e.g. the sharp BT dip right after
           // charge -- can't stretch the axis and flatten the rest of the
-          // roast's curve into an unreadable line near zero.
-          min: -50,
-          max: 50,
+          // roast's curve into an unreadable line near zero. Scaled by
+          // 1.8 in Fahrenheit mode -- a rate conversion (no +32 offset),
+          // matching how the actual RoR data itself is converted above.
+          min: tempUnit === "f" ? -90 : -50,
+          max: tempUnit === "f" ? 90 : 50,
         },
         yControl: {
           type: "linear",
@@ -386,7 +405,7 @@ export default function RoastChart({ profile = [], events = [], height = 420, ti
         },
       },
     }),
-    [events, phases, showTemp, showRor, showControl]
+    [events, phases, showTemp, showRor, showControl, tempUnit]
   );
 
   return (

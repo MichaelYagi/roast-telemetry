@@ -67,12 +67,14 @@ async def update_settings(settings: AppSettings) -> AppSettings:
     panels = _filter_panels(settings.broken_out_panels)
     colors = _filter_colors(settings.breakout_panel_colors)
     small_panels = _filter_panels(settings.small_readout_panels)
+    temperature_unit = settings.temperature_unit if settings.temperature_unit in ("c", "f") else "c"
     storage.set_settings(
         ollama_url=settings.ollama_url,
         ollama_model=settings.ollama_model,
         broken_out_panels=panels,
         breakout_panel_colors=colors,
         small_readout_panels=small_panels,
+        temperature_unit=temperature_unit,
     )
     result = AppSettings(
         ollama_url=settings.ollama_url,
@@ -80,6 +82,7 @@ async def update_settings(settings: AppSettings) -> AppSettings:
         broken_out_panels=panels,
         breakout_panel_colors=colors,
         small_readout_panels=small_panels,
+        temperature_unit=temperature_unit,
     )
     await settings_pubsub.publish(result.model_dump_json())
     return result

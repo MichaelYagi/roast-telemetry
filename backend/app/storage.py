@@ -283,6 +283,7 @@ def get_settings() -> dict:
         "broken_out_panels": broken_out_panels,
         "breakout_panel_colors": breakout_panel_colors,
         "small_readout_panels": small_readout_panels,
+        "temperature_unit": values.get("temperature_unit") or "c",
     }
 
 

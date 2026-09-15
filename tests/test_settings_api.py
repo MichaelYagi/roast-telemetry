@@ -16,7 +16,7 @@ def test_get_settings_defaults(client):
     assert resp.status_code == 200
     assert resp.json() == {
         "ollama_url": None, "ollama_model": None, "broken_out_panels": [], "breakout_panel_colors": {},
-        "small_readout_panels": ["et", "bt", "dt", "ror_bt"],
+        "small_readout_panels": ["et", "bt", "dt", "ror_bt"], "temperature_unit": "c",
     }
 
 
@@ -99,3 +99,17 @@ def test_put_settings_preserves_panel_order(client):
         "broken_out_panels": ["drum", "bt", "et"],
     })
     assert resp.json()["broken_out_panels"] == ["drum", "bt", "et"]
+
+
+def test_put_settings_saves_temperature_unit(client):
+    resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "temperature_unit": "f"})
+    assert resp.json()["temperature_unit"] == "f"
+    assert client.get("/api/settings").json()["temperature_unit"] == "f"
+
+
+def test_put_settings_bogus_temperature_unit_falls_back_to_celsius(client):
+    # Same tolerant-instead-of-erroring convention as the panel/color
+    # filtering above -- an invalid value falls back to the default
+    # rather than failing the whole save.
+    resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "temperature_unit": "kelvin"})
+    assert resp.json()["temperature_unit"] == "c"

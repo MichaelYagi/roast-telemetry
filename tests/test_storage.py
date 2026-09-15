@@ -23,6 +23,7 @@ def test_settings_roundtrip_including_panel_list(isolated_db):
         "breakout_panel_colors": {"bt": "#112233"},
         # Never saved in this test -- falls back to the seeded default.
         "small_readout_panels": ["et", "bt", "dt", "ror_bt"],
+        "temperature_unit": "c",
     }
 
 
@@ -69,6 +70,7 @@ def test_get_settings_defaults_on_empty_db(isolated_db):
         "broken_out_panels": [],
         "breakout_panel_colors": {},
         "small_readout_panels": ["et", "bt", "dt", "ror_bt"],
+        "temperature_unit": "c",
     }
 
 

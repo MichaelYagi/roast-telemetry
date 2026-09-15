@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client.js";
+import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 
 // Every channel worth checking on a full modbus_live connection -- ms6514
 // only ever has bt/et (see canWrite/channelsForMode below), everything
@@ -21,8 +22,14 @@ const SAMPLE_WINDOW_MS = 4000;
 const SAMPLE_INTERVAL_MS = 250; // just samples the already-live `latest` prop -- no extra network calls
 const NUDGE_PCT = 5;
 
-function analyzeReadSamples(samples, channels) {
+function analyzeReadSamples(samples, channels, tempUnit) {
   return channels.map((ch) => {
+    const isTemp = ch.unit === "°";
+    // Plausibility bounds (ch.min/ch.max) always stay Celsius -- they're
+    // sanity-check thresholds, not something a display preference should
+    // touch. Only what gets shown to the user converts.
+    const display = (v) => (isTemp ? celsiusToUnit(v, tempUnit) : v);
+    const unit = isTemp ? unitSuffix(tempUnit) : ch.unit;
     const values = samples.map((s) => s?.[ch.key]).filter((v) => v != null);
     if (values.length === 0) {
       // Not necessarily a failure -- e.g. DT is off by default on most
@@ -35,14 +42,14 @@ function analyzeReadSamples(samples, channels) {
     const max = Math.min(300, Math.max(...values));
     const inRange = values.every((v) => v >= ch.min && v <= ch.max);
     if (!inRange) {
-      return { ...ch, status: "fail", detail: `out of plausible range (${min.toFixed(1)}-${max.toFixed(1)})` };
+      return { ...ch, status: "fail", detail: `out of plausible range (${display(min).toFixed(1)}-${display(max).toFixed(1)})` };
     }
     const varies = max - min > 0.001;
     const last = values[values.length - 1];
     return {
       ...ch,
       status: "pass",
-      detail: `${last.toFixed(1)}${ch.unit}${varies ? "" : " (steady -- fine if the roaster is idle)"}`,
+      detail: `${display(last).toFixed(1)}${unit}${varies ? "" : " (steady -- fine if the roaster is idle)"}`,
     };
   });
 }
@@ -56,7 +63,7 @@ function analyzeReadSamples(samples, channels) {
 // apply_command status check, which never allows writes outside
 // IDLE/ROASTING/COOLING -- there's no path from here to a write firing
 // mid-roast.
-export default function ConnectionTestPanel({ roastId, latest, mode }) {
+export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = "c" }) {
   const [testMode, setTestMode] = useState(null); // null | "read" | "read_write"
   const [running, setRunning] = useState(false);
   const [readResults, setReadResults] = useState(null);
@@ -85,7 +92,7 @@ export default function ConnectionTestPanel({ roastId, latest, mode }) {
     }, SAMPLE_INTERVAL_MS);
     const timeout = setTimeout(() => {
       clearInterval(interval);
-      setReadResults(analyzeReadSamples(samplesRef.current, channelsForMode));
+      setReadResults(analyzeReadSamples(samplesRef.current, channelsForMode, tempUnit));
       setRunning(false);
     }, SAMPLE_WINDOW_MS);
     return () => {

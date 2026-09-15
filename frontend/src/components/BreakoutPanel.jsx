@@ -1,16 +1,18 @@
 import { BREAKOUT_PANEL_ITEMS } from "../breakoutPanels.js";
+import { formatTemp } from "../tempUnits.js";
 
 // Optional large-digit sidebar for the Live Roast screen -- purely
 // additive (see Settings: "Big Readout Panel"), nothing here replaces
 // the normal small displays elsewhere on the page. Renders nothing at
 // all when no items are enabled, so it costs zero layout space by
 // default -- see SettingsView.jsx / breakoutPanels.js for the toggles.
-function computeValues(latest, milestones, elapsedLabel, roast) {
+function computeValues(latest, milestones, elapsedLabel, roast, tempUnit) {
   const fmt = (v, digits = 1, suffix = "") => (v == null ? "—" : `${v.toFixed(digits)}${suffix}`);
+  const temp = (v) => formatTemp(v, tempUnit) ?? "—";
   return {
-    bt: fmt(latest?.bt, 1, "°"),
-    et: fmt(latest?.et, 1, "°"),
-    dt: fmt(latest?.dt, 1, "°"),
+    bt: temp(latest?.bt),
+    et: temp(latest?.et),
+    dt: temp(latest?.dt),
     ror_bt: fmt(latest?.ror_bt, 1),
     ror_et: fmt(latest?.ror_et, 1),
     time: elapsedLabel,
@@ -21,7 +23,7 @@ function computeValues(latest, milestones, elapsedLabel, roast) {
     to_fcs: milestones?.fcsTime ?? "—",
     to_dev: milestones?.devTime ?? "—",
     heater: fmt(latest?.heater_pct, 0, "%"),
-    burner_sv: fmt(latest?.burner_sv_c, 1, "°"),
+    burner_sv: temp(latest?.burner_sv_c),
     fan: fmt(latest?.fan_pct, 0, "%"),
     drum: fmt(latest?.drum_speed_pct, 0, "%"),
     playback_speed: roast?.playback_speed != null ? `${roast.playback_speed}x` : "—",
@@ -31,11 +33,11 @@ function computeValues(latest, milestones, elapsedLabel, roast) {
 // `enabledKeys` is an ordered array (from Settings' "Big Readout Panel" ▲▼
 // reordering) -- render in that order, not BREAKOUT_PANEL_ITEMS' fixed
 // declaration order.
-export default function BreakoutPanel({ enabledKeys, latest, milestones, elapsedLabel, roast, colorOverrides }) {
+export default function BreakoutPanel({ enabledKeys, latest, milestones, elapsedLabel, roast, colorOverrides, tempUnit = "c" }) {
   const items = enabledKeys.map((key) => BREAKOUT_PANEL_ITEMS.find((item) => item.key === key)).filter(Boolean);
   if (items.length === 0) return null;
 
-  const values = computeValues(latest, milestones, elapsedLabel, roast);
+  const values = computeValues(latest, milestones, elapsedLabel, roast, tempUnit);
 
   return (
     <div className="breakout-panel">

@@ -40,6 +40,9 @@ prefer the link above or open the files locally.)*
   an optional extra delay, Artisan-Alarms-style. Burner bindings need an
   extra explicit confirm step; a pending delayed action is cancelled,
   not fired late, if you stop the roast first.
+- **Celsius/Fahrenheit display toggle** (Settings → Temperature Unit),
+  same idea as Artisan's own Celsius/Fahrenheit Mode — display only,
+  everything is still stored and sent as Celsius.
 - **Live rate-of-rise, computed from raw BT/ET either way** — real
   hardware doesn't carry roast-milestone events on its own (a PLC or a
   thermocouple meter has no concept of Charge/Dry End/etc.), and this

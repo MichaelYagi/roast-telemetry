@@ -10,6 +10,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { api } from "../api/client.js";
+import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -20,9 +21,16 @@ export default function RoastComparisonView() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [details, setDetails] = useState({});
   const [curve, setCurve] = useState("bt");
+  const [tempUnit, setTempUnit] = useState("c"); // display only, see Settings > Temperature Unit
 
   useEffect(() => {
     api.listRoasts({ limit: 200 }).then(setRoasts);
+  }, []);
+
+  // One-time fetch, not a live subscription -- same rationale as
+  // RoastDetailView.jsx.
+  useEffect(() => {
+    api.getSettings().then((s) => setTempUnit(s.temperature_unit || "c"));
   }, []);
 
   function toggle(id) {
@@ -37,13 +45,18 @@ export default function RoastComparisonView() {
     });
   }, [selectedIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const isRate = curve.startsWith("ror_");
+
   const data = useMemo(() => {
+    // Rate curves (°C/min) convert by scale only, no +32 offset -- see
+    // RoastChart.jsx's identical convertRor for the same reasoning.
+    const convert = (v) => (v == null ? null : isRate ? (tempUnit === "f" ? v * 1.8 : v) : celsiusToUnit(v, tempUnit));
     return {
       datasets: selectedIds
         .filter((id) => details[id])
         .map((id, i) => ({
           label: details[id].title,
-          data: details[id].profile.map((p) => ({ x: p.time_s, y: p[curve] })),
+          data: details[id].profile.map((p) => ({ x: p.time_s, y: convert(p[curve]) })),
           borderColor: PALETTE[i % PALETTE.length],
           backgroundColor: PALETTE[i % PALETTE.length],
           pointRadius: 0,
@@ -51,7 +64,7 @@ export default function RoastComparisonView() {
           tension: 0.15,
         })),
     };
-  }, [selectedIds, details, curve]);
+  }, [selectedIds, details, curve, tempUnit, isRate]);
 
   const options = useMemo(
     () => ({
@@ -63,10 +76,13 @@ export default function RoastComparisonView() {
       plugins: { legend: { position: "top" } },
       scales: {
         x: { type: "linear", title: { display: true, text: "Time (s)" } },
-        y: { type: "linear", title: { display: true, text: `${curve.toUpperCase()} (°C)` } },
+        y: {
+          type: "linear",
+          title: { display: true, text: `${curve.toUpperCase()} (${unitSuffix(tempUnit)}${isRate ? "/min" : ""})` },
+        },
       },
     }),
-    [curve]
+    [curve, tempUnit, isRate]
   );
 
   return (

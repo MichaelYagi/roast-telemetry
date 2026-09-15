@@ -11,6 +11,7 @@ import ConnectionTestPanel from "../components/ConnectionTestPanel.jsx";
 import ControlPanel from "../components/ControlPanel.jsx";
 import EventButtonRow from "../components/EventButtonRow.jsx";
 import RoastChart from "../components/RoastChart.jsx";
+import { formatTemp } from "../tempUnits.js";
 
 const SAMPLE_ALOG_PATH = "backend/data/sample_roasts/demo_roast.alog";
 
@@ -169,6 +170,7 @@ export default function LiveRoastView() {
   const [brokenOutPanels, setBrokenOutPanels] = useState([]); // ordered array, matches Settings' display order
   const [panelColors, setPanelColors] = useState({}); // key -> hex override, shared by both readout panels
   const [smallReadoutPanels, setSmallReadoutPanels] = useState([]); // ordered array, independent from brokenOutPanels
+  const [tempUnit, setTempUnit] = useState("c"); // "c" | "f" -- display only, see Settings > Temperature Unit
   const [viewportWide, setViewportWide] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= BREAKOUT_SPLIT_MIN_VIEWPORT
   );
@@ -387,6 +389,7 @@ export default function LiveRoastView() {
       // older save (from before "time" was excluded) could still have it
       // in the array.
       setSmallReadoutPanels((s.small_readout_panels || []).filter((k) => !SMALL_READOUT_EXCLUDED_KEYS.includes(k)));
+      setTempUnit(s.temperature_unit || "c");
     };
     const source = new EventSource(settingsStreamUrl());
     source.addEventListener("settings", (e) => {
@@ -1358,12 +1361,18 @@ export default function LiveRoastView() {
               two modes that have a real connection worth verifying before
               committing to a roast. */}
           {phase === "armed" && LIVE_MODES.includes(activeMode) && (
-            <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} />
+            <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} />
           )}
           <div className="panel scope-panel">
             <div className="scope-body">
               <div className="scope-chart" ref={scopeChartRef}>
-                <RoastChart profile={roast?.profile || []} events={roast?.events || []} title={null} height={chartHeight} />
+                <RoastChart
+                  profile={roast?.profile || []}
+                  events={roast?.events || []}
+                  title={null}
+                  height={chartHeight}
+                  tempUnit={tempUnit}
+                />
                 <div
                   className="scope-chart-resize-handle"
                   title="Drag to resize the chart (Small Readout follows it)"
@@ -1388,6 +1397,7 @@ export default function LiveRoastView() {
                   elapsedLabel={elapsedLabel}
                   roast={roast}
                   colorOverrides={panelColors}
+                  tempUnit={tempUnit}
                 />
               </div>
             </div>
@@ -1513,7 +1523,7 @@ export default function LiveRoastView() {
                   .reverse()
                   .map((ev) => (
                     <li key={ev.id}>
-                      <strong>{ev.label}</strong> @ {formatElapsed(ev.time_s)} ({ev.value != null ? ev.value.toFixed(1) : "--"}°C)
+                      <strong>{ev.label}</strong> @ {formatElapsed(ev.time_s)} ({ev.value != null ? formatTemp(ev.value, tempUnit) : "--"})
                     </li>
                   ))}
               </ul>
@@ -1559,6 +1569,7 @@ export default function LiveRoastView() {
               elapsedLabel={elapsedLabel}
               roast={roast}
               colorOverrides={panelColors}
+              tempUnit={tempUnit}
             />
           </div>
         ) : (
@@ -1569,6 +1580,7 @@ export default function LiveRoastView() {
             elapsedLabel={elapsedLabel}
             roast={roast}
             colorOverrides={panelColors}
+            tempUnit={tempUnit}
           />
         )}
         </div>

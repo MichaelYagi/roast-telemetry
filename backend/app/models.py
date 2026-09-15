@@ -313,6 +313,15 @@ class AppSettings(BaseModel):
     # so existing installs see no visual change until they actually touch
     # Settings > Small Readout.
     small_readout_panels: list[str] = []
+    # Display-only, "c" or "f" -- same idea as Artisan's own Config >
+    # Temperature > Fahrenheit/Celsius Mode toggle. Only affects how
+    # already-Celsius values are *shown* (readouts, chart, event history);
+    # every stored value, every config input field (thresholds, SV
+    # ranges, alarm rule temperatures), and everything sent to/from the
+    # API stays Celsius always -- converting those bidirectionally was
+    # judged more confusing than useful for a feature nobody asked for
+    # beyond "let me see the numbers in my preferred unit".
+    temperature_unit: str = "c"
 
 
 class OllamaStatus(BaseModel):

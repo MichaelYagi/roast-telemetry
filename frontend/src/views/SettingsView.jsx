@@ -21,6 +21,7 @@ export default function SettingsView() {
   // same panelColors above), so the same value (e.g. "bt") can be
   // enabled in one, both, or neither independently, always the same color.
   const [smallReadoutPanels, setSmallReadoutPanels] = useState([]);
+  const [temperatureUnit, setTemperatureUnit] = useState("c");
   const [loaded, setLoaded] = useState(false);
   const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState(null); // { connected, models, error } | null
@@ -34,6 +35,7 @@ export default function SettingsView() {
       setBrokenOutPanels(s.broken_out_panels || []);
       setPanelColors(s.breakout_panel_colors || {});
       setSmallReadoutPanels(s.small_readout_panels || []);
+      setTemperatureUnit(s.temperature_unit || "c");
       setLoaded(true);
     });
   }, []);
@@ -67,6 +69,7 @@ export default function SettingsView() {
         broken_out_panels: brokenOutPanels,
         breakout_panel_colors: panelColors,
         small_readout_panels: smallReadoutPanels,
+        temperature_unit: temperatureUnit,
       });
       setSaveFeedback("Saved.");
     } catch (err) {
@@ -79,6 +82,36 @@ export default function SettingsView() {
 
   return (
     <div className="settings-view">
+      <div className="panel">
+        <h2>Temperature Unit</h2>
+        <p className="hint">
+          Display only, same idea as Artisan's own Celsius/Fahrenheit Mode toggle -- everything is still
+          stored and sent as Celsius; this only changes how live readings (readouts, chart, event history)
+          are shown. Threshold/config fields (Dry End, FC Start, SV ranges, alarm rule temperatures) stay
+          in Celsius regardless, so what you type there always means the same thing.
+        </p>
+        <div className="form-row">
+          <label className="checkbox-label">
+            <input
+              type="radio"
+              name="temperature_unit"
+              checked={temperatureUnit === "c"}
+              onChange={() => setTemperatureUnit("c")}
+            />
+            Celsius (°C)
+          </label>
+          <label className="checkbox-label">
+            <input
+              type="radio"
+              name="temperature_unit"
+              checked={temperatureUnit === "f"}
+              onChange={() => setTemperatureUnit("f")}
+            />
+            Fahrenheit (°F)
+          </label>
+        </div>
+      </div>
+
       <div className="panel">
         <h2>Settings</h2>
         <p className="hint">
