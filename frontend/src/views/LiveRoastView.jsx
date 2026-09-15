@@ -1451,12 +1451,6 @@ export default function LiveRoastView() {
             <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} />
           )}
           <div className="panel scope-panel">
-            <BackgroundProfilePicker
-              excludeId={roastId}
-              selectedId={backgroundRoastId}
-              selectedTitle={backgroundLabel}
-              onSelect={handleSelectBackground}
-            />
             <div className="scope-body">
               <div className="scope-chart" ref={scopeChartRef}>
                 <RoastChart
@@ -1514,6 +1508,16 @@ export default function LiveRoastView() {
                 {n.text}
               </p>
             ))}
+            {/* Below the chart and milestone buttons, not above -- nothing
+                should sit between opening this page and seeing the live
+                curve once a roast is actually running. Picking/changing
+                a background reference is a secondary, occasional action. */}
+            <BackgroundProfilePicker
+              excludeId={roastId}
+              selectedId={backgroundRoastId}
+              selectedTitle={backgroundLabel}
+              onSelect={handleSelectBackground}
+            />
           </div>
 
           {roast && (
