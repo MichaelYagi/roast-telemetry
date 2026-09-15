@@ -2148,3 +2148,56 @@ button:disabled {
   transform: skew(-6deg) !important;
   filter: saturate(2.5) !important;
 }
+
+/* ============================================================
+   PRINT -- "printable roast report" (RoastDetailView's Print report
+   button, browser-native print-to-PDF -- see that view for what
+   .no-print/.print-only mark). Forces a plain light/white look
+   regardless of the active theme (a dark/coffee/garbagefire background
+   printed literally would waste ink and often print unreadable), and
+   hides interactive chrome that means nothing on paper. */
+.print-only {
+  display: none;
+}
+
+@media print {
+  :root {
+    color-scheme: light;
+    --bg: #ffffff;
+    --panel: #ffffff;
+    --border: #d4d4d4;
+    --text: #000000;
+    --text-muted: #444444;
+    --accent: #2e6da4;
+    --accent-soft: #e6f0f8;
+  }
+
+  .app-header,
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  /* The chart's own BT/ET/DT/RoR/etc. checkboxes -- a printed report
+     shows whatever was toggled on at print time, but offering to
+     toggle it on paper makes no sense. */
+  .scope-toggles {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  .panel {
+    border: 1px solid #d4d4d4;
+    box-shadow: none;
+    /* Print's own page-break handling does a much better job of this
+       than trying to force every panel to fit one page -- forcing it
+       here just as often cuts a panel awkwardly in half instead. */
+    break-inside: avoid;
+  }
+}

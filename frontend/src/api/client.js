@@ -50,6 +50,7 @@ export const api = {
   addNote: (id, note) => request(`/roasts/${id}/notes`, { method: "POST", body: JSON.stringify(note) }),
   addEvent: (id, event) => request(`/roasts/${id}/events`, { method: "POST", body: JSON.stringify(event) }),
   alogDownloadUrl: (id) => `${BASE}/roasts/${id}/alog`,
+  csvDownloadUrl: (id) => `${BASE}/roasts/${id}/csv`,
   importAlog: (path, title) =>
     request(`/roasts/import?${new URLSearchParams({ path, ...(title ? { title } : {}) })}`, { method: "POST" }),
 

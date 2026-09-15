@@ -72,6 +72,11 @@ prefer the link above or open the files locally.)*
   measured from their own Charge event, so no realignment is needed —
   purely a visual overlay picked per session; it never reads from or
   affects the live roast's own recording, automation, or control state.
+- **CSV export and a printable roast report** — every roast (finished or
+  still recording) has a spreadsheet-friendly CSV download alongside the
+  Artisan-native `.alog` one, plus a "Print report" button using the
+  browser's own print-to-PDF (no extra dependency) for a clean, chart-
+  included summary sheet.
 - **Login, with the first registrant becoming admin.** No built-in
   default account — the first person to register gets immediate admin
   access; everyone after that is pending until the admin allows them

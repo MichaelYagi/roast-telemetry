@@ -2,14 +2,18 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import json
 import re
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sse_starlette.sse import EventSourceResponse
+
+from alog_playback.alog_io import _nearest_index
 
 from .. import auth, ollama_client, storage
 from ..models import (
@@ -43,6 +47,59 @@ def alog_filename(title: str, created_at: str) -> str:
     safe_title = _UNSAFE_FILENAME_CHARS.sub("_", title).strip() or "roast"
     timestamp = created_at[:16].replace("T", "_").replace(":", "")
     return f"{safe_title}_{timestamp}.alog"
+
+
+def csv_filename(title: str, created_at: str) -> str:
+    """Same "<Title>_<YYYY-MM-DD_HHMM>.csv" convention as alog_filename
+    above, mirrored client-side the same way (see RoastDetailView.jsx's
+    csvFilename)."""
+    safe_title = _UNSAFE_FILENAME_CHARS.sub("_", title).strip() or "roast"
+    timestamp = created_at[:16].replace("T", "_").replace(":", "")
+    return f"{safe_title}_{timestamp}.csv"
+
+
+def roast_to_csv(roast: Roast) -> str:
+    """One row per recorded sample, time-aligned -- BT/ET/DT/RoR/Burner-
+    Air-Drum-%/Burner-SV plus any role=EXTRA DeviceProfile channels this
+    roast happens to have (collected as the union of every point's own
+    `extra` keys, in first-seen order, same convention RoastChart.jsx's
+    own extraSeriesDefs uses client-side). `event` is populated on
+    whichever row is *closest* to each milestone's own time_s (reusing
+    alog_io's own _nearest_index, the same alignment its .alog writer
+    uses) rather than requiring an exact match -- CHARGE in particular
+    can land at time_s=0.0 while a live-recorded roast's first real
+    sample is at time_s=1.0 (confirmed empirically against a live
+    simulator roast), so exact equality silently drops it."""
+    extra_labels: list[str] = []
+    for p in roast.profile:
+        for label in p.extra or {}:
+            if label not in extra_labels:
+                extra_labels.append(label)
+
+    sample_times = [p.time_s for p in roast.profile]
+    events_by_time: dict[float, list[str]] = {}
+    for e in roast.events:
+        if not sample_times:
+            break
+        nearest_t = sample_times[_nearest_index(sample_times, e.time_s)]
+        events_by_time.setdefault(nearest_t, []).append(e.label)
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["time_s", "event", "bt", "et", "dt", "ror_bt", "ror_et", "heater_pct", "fan_pct", "drum_speed_pct", "burner_sv_c"]
+        + [f"extra_{label}" for label in extra_labels]
+    )
+    for p in roast.profile:
+        writer.writerow(
+            [
+                p.time_s,
+                "; ".join(events_by_time.get(p.time_s, [])),
+                p.bt, p.et, p.dt, p.ror_bt, p.ror_et, p.heater_pct, p.fan_pct, p.drum_speed_pct, p.burner_sv_c,
+            ]
+            + [p.extra.get(label) for label in extra_labels]
+        )
+    return buffer.getvalue()
 
 
 @router.get("", response_model=list[RoastSummary])
@@ -171,6 +228,24 @@ def download_alog(roast_id: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="alog not available (roast still in progress or not found)")
     return FileResponse(
         roast.alog_path, filename=alog_filename(roast.title, roast.created_at), media_type="application/octet-stream"
+    )
+
+
+@router.get("/{roast_id}/csv")
+def download_csv(roast_id: str) -> Response:
+    """Plain spreadsheet-friendly export -- one row per recorded sample.
+    Unlike the .alog download (only available once a roast has actually
+    finished recording, since that's when it's written to disk -- see
+    RoastSession._finish), this works for a roast still in progress too,
+    reading straight from its live in-memory profile via the same
+    get_roast_detail session_manager already uses everywhere else."""
+    roast = session_manager.get_roast_detail(roast_id)
+    if roast is None:
+        raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
+    return Response(
+        content=roast_to_csv(roast),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{csv_filename(roast.title, roast.created_at)}"'},
     )
 
 

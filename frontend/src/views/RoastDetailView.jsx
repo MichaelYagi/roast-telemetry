@@ -24,6 +24,13 @@ function alogFilename(title, createdAt) {
   return `${safeTitle}_${timestamp}.alog`;
 }
 
+// Same convention, mirrors backend/app/api/roasts.py's csv_filename().
+function csvFilename(title, createdAt) {
+  const safeTitle = title.replace(/[\\/:*?"<>|]/g, "_").trim() || "roast";
+  const timestamp = createdAt.slice(0, 16).replace("T", "_").replace(":", "");
+  return `${safeTitle}_${timestamp}.csv`;
+}
+
 export default function RoastDetailView() {
   const { id } = useParams();
   const [roast, setRoast] = useState(null);
@@ -49,23 +56,48 @@ export default function RoastDetailView() {
 
   return (
     <div className="detail-view">
-      <div className="panel">
+      <div className="panel no-print">
         <h2>{roast.title}</h2>
         <p className="sub">
           {roast.mode} · status: <strong>{roast.status}</strong> · duration:{" "}
           {roast.duration_s ? `${Math.floor(roast.duration_s / 60)}:${String(Math.round(roast.duration_s % 60)).padStart(2, "0")}` : "—"}
         </p>
-        {roast.alog_path && (
-          // No target="_blank" -- the response is Content-Disposition:
-          // attachment, so it downloads without navigating away; adding
-          // _blank just pops an empty new tab in some browsers while the
-          // file downloads silently in the background, looking like a
-          // no-op click. Real Artisan's own native format -- File > Open
-          // in Artisan itself opens this directly, no conversion needed.
-          <>
-            Download <a href={api.alogDownloadUrl(roast.id)}>{alogFilename(roast.title, roast.created_at)}</a>
-          </>
-        )}
+        <p>
+          {roast.alog_path && (
+            // No target="_blank" -- the response is Content-Disposition:
+            // attachment, so it downloads without navigating away; adding
+            // _blank just pops an empty new tab in some browsers while the
+            // file downloads silently in the background, looking like a
+            // no-op click. Real Artisan's own native format -- File > Open
+            // in Artisan itself opens this directly, no conversion needed.
+            <>
+              Download <a href={api.alogDownloadUrl(roast.id)}>{alogFilename(roast.title, roast.created_at)}</a>
+              {" · "}
+            </>
+          )}
+          Download <a href={api.csvDownloadUrl(roast.id)}>{csvFilename(roast.title, roast.created_at)}</a>
+          {" · "}
+          {/* Browser-native print-to-PDF rather than a generated file --
+              no new dependency, and "Save as PDF" in the print dialog is
+              already a real PDF export. The report itself is just this
+              page with .no-print-marked chrome (this whole block, nav
+              controls elsewhere on the page) hidden via the @media print
+              rules in styles.css -- see those for what stays visible. */}
+          <button type="button" className="link-like" onClick={() => window.print()}>
+            Print report
+          </button>
+        </p>
+      </div>
+
+      {/* Print-only header -- the interactive one above (with its
+          download links/print button) is hidden when printing, so the
+          report needs its own plain title/stat line to replace it. */}
+      <div className="print-only detail-print-header">
+        <h2>{roast.title}</h2>
+        <p className="sub">
+          {roast.mode} · status: {roast.status} · duration:{" "}
+          {roast.duration_s ? `${Math.floor(roast.duration_s / 60)}:${String(Math.round(roast.duration_s % 60)).padStart(2, "0")}` : "—"}
+        </p>
       </div>
 
       <div className="panel">

@@ -1,7 +1,11 @@
 """Pure helper functions in backend/app/api/roasts.py."""
 from __future__ import annotations
 
-from backend.app.api.roasts import alog_filename
+import csv
+import io
+
+from backend.app.api.roasts import alog_filename, csv_filename, roast_to_csv
+from backend.app.models import Roast, RoastEvent, RoastMode, RoastProfilePoint, RoastStatus
 
 
 def test_alog_filename_basic():
@@ -17,3 +21,61 @@ def test_alog_filename_sanitizes_unsafe_characters():
 
 def test_alog_filename_falls_back_when_title_is_empty():
     assert alog_filename("   ", "2026-03-05T14:32:10") == "roast_2026-03-05_1432.alog"
+
+
+def test_csv_filename_basic():
+    assert csv_filename("My Roast", "2026-03-05T14:32:10") == "My Roast_2026-03-05_1432.csv"
+
+
+def _make_roast(profile, events=None) -> Roast:
+    return Roast(
+        id="r1", title="Test Roast", mode=RoastMode.SIMULATOR, status=RoastStatus.STOPPED,
+        created_at="2026-01-01T00:00:00", profile=profile, events=events or [], notes=[],
+    )
+
+
+def test_roast_to_csv_header_and_rows():
+    roast = _make_roast([
+        RoastProfilePoint(time_s=0.0, bt=96.0, et=200.0, heater_pct=70.0, fan_pct=20.0, drum_speed_pct=50.0),
+        RoastProfilePoint(time_s=1.0, bt=95.5, et=201.0, heater_pct=70.0, fan_pct=20.0, drum_speed_pct=50.0),
+    ])
+    rows = list(csv.reader(io.StringIO(roast_to_csv(roast))))
+    assert rows[0] == ["time_s", "event", "bt", "et", "dt", "ror_bt", "ror_et", "heater_pct", "fan_pct", "drum_speed_pct", "burner_sv_c"]
+    assert rows[1][0] == "0.0"
+    assert rows[1][2] == "96.0"
+    assert len(rows) == 3  # header + 2 samples
+
+
+def test_roast_to_csv_tags_the_row_a_milestone_landed_on():
+    roast = _make_roast(
+        [RoastProfilePoint(time_s=0.0, bt=96.0), RoastProfilePoint(time_s=1.0, bt=95.5)],
+        events=[RoastEvent(id="e1", time_s=0.0, type="CHARGE", label="Charge")],
+    )
+    rows = list(csv.reader(io.StringIO(roast_to_csv(roast))))
+    event_col = rows[0].index("event")
+    assert rows[1][event_col] == "Charge"
+    assert rows[2][event_col] == ""
+
+
+def test_roast_to_csv_tags_the_nearest_row_when_no_exact_match():
+    # A live-recorded simulator roast's CHARGE fires at time_s=0.0, but
+    # its first real sample lands at time_s=1.0 -- confirmed live. The
+    # nearest row, not "no row at all", should get tagged.
+    roast = _make_roast(
+        [RoastProfilePoint(time_s=1.0, bt=96.0), RoastProfilePoint(time_s=2.0, bt=95.9)],
+        events=[RoastEvent(id="e1", time_s=0.0, type="CHARGE", label="Charge")],
+    )
+    rows = list(csv.reader(io.StringIO(roast_to_csv(roast))))
+    event_col = rows[0].index("event")
+    assert rows[1][event_col] == "Charge"
+    assert rows[2][event_col] == ""
+
+
+def test_roast_to_csv_adds_a_column_per_extra_channel():
+    roast = _make_roast([
+        RoastProfilePoint(time_s=0.0, bt=96.0, extra={"Flue": 120.0}),
+        RoastProfilePoint(time_s=1.0, bt=95.5, extra={"Flue": 121.0}),
+    ])
+    rows = list(csv.reader(io.StringIO(roast_to_csv(roast))))
+    assert rows[0][-1] == "extra_Flue"
+    assert rows[1][-1] == "120.0"

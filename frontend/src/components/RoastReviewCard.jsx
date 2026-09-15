@@ -88,13 +88,13 @@ export default function RoastReviewCard({ roastId, roastActive }) {
             )}
 
             {!busy && (
-              <button type="button" onClick={handleGenerate} disabled={roastActive}>
+              <button type="button" className="no-print" onClick={handleGenerate} disabled={roastActive}>
                 {review ? "Regenerate review" : "Generate review"}
               </button>
             )}
-            {roastActive && <p className="hint">Finish the roast before generating a review.</p>}
+            {roastActive && <p className="hint no-print">Finish the roast before generating a review.</p>}
             {!roastActive && !review && (
-              <p className="hint">Uses a local Ollama server -- configure it under Settings.</p>
+              <p className="hint no-print">Uses a local Ollama server -- configure it under Settings.</p>
             )}
           </>
         )}
