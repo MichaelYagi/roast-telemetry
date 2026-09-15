@@ -1311,15 +1311,19 @@ button:disabled {
   display: flex;
   align-items: flex-end;
   gap: 1.1rem;
-  /* Floor of 260px regardless of how short --scope-chart-height gets
-     (the chart's own drag-resize floor, CHART_MIN_HEIGHT, is 160px) --
-     a 2-member stacked lane with arrows on needs roughly that much to
-     stay legible without relying on .vertical-control-group's own
-     overflow-y:auto scroll for what should be the common case. Only
-     this panel's own height gets the floor -- --scope-chart-height
-     itself is untouched, so the chart and Small Readout column (which
-     read that var directly) can still go as short as the operator drags. */
-  height: max(var(--scope-chart-height, 420px), 260px);
+  /* Plain --scope-chart-height, same as .scope-chart/.small-readout-col
+     read directly -- an earlier version gave this its own taller floor
+     (260px) so a stacked lane wouldn't need to scroll in the common
+     case, but a flex row's height follows its tallest child regardless
+     of align-self, so that floor dragged the whole .scope-body row
+     taller than the chart's own real height, misaligning it from its
+     siblings. Staying matched to the chart takes priority -- when a
+     dragged-short chart genuinely doesn't leave enough room for a
+     stacked lane, .vertical-control-group's own overflow-y: auto below
+     is what handles it (a real scrollbar, contained to this column,
+     same as .small-readout-col already does for the identical squeeze),
+     not growing the shared row. */
+  height: var(--scope-chart-height, 420px);
 }
 
 /* A "group" is one lane -- one or more sliders sharing that lane's width,
