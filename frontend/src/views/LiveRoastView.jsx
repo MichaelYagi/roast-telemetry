@@ -1528,13 +1528,6 @@ export default function LiveRoastView() {
                   height={chartHeight}
                   tempUnit={tempUnit}
                 />
-                <div
-                  className="scope-chart-resize-handle"
-                  title="Drag to resize the chart (Small Readout follows it)"
-                  onPointerDown={handleChartResizePointerDown}
-                  onPointerMove={handleChartResizePointerMove}
-                  onPointerUp={handleChartResizePointerUp}
-                />
               </div>
               {/* Independent from the split breakout panel now (see
                   Settings > Small Readout) -- always shown regardless of
@@ -1556,6 +1549,21 @@ export default function LiveRoastView() {
                 />
               </div>
             </div>
+            {/* Moved out of .scope-chart -- as a sibling spanning the whole
+                .scope-body row, this line (and the drag handle) now runs
+                under the vertical control sliders and the Small Readout
+                column too, not just the chart, so it actually reads as the
+                bottom edge of the whole row instead of stopping short on
+                both sides. Still resizes the same --scope-chart-height
+                every one of those three columns already sizes itself off
+                of, so dragging it still resizes all three together. */}
+            <div
+              className="scope-chart-resize-handle"
+              title="Drag to resize the chart row (controls/chart/Small Readout follow it)"
+              onPointerDown={handleChartResizePointerDown}
+              onPointerMove={handleChartResizePointerMove}
+              onPointerUp={handleChartResizePointerUp}
+            />
             <EventButtonRow
               disabled={!isRecording}
               events={roast?.events || []}

@@ -1320,13 +1320,25 @@ button:disabled {
    Fan in the bottom half, same x-position throughout). A single-member
    group is the plain siloed case: its one slider just fills the whole
    lane height via flex:1 below. The gap *between* lanes is
-   .vertical-control-stack's own `gap`, not this. */
+   .vertical-control-stack's own `gap`, not this.
+   overflow-y: auto is a hard guarantee, not just a common-case nicety --
+   a lane with 2+ members (each needing its own value/arrows/track-floor/
+   label) can easily need more height than a short --scope-chart-height
+   has to give (CHART_MIN_HEIGHT is 160px total for the whole row; two
+   stacked members with arrows on need well over that between them). Height
+   here is an explicit 100% (of the stack's own fixed height), so without
+   this, content that doesn't fit spills out past the panel's bottom edge
+   into whatever's below it (confirmed: the CHARGE button) instead of
+   being contained -- this scrolls that lane internally instead, same
+   fixed-height-plus-scroll pattern .small-readout-col already uses below
+   for the identical "many items, not enough room" problem. */
 .vertical-control-group {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0;
   height: 100%;
+  overflow-y: auto;
 }
 
 .vertical-slider-col {
@@ -1389,7 +1401,12 @@ button:disabled {
   appearance: slider-vertical;
   width: 22px;
   flex: 1;
-  min-height: 60px;
+  /* Lower than it might look -- deliberately small so two members
+     stacked in one lane (each needing their own value/arrows/label
+     around this) have a real chance of both fitting without triggering
+     .vertical-control-group's overflow-y:auto scroll in the common case;
+     that scroll is still there as the hard guarantee for whatever doesn't. */
+  min-height: 36px;
   padding: 0;
   border: none;
   accent-color: var(--item-color, var(--accent));
@@ -1790,15 +1807,20 @@ button:disabled {
   align-self: flex-start;
 }
 
-/* Drag-to-resize the chart's own height (see handleChartResizePointerDown
+/* Drag-to-resize the chart row's height (see handleChartResizePointerDown
    in LiveRoastView.jsx) -- CHART_MIN_HEIGHT there is the one hard floor;
    deliberately no CSS max-height either, same reasoning as that
    constant's own comment: unlike the width divider (which trades space
    against a sibling panel that has its own floor), height only trades
-   against page scroll, which is the user's call, not this app's. Small
-   Readout (a sibling of .scope-chart, not a child) isn't touched
-   directly -- it already tracks .scope-chart's *rendered* height via
-   --scope-chart-height, so shrinking this shrinks that for free. */
+   against page scroll, which is the user's call, not this app's. A
+   sibling of .scope-body itself now (not nested inside .scope-chart), so
+   it's a plain block-level div spanning .scope-body's full width -- the
+   ::after line below reads as the bottom edge of the whole row (vertical
+   controls + chart + Small Readout), not just the chart in the middle.
+   The other two columns aren't touched directly -- they already track
+   --scope-chart-height (set from measuring .scope-chart, a ResizeObserver
+   effect elsewhere in LiveRoastView.jsx), so dragging this shrinks all
+   three together for free. */
 .scope-chart-resize-handle {
   height: 10px;
   margin-top: 0.35rem;
