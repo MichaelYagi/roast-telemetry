@@ -1313,7 +1313,7 @@ button:disabled {
      stack's full height (see .vertical-control-group below), not just
      sit at its own natural content size pinned to the bottom. */
   align-items: stretch;
-  gap: 1.1rem;
+  gap: 0.3rem;
   /* --scope-chart-height minus .panel's own vertical chrome (this stack's
      parent is .panel.vertical-control-panel -- see below -- 1rem top +
      1rem bottom padding plus a 1px top/bottom border, .panel's own rule)
@@ -1378,7 +1378,7 @@ button:disabled {
      is there to catch, as one shared scrollbar for the whole panel,
      instead of overlapping text. */
   width: 100%;
-  padding: 0 0.4rem;
+  padding: 0 0.2rem;
 }
 
 .vertical-slider-value {
