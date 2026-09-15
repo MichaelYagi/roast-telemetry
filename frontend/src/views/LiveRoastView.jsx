@@ -1035,7 +1035,7 @@ export default function LiveRoastView() {
                 />
               </label>
               <label>
-                Separate drive port — optional, uncommon
+                Separate drive port (optional)
                 <input
                   placeholder="only if your own wiring needs a 2nd connection for Air/Drum"
                   list="serial-ports-list"
