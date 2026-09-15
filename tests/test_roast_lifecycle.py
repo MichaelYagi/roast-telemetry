@@ -25,6 +25,7 @@ import pytest
 
 from backend.app.models import ControlCommand, RoastCreateRequest, RoastMode, RoastStatus
 from backend.app.roast_session.session import RoastSessionManager
+from backend.app.ws_manager import pubsub
 
 
 async def _stop_background_task(session) -> None:
@@ -122,5 +123,35 @@ def test_abort_after_recording_keeps_normal_stop_behavior(isolated_db):
         # (existing behavior, unchanged by this refactor) -- only the
         # never-recorded case is.
         assert manager.get(roast_id) is not None
+
+    asyncio.run(body())
+
+
+def test_sample_messages_carry_the_current_status_after_begin_recording(isolated_db):
+    """Regression test for a real bug found live: the frontend's roast.status
+    only ever got set once, from the WS "snapshot" message sent at connect
+    time (always IDLE for modbus_live/ms6514_live, since connect() precedes
+    START) -- nothing updated it afterward, so the UI stayed stuck showing
+    "idle" forever post-START (elapsed time frozen, every milestone button
+    permanently disabled) even though the backend was genuinely ROASTING
+    and profile was genuinely filling in. Fix: "sample" pubsub messages now
+    carry the live status_snapshot; this confirms that actually happens."""
+    async def body():
+        manager, request = make_manager_and_request()
+        request.sample_interval_s = 0.05  # keep the test fast
+        session = manager.create(request)
+        queue = pubsub.subscribe(session.id)
+        try:
+            await session.connect()
+            await session.begin_recording()
+
+            message = await asyncio.wait_for(queue.get(), timeout=2.0)
+            while message["type"] != "sample":
+                message = await asyncio.wait_for(queue.get(), timeout=2.0)
+
+            assert message["status"] == "roasting"
+        finally:
+            pubsub.unsubscribe(session.id, queue)
+            await _stop_background_task(session)
 
     asyncio.run(body())

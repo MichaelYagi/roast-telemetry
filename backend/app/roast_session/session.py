@@ -275,6 +275,19 @@ class RoastSession:
                         "roast_id": self.id,
                         "sample": sample,
                         "events": events,
+                        # Without this, the frontend's roast.status only ever
+                        # gets set once, from the WS "snapshot" message sent
+                        # right when the connection opens -- for modbus_live/
+                        # ms6514_live that's always IDLE (connect() happens
+                        # before START), and nothing else ever updated it
+                        # afterward. Real bug found live: after START, the UI
+                        # kept showing "idle" forever (elapsed time stuck at
+                        # 0:00, every milestone button permanently disabled)
+                        # even though the backend was genuinely ROASTING and
+                        # profile was genuinely filling in -- the chart (which
+                        # reads roast.profile directly) looked correct while
+                        # everything gated on roast.status was stuck.
+                        "status": status_snapshot.value,
                     })
 
                     if finished:

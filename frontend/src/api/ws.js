@@ -60,6 +60,16 @@ export function useRoastStream(roastId) {
           if (!prev) return prev;
           return {
             ...prev,
+            // Without this, roast.status only ever got set once, from the
+            // initial "snapshot" message at WS-connect time -- always
+            // "idle" for modbus_live/ms6514_live, since connect() happens
+            // before START. Nothing else ever updated it afterward, so the
+            // UI stayed stuck showing "idle" forever after a real START
+            // (elapsed time frozen at 0:00, every milestone button
+            // permanently disabled) even though the backend had genuinely
+            // begun recording -- the chart looked fine since it reads
+            // roast.profile directly, which *was* filling in correctly.
+            status: message.status || prev.status,
             profile: [...prev.profile, message.sample],
             events: [...prev.events, ...(message.events || [])],
           };
