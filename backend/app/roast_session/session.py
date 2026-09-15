@@ -25,6 +25,7 @@ from simulator import SimulatorEngine
 from .. import storage
 from ..models import (
     ALWAYS_AUTO_EVENT_TYPES,
+    MILESTONE_LABELS,
     MILESTONE_SEQUENCE,
     AlarmRule,
     AlarmTriggerKind,
@@ -518,6 +519,26 @@ class RoastSession:
         except RoastSessionError:
             pass
 
+    def _fire_milestone_mark(self, rule: AlarmRule) -> Optional[dict]:
+        """Lets a rule chain one milestone into auto-marking another --
+        e.g. "30s after Turning Point, mark FC End" -- by calling the
+        real add_event() internally, the exact same path a manual button
+        click uses. Inherits every existing safety check for free
+        (sequencing, no re-marking, notify_manual_charge/
+        mark_milestone_fired bookkeeping) instead of needing its own
+        copy of any of it. Swallows RoastSessionError the same way
+        _fire_alarm_command does -- e.g. the target is already marked,
+        or out of sequence relative to what's happened since this rule
+        was configured -- a failed auto-mark must never crash the firing
+        task. Returns the created event (for the caller to publish) or
+        None if it was swallowed."""
+        label = MILESTONE_LABELS.get(rule.mark_milestone, rule.mark_milestone.value if rule.mark_milestone else "")
+        value = self.profile[-1]["bt"] if self.profile else None
+        try:
+            return self.add_event(EventCreateRequest(type=rule.mark_milestone, label=label, value=value))
+        except RoastSessionError:
+            return None
+
     async def _fire_rule(self, rule: AlarmRule) -> None:
         try:
             if rule.delay_s > 0:
@@ -541,6 +562,10 @@ class RoastSession:
                     # not the primary guard.
                     return
             self._fire_alarm_command(rule)
+            if rule.mark_milestone is not None:
+                created = self._fire_milestone_mark(rule)
+                if created is not None:
+                    await pubsub.publish(self.id, {"type": "event", "roast_id": self.id, "event": created})
             # Always published, delay_s==0 included -- a rule's optional
             # `message` needs a way to reach the frontend regardless of
             # timing, so immediate rules are no longer silent the way

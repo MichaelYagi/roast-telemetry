@@ -35,11 +35,13 @@ prefer the link above or open the files locally.)*
   deliberately benign write check (a no-op round-trip on the least
   consequential channel) before you ever start a real roast.
 - **Optional automation rules** for Direct Modbus — bind a Burner/Air/Drum
-  command and/or an in-app banner message to fire automatically on a
-  milestone, a BT/ET temperature threshold, or elapsed roast time, with
-  an optional extra delay, Artisan-Alarms-style. Burner bindings need an
-  extra explicit confirm step; a pending delayed action is cancelled,
-  not fired late, if you stop the roast first.
+  command, an in-app banner message, and/or auto-marking a later
+  milestone (chaining one milestone into another, e.g. "30s after
+  Turning Point, mark FC End") to fire automatically on a milestone, a
+  BT/ET temperature threshold, or elapsed roast time, with an optional
+  extra delay, Artisan-Alarms-style. Burner bindings need an extra
+  explicit confirm step; a pending delayed action is cancelled, not
+  fired late, if you stop the roast first.
 - **Celsius/Fahrenheit display toggle** (Settings → Temperature Unit),
   same idea as Artisan's own Celsius/Fahrenheit Mode — display only,
   everything is still stored and sent as Celsius.

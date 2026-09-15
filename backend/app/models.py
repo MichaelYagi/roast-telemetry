@@ -67,6 +67,22 @@ MILESTONE_SEQUENCE = [
     RoastEventType.COOL_END,
 ]
 
+# Human-readable labels for milestones an AlarmRule auto-marks (see
+# AlarmRule.mark_milestone) -- mirrors the labels a manual click would
+# use, since as far as add_event() and the roast record are concerned
+# an auto-mark IS a manual mark, just triggered by a rule instead of a
+# button press.
+MILESTONE_LABELS = {
+    RoastEventType.CHARGE: "Charge",
+    RoastEventType.DRY_END: "Dry End",
+    RoastEventType.FC_START: "FC Start",
+    RoastEventType.FC_END: "FC End",
+    RoastEventType.SC_START: "SC Start",
+    RoastEventType.SC_END: "SC End",
+    RoastEventType.DROP: "Drop",
+    RoastEventType.COOL_END: "Cool End",
+}
+
 # TURNING_POINT is never manually markable -- it's a pure observation
 # (the BT minimum right after Charge), no human judgment involved, so
 # it stays auto-detected for every mode. For modbus_live/ms6514_live,
@@ -165,6 +181,23 @@ class AlarmRule(BaseModel):
       the condition stays true.
     - TIME: elapsed roast time crosses `at_time_s`. Same one-shot
       evaluation as TEMPERATURE.
+
+    Actions are independent of trigger kind and each other -- a rule can
+    set any combination of a command, a message, and `mark_milestone`
+    (chaining one milestone into auto-marking another, e.g. "30s after
+    Turning Point, mark FC End" -- not possible before this field
+    existed, since a rule's action could only send a command or show a
+    banner, never touch the roast's own event record). `mark_milestone`
+    goes through RoastSession.add_event() internally, the exact same
+    path a manual button click uses -- inherits every existing safety
+    check for free (sequencing, no re-marking, the notify_manual_charge/
+    mark_milestone_fired bookkeeping) rather than needing its own copy
+    of any of that. TURNING_POINT isn't a valid value (never manually
+    markable, auto-only -- see ALWAYS_AUTO_EVENT_TYPES); a value that's
+    out of sequence by the time the rule actually fires (e.g. the
+    target's already marked, or something later already happened) just
+    silently fails to apply, same tolerant failure as a command hitting
+    a device error.
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -178,6 +211,7 @@ class AlarmRule(BaseModel):
     fan_pct: Optional[float] = Field(default=None, ge=0, le=100)
     drum_speed_pct: Optional[float] = Field(default=None, ge=0, le=100)
     message: Optional[str] = Field(default=None, max_length=200, description="Optional in-app banner text shown when this rule fires")
+    mark_milestone: Optional[RoastEventType] = Field(default=None, description="Optional: auto-mark this milestone when the rule fires, chaining one milestone into another. Never TURNING_POINT/CUSTOM.")
 
 
 class RoastCreateRequest(BaseModel):

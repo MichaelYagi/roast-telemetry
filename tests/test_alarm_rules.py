@@ -232,6 +232,62 @@ def test_alarm_fired_publishes_the_rules_message():
     asyncio.run(body())
 
 
+def test_mark_milestone_auto_marks_the_target_and_publishes_it():
+    rule = event_rule(RoastEventType.CHARGE, delay_s=0, mark_milestone=RoastEventType.DRY_END)
+    session = make_recording_session([rule])
+    session.apply_command = lambda cmd: None
+    session.profile = [{"time_s": 30.0, "bt": 150.0}]
+
+    async def body():
+        queue = pubsub.subscribe(session.id)
+        try:
+            session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))
+            message = await asyncio.wait_for(queue.get(), timeout=1.0)
+            assert message["type"] == "event"
+            assert message["event"]["type"] == RoastEventType.DRY_END.value
+            assert message["event"]["value"] == 150.0
+            assert message["event"]["label"] == "Dry End"
+            types = {e["type"] for e in session.events}
+            assert types == {RoastEventType.CHARGE.value, RoastEventType.DRY_END.value}
+        finally:
+            pubsub.unsubscribe(session.id, queue)
+
+    asyncio.run(body())
+
+
+def test_mark_milestone_out_of_sequence_silently_fails():
+    # DRY_END is already marked by the time this rule's trigger (a later
+    # FC_START click) fires -- add_event's own "already marked" guard
+    # rejects the auto-mark, and that RoastSessionError must not
+    # propagate out of the firing task.
+    rule = event_rule(RoastEventType.FC_START, delay_s=0, mark_milestone=RoastEventType.DRY_END)
+    session = make_recording_session([rule])
+    session.apply_command = lambda cmd: None
+    session.events.append({"id": "x", "time_s": 10.0, "type": RoastEventType.DRY_END.value, "label": "Dry End", "value": 160.0})
+
+    async def body():
+        session.add_event(EventCreateRequest(type=RoastEventType.FC_START, label="FC Start"))
+        await asyncio.sleep(0.05)
+        types = [e["type"] for e in session.events]
+        assert types.count(RoastEventType.DRY_END.value) == 1  # not duplicated
+
+    asyncio.run(body())
+
+
+def test_mark_milestone_works_with_a_delayed_rule_too():
+    rule = event_rule(RoastEventType.CHARGE, delay_s=0.05, mark_milestone=RoastEventType.DRY_END)
+    session = make_recording_session([rule])
+    session.apply_command = lambda cmd: None
+
+    async def body():
+        session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))
+        await asyncio.sleep(0.15)
+        types = {e["type"] for e in session.events}
+        assert RoastEventType.DRY_END.value in types
+
+    asyncio.run(body())
+
+
 def test_delay_s_zero_still_publishes_alarm_fired():
     # Immediate rules used to skip publishing entirely as an optimization
     # -- no longer valid now that a message needs a way to reach the

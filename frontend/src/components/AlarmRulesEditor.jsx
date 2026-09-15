@@ -18,6 +18,7 @@ function summarizeCommand(rule) {
   if (rule.fan_pct != null) parts.push(`Air→${rule.fan_pct}%`);
   if (rule.drum_speed_pct != null) parts.push(`Drum→${rule.drum_speed_pct}%`);
   if (rule.message) parts.push(`banner: "${rule.message}"`);
+  if (rule.mark_milestone) parts.push(`mark ${rule.mark_milestone.replace("_", " ")}`);
   return parts.join(", ") || "(nothing set)";
 }
 
@@ -47,6 +48,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
   const [draftFan, setDraftFan] = useState("");
   const [draftDrum, setDraftDrum] = useState("");
   const [draftMessage, setDraftMessage] = useState("");
+  const [draftMarkMilestone, setDraftMarkMilestone] = useState("");
   // A rule that touches Burner needs an explicit extra confirm before it
   // can be added -- same caution Testing Mode's nudge feature uses, since
   // a bad Burner setpoint can make the roaster's own bang-bang controller
@@ -73,10 +75,12 @@ export default function AlarmRulesEditor({ rules, onChange }) {
     setDraftFan("");
     setDraftDrum("");
     setDraftMessage("");
+    setDraftMarkMilestone("");
     setBurnerConfirming(false);
   }
 
-  const hasAnyCommand = draftHeater !== "" || draftFan !== "" || draftDrum !== "" || draftMessage.trim() !== "";
+  const hasAnyCommand =
+    draftHeater !== "" || draftFan !== "" || draftDrum !== "" || draftMessage.trim() !== "" || draftMarkMilestone !== "";
   const triggerReady =
     draftKind === "event" ? true : draftKind === "temperature" ? draftThreshold !== "" : draftAtTime !== "";
 
@@ -97,6 +101,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
       fan_pct: draftFan === "" ? null : Number(draftFan),
       drum_speed_pct: draftDrum === "" ? null : Number(draftDrum),
       message: draftMessage.trim() || null,
+      mark_milestone: draftMarkMilestone || null,
     };
     onChange([...rules, rule]);
     resetDraft();
@@ -247,7 +252,25 @@ export default function AlarmRulesEditor({ rules, onChange }) {
                 onChange={(e) => draftSetter(setDraftMessage)(e.target.value)}
               />
             </label>
+            <label>
+              Also mark milestone (optional)
+              <select value={draftMarkMilestone} onChange={(e) => draftSetter(setDraftMarkMilestone)(e.target.value)}>
+                <option value="">(none)</option>
+                {EVENT_TRIGGER_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {t.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
+          {draftMarkMilestone && (
+            <p className="hint">
+              Chains this rule's trigger into auto-marking {draftMarkMilestone.replace("_", " ")} — same as clicking
+              that button yourself, so it still has to happen in the correct order relative to whatever's already
+              been marked, or it's silently skipped.
+            </p>
+          )}
 
           {burnerConfirming ? (
             <>

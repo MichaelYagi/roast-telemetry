@@ -207,6 +207,16 @@
     click-to-dismiss line on the Live Roast screen), independent of
     whether the rule also sends a command.
   </p>
+  <p>
+    A rule can also <strong>chain into auto-marking a later milestone</strong>
+    (the "Also mark milestone" dropdown) — e.g. "30 seconds after Turning
+    Point, mark FC End" if you know your machine's development time is
+    reliably consistent. This goes through the exact same path a manual
+    button click uses, so it's still subject to every normal rule (can't
+    mark something already marked, can't mark something out of sequence)
+    — a rule that fires out of order just silently does nothing, the same
+    tolerant failure as a bound command hitting a device error.
+  </p>
   <ul>
     <li>
       <strong>modbus_live only.</strong> ms6514_live has no write
