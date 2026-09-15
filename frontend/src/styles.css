@@ -552,10 +552,14 @@ button:disabled {
   flex: 1 1 auto;
 }
 
+.alarm-rules-enabled-toggle {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
 /* Kept saved and visible, not hidden -- a disabled rule fades rather
    than disappearing, so it's obvious at a glance which rules are
-   actually live right now without having to look at each row's own
-   Disable/Enable button label. */
+   actually live right now without having to check each checkbox. */
 .alarm-rules-row-disabled .alarm-rules-trigger,
 .alarm-rules-row-disabled .alarm-rules-detail {
   opacity: 0.5;
