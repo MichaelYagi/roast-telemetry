@@ -535,6 +535,7 @@ button:disabled {
 
 .alarm-rules-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 0.5rem;
   font-size: 0.9rem;
@@ -549,6 +550,20 @@ button:disabled {
 .alarm-rules-detail {
   color: var(--text-muted);
   flex: 1 1 auto;
+}
+
+.alarm-rules-enabled-toggle {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+/* Kept saved and visible, not hidden -- a disabled rule fades rather
+   than disappearing, so it's obvious at a glance which rules are
+   actually live right now without having to check each checkbox. */
+.alarm-rules-row-disabled .alarm-rules-trigger,
+.alarm-rules-row-disabled .alarm-rules-detail {
+  opacity: 0.5;
+  text-decoration: line-through;
 }
 
 /* --- Device profiles (DeviceProfileEditor) -- same collapsible-section

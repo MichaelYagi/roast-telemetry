@@ -37,6 +37,9 @@ function summarizeTrigger(rule) {
 // buildConfigFromForm/handleLoadPreset) -- modbus_live only, since
 // ms6514_live has no write capability to bind a command to at all.
 export default function AlarmRulesEditor({ rules, onChange }) {
+  // null while adding a new rule; the array index of the rule currently
+  // loaded into the draft fields below while editing an existing one.
+  const [editingIndex, setEditingIndex] = useState(null);
   const [draftKind, setDraftKind] = useState("event");
   const [draftEventType, setDraftEventType] = useState(EVENT_TRIGGER_OPTIONS[0]);
   const [draftChannel, setDraftChannel] = useState("bt");
@@ -64,6 +67,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
   }
 
   function resetDraft() {
+    setEditingIndex(null);
     setDraftKind("event");
     setDraftEventType(EVENT_TRIGGER_OPTIONS[0]);
     setDraftChannel("bt");
@@ -78,18 +82,39 @@ export default function AlarmRulesEditor({ rules, onChange }) {
     setBurnerConfirming(false);
   }
 
+  function startEdit(index) {
+    const rule = rules[index];
+    setEditingIndex(index);
+    setDraftKind(rule.trigger_kind);
+    setDraftEventType(rule.event_type || EVENT_TRIGGER_OPTIONS[0]);
+    setDraftChannel(rule.channel || "bt");
+    setDraftThreshold(rule.threshold_c ?? "");
+    setDraftAtTime(rule.at_time_s ?? "");
+    setDraftDelay(rule.delay_s ?? 0);
+    setDraftHeater(rule.heater_pct ?? "");
+    setDraftFan(rule.fan_pct ?? "");
+    setDraftDrum(rule.drum_speed_pct ?? "");
+    setDraftMessage(rule.message || "");
+    setDraftMarkMilestone(rule.mark_milestone || "");
+    setBurnerConfirming(false);
+  }
+
   const hasAnyCommand =
     draftHeater !== "" || draftFan !== "" || draftDrum !== "" || draftMessage.trim() !== "" || draftMarkMilestone !== "";
   const triggerReady =
     draftKind === "event" ? true : draftKind === "temperature" ? draftThreshold !== "" : draftAtTime !== "";
 
-  function addRule() {
+  function saveRule() {
     const touchesBurner = draftHeater !== "";
     if (touchesBurner && !burnerConfirming) {
       setBurnerConfirming(true);
       return;
     }
+    // enabled carries over unchanged from the rule being edited (default
+    // true for a brand new one) -- editing a rule's trigger/action isn't
+    // the same gesture as flipping its own enabled toggle in the list.
     const rule = {
+      enabled: editingIndex != null ? rules[editingIndex].enabled : true,
       trigger_kind: draftKind,
       event_type: draftKind === "event" ? draftEventType : null,
       channel: draftKind === "temperature" ? draftChannel : null,
@@ -102,12 +127,21 @@ export default function AlarmRulesEditor({ rules, onChange }) {
       message: draftMessage.trim() || null,
       mark_milestone: draftMarkMilestone || null,
     };
-    onChange([...rules, rule]);
+    if (editingIndex != null) {
+      onChange(rules.map((r, i) => (i === editingIndex ? { ...rules[editingIndex], ...rule } : r)));
+    } else {
+      onChange([...rules, rule]);
+    }
     resetDraft();
   }
 
   function removeRule(index) {
+    if (editingIndex === index) resetDraft();
     onChange(rules.filter((_, i) => i !== index));
+  }
+
+  function toggleEnabled(index) {
+    onChange(rules.map((r, i) => (i === index ? { ...r, enabled: r.enabled === false } : r)));
   }
 
   return (
@@ -122,17 +156,26 @@ export default function AlarmRulesEditor({ rules, onChange }) {
 
           {rules.length > 0 && (
             <ul className="alarm-rules-list">
-              {rules.map((rule, i) => (
-                <li key={rule.id || i} className="alarm-rules-row">
-                  <span className="alarm-rules-trigger">{summarizeTrigger(rule)}</span>
-                  <span className="alarm-rules-detail">
-                    {rule.delay_s > 0 ? `+${rule.delay_s}s` : "immediately"} → {summarizeCommand(rule)}
-                  </span>
-                  <button type="button" className="danger" onClick={() => removeRule(i)}>
-                    Remove
-                  </button>
-                </li>
-              ))}
+              {rules.map((rule, i) => {
+                const enabled = rule.enabled !== false;
+                return (
+                  <li key={rule.id || i} className={`alarm-rules-row${enabled ? "" : " alarm-rules-row-disabled"}`}>
+                    <label className="checkbox-label alarm-rules-enabled-toggle" title={enabled ? "Disable this rule" : "Enable this rule"}>
+                      <input type="checkbox" checked={enabled} onChange={() => toggleEnabled(i)} />
+                    </label>
+                    <span className="alarm-rules-trigger">{summarizeTrigger(rule)}</span>
+                    <span className="alarm-rules-detail">
+                      {rule.delay_s > 0 ? `+${rule.delay_s}s` : "immediately"} → {summarizeCommand(rule)}
+                    </span>
+                    <button type="button" onClick={() => startEdit(i)} disabled={editingIndex === i}>
+                      {editingIndex === i ? "Editing…" : "Edit"}
+                    </button>
+                    <button type="button" className="danger" onClick={() => removeRule(i)}>
+                      Remove
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
 
@@ -268,6 +311,12 @@ export default function AlarmRulesEditor({ rules, onChange }) {
             </p>
           )}
 
+          {editingIndex != null && (
+            <p className="hint">
+              Editing rule #{editingIndex + 1} above -- "Save changes" replaces it in place, or Cancel to leave it
+              unchanged.
+            </p>
+          )}
           {burnerConfirming ? (
             <>
               <p className="hint">
@@ -279,11 +328,11 @@ export default function AlarmRulesEditor({ rules, onChange }) {
                   at_time_s: draftAtTime,
                 })}
                 {Number(draftDelay) > 0 ? ` (after a ${draftDelay}s delay)` : ""} — no further confirmation once
-                saved. Only add this if you're sure.
+                saved. Only {editingIndex != null ? "save" : "add"} this if you're sure.
               </p>
               <div className="event-button-row">
-                <button type="button" onClick={addRule}>
-                  Confirm: add Burner rule
+                <button type="button" onClick={saveRule}>
+                  Confirm: {editingIndex != null ? "save Burner rule" : "add Burner rule"}
                 </button>
                 <button type="button" className="danger" onClick={() => setBurnerConfirming(false)}>
                   Cancel
@@ -291,9 +340,16 @@ export default function AlarmRulesEditor({ rules, onChange }) {
               </div>
             </>
           ) : (
-            <button type="button" onClick={addRule} disabled={!hasAnyCommand || !triggerReady}>
-              Add rule
-            </button>
+            <div className="event-button-row">
+              <button type="button" onClick={saveRule} disabled={!hasAnyCommand || !triggerReady}>
+                {editingIndex != null ? "Save changes" : "Add rule"}
+              </button>
+              {editingIndex != null && (
+                <button type="button" className="danger" onClick={resetDraft}>
+                  Cancel
+                </button>
+              )}
+            </div>
           )}
       </div>
     </div>

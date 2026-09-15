@@ -288,6 +288,41 @@ def test_mark_milestone_works_with_a_delayed_rule_too():
     asyncio.run(body())
 
 
+def test_disabled_event_rule_does_not_fire():
+    rule = event_rule(RoastEventType.CHARGE, delay_s=0, drum_speed_pct=55.0, enabled=False)
+    session = make_recording_session([rule])
+    calls = []
+    session.apply_command = lambda cmd: calls.append(cmd)
+
+    async def body():
+        session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))
+        await asyncio.sleep(0.05)
+        assert calls == []
+
+    asyncio.run(body())
+
+
+def test_disabled_ambient_rule_does_not_fire():
+    rule = AlarmRule(trigger_kind=AlarmTriggerKind.TEMPERATURE, channel="bt", threshold_c=200.0, delay_s=0, fan_pct=80.0, enabled=False)
+    session = make_recording_session([rule])
+    calls = []
+    session.apply_command = lambda cmd: calls.append(cmd)
+
+    async def body():
+        session._evaluate_ambient_alarms({"bt": 205.0, "time_s": 1.0})
+        await asyncio.sleep(0.05)
+        assert calls == []
+
+    asyncio.run(body())
+
+
+def test_rule_defaults_to_enabled_when_field_omitted():
+    # An older saved config's rules never had `enabled` at all -- must
+    # default to firing normally, not silently go inert.
+    rule = event_rule(RoastEventType.CHARGE, delay_s=0, drum_speed_pct=55.0)
+    assert rule.enabled is True
+
+
 def test_delay_s_zero_still_publishes_alarm_fired():
     # Immediate rules used to skip publishing entirely as an optimization
     # -- no longer valid now that a message needs a way to reach the

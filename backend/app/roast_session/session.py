@@ -495,7 +495,7 @@ class RoastSession:
                 mark_fired(req.type.value)
         if self.mode == RoastMode.MODBUS_LIVE:
             for rule in self._alarm_rules:
-                if rule.trigger_kind == AlarmTriggerKind.EVENT and rule.event_type == req.type:
+                if rule.enabled and rule.trigger_kind == AlarmTriggerKind.EVENT and rule.event_type == req.type:
                     self._schedule_rule(rule)
         return event
 
@@ -510,7 +510,7 @@ class RoastSession:
         if self.mode != RoastMode.MODBUS_LIVE:
             return
         for rule in self._alarm_rules:
-            if rule.trigger_kind == AlarmTriggerKind.EVENT or rule.id in self._fired_ambient_rule_ids:
+            if not rule.enabled or rule.trigger_kind == AlarmTriggerKind.EVENT or rule.id in self._fired_ambient_rule_ids:
                 continue
             crossed = False
             if rule.trigger_kind == AlarmTriggerKind.TEMPERATURE and rule.threshold_c is not None:

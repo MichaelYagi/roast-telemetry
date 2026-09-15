@@ -319,6 +319,7 @@ class AlarmRule(BaseModel):
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    enabled: bool = Field(default=True, description="Uncheck to keep a rule saved but stop it from firing, without deleting it. A rule missing this field (an older saved config) defaults to enabled, same as always.")
     trigger_kind: AlarmTriggerKind = AlarmTriggerKind.EVENT
     event_type: Optional[RoastEventType] = None
     channel: Optional[str] = Field(default=None, description='"bt" or "et" -- TEMPERATURE trigger_kind only')
