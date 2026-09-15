@@ -1311,7 +1311,15 @@ button:disabled {
   display: flex;
   align-items: flex-end;
   gap: 1.1rem;
-  height: var(--scope-chart-height, 420px);
+  /* Floor of 260px regardless of how short --scope-chart-height gets
+     (the chart's own drag-resize floor, CHART_MIN_HEIGHT, is 160px) --
+     a 2-member stacked lane with arrows on needs roughly that much to
+     stay legible without relying on .vertical-control-group's own
+     overflow-y:auto scroll for what should be the common case. Only
+     this panel's own height gets the floor -- --scope-chart-height
+     itself is untouched, so the chart and Small Readout column (which
+     read that var directly) can still go as short as the operator drags. */
+  height: max(var(--scope-chart-height, 420px), 260px);
 }
 
 /* A "group" is one lane -- one or more sliders sharing that lane's width,
@@ -1347,7 +1355,17 @@ button:disabled {
   align-items: center;
   gap: 0.3rem;
   flex: 1;
-  min-height: 0;
+  /* Deliberately NOT min-height: 0 -- that would let this shrink below
+     its own content's natural minimum (value text + arrows + the
+     track's own 36px floor + label), which doesn't degrade gracefully:
+     it compresses everything toward zero and the value/arrows/label of
+     one stacked member visually run into the next member's, instead of
+     clipping cleanly. Leaving this at its default (auto) means a flex
+     item refuses to shrink past its own content's minimum size, so a
+     lane that genuinely doesn't have room overflows *the lane* as a
+     whole -- which is exactly what .vertical-control-group's own
+     overflow-y: auto above is there to catch (a real scrollbar instead
+     of overlapping text). */
   width: 100%;
   padding: 0 0.4rem;
 }
