@@ -48,6 +48,18 @@ CREATE TABLE IF NOT EXISTS roast_presets (
     drum_speed_pct REAL
 );
 
+-- A named Modbus register map (DeviceProfile) for one roaster brand/
+-- model -- see backend/app/api/device_profiles.py. built_in=1 rows ship
+-- with the app (seeded once, see seed_default_device_profiles below)
+-- and the API refuses to PUT/DELETE them.
+CREATE TABLE IF NOT EXISTS device_profiles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    built_in INTEGER NOT NULL DEFAULT 0
+);
+
 -- Plain key/value store, currently just Ollama's base URL + model name.
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
@@ -268,6 +280,62 @@ def get_preset_row(preset_id: str) -> Optional[dict]:
 def delete_preset_row(preset_id: str) -> None:
     with _conn() as c:
         c.execute("DELETE FROM roast_presets WHERE id = ?", (preset_id,))
+
+
+def seed_default_device_profiles(seeds: list[dict]) -> None:
+    """Same per-id marker-row idempotence as seed_default_presets above --
+    see that docstring for the full rationale. Ships the built-in FZ-94
+    profile (see modbus_bridge/device_profiles.py) once; deleting it
+    stays deleted rather than resurrecting on the next startup. (Not
+    that the API actually allows deleting a built_in=1 row today -- this
+    still matters if that ever changes, or for a future built-in profile
+    added after this one.)"""
+    with _conn() as c:
+        for profile in seeds:
+            marker_key = f"seeded_default_device_profile:{profile['id']}"
+            already_seeded = c.execute("SELECT 1 FROM settings WHERE key = ?", (marker_key,)).fetchone()
+            if already_seeded is not None:
+                continue
+            c.execute(
+                """INSERT OR IGNORE INTO device_profiles (id, name, created_at, config_json, built_in)
+                   VALUES (:id, :name, :created_at, :config_json, :built_in)""",
+                {"built_in": 1, **profile},
+            )
+            c.execute("INSERT INTO settings (key, value) VALUES (:key, :value)", {"key": marker_key, "value": "1"})
+
+
+def insert_device_profile(profile: dict) -> None:
+    with _conn() as c:
+        c.execute(
+            """INSERT INTO device_profiles (id, name, created_at, config_json, built_in)
+               VALUES (:id, :name, :created_at, :config_json, :built_in)""",
+            {"built_in": 0, **profile},
+        )
+
+
+def update_device_profile_row(profile_id: str, profile: dict) -> None:
+    with _conn() as c:
+        c.execute(
+            "UPDATE device_profiles SET name = :name, config_json = :config_json WHERE id = :id",
+            {**profile, "id": profile_id},
+        )
+
+
+def list_device_profile_rows() -> list[dict]:
+    with _conn() as c:
+        rows = c.execute("SELECT * FROM device_profiles ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_device_profile_row(profile_id: str) -> Optional[dict]:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM device_profiles WHERE id = ?", (profile_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def delete_device_profile_row(profile_id: str) -> None:
+    with _conn() as c:
+        c.execute("DELETE FROM device_profiles WHERE id = ?", (profile_id,))
 
 
 def get_settings() -> dict:

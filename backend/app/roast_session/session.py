@@ -30,6 +30,7 @@ from ..models import (
     AlarmRule,
     AlarmTriggerKind,
     ControlCommand,
+    DeviceProfile,
     EventCreateRequest,
     NoteCreateRequest,
     Roast,
@@ -114,16 +115,46 @@ class RoastSession:
             if not request.modbus_port:
                 raise RoastSessionError("modbus_port is required for modbus_live mode")
             try:
-                engine = ModbusEngine(
-                    request.modbus_port,
-                    baudrate=request.modbus_baudrate,
-                    control_port=request.modbus_control_port,
-                    control_baudrate=request.modbus_control_baudrate,
-                    dry_end_c=request.dry_end_c,
-                    fc_start_c=request.fc_start_c,
-                    detect_milestones=request.auto_detect_milestones,
-                    **_modbus_register_overrides(request),
-                )
+                if request.modbus_device_profile_id:
+                    # Profile-driven path -- see ModbusEngine.from_profile
+                    # and DeviceProfile in models.py. Takes over the whole
+                    # register map *and* connection framing (baudrate/
+                    # bytesize/parity/stopbits all come from the profile
+                    # itself, not modbus_baudrate -- that field always has
+                    # a concrete default (19200) even when the operator
+                    # never touched it, so there's no reliable way to tell
+                    # "explicitly overridden" from "just the form default"
+                    # the way the other Optional[...] fields below can).
+                    # control_port still applies -- that's about which
+                    # physical wire, not the profile's own protocol
+                    # details. The 26 flat modbus_* register-map fields
+                    # are simply not consulted when this is set (no
+                    # merging between the two -- see
+                    # RoastCreateRequest.modbus_device_profile_id's own
+                    # docstring for why that's the deliberate choice).
+                    profile_row = storage.get_device_profile_row(request.modbus_device_profile_id)
+                    if profile_row is None:
+                        raise RoastSessionError(f"device profile {request.modbus_device_profile_id!r} not found")
+                    profile = DeviceProfile.from_row(profile_row)
+                    engine = ModbusEngine.from_profile(
+                        profile,
+                        request.modbus_port,
+                        control_port=request.modbus_control_port,
+                        dry_end_c=request.dry_end_c,
+                        fc_start_c=request.fc_start_c,
+                        detect_milestones=request.auto_detect_milestones,
+                    )
+                else:
+                    engine = ModbusEngine(
+                        request.modbus_port,
+                        baudrate=request.modbus_baudrate,
+                        control_port=request.modbus_control_port,
+                        control_baudrate=request.modbus_control_baudrate,
+                        dry_end_c=request.dry_end_c,
+                        fc_start_c=request.fc_start_c,
+                        detect_milestones=request.auto_detect_milestones,
+                        **_modbus_register_overrides(request),
+                    )
             except ValueError as exc:
                 raise RoastSessionError(str(exc)) from exc
         elif request.mode == RoastMode.MS6514_LIVE:

@@ -61,6 +61,12 @@ export const api = {
     request(`/presets/${id}`, { method: "PUT", body: JSON.stringify({ name, config, ...controls }) }),
   deletePreset: (id) => request(`/presets/${id}`, { method: "DELETE" }),
 
+  // device profiles (Modbus register maps -- see DeviceProfile in the backend)
+  listDeviceProfiles: () => request("/device-profiles"),
+  createDeviceProfile: (profile) => request("/device-profiles", { method: "POST", body: JSON.stringify(profile) }),
+  updateDeviceProfile: (id, profile) => request(`/device-profiles/${id}`, { method: "PUT", body: JSON.stringify(profile) }),
+  deleteDeviceProfile: (id) => request(`/device-profiles/${id}`, { method: "DELETE" }),
+
   // settings (Ollama connection for AI roast reviews)
   getSettings: () => request("/settings"),
   saveSettings: (settings) => request("/settings", { method: "PUT", body: JSON.stringify(settings) }),

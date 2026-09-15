@@ -72,6 +72,26 @@ function backgroundSeriesDefs(label) {
   ];
 }
 
+// Any role=EXTRA temperature channels a DeviceProfile declares (see the
+// backend's ModbusTempChannel/RoastProfilePoint.extra) -- e.g. a roaster
+// with a flue probe beyond BT/ET/DT. Same reasoning as
+// backgroundSeriesDefs above: built dynamically (there's no fixed list,
+// since which extra channels exist -- if any -- depends entirely on
+// which device profile this roast used), not part of the static
+// SERIES_DEFS list, so they never show up as an empty toggle otherwise.
+const EXTRA_CHANNEL_COLORS = ["#0d9488", "#b45309", "#7c3aed", "#be185d"];
+function extraSeriesDefs(labels) {
+  return labels.map((label, i) => ({
+    key: `EXTRA_${label}`,
+    label,
+    color: EXTRA_CHANNEL_COLORS[i % EXTRA_CHANNEL_COLORS.length],
+    axis: "yTemp",
+    source: "extra",
+    field: label,
+    defaultOn: true,
+  }));
+}
+
 // The three classic roast phases, each bounded by a pair of named
 // milestone events. Colors follow the common green/yellow/red convention
 // (drying / Maillard-browning / development).
@@ -279,13 +299,29 @@ export default function RoastChart({
   title = "Roaster Scope",
   tempUnit = "c",
 }) {
+  // Cheap to recompute every tick (profile grows every second during a
+  // live roast anyway, same cost the data/availability useMemos below
+  // already pay) but stable in *output* -- a sorted, joined string only
+  // changes when the actual set of extra-channel labels changes, not on
+  // every new sample, so it's what seriesDefs below depends on rather
+  // than raw `profile` (which would otherwise churn the array reference,
+  // and with it the visible-state merge effect, every single tick).
+  const extraLabelsKey = useMemo(() => {
+    const labels = new Set();
+    for (const p of profile) for (const label of Object.keys(p.extra || {})) labels.add(label);
+    return [...labels].sort().join("|");
+  }, [profile]);
+
   // Static live channels plus, only while a background roast is actually
-  // loaded, its two reference curves -- see backgroundSeriesDefs above
-  // for why those aren't just always part of SERIES_DEFS.
-  const seriesDefs = useMemo(
-    () => (background.length ? [...SERIES_DEFS, ...backgroundSeriesDefs(backgroundLabel)] : SERIES_DEFS),
-    [background.length, backgroundLabel]
-  );
+  // loaded, its two reference curves (see backgroundSeriesDefs above),
+  // plus any extra temperature channels this roast's own profile data
+  // actually has (see extraSeriesDefs above).
+  const seriesDefs = useMemo(() => {
+    let defs = SERIES_DEFS;
+    if (background.length) defs = [...defs, ...backgroundSeriesDefs(backgroundLabel)];
+    if (extraLabelsKey) defs = [...defs, ...extraSeriesDefs(extraLabelsKey.split("|"))];
+    return defs;
+  }, [background.length, backgroundLabel, extraLabelsKey]);
 
   const [visible, setVisible] = useState(() =>
     Object.fromEntries(SERIES_DEFS.map((s) => [s.key, s.defaultOn]))
@@ -321,6 +357,8 @@ export default function RoastChart({
         out[s.key] = profile.some((p) => p[s.field] != null);
       } else if (s.source === "background") {
         out[s.key] = background.some((p) => p[s.field] != null);
+      } else if (s.source === "extra") {
+        out[s.key] = profile.some((p) => p.extra?.[s.field] != null);
       } else {
         const continuousField = CONTINUOUS_FIELD_BY_CHANNEL[s.key];
         const hasContinuous = continuousField && profile.some((p) => p[continuousField] != null);
@@ -353,6 +391,8 @@ export default function RoastChart({
         // Charge event, so plotting them on the same x-axis is the whole
         // trick, no extra alignment needed.
         points = background.map((p) => ({ x: p.time_s, y: p[s.field] == null ? null : celsiusToUnit(p[s.field], tempUnit) }));
+      } else if (s.source === "extra") {
+        points = profile.map((p) => ({ x: p.time_s, y: p.extra?.[s.field] == null ? null : celsiusToUnit(p.extra[s.field], tempUnit) }));
       } else {
         const continuousField = CONTINUOUS_FIELD_BY_CHANNEL[s.key];
         const hasContinuous = continuousField && profile.some((p) => p[continuousField] != null);

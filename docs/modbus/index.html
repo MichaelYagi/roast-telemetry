@@ -67,6 +67,42 @@
     ID.
   </p>
 
+  <h2 id="device-profiles">Device profiles</h2>
+  <p>
+    The 26 flat override fields above are one way to target a different
+    Modbus roaster; a <strong>Device Profile</strong> is the other, more
+    reusable way — a named, saved register map you pick from a dropdown
+    instead of re-entering every field per roast. The Coffee-Tech FZ-94
+    ships as a built-in profile (not editable/deletable); anything else
+    is a custom profile you build in the "Device profiles" panel of the
+    Configure Roast form.
+  </p>
+  <p>
+    A profile has any number of temperature channels (role BT — always
+    required, the heartbeat read — ET, DT, or any number of
+    <strong>extra</strong> channels with their own label, e.g. "Flue")
+    and any number of control channels, each mapped onto one of the
+    three existing Controls-panel slots (Burner/Air/Drum) via one of
+    three mechanisms:
+  </p>
+  <table>
+    <thead><tr><th>Mechanism</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td>Setpoint temperature</td><td>A bang-bang PID setpoint write+readback — the FZ-94's own Burner mechanism (see above): a drum-temperature limit, not a power percentage, mapped onto a configurable °C range for the 0–100% UI slider.</td></tr>
+      <tr><td>VFD drive</td><td>A run/stop word plus a separate frequency-command register, optional feedback readback — the FZ-94's own Air/Drum mechanism.</td></tr>
+      <tr><td>Direct register</td><td>A single register directly holding a plain 0–100% value, one write, no run/stop word — the simpler mechanism plenty of non-FZ-94 roasters actually use for a fan or damper.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Extra temperature channels are recorded and shown on the live chart
+    regardless of how many you declare, but only the first two (by
+    declared order) round-trip through a saved <code>.alog</code>
+    export — a fixed capacity in real Artisan's own native file format
+    (its "extra device" bank has exactly 3 slots total; one is always
+    reserved for DT), not an arbitrary limit. Anything beyond that stays
+    live-only.
+  </p>
+
   <h2>Connection basics that apply regardless of model</h2>
   <ul>
     <li>

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -126,6 +126,15 @@ class RoastProfilePoint(BaseModel):
     # this is what the roaster's own PID controller actually holds.
     # modbus_live only, None for every other mode.
     burner_sv_c: Optional[float] = None
+    # Any role=EXTRA temperature channels from a DeviceProfile (see
+    # ModbusTempChannel), keyed by that channel's own label -- e.g. a
+    # roaster with a flue probe beyond BT/ET/DT. Empty for every mode/
+    # profile that doesn't declare one. Only the first two (by the
+    # profile's own declared order) round-trip through a real .alog
+    # export (alog_playback/alog_io.py's extraname2/extratemp2 bank has
+    # exactly 2 free slots) -- more can still be recorded and charted
+    # live, they just won't survive an .alog export/reimport beyond that.
+    extra: dict[str, float] = {}
 
 
 class RoastEvent(BaseModel):
@@ -145,6 +154,115 @@ class RoastNote(BaseModel):
     time_s: float
     text: str
     author: Optional[str] = None
+
+
+class ModbusChannelRole(str, Enum):
+    BT = "bt"
+    ET = "et"
+    DT = "dt"
+    EXTRA = "extra"
+
+
+class ModbusTempChannel(BaseModel):
+    """One temperature probe's register mapping. BT is required on every
+    profile (it's the heartbeat -- see ModbusEngine.tick()); ET/DT/EXTRA
+    are all optional. Multiple EXTRA channels are allowed (each needs its
+    own `label`, e.g. "Flue") -- see RoastProfilePoint.extra for where
+    those readings end up, and its docstring for the .alog export cap."""
+
+    role: ModbusChannelRole
+    label: Optional[str] = Field(default=None, description="Required for role=extra (e.g. 'Flue'); ignored otherwise (bt/et/dt already have fixed names).")
+    slave_id: int
+    register_address: int
+    divisor: float = 10.0
+
+
+class ModbusControlKind(str, Enum):
+    # Today's Burner: a bang-bang PID setpoint write+readback (see
+    # ModbusEngine's module docstring for the FZ-94's own mechanism).
+    SV_TEMPERATURE = "sv_temperature"
+    # Today's Air/Drum: a VFD run/stop word + separate frequency-command
+    # register, optional feedback readback.
+    VFD_DRIVE = "vfd_drive"
+    # A single register directly holding a plain 0-100(-ish) percentage,
+    # one write, no run/stop word, no separate frequency step -- the
+    # simpler mechanism plenty of non-FZ-94 roasters actually use.
+    DIRECT_REGISTER = "direct_register"
+
+
+class ModbusControlChannel(BaseModel):
+    """One writable channel (Burner/Air/Drum-equivalent), mapped onto one
+    of this app's existing three control slots via `maps_to` -- the
+    Controls UI sliders and Automation Rules stay heater_pct/fan_pct/
+    drum_speed_pct regardless of which physical channel/mechanism backs
+    each one. Only the fields relevant to `kind` need to be set; the rest
+    are ignored (same tolerant-unused-field convention as AlarmRule's own
+    per-trigger-kind fields)."""
+
+    maps_to: Literal["heater_pct", "fan_pct", "drum_speed_pct"]
+    kind: ModbusControlKind
+    slave_id: int
+    # sv_temperature
+    register_address: Optional[int] = None
+    sv_range_c: Optional[tuple[float, float]] = None
+    divisor: float = 10.0
+    # vfd_drive
+    control_register: Optional[int] = None
+    frequency_register: Optional[int] = None
+    frequency_scale: float = Field(default=100.0, description="raw = pct * frequency_scale; FZ-94's Delta VFD-L uses 100.")
+    # direct_register
+    write_register: Optional[int] = None
+    write_scale: float = 1.0
+    # vfd_drive + direct_register feedback readback (optional either way)
+    feedback_register: Optional[int] = None
+    feedback_divisor: float = 1.0
+    value_range: tuple[float, float] = (0.0, 100.0)
+
+
+class DeviceProfile(BaseModel):
+    """A named, reusable Modbus register map for one roaster brand/model
+    -- what used to require new Python code (a new ModbusEngine subclass
+    or constructor default) is now data, selected per roast via
+    RoastCreateRequest.modbus_device_profile_id instead of the 26 flat
+    modbus_* override fields (which still work exactly as before when no
+    profile is selected -- this is purely additive, not a replacement).
+    `built_in` profiles ship with the app and can't be edited/deleted via
+    the API (see api/device_profiles.py)."""
+
+    id: str
+    name: str
+    created_at: str
+    baudrate: int = 19200
+    bytesize: int = 8
+    parity: str = "N"
+    stopbits: int = 2
+    temp_channels: list[ModbusTempChannel]
+    control_channels: list[ModbusControlChannel] = []
+    built_in: bool = False
+
+    @classmethod
+    def from_row(cls, row: dict) -> "DeviceProfile":
+        """Shared by api/device_profiles.py and RoastSession's engine
+        construction -- combines a device_profiles table row's own
+        id/created_at/built_in with the channel-map fields serialized
+        into its config_json (which also redundantly carries `name`,
+        kept in sync with the row's own name column by every write)."""
+        return cls(
+            id=row["id"],
+            created_at=row["created_at"],
+            built_in=bool(row["built_in"]),
+            **DeviceProfileCreateRequest.model_validate_json(row["config_json"]).model_dump(),
+        )
+
+
+class DeviceProfileCreateRequest(BaseModel):
+    name: str
+    baudrate: int = 19200
+    bytesize: int = 8
+    parity: str = "N"
+    stopbits: int = 2
+    temp_channels: list[ModbusTempChannel]
+    control_channels: list[ModbusControlChannel] = []
 
 
 class ControlCommand(BaseModel):
@@ -225,6 +343,7 @@ class RoastCreateRequest(BaseModel):
     modbus_baudrate: int = Field(default=19200, description="modbus_live mode only; default matches Artisan's own shipped Coffee-Tech FZ-94 preset (19200/8N2)")
     modbus_control_port: Optional[str] = Field(default=None, description="modbus_live mode only, optional: only set this if your own wiring genuinely needs a *separate* connection for Air/Drum drive control (uncommon) -- e.g. 'COM4'. Leave blank (the normal case) to send Air/Drum over modbus_port along with everything else.")
     modbus_control_baudrate: int = Field(default=19200, description="modbus_live mode only; baud rate for modbus_control_port, if that's set")
+    modbus_device_profile_id: Optional[str] = Field(default=None, description="modbus_live, optional: use a saved/built-in DeviceProfile's full channel map instead of the individual modbus_* override fields below. When set, those flat fields are ignored (a profile fully replaces them, no merging) -- see api/device_profiles.py. Leave unset (the default) for exactly today's behavior.")
     # Full ModbusEngine register-map override set -- all optional and None
     # by default, meaning "use ModbusEngine's own (FZ-94) default"; only
     # set what your own unit actually needs overridden. BT/ET/DT/Burner's

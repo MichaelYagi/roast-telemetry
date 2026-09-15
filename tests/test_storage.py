@@ -243,3 +243,53 @@ def test_seed_default_presets_tolerates_a_row_that_exists_without_its_marker(iso
     _seed(isolated_db, preset_id="default-fz94-usb")  # does not raise
 
     assert len(isolated_db.list_preset_rows()) == 1
+
+
+def test_device_profile_crud(isolated_db):
+    isolated_db.insert_device_profile({
+        "id": "dp1", "name": "My Roaster", "created_at": "2026-01-01T00:00:00",
+        "config_json": '{"name": "My Roaster", "temp_channels": []}',
+    })
+
+    row = isolated_db.get_device_profile_row("dp1")
+    assert row["name"] == "My Roaster"
+    assert row["built_in"] == 0  # default, unlike seeded built-ins
+
+    isolated_db.update_device_profile_row("dp1", {"name": "Renamed", "config_json": row["config_json"]})
+    row = isolated_db.get_device_profile_row("dp1")
+    assert row["name"] == "Renamed"
+
+    assert len(isolated_db.list_device_profile_rows()) == 1
+    isolated_db.delete_device_profile_row("dp1")
+    assert isolated_db.list_device_profile_rows() == []
+
+
+def _seed_device_profile(isolated_db, profile_id="coffeetech-fz94"):
+    isolated_db.seed_default_device_profiles([
+        {"id": profile_id, "name": "Coffee-Tech FZ-94 (built-in)", "created_at": "2026-01-01T00:00:00", "config_json": "{}"},
+    ])
+
+
+def test_seed_default_device_profiles_inserts_once_as_built_in(isolated_db):
+    _seed_device_profile(isolated_db)
+
+    rows = isolated_db.list_device_profile_rows()
+    assert len(rows) == 1
+    assert rows[0]["id"] == "coffeetech-fz94"
+    assert rows[0]["built_in"] == 1
+
+
+def test_seed_default_device_profiles_does_not_duplicate_on_repeat_calls(isolated_db):
+    _seed_device_profile(isolated_db)
+    _seed_device_profile(isolated_db)
+
+    assert len(isolated_db.list_device_profile_rows()) == 1
+
+
+def test_seed_default_device_profiles_does_not_resurrect_a_deleted_one(isolated_db):
+    _seed_device_profile(isolated_db)
+    isolated_db.delete_device_profile_row("coffeetech-fz94")
+
+    _seed_device_profile(isolated_db)
+
+    assert isolated_db.list_device_profile_rows() == []

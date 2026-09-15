@@ -23,7 +23,16 @@ prefer the link above or open the files locally.)*
   - **Direct Modbus** — talks straight to a real roaster's PLC over
     Modbus RTU, bypassing Artisan entirely, with full read *and* write
     control (Burner/Air/Drum). Ships configured for Coffee-Tech's
-    FZ-94; every register is overridable for a different Modbus roaster.
+    FZ-94, expressed as a built-in **Device Profile** — a named,
+    reusable register map covering any number of temperature channels
+    and three control mechanisms (setpoint-temperature, VFD drive,
+    plain direct-register), so supporting a different roaster brand is
+    building/saving a profile, not writing new code. The 26 individual
+    flat register-override fields still work exactly as before for
+    anyone not using a profile. Up to two extra temperature channels
+    beyond BT/ET/DT (e.g. a flue probe) are recorded and charted live;
+    the first two round-trip through a real `.alog` export too (a fixed
+    capacity in Artisan's own file format).
   - **Direct USB (thermocouple meter)** — reads a Mastech MS6514 dual
     K-type thermocouple meter straight over USB-serial.
 - **Artisan-style connect-then-record flow** for the two live-hardware

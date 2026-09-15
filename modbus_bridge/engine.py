@@ -130,6 +130,14 @@ from typing import Optional
 
 from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ModbusException
+
+from backend.app.models import (
+    DeviceProfile,
+    ModbusChannelRole,
+    ModbusControlChannel,
+    ModbusControlKind,
+    ModbusTempChannel,
+)
 from roast_heuristics import LiveRoastDetector
 
 
@@ -199,8 +207,6 @@ class ModbusEngine:
         detect_milestones: bool = False,
         client_cls=ModbusSerialClient,  # injectable for testing without real hardware
     ):
-        if not port:
-            raise ValueError("port (e.g. 'COM3') is required to connect via Modbus RTU")
         self.port = port
         self.control_port = control_port
         self.bt_slave_id = bt_slave_id
@@ -229,6 +235,30 @@ class ModbusEngine:
         self.drum_feedback_register = drum_feedback_register
         self.drum_feedback_divisor = drum_feedback_divisor or 1.0
 
+        # Everything above is kept exactly as before (including every
+        # individual attribute -- tests assert on e.g. engine.bt_slave_id
+        # directly) purely for backward compatibility; tick()/
+        # apply_command() below now actually run off these two generic
+        # lists instead, built from those same flat args. See
+        # DeviceProfile/ModbusTempChannel/ModbusControlChannel in
+        # backend/app/models.py -- this constructor is the compatibility
+        # shim for the FZ-94's own (or an overridden) flat register map;
+        # from_profile() below is the other way in, building the same
+        # two lists directly from a saved/built-in DeviceProfile instead.
+        self.temp_channels, self.control_channels = self._channels_from_flat_args(
+            bt_slave_id=self.bt_slave_id, bt_register=self.bt_register, bt_divisor=self.bt_divisor,
+            et_slave_id=self.et_slave_id, et_register=self.et_register, et_divisor=self.et_divisor,
+            dt_slave_id=self.dt_slave_id, dt_register=self.dt_register, dt_divisor=self.dt_divisor,
+            burner_slave_id=self.burner_slave_id, burner_register=self.burner_register,
+            burner_divisor=self.burner_divisor, burner_sv_range_c=self.burner_sv_range_c,
+            air_slave_id=self.air_slave_id, air_control_register=self.air_control_register,
+            air_frequency_register=self.air_frequency_register, air_range=self.air_range,
+            air_feedback_register=self.air_feedback_register, air_feedback_divisor=self.air_feedback_divisor,
+            drum_slave_id=self.drum_slave_id, drum_control_register=self.drum_control_register,
+            drum_frequency_register=self.drum_frequency_register, drum_range=self.drum_range,
+            drum_feedback_register=self.drum_feedback_register, drum_feedback_divisor=self.drum_feedback_divisor,
+        )
+
         self._dry_end_c = dry_end_c
         self._fc_start_c = fc_start_c
         # Real hardware means a real operator standing at the machine --
@@ -245,6 +275,126 @@ class ModbusEngine:
         self._control_last_error: Optional[str] = None
         self._last_values: dict[str, float] = {}
 
+        self._open_connections(
+            port, baudrate, bytesize, parity, stopbits, timeout,
+            control_port, control_baudrate, control_bytesize, control_parity, control_stopbits, control_timeout,
+            client_cls,
+        )
+
+    @staticmethod
+    def _channels_from_flat_args(
+        *, bt_slave_id, bt_register, bt_divisor, et_slave_id, et_register, et_divisor,
+        dt_slave_id, dt_register, dt_divisor, burner_slave_id, burner_register, burner_divisor, burner_sv_range_c,
+        air_slave_id, air_control_register, air_frequency_register, air_range, air_feedback_register, air_feedback_divisor,
+        drum_slave_id, drum_control_register, drum_frequency_register, drum_range, drum_feedback_register, drum_feedback_divisor,
+    ) -> tuple[list[ModbusTempChannel], list[ModbusControlChannel]]:
+        """Translates the legacy flat FZ-94-shaped constructor args into
+        the same two generic lists from_profile() builds directly from a
+        DeviceProfile -- see the constructor's own comment for why both
+        paths exist. `None` on an optional register disables that channel
+        entirely, same meaning it's always had."""
+        temp_channels = [ModbusTempChannel(role=ModbusChannelRole.BT, slave_id=bt_slave_id, register_address=bt_register, divisor=bt_divisor)]
+        if et_register is not None:
+            temp_channels.append(ModbusTempChannel(role=ModbusChannelRole.ET, slave_id=et_slave_id, register_address=et_register, divisor=et_divisor))
+        if dt_register is not None:
+            temp_channels.append(ModbusTempChannel(role=ModbusChannelRole.DT, slave_id=dt_slave_id, register_address=dt_register, divisor=dt_divisor))
+
+        control_channels: list[ModbusControlChannel] = []
+        if burner_register is not None:
+            control_channels.append(ModbusControlChannel(
+                maps_to="heater_pct", kind=ModbusControlKind.SV_TEMPERATURE, slave_id=burner_slave_id,
+                register_address=burner_register, divisor=burner_divisor, sv_range_c=burner_sv_range_c,
+            ))
+        if air_control_register is not None and air_frequency_register is not None:
+            control_channels.append(ModbusControlChannel(
+                maps_to="fan_pct", kind=ModbusControlKind.VFD_DRIVE, slave_id=air_slave_id,
+                control_register=air_control_register, frequency_register=air_frequency_register, frequency_scale=100.0,
+                feedback_register=air_feedback_register, feedback_divisor=air_feedback_divisor, value_range=air_range,
+            ))
+        if drum_control_register is not None and drum_frequency_register is not None:
+            control_channels.append(ModbusControlChannel(
+                maps_to="drum_speed_pct", kind=ModbusControlKind.VFD_DRIVE, slave_id=drum_slave_id,
+                control_register=drum_control_register, frequency_register=drum_frequency_register, frequency_scale=100.0,
+                feedback_register=drum_feedback_register, feedback_divisor=drum_feedback_divisor, value_range=drum_range,
+            ))
+        return temp_channels, control_channels
+
+    @classmethod
+    def from_profile(
+        cls,
+        profile: DeviceProfile,
+        port: str,
+        *,
+        baudrate: Optional[int] = None,
+        bytesize: Optional[int] = None,
+        parity: Optional[str] = None,
+        stopbits: Optional[int] = None,
+        timeout: float = 0.4,
+        control_port: Optional[str] = None,
+        control_baudrate: Optional[int] = None,
+        control_bytesize: Optional[int] = None,
+        control_parity: Optional[str] = None,
+        control_stopbits: Optional[int] = None,
+        control_timeout: float = 0.4,
+        dry_end_c: Optional[float] = 160.0,
+        fc_start_c: Optional[float] = 196.0,
+        detect_milestones: bool = False,
+        client_cls=ModbusSerialClient,
+    ) -> "ModbusEngine":
+        """The profile-driven way in -- builds the same two generic
+        channel lists the flat constructor above builds internally, but
+        straight from a saved/built-in DeviceProfile instead of 26 flat
+        override fields. Connection settings default to the profile's
+        own (baudrate/bytesize/parity/stopbits) but can still be
+        overridden per-roast, same as modbus_baudrate already can today.
+        Every named flat attribute (self.bt_slave_id etc.) that only the
+        legacy constructor's own tests/internals ever read is left unset
+        here -- nothing in tick()/apply_command() touches them; they only
+        exist for the flat-constructor compatibility path above."""
+        self = cls.__new__(cls)
+        self.port = port
+        self.control_port = control_port
+        self.temp_channels = list(profile.temp_channels)
+        self.control_channels = list(profile.control_channels)
+
+        self._dry_end_c = dry_end_c
+        self._fc_start_c = fc_start_c
+        self._detect_milestones = detect_milestones
+        self._detector = LiveRoastDetector(dry_end_c=dry_end_c, fc_start_c=fc_start_c, detect_milestones=detect_milestones)
+        self._last_time_s = 0.0
+        self._connected = False
+        self._last_error = None
+        self._control_last_error = None
+        self._last_values = {}
+
+        self._open_connections(
+            port,
+            baudrate if baudrate is not None else profile.baudrate,
+            bytesize if bytesize is not None else profile.bytesize,
+            parity if parity is not None else profile.parity,
+            stopbits if stopbits is not None else profile.stopbits,
+            timeout,
+            control_port,
+            control_baudrate if control_baudrate is not None else profile.baudrate,
+            control_bytesize if control_bytesize is not None else profile.bytesize,
+            control_parity if control_parity is not None else profile.parity,
+            control_stopbits if control_stopbits is not None else profile.stopbits,
+            control_timeout,
+            client_cls,
+        )
+        return self
+
+    def _open_connections(
+        self, port, baudrate, bytesize, parity, stopbits, timeout,
+        control_port, control_baudrate, control_bytesize, control_parity, control_stopbits, control_timeout,
+        client_cls,
+    ) -> None:
+        """Shared by both constructors above -- opens the primary serial
+        connection (and, only if control_port is actually set, a second
+        one for Air/Drum -- see the module docstring's confirmed
+        single-bus architecture)."""
+        if not port:
+            raise ValueError("port (e.g. 'COM3') is required to connect via Modbus RTU")
         self._client = client_cls(
             port=port, baudrate=baudrate, bytesize=bytesize, parity=parity, stopbits=stopbits, timeout=timeout,
         )
@@ -310,69 +460,83 @@ class ModbusEngine:
                 self._connected = False
             return None
 
+    def _read_temp_channel(self, ch: ModbusTempChannel, *, is_heartbeat: bool = False) -> Optional[float]:
+        raw = self._read_register(ch.register_address, ch.slave_id, is_heartbeat=is_heartbeat)
+        return (raw / (ch.divisor or 1.0)) if raw is not None else None
+
+    def _read_control_feedback(self, ch: ModbusControlChannel) -> tuple[Optional[float], Optional[float]]:
+        """Returns (pct_feedback, raw_sv_c). raw_sv_c is only ever
+        non-None for kind=SV_TEMPERATURE (the roaster's own PID setpoint
+        in its native °C -- see RoastProfilePoint.burner_sv_c); every
+        other kind returns None there, no equivalent concept."""
+        if ch.kind == ModbusControlKind.SV_TEMPERATURE:
+            # Readable from the same address it's written to -- reports
+            # the PLC's actual current setpoint, not just an echo of the
+            # last command this app itself sent. Matters on connecting to
+            # a device an operator (or a previous session) already has
+            # running: without this, heater_pct would read blank/0 until
+            # this app happened to write it, which is both misleading and
+            # risks clobbering real state if the UI ever auto-sent a
+            # "starting value" on top of that instead of reflecting it.
+            if ch.register_address is None:
+                return None, None
+            raw = self._read_register(ch.register_address, ch.slave_id)
+            if raw is None:
+                return None, None
+            sv_c = raw / (ch.divisor or 1.0)
+            sv_lo, sv_hi = ch.sv_range_c or (0.0, 100.0)
+            pct = max(0.0, min(100.0, (sv_c - sv_lo) / (sv_hi - sv_lo) * 100.0)) if sv_hi != sv_lo else None
+            return pct, sv_c
+        # vfd_drive / direct_register share the same optional feedback-
+        # register shape -- a genuine readback of the drive/register's
+        # actual current value, not an echo of the last write. None here
+        # (no feedback register configured, or the read failed) falls
+        # back to the last commanded value in tick() below, same
+        # degrade-gracefully behavior as always.
+        if ch.feedback_register is None:
+            return None, None
+        raw = self._read_register(ch.feedback_register, ch.slave_id, client=self._control_client)
+        return ((raw / (ch.feedback_divisor or 1.0)) if raw is not None else None), None
+
     # -- engine contract (matches simulator.SimulatorEngine / AlogPlayer / MS6514Engine) --
     def tick(self, dt: float) -> dict:
         self._last_time_s += dt
         time_s = self._last_time_s
 
-        bt_raw = self._read_register(self.bt_register, self.bt_slave_id, is_heartbeat=True)
-        bt = (bt_raw / self.bt_divisor) if bt_raw is not None else None
-
-        et = None
-        if self.et_register is not None:
-            et_raw = self._read_register(self.et_register, self.et_slave_id)
-            et = (et_raw / self.et_divisor) if et_raw is not None else None
-
-        dt = None
-        if self.dt_register is not None:
-            dt_raw = self._read_register(self.dt_register, self.dt_slave_id)
-            dt = (dt_raw / self.dt_divisor) if dt_raw is not None else None
+        bt = et = dt_val = None
+        extra: dict[str, float] = {}
+        for ch in self.temp_channels:
+            value = self._read_temp_channel(ch, is_heartbeat=(ch.role == ModbusChannelRole.BT))
+            if ch.role == ModbusChannelRole.BT:
+                bt = value
+            elif ch.role == ModbusChannelRole.ET:
+                et = value
+            elif ch.role == ModbusChannelRole.DT:
+                dt_val = value
+            elif ch.role == ModbusChannelRole.EXTRA and value is not None and ch.label:
+                extra[ch.label] = value
 
         sample = self._detector.observe(time_s, bt, et)
-        sample["dt"] = dt
+        sample["dt"] = dt_val
+        sample["extra"] = extra
 
-        # Burner SV is a holding register -- readable from the same address
-        # it's written to (register 5), so this reports the PLC's actual
-        # current setpoint, not just an echo of the last command this app
-        # itself sent. Matters on connecting to a device an operator (or a
-        # previous session) already has running: without this, heater_pct
-        # would read blank/0 until this app happened to write it, which is
-        # both misleading and, if the UI ever auto-sent a "starting value"
-        # on top of that, actively risked clobbering real state instead of
-        # reflecting it. See burner_sv_range_c for the inverse of the same
-        # mapping _write_burner_sv uses.
-        heater_fb = None
+        # Explicit None for every one of the three known slots up front --
+        # a profile that doesn't map a control channel onto one (or the
+        # flat-constructor path with that channel disabled) still reports
+        # it as present-and-null, not simply absent from the dict, same
+        # as this engine has always done.
+        sample["heater_pct"] = sample["fan_pct"] = sample["drum_speed_pct"] = None
         sv_c = None
-        if self.burner_register is not None:
-            sv_raw = self._read_register(self.burner_register, self.burner_slave_id)
-            if sv_raw is not None:
-                sv_c = sv_raw / self.burner_divisor
-                sv_lo, sv_hi = self.burner_sv_range_c
-                heater_fb = max(0.0, min(100.0, (sv_c - sv_lo) / (sv_hi - sv_lo) * 100.0))
-        sample["heater_pct"] = heater_fb if heater_fb is not None else self._last_values.get("burner")
+        for ch in self.control_channels:
+            pct, maybe_sv_c = self._read_control_feedback(ch)
+            sample[ch.maps_to] = pct if pct is not None else self._last_values.get(ch.maps_to)
+            if maybe_sv_c is not None:
+                sv_c = maybe_sv_c
         # The raw SV in its native unit (°C), not the 0-100% UI mapping --
-        # lets an operator sanity-check burner_sv_range_c against the
-        # roaster's own real setpoint instead of trusting the % blindly.
+        # lets an operator sanity-check sv_range_c against the roaster's
+        # own real setpoint instead of trusting the % blindly. None on a
+        # profile with no SV_TEMPERATURE control channel at all.
         sample["burner_sv_c"] = sv_c
-
-        # Prefer a genuine feedback read over echoing the last command --
-        # confirms the drive actually took the write, not just that pymodbus
-        # didn't error. Falls back to the echo if no feedback register is
-        # configured (or its read fails), so this degrades to the old
-        # behavior rather than going blank.
-        air_fb = None
-        if self.air_feedback_register is not None:
-            air_raw = self._read_register(self.air_feedback_register, self.air_slave_id, client=self._control_client)
-            air_fb = (air_raw / self.air_feedback_divisor) if air_raw is not None else None
-        sample["fan_pct"] = air_fb if air_fb is not None else self._last_values.get("air")
-
-        drum_fb = None
-        if self.drum_feedback_register is not None:
-            drum_raw = self._read_register(
-                self.drum_feedback_register, self.drum_slave_id, client=self._control_client
-            )
-            drum_fb = (drum_raw / self.drum_feedback_divisor) if drum_raw is not None else None
-        sample["drum_speed_pct"] = drum_fb if drum_fb is not None else self._last_values.get("drum")
         return sample
 
     def get_new_events(self) -> list:
@@ -381,63 +545,77 @@ class ModbusEngine:
     def apply_command(self, cmd: dict) -> None:
         """Reuses the platform's existing heater_pct/fan_pct/drum_speed_pct
         control command shape so the existing Controls UI works
-        unmodified for this engine too -- heater_pct becomes a Burner SV
-        temperature write on the primary connection, fan_pct/drum_speed_pct
-        become two-register VFD drive writes on the (separate) control
-        connection. See module docstring for why these three don't share
-        one simple "write a percentage to a register" shape."""
-        if cmd.get("heater_pct") is not None:
-            self._write_burner_sv(float(cmd["heater_pct"]))
-        if cmd.get("fan_pct") is not None:
-            self._write_drive(
-                "air", self.air_slave_id, self.air_control_register, self.air_frequency_register,
-                float(cmd["fan_pct"]), self.air_range,
-            )
-        if cmd.get("drum_speed_pct") is not None:
-            self._write_drive(
-                "drum", self.drum_slave_id, self.drum_control_register, self.drum_frequency_register,
-                float(cmd["drum_speed_pct"]), self.drum_range,
-            )
+        unmodified regardless of which physical channel/mechanism a
+        DeviceProfile actually maps each slot onto -- dispatches to one
+        of the three write helpers below by that channel's own `kind`.
+        See ModbusControlKind for why these don't share one simple
+        "write a percentage to a register" shape."""
+        for ch in self.control_channels:
+            value = cmd.get(ch.maps_to)
+            if value is None:
+                continue
+            if ch.kind == ModbusControlKind.SV_TEMPERATURE:
+                self._write_sv_temperature(ch, float(value))
+            elif ch.kind == ModbusControlKind.VFD_DRIVE:
+                self._write_vfd_drive(ch, float(value))
+            elif ch.kind == ModbusControlKind.DIRECT_REGISTER:
+                self._write_direct_register(ch, float(value))
 
-    def _write_burner_sv(self, heater_pct: float) -> None:
-        if self.burner_register is None:
+    def _write_sv_temperature(self, ch: ModbusControlChannel, pct: float) -> None:
+        if ch.register_address is None:
             return
-        pct = max(0.0, min(100.0, heater_pct))
-        sv_lo, sv_hi = self.burner_sv_range_c
+        pct = max(0.0, min(100.0, pct))
+        sv_lo, sv_hi = ch.sv_range_c or (0.0, 100.0)
         sv_c = sv_lo + (pct / 100.0) * (sv_hi - sv_lo)
-        raw = int(round(sv_c * self.burner_divisor))
+        raw = int(round(sv_c * (ch.divisor or 1.0)))
         try:
-            result = self._client.write_register(self.burner_register, raw, device_id=self.burner_slave_id)
+            result = self._client.write_register(ch.register_address, raw, device_id=ch.slave_id)
             if result.isError():
                 self._last_error = str(result)
             else:
                 self._last_error = None
                 self._connected = True
-                self._last_values["burner"] = pct
+                self._last_values[ch.maps_to] = pct
         except ModbusException as exc:
             self._last_error = str(exc)
             self._connected = False
 
-    def _write_drive(
-        self, name: str, slave_id: int, control_register: Optional[int], frequency_register: Optional[int],
-        value: float, value_range: tuple[float, float],
-    ) -> None:
-        if control_register is None or frequency_register is None:
+    def _write_vfd_drive(self, ch: ModbusControlChannel, value: float) -> None:
+        if ch.control_register is None or ch.frequency_register is None:
             return
-        lo, hi = value_range
+        lo, hi = ch.value_range
         clamped = max(lo, min(hi, value))
         try:
             run_state = 2 if clamped > 0 else 1  # 2=Run, 1=Stop
-            run_result = self._control_client.write_register(control_register, run_state, device_id=slave_id)
+            run_result = self._control_client.write_register(ch.control_register, run_state, device_id=ch.slave_id)
             freq_result = self._control_client.write_register(
-                frequency_register, int(round(clamped * 100)), device_id=slave_id
+                ch.frequency_register, int(round(clamped * ch.frequency_scale)), device_id=ch.slave_id
             )
             if run_result.isError() or freq_result.isError():
                 self._control_last_error = str(run_result) if run_result.isError() else str(freq_result)
             else:
                 self._control_last_error = None
                 self._control_connected = True
-                self._last_values[name] = clamped
+                self._last_values[ch.maps_to] = clamped
+        except ModbusException as exc:
+            self._control_last_error = str(exc)
+            self._control_connected = False
+
+    def _write_direct_register(self, ch: ModbusControlChannel, value: float) -> None:
+        if ch.write_register is None:
+            return
+        lo, hi = ch.value_range
+        clamped = max(lo, min(hi, value))
+        try:
+            result = self._control_client.write_register(
+                ch.write_register, int(round(clamped * ch.write_scale)), device_id=ch.slave_id
+            )
+            if result.isError():
+                self._control_last_error = str(result)
+            else:
+                self._control_last_error = None
+                self._control_connected = True
+                self._last_values[ch.maps_to] = clamped
         except ModbusException as exc:
             self._control_last_error = str(exc)
             self._control_connected = False

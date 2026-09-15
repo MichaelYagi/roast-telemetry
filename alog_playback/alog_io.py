@@ -283,15 +283,32 @@ def roast_to_artisan_native_dict(
     # regardless of what's actually in extraname2/extratemp2. Slot 0 is
     # repurposed for DT (drum space temp -- a real third probe on the
     # FZ-94, its own Modbus slave ID, not the same thing as BT/ET;
-    # see modbus_bridge/engine.py) when available; the remaining slots
-    # (this app has no data for real Kaleido AT/AH sensors) stay flat
-    # placeholder curves, same as before.
+    # see modbus_bridge/engine.py) when available; any further
+    # role=EXTRA channels from a DeviceProfile (see
+    # RoastProfilePoint.extra) repurpose whatever slots remain the exact
+    # same safe way, ordered by first appearance in this roast's own
+    # profile -- there are only 3 slots total in the donor template (DT
+    # + 2 more), a real, fixed ceiling, not an arbitrary one; anything
+    # past that still lives in profile[i]["extra"] for the live chart/
+    # readouts, it just doesn't round-trip through this export. Any slot
+    # still unused after that stays a flat placeholder curve, same as
+    # before this app had any extra-channel data to put there at all.
+    extra_labels: list[str] = []
+    for p in export_profile:
+        for label in p.get("extra") or {}:
+            if label not in extra_labels:
+                extra_labels.append(label)
+
     extraname2 = list(data.get("extraname2") or [])
     extratemp2 = []
     for i in range(len(extraname2)):
         if i == 0:
             extraname2[0] = "DT"
             extratemp2.append(_fill_and_floatify([p.get("dt") for p in export_profile]))
+        elif i - 1 < len(extra_labels):
+            label = extra_labels[i - 1]
+            extraname2[i] = label
+            extratemp2.append(_fill_and_floatify([(p.get("extra") or {}).get(label) for p in export_profile]))
         else:
             extratemp2.append([0.0] * len(timex))
     extratimex = [timex] * max(len(extraname1), len(extraname2), 1)
@@ -559,7 +576,16 @@ def _step_hold_align(src_times: list, src_values: list, target_times: list) -> l
 
 def _extract_continuous_channels(data: dict, timex: list) -> dict[str, list]:
     """Map real Artisan's extra-device channels onto our heater_pct/
-    fan_pct/drum_speed_pct fields, aligned to the main `timex`."""
+    fan_pct/drum_speed_pct/dt fields. Any *other* plain-text label (not
+    DT, not a `{N}` etype reference) becomes an `extra:<label>`
+    pseudo-field instead of being silently dropped -- see
+    alog_dict_to_points below, which folds those into each point's own
+    `extra` dict (see RoastProfilePoint.extra). Covers both this app's
+    own role=EXTRA DeviceProfile channels round-tripping through
+    roast_to_artisan_native_dict's extraname2 slots, and a genuine
+    third-party Artisan file (e.g. a real Kaleido export) carrying its
+    own extra sensors (SV/AT/AH, ...) this app has no other name for --
+    previously discarded entirely, now preserved generically."""
     etypes = data.get("etypes") or []
     extratimex = data.get("extratimex") or []
     pairs = [
@@ -576,12 +602,13 @@ def _extract_continuous_channels(data: dict, timex: list) -> dict[str, list]:
                 field = "dt"
             else:
                 m = _EXTRANAME_ETYPE_RE.match(str(name)) if name else None
-                if not m:
-                    continue
-                etype_idx = int(m.group(1))
-                if not (0 <= etype_idx < len(etypes)):
-                    continue
-                field = _CHANNEL_FIELD.get(etypes[etype_idx])
+                if m:
+                    etype_idx = int(m.group(1))
+                    field = _CHANNEL_FIELD.get(etypes[etype_idx]) if 0 <= etype_idx < len(etypes) else None
+                elif name:
+                    field = f"extra:{name}"
+                else:
+                    field = None
             if not field or field in result:
                 continue
             values = temps[i]
@@ -606,6 +633,11 @@ def alog_dict_to_points(data: dict) -> dict:
     control_list = data.get("control") or []
     control = {c["time_s"]: c for c in control_list if isinstance(c, dict) and "time_s" in c}
     continuous = _extract_continuous_channels(data, timex)
+    # extra:<label> pseudo-fields (see _extract_continuous_channels) fold
+    # into each point's own `extra` dict below rather than becoming top-
+    # level RoastProfilePoint fields the way heater_pct/fan_pct/dt do --
+    # there's no fixed set of these, unlike the other three.
+    extra_channels = {k[len("extra:"):]: v for k, v in continuous.items() if k.startswith("extra:")}
 
     profile = []
     for i, t in enumerate(timex):
@@ -620,6 +652,7 @@ def alog_dict_to_points(data: dict) -> dict:
             "fan_pct": continuous["fan_pct"][i] if "fan_pct" in continuous else c.get("fan_pct"),
             "drum_speed_pct": continuous["drum_speed_pct"][i] if "drum_speed_pct" in continuous else c.get("drum_speed_pct"),
             "dt": continuous["dt"][i] if "dt" in continuous else c.get("dt"),
+            "extra": {label: values[i] for label, values in extra_channels.items() if values[i] is not None},
         })
 
     weight_green_g, weight_roasted_g = _extract_weight(data)

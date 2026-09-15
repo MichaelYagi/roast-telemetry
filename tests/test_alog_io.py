@@ -51,6 +51,51 @@ def test_roundtrip_through_save_and_load(tmp_path):
     assert points["notes"][0]["text"] == "hello"
 
 
+def test_extra_channels_roundtrip_through_the_extraname2_bank(tmp_path):
+    # role=EXTRA DeviceProfile channels (see RoastProfilePoint.extra) --
+    # up to 2 round-trip through the real .alog format's extraname2 bank
+    # (slot 0 is DT, slots 1/2 are free -- see roast_to_artisan_native_dict's
+    # own comment on why that's a fixed ceiling, not arbitrary).
+    profile = [
+        {"time_s": 0.0, "bt": 20.0, "et": 25.0, "dt": 30.0, "extra": {"Flue": 40.0, "Ambient": 18.0}},
+        {"time_s": 1.0, "bt": 21.0, "et": 26.0, "dt": 31.0, "extra": {"Flue": 41.0, "Ambient": 18.5}},
+    ]
+    alog_dict = roast_to_artisan_native_dict(
+        title="Extra Channels Roast", profile=profile, events=[], notes=[],
+    )
+    path = str(tmp_path / "roast.alog")
+    save_artisan_native_alog(path, alog_dict)
+
+    loaded = load_alog(path)
+    points = alog_dict_to_points(loaded)
+
+    # Index 0 is the synthetic pre-charge lead-in sample (same convention
+    # as the main roundtrip test above) -- it clones profile[0], so it
+    # carries the same extra values too.
+    profile_points = points["profile"]
+    assert [p["dt"] for p in profile_points] == [30.0, 30.0, 31.0]
+    assert [p["extra"]["Flue"] for p in profile_points] == [40.0, 40.0, 41.0]
+    assert [p["extra"]["Ambient"] for p in profile_points] == [18.0, 18.0, 18.5]
+
+
+def test_a_third_extra_channel_beyond_the_two_free_slots_does_not_export(tmp_path):
+    # Documents the real, fixed ceiling (donor template has exactly 3
+    # extraname2 slots: DT + 2 more) rather than silently corrupting
+    # anything -- a third role=EXTRA channel just isn't in the export.
+    profile = [
+        {"time_s": 0.0, "bt": 20.0, "et": 25.0, "extra": {"A": 1.0, "B": 2.0, "C": 3.0}},
+    ]
+    alog_dict = roast_to_artisan_native_dict(title="R", profile=profile, events=[], notes=[])
+    path = str(tmp_path / "roast.alog")
+    save_artisan_native_alog(path, alog_dict)
+
+    points = alog_dict_to_points(load_alog(path))
+    extras = points["profile"][-1]["extra"]
+    assert extras.get("A") == 1.0
+    assert extras.get("B") == 2.0
+    assert "C" not in extras
+
+
 def test_load_alog_parses_real_artisan_python_literal(tmp_path):
     # Real Artisan .alog files are `str(dict)`, not JSON -- single quotes,
     # True/False/None -- loaded back with ast.literal_eval, never eval().

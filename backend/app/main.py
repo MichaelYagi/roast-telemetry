@@ -11,8 +11,9 @@ from fastapi.staticfiles import StaticFiles
 
 from . import auth, storage
 from .api import auth as auth_api
-from .api import devices, presets, roasts, serial_ports, settings
-from .models import RoastCreateRequest, UserStatus
+from .api import device_profiles, devices, presets, roasts, serial_ports, settings
+from .models import DeviceProfileCreateRequest, RoastCreateRequest, UserStatus
+from modbus_bridge.device_profiles import BUILT_IN_PROFILES
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
@@ -51,6 +52,15 @@ async def lifespan(app: FastAPI):
             "config_json": p["config"].model_dump_json(),
         }
         for p in _DEFAULT_PRESETS
+    ])
+    storage.seed_default_device_profiles([
+        {
+            "id": p.id,
+            "name": p.name,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "config_json": DeviceProfileCreateRequest(**p.model_dump()).model_dump_json(),
+        }
+        for p in BUILT_IN_PROFILES
     ])
     yield
 
@@ -105,6 +115,7 @@ app.include_router(auth_api.router, prefix="/api")
 app.include_router(roasts.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
 app.include_router(presets.router, prefix="/api")
+app.include_router(device_profiles.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 app.include_router(serial_ports.router, prefix="/api")
 

@@ -10,6 +10,7 @@ import ConnectionBadge from "../components/ConnectionBadge.jsx";
 import AlarmRulesEditor from "../components/AlarmRulesEditor.jsx";
 import ConnectionTestPanel from "../components/ConnectionTestPanel.jsx";
 import ControlPanel from "../components/ControlPanel.jsx";
+import DeviceProfileEditor from "../components/DeviceProfileEditor.jsx";
 import EventButtonRow from "../components/EventButtonRow.jsx";
 import RoastChart from "../components/RoastChart.jsx";
 import { formatTemp } from "../tempUnits.js";
@@ -101,6 +102,11 @@ export default function LiveRoastView() {
     modbus_baudrate: 19200,
     modbus_control_port: "",
     modbus_control_baudrate: 19200,
+    // "" = "Custom (advanced fields below)" -- today's exact flow, the
+    // 26 flat modbus_* override fields still drive the register map.
+    // Any other value is a DeviceProfile id, which takes over instead
+    // (see buildConfigFromForm below) and hides the advanced section.
+    modbus_device_profile_id: "",
     ms6514_port: "",
     // Off by default -- real hardware means a real operator marking
     // milestones by hand, not an algorithm guessing, unless explicitly
@@ -150,6 +156,12 @@ export default function LiveRoastView() {
     modbus_burner_sv_max_c: "",
   });
   const [showAdvancedModbus, setShowAdvancedModbus] = useState(false);
+  const [deviceProfiles, setDeviceProfiles] = useState([]);
+
+  function refreshDeviceProfiles() {
+    api.listDeviceProfiles().then(setDeviceProfiles).catch(() => {});
+  }
+  useEffect(refreshDeviceProfiles, []);
   // Populates the Serial port / drive-port fields' <datalist> -- a
   // convenience list of what the OS currently sees plugged in, not a
   // whitelist (both fields stay plain text inputs, so a port not
@@ -514,6 +526,7 @@ export default function LiveRoastView() {
       payload.modbus_baudrate = Number(form.modbus_baudrate) || 19200;
       payload.modbus_control_port = form.modbus_control_port || null;
       payload.modbus_control_baudrate = Number(form.modbus_control_baudrate) || 19200;
+      payload.modbus_device_profile_id = form.modbus_device_profile_id || null;
       payload.modbus_bt_slave_id = numOrNull(form.modbus_bt_slave_id);
       payload.modbus_bt_register = numOrNull(form.modbus_bt_register);
       payload.modbus_bt_divisor = numOrNull(form.modbus_bt_divisor);
@@ -641,6 +654,7 @@ export default function LiveRoastView() {
       modbus_baudrate: c.modbus_baudrate ?? f.modbus_baudrate,
       modbus_control_port: c.modbus_control_port || "",
       modbus_control_baudrate: c.modbus_control_baudrate ?? f.modbus_control_baudrate,
+      modbus_device_profile_id: c.modbus_device_profile_id || "",
       ms6514_port: c.ms6514_port || "",
       auto_detect_milestones: c.auto_detect_milestones ?? false,
       dry_end_c: c.dry_end_c ?? "",
@@ -994,14 +1008,38 @@ export default function LiveRoastView() {
                 its interpreting source code for this exact model; Air/Drum register numbers are only
                 blog-sourced.
               </p>
-              <button
-                type="button"
-                className="advanced-toggle"
-                onClick={() => setShowAdvancedModbus((v) => !v)}
-              >
-                {showAdvancedModbus ? "▾" : "▸"} Advanced Modbus register map
-              </button>
-              {showAdvancedModbus && (
+              <label>
+                Device profile
+                <select
+                  value={form.modbus_device_profile_id}
+                  onChange={(e) => setForm({ ...form, modbus_device_profile_id: e.target.value })}
+                >
+                  <option value="">Custom (advanced fields below)</option>
+                  {deviceProfiles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {p.built_in ? " (built-in)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {form.modbus_device_profile_id ? (
+                <p className="hint">
+                  Using the "{deviceProfiles.find((p) => p.id === form.modbus_device_profile_id)?.name}" register
+                  map -- the advanced fields below don't apply while a profile is selected. Pick "Custom" above to
+                  go back to setting individual registers by hand.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  className="advanced-toggle"
+                  onClick={() => setShowAdvancedModbus((v) => !v)}
+                >
+                  {showAdvancedModbus ? "▾" : "▸"} Advanced Modbus register map
+                </button>
+              )}
+              <DeviceProfileEditor onChange={refreshDeviceProfiles} />
+              {!form.modbus_device_profile_id && showAdvancedModbus && (
                 <div className="advanced-modbus-fields">
                   <p className="hint">
                     Leave any of these blank to use the FZ-94 defaults above. Only worth touching once you've
