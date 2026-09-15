@@ -17,6 +17,8 @@ def test_get_settings_defaults(client):
     assert resp.json() == {
         "ollama_url": None, "ollama_model": None, "broken_out_panels": [], "breakout_panel_colors": {},
         "small_readout_panels": ["et", "bt", "dt", "ror_bt"], "temperature_unit": "c",
+        "vertical_control_layout": [["drum_speed_pct"], ["fan_pct"], ["heater_pct"]],
+        "vertical_control_arrows": {},
     }
 
 
@@ -113,3 +115,39 @@ def test_put_settings_bogus_temperature_unit_falls_back_to_celsius(client):
     # rather than failing the whole save.
     resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "temperature_unit": "kelvin"})
     assert resp.json()["temperature_unit"] == "c"
+
+
+def test_put_settings_drops_unknown_vertical_control_keys(client):
+    resp = client.put("/api/settings", json={
+        "ollama_url": None,
+        "ollama_model": None,
+        "vertical_control_layout": [["drum_speed_pct", "not_a_real_channel"], ["bogus"], ["burner_sv_c"]],
+    })
+
+    assert resp.status_code == 200
+    # The bogus-only group disappears entirely (empty after filtering);
+    # the mixed group keeps just its valid member.
+    assert resp.json()["vertical_control_layout"] == [["drum_speed_pct"], ["burner_sv_c"]]
+
+
+def test_put_settings_dedupes_vertical_control_layout_across_groups(client):
+    # A channel appearing twice would render two drag-independent copies
+    # of the same slider -- de-duped across the whole layout, not just
+    # within one group.
+    resp = client.put("/api/settings", json={
+        "ollama_url": None,
+        "ollama_model": None,
+        "vertical_control_layout": [["heater_pct"], ["heater_pct", "fan_pct"]],
+    })
+
+    assert resp.json()["vertical_control_layout"] == [["heater_pct"], ["fan_pct"]]
+
+
+def test_put_settings_filters_vertical_control_arrows(client):
+    resp = client.put("/api/settings", json={
+        "ollama_url": None,
+        "ollama_model": None,
+        "vertical_control_arrows": {"heater_pct": True, "not_a_real_channel": True},
+    })
+
+    assert resp.json()["vertical_control_arrows"] == {"heater_pct": True}

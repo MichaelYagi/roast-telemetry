@@ -32,6 +32,7 @@ from ..models import (
     ControlCommand,
     DeviceProfile,
     EventCreateRequest,
+    ModbusControlKind,
     NoteCreateRequest,
     Roast,
     RoastCreateRequest,
@@ -184,6 +185,17 @@ class RoastSession:
             raise RoastSessionError(f"unsupported mode {request.mode}")
 
         self._engine = engine
+        # Exposed via summary() so the frontend's vertical control panel
+        # can convert heater_pct <-> burner_sv_c locally while dragging
+        # (optimistic preview -- see ModbusControlChannel.sv_range_c),
+        # instead of waiting on a telemetry round-trip to see the other
+        # slider move. None for every mode without an SV_TEMPERATURE
+        # control channel (only modbus_live can have one).
+        self.burner_sv_range_c: Optional[tuple[float, float]] = None
+        for ch in getattr(engine, "control_channels", []):
+            if ch.kind == ModbusControlKind.SV_TEMPERATURE:
+                self.burner_sv_range_c = ch.sv_range_c
+                break
         self.device = MockDevice(device_id=roast_id, engine=engine)
         self._task: Optional[asyncio.Task] = None
         self._stop_requested = asyncio.Event()
@@ -656,6 +668,7 @@ class RoastSession:
             auto_detect_milestones=self.auto_detect_milestones,
             dry_end_c=self.dry_end_c,
             fc_start_c=self.fc_start_c,
+            burner_sv_range_c=self.burner_sv_range_c,
         )
 
     def to_roast(self) -> Roast:

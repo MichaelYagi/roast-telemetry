@@ -269,6 +269,11 @@ class ControlCommand(BaseModel):
     heater_pct: Optional[float] = Field(default=None, ge=0, le=100)
     fan_pct: Optional[float] = Field(default=None, ge=0, le=100)
     drum_speed_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    # Alternate write path for the same burner setpoint heater_pct already
+    # writes -- native °C instead of a 0-100% mapping, for a second slider
+    # that moves the same underlying value (see ModbusEngine.apply_command).
+    # No ge/le: valid range is per-DeviceProfile (sv_range_c), not fixed.
+    burner_sv_c: Optional[float] = Field(default=None, description="modbus_live only: burner setpoint in native °C, an alternate unit to heater_pct for the same underlying value.")
     speed: Optional[float] = Field(default=None, ge=0, description="Playback speed multiplier (alog_playback mode only)")
 
 
@@ -413,6 +418,12 @@ class RoastSummary(BaseModel):
     auto_detect_milestones: bool = False
     dry_end_c: Optional[float] = None
     fc_start_c: Optional[float] = None
+    # modbus_live only, when the connected profile/register-map has an
+    # SV_TEMPERATURE burner channel: the °C bounds heater_pct's 0-100% is
+    # mapped onto (see ModbusControlChannel.sv_range_c). Lets the frontend's
+    # vertical control panel convert heater_pct<->burner_sv_c locally while
+    # dragging either slider, instead of waiting on a telemetry round trip.
+    burner_sv_range_c: Optional[tuple[float, float]] = None
 
 
 class Roast(RoastSummary):
@@ -442,6 +453,16 @@ class RoastPreset(BaseModel):
     fan_pct: Optional[float] = None
     drum_speed_pct: Optional[float] = None
 
+
+# Valid keys for AppSettings.vertical_control_layout/vertical_control_arrows
+# -- the four channels the vertical control panel (left of the live chart,
+# see frontend/src/components/VerticalControlPanel.jsx) can show.
+# drum_speed_pct/fan_pct are always shown regardless of settings (there's
+# no Controls panel fallback anymore -- see VerticalControlPanel's own
+# comment); heater_pct/burner_sv_c are the two configurable ones, and at
+# least one of those two must always be present (enforced by the settings
+# editor UI, not here -- this is just the valid-key allowlist).
+VERTICAL_CONTROL_KEYS = {"drum_speed_pct", "fan_pct", "heater_pct", "burner_sv_c"}
 
 # Valid keys for AppSettings.broken_out_panels -- which live readouts the
 # Live Roast view should also render large in the optional breakout panel
@@ -486,6 +507,22 @@ class AppSettings(BaseModel):
     # judged more confusing than useful for a feature nobody asked for
     # beyond "let me see the numbers in my preferred unit".
     temperature_unit: str = "c"
+    # Vertical control panel (left of the live chart, replaces the old
+    # always-visible horizontal Controls panel entirely -- see
+    # VerticalControlPanel.jsx). Ordered list of "columns", each column an
+    # ordered list of 1+ VERTICAL_CONTROL_KEYS -- a column with one key
+    # renders as its own siloed slider/readout; a column with multiple
+    # keys renders them grouped with no gap between them (visually
+    # "stacked" together, each still its own independent draggable
+    # control -- not a literal shared-scale overlay). storage.get_settings()
+    # seeds this to [["drum_speed_pct"], ["fan_pct"], ["heater_pct"]] only
+    # the first time (key never saved before), matching what the old
+    # Controls panel always showed -- SV stays opt-in.
+    vertical_control_layout: list[list[str]] = []
+    # Per-channel: show +/- increment/decrement buttons above and below
+    # that slider. Missing key (the default -- "default to all off") means
+    # off, same tolerant-missing-key convention as breakout_panel_colors.
+    vertical_control_arrows: dict[str, bool] = {}
 
 
 class OllamaStatus(BaseModel):

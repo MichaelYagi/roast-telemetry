@@ -100,6 +100,27 @@ def test_auto_detect_milestones_opt_in_reaches_the_engine():
     assert engine._detect_milestones is True
 
 
+def test_session_exposes_burner_sv_range_c_for_the_vertical_control_panel():
+    # Lets the frontend convert heater_pct<->burner_sv_c locally (optimistic
+    # preview) without needing to separately fetch the device profile --
+    # see RoastSession.__init__'s own comment and RoastSummary.burner_sv_range_c.
+    request = RoastCreateRequest(
+        title="Test Roast", mode=RoastMode.MODBUS_LIVE, modbus_port=BOGUS_PORT,
+        modbus_burner_sv_min_c=120.0, modbus_burner_sv_max_c=200.0,
+    )
+    session = RoastSession("test-roast-id", request)
+
+    assert session.burner_sv_range_c == (120.0, 200.0)
+    assert session.summary().burner_sv_range_c == (120.0, 200.0)
+
+
+def test_session_burner_sv_range_c_none_for_non_modbus_modes():
+    request = RoastCreateRequest(title="Test Roast", mode=RoastMode.SIMULATOR)
+    session = RoastSession("test-roast-id", request)
+
+    assert session.burner_sv_range_c is None
+
+
 def test_auto_detect_milestones_opt_in_reaches_ms6514_too():
     request = RoastCreateRequest(
         title="Test Roast", mode=RoastMode.MS6514_LIVE, ms6514_port=BOGUS_PORT, auto_detect_milestones=True,

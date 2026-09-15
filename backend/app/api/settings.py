@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse
 
 from .. import ollama_client, storage
-from ..models import BREAKOUT_PANEL_KEYS, AppSettings, OllamaStatus
+from ..models import BREAKOUT_PANEL_KEYS, VERTICAL_CONTROL_KEYS, AppSettings, OllamaStatus
 from ..ws_manager import settings_pubsub
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -27,6 +27,33 @@ def _filter_panels(keys: list[str]) -> list[str]:
 
 def _filter_colors(colors: dict[str, str]) -> dict[str, str]:
     return {k: v for k, v in colors.items() if k in BREAKOUT_PANEL_KEYS and _HEX_COLOR_RE.match(v)}
+
+
+def _filter_vertical_layout(groups: list[list[str]]) -> list[list[str]]:
+    # Drops unknown keys and empty groups (a group that loses its only
+    # member to filtering shouldn't leave a phantom empty column), and
+    # de-dupes across the whole layout (a channel appearing twice would
+    # render two drag-independent copies of the same slider, confusing
+    # rather than just redundant). Does NOT enforce "drum/fan present" or
+    # "at least one of heater_pct/burner_sv_c" here -- the settings editor
+    # UI is what prevents constructing an invalid layout in the first
+    # place; the *renderer* (VerticalControlPanel.jsx) is what stays safe
+    # regardless, by falling back to its own built-in defaults for
+    # whichever mandatory channel a still-malformed layout is missing --
+    # same belt-and-suspenders split as _filter_colors' shape check above
+    # not needing to also guess a "right" color.
+    seen: set[str] = set()
+    result: list[list[str]] = []
+    for group in groups:
+        filtered = [k for k in group if k in VERTICAL_CONTROL_KEYS and k not in seen]
+        seen.update(filtered)
+        if filtered:
+            result.append(filtered)
+    return result
+
+
+def _filter_arrows(arrows: dict[str, bool]) -> dict[str, bool]:
+    return {k: bool(v) for k, v in arrows.items() if k in VERTICAL_CONTROL_KEYS}
 
 
 @router.get("/stream")
@@ -68,6 +95,8 @@ async def update_settings(settings: AppSettings) -> AppSettings:
     colors = _filter_colors(settings.breakout_panel_colors)
     small_panels = _filter_panels(settings.small_readout_panels)
     temperature_unit = settings.temperature_unit if settings.temperature_unit in ("c", "f") else "c"
+    vertical_layout = _filter_vertical_layout(settings.vertical_control_layout)
+    vertical_arrows = _filter_arrows(settings.vertical_control_arrows)
     storage.set_settings(
         ollama_url=settings.ollama_url,
         ollama_model=settings.ollama_model,
@@ -75,6 +104,8 @@ async def update_settings(settings: AppSettings) -> AppSettings:
         breakout_panel_colors=colors,
         small_readout_panels=small_panels,
         temperature_unit=temperature_unit,
+        vertical_control_layout=vertical_layout,
+        vertical_control_arrows=vertical_arrows,
     )
     result = AppSettings(
         ollama_url=settings.ollama_url,
@@ -83,6 +114,8 @@ async def update_settings(settings: AppSettings) -> AppSettings:
         breakout_panel_colors=colors,
         small_readout_panels=small_panels,
         temperature_unit=temperature_unit,
+        vertical_control_layout=vertical_layout,
+        vertical_control_arrows=vertical_arrows,
     )
     await settings_pubsub.publish(result.model_dump_json())
     return result

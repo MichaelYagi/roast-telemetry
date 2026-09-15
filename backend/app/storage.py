@@ -366,6 +366,25 @@ def get_settings() -> dict:
         )
     except (json.JSONDecodeError, TypeError):
         small_readout_panels = ["et", "bt", "dt", "ror_bt"]
+    try:
+        # Same never-saved-vs-explicitly-set distinction as
+        # small_readout_panels above -- seeds to what the old always-on
+        # Controls panel showed (Drum, Fan, Burner, each siloed) only the
+        # first time; an install that explicitly saves a different layout
+        # keeps it.
+        vertical_control_layout = (
+            json.loads(values["vertical_control_layout"])
+            if values.get("vertical_control_layout")
+            else [["drum_speed_pct"], ["fan_pct"], ["heater_pct"]]
+        )
+    except (json.JSONDecodeError, TypeError):
+        vertical_control_layout = [["drum_speed_pct"], ["fan_pct"], ["heater_pct"]]
+    try:
+        vertical_control_arrows = (
+            json.loads(values["vertical_control_arrows"]) if values.get("vertical_control_arrows") else {}
+        )
+    except (json.JSONDecodeError, TypeError):
+        vertical_control_arrows = {}
     return {
         "ollama_url": values.get("ollama_url"),
         "ollama_model": values.get("ollama_model"),
@@ -373,6 +392,8 @@ def get_settings() -> dict:
         "breakout_panel_colors": breakout_panel_colors,
         "small_readout_panels": small_readout_panels,
         "temperature_unit": values.get("temperature_unit") or "c",
+        "vertical_control_layout": vertical_control_layout,
+        "vertical_control_arrows": vertical_control_arrows,
     }
 
 
@@ -383,6 +404,10 @@ def set_settings(**kv) -> None:
         kv["breakout_panel_colors"] = json.dumps(kv["breakout_panel_colors"])
     if "small_readout_panels" in kv:
         kv["small_readout_panels"] = json.dumps(kv["small_readout_panels"])
+    if "vertical_control_layout" in kv:
+        kv["vertical_control_layout"] = json.dumps(kv["vertical_control_layout"])
+    if "vertical_control_arrows" in kv:
+        kv["vertical_control_arrows"] = json.dumps(kv["vertical_control_arrows"])
     with _conn() as c:
         for key, value in kv.items():
             c.execute(

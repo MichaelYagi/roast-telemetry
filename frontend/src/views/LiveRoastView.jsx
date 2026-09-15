@@ -9,7 +9,7 @@ import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 import ConnectionBadge from "../components/ConnectionBadge.jsx";
 import AlarmRulesEditor from "../components/AlarmRulesEditor.jsx";
 import ConnectionTestPanel from "../components/ConnectionTestPanel.jsx";
-import ControlPanel from "../components/ControlPanel.jsx";
+import VerticalControlPanel from "../components/VerticalControlPanel.jsx";
 import DeviceProfileEditor from "../components/DeviceProfileEditor.jsx";
 import EventButtonRow from "../components/EventButtonRow.jsx";
 import RoastChart from "../components/RoastChart.jsx";
@@ -214,6 +214,8 @@ export default function LiveRoastView() {
   const [panelColors, setPanelColors] = useState({}); // key -> hex override, shared by both readout panels
   const [smallReadoutPanels, setSmallReadoutPanels] = useState([]); // ordered array, independent from brokenOutPanels
   const [tempUnit, setTempUnit] = useState("c"); // "c" | "f" -- display only, see Settings > Temperature Unit
+  const [verticalControlLayout, setVerticalControlLayout] = useState([]); // Settings > Controls -- see VerticalControlPanel.jsx
+  const [verticalControlArrows, setVerticalControlArrows] = useState({});
   const [viewportWide, setViewportWide] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= BREAKOUT_SPLIT_MIN_VIEWPORT
   );
@@ -433,6 +435,8 @@ export default function LiveRoastView() {
       // in the array.
       setSmallReadoutPanels((s.small_readout_panels || []).filter((k) => !SMALL_READOUT_EXCLUDED_KEYS.includes(k)));
       setTempUnit(s.temperature_unit || "c");
+      setVerticalControlLayout(s.vertical_control_layout || []);
+      setVerticalControlArrows(s.vertical_control_arrows || {});
     };
     const source = new EventSource(settingsStreamUrl());
     source.addEventListener("settings", (e) => {
@@ -1492,6 +1496,28 @@ export default function LiveRoastView() {
           )}
           <div className="panel scope-panel">
             <div className="scope-body">
+              {CONTROLLABLE_MODES.includes(activeMode) && (
+                <VerticalControlPanel
+                  disabled={!isActive}
+                  onSend={handleCommand}
+                  // No form-value fallback here -- that would silently
+                  // substitute a plausible-looking made-up number whenever
+                  // `latest` hadn't arrived yet, indistinguishable from a
+                  // register that's genuinely misconfigured/never going to
+                  // arrive. Each slider renders null as an honest "—"/
+                  // disabled state instead, which resolves the instant a
+                  // real sample lands.
+                  initial={{
+                    heater_pct: latest?.heater_pct,
+                    fan_pct: latest?.fan_pct,
+                    drum_speed_pct: latest?.drum_speed_pct,
+                    burner_sv_c: latest?.burner_sv_c,
+                  }}
+                  layout={verticalControlLayout}
+                  arrows={verticalControlArrows}
+                  svRangeC={roast?.burner_sv_range_c || null}
+                />
+              )}
               <div className="scope-chart" ref={scopeChartRef}>
                 <RoastChart
                   profile={roast?.profile || []}
@@ -1602,23 +1628,6 @@ export default function LiveRoastView() {
           )}
 
           <div className="live-grid">
-            {CONTROLLABLE_MODES.includes(activeMode) && (
-              <ControlPanel
-                disabled={!isActive}
-                onSend={handleCommand}
-                // No form-value fallback here (used to be `?? Number(form.heater_pct)`)
-                // -- that silently substituted a plausible-looking made-up number
-                // whenever `latest` hadn't arrived yet, indistinguishable from a
-                // register that's genuinely misconfigured/never going to arrive.
-                // ControlPanel itself now renders null as an honest "—"/disabled
-                // state instead, which resolves the instant a real sample lands.
-                initial={{
-                  heater_pct: latest?.heater_pct,
-                  fan_pct: latest?.fan_pct,
-                  drum_speed_pct: latest?.drum_speed_pct,
-                }}
-              />
-            )}
             {activeMode === "alog_playback" && (
               <div className="panel control-panel">
                 <h3>Playback Speed</h3>
@@ -1635,13 +1644,14 @@ export default function LiveRoastView() {
             )}
             {activeMode === "modbus_live" && (
               <p className="hint" style={{ gridColumn: "1 / -1" }}>
-                Controls above read and write directly over {form.modbus_port || "the serial port"}: Burner is a
-                drum-temperature setpoint (register 5, default 100–250°C — not a power %), Air and Drum are VFD
-                drives (run/stop + frequency registers 8192/8193, default 0–100%/0–70%), each with its own
-                feedback register (8451) reporting the drive's actual current speed. Out-of-range values are
-                clamped to the configured range. See "Advanced Modbus register map" above to override any of
-                these for your own unit. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual
-                click — mark them yourself as the roast happens.
+                The controls beside the chart read and write directly over {form.modbus_port || "the serial port"}:
+                Burner is a drum-temperature setpoint (register 5, default 100–250°C — not a power %, shown as
+                both a % slider and a direct °C slider that move each other), Air and Drum are VFD drives
+                (run/stop + frequency registers 8192/8193, default 0–100%/0–70%), each with its own feedback
+                register (8451) reporting the drive's actual current speed. Out-of-range values are clamped to
+                the configured range. See "Advanced Modbus register map" above to override any of these for
+                your own unit. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual click — mark
+                them yourself as the roast happens.
               </p>
             )}
             {activeMode === "ms6514_live" && (

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client.js";
 import BreakoutSettingsEditor from "../components/BreakoutSettingsEditor.jsx";
+import VerticalControlSettingsEditor from "../components/VerticalControlSettingsEditor.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 
 const CHECK_DEBOUNCE_MS = 600;
@@ -22,6 +23,8 @@ export default function SettingsView() {
   // enabled in one, both, or neither independently, always the same color.
   const [smallReadoutPanels, setSmallReadoutPanels] = useState([]);
   const [temperatureUnit, setTemperatureUnit] = useState("c");
+  const [verticalControlLayout, setVerticalControlLayout] = useState([]);
+  const [verticalControlArrows, setVerticalControlArrows] = useState({});
   const [loaded, setLoaded] = useState(false);
   const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState(null); // { connected, models, error } | null
@@ -36,6 +39,8 @@ export default function SettingsView() {
       setPanelColors(s.breakout_panel_colors || {});
       setSmallReadoutPanels(s.small_readout_panels || []);
       setTemperatureUnit(s.temperature_unit || "c");
+      setVerticalControlLayout(s.vertical_control_layout || []);
+      setVerticalControlArrows(s.vertical_control_arrows || {});
       setLoaded(true);
     });
   }, []);
@@ -70,6 +75,8 @@ export default function SettingsView() {
         breakout_panel_colors: panelColors,
         small_readout_panels: smallReadoutPanels,
         temperature_unit: temperatureUnit,
+        vertical_control_layout: verticalControlLayout,
+        vertical_control_arrows: verticalControlArrows,
       });
       setSaveFeedback("Saved.");
     } catch (err) {
@@ -143,6 +150,22 @@ export default function SettingsView() {
           colors={panelColors}
           setColors={setPanelColors}
           excludeKeys={SMALL_READOUT_EXCLUDED_KEYS}
+        />
+      </div>
+
+      <div className="panel">
+        <h2>Controls</h2>
+        <p className="hint">
+          The vertical control sliders beside the live chart's Drum/Air/Burner/SV. Drum and Air are always
+          shown; Burner % and Burner SV (°C) can each be shown or hidden, but at least one of the two always
+          stays visible -- moving one moves the other, they're the same underlying burner setpoint in
+          different units. Changes here apply to an already-open Live Roast tab within a few seconds.
+        </p>
+        <VerticalControlSettingsEditor
+          layout={verticalControlLayout}
+          setLayout={setVerticalControlLayout}
+          arrows={verticalControlArrows}
+          setArrows={setVerticalControlArrows}
         />
       </div>
 

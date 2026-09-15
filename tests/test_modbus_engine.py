@@ -135,6 +135,53 @@ def test_apply_command_heater_pct_extremes_map_to_sv_range_bounds():
     assert (5, 2500, 12) in primary.writes  # 100% -> 250.0C -> 2500
 
 
+def test_apply_command_burner_sv_c_writes_degrees_directly():
+    # Alternate write path onto the exact same register as heater_pct
+    # (see ModbusEngine.apply_command) -- 180C -> x10 -> 1800, same slave
+    # 12/register 5 as the %-based test above.
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls)
+    primary = instances["PRIMARY"]
+
+    engine.apply_command({"burner_sv_c": 180.0})
+
+    assert (5, 1800, 12) in primary.writes
+
+
+def test_apply_command_burner_sv_c_clamps_to_sv_range():
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls)
+    primary = instances["PRIMARY"]
+
+    engine.apply_command({"burner_sv_c": 9999.0})
+    engine.apply_command({"burner_sv_c": -50.0})
+
+    assert (5, 2500, 12) in primary.writes  # clamped to the 250C ceiling
+    assert (5, 1000, 12) in primary.writes  # clamped to the 100C floor
+
+
+def test_apply_command_burner_sv_c_and_heater_pct_stay_in_sync():
+    # "one moves the other" -- writing via either unit updates the SAME
+    # _last_values["heater_pct"] entry tick() falls back to when a live
+    # feedback read fails, so the two sliders never independently drift.
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls)
+
+    engine.apply_command({"burner_sv_c": 175.0})  # 50% of the 100-250C range
+
+    assert engine._last_values["heater_pct"] == pytest.approx(50.0)
+
+
+def test_apply_command_burner_sv_c_is_a_noop_when_burner_register_disabled():
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", burner_register=None, client_cls=client_cls)
+    primary = instances["PRIMARY"]
+
+    engine.apply_command({"burner_sv_c": 180.0})
+
+    assert primary.writes == []
+
+
 def test_apply_command_fan_and_drum_write_run_and_frequency_to_control_client():
     client_cls, instances = _make_fake_client_cls()
     engine = ModbusEngine("PRIMARY", control_port="CONTROL", client_cls=client_cls)

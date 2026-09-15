@@ -552,14 +552,22 @@ class ModbusEngine:
         "write a percentage to a register" shape."""
         for ch in self.control_channels:
             value = cmd.get(ch.maps_to)
-            if value is None:
-                continue
+            if value is not None:
+                if ch.kind == ModbusControlKind.SV_TEMPERATURE:
+                    self._write_sv_temperature(ch, float(value))
+                elif ch.kind == ModbusControlKind.VFD_DRIVE:
+                    self._write_vfd_drive(ch, float(value))
+                elif ch.kind == ModbusControlKind.DIRECT_REGISTER:
+                    self._write_direct_register(ch, float(value))
+            # Second, independent write path onto the exact same burner
+            # channel -- native °C instead of heater_pct's 0-100% mapping.
+            # Not a separate ModbusControlChannel/maps_to slot: both are
+            # unit representations of the one PID setpoint this channel's
+            # register actually holds (see ControlCommand.burner_sv_c).
             if ch.kind == ModbusControlKind.SV_TEMPERATURE:
-                self._write_sv_temperature(ch, float(value))
-            elif ch.kind == ModbusControlKind.VFD_DRIVE:
-                self._write_vfd_drive(ch, float(value))
-            elif ch.kind == ModbusControlKind.DIRECT_REGISTER:
-                self._write_direct_register(ch, float(value))
+                sv_c = cmd.get("burner_sv_c")
+                if sv_c is not None:
+                    self._write_sv_temperature_c(ch, float(sv_c))
 
     def _write_sv_temperature(self, ch: ModbusControlChannel, pct: float) -> None:
         if ch.register_address is None:
@@ -567,6 +575,23 @@ class ModbusEngine:
         pct = max(0.0, min(100.0, pct))
         sv_lo, sv_hi = ch.sv_range_c or (0.0, 100.0)
         sv_c = sv_lo + (pct / 100.0) * (sv_hi - sv_lo)
+        self._write_sv_raw(ch, sv_c, pct)
+
+    def _write_sv_temperature_c(self, ch: ModbusControlChannel, sv_c: float) -> None:
+        if ch.register_address is None:
+            return
+        sv_lo, sv_hi = ch.sv_range_c or (0.0, 100.0)
+        lo, hi = min(sv_lo, sv_hi), max(sv_lo, sv_hi)
+        sv_c = max(lo, min(hi, sv_c))
+        pct = max(0.0, min(100.0, (sv_c - sv_lo) / (sv_hi - sv_lo) * 100.0)) if sv_hi != sv_lo else None
+        self._write_sv_raw(ch, sv_c, pct)
+
+    def _write_sv_raw(self, ch: ModbusControlChannel, sv_c: float, pct: Optional[float]) -> None:
+        """Shared by both SV write paths above -- same register, same
+        divisor-scaled integer write, only how `sv_c` got computed
+        differs. `pct` is stashed in _last_values so tick()'s heater_pct
+        feedback (and the other write path) both stay in sync regardless
+        of which unit was actually written."""
         raw = int(round(sv_c * (ch.divisor or 1.0)))
         try:
             result = self._client.write_register(ch.register_address, raw, device_id=ch.slave_id)
@@ -575,7 +600,8 @@ class ModbusEngine:
             else:
                 self._last_error = None
                 self._connected = True
-                self._last_values[ch.maps_to] = pct
+                if pct is not None:
+                    self._last_values[ch.maps_to] = pct
         except ModbusException as exc:
             self._last_error = str(exc)
             self._connected = False
