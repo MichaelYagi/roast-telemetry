@@ -163,7 +163,6 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
           </div>
         ))}
       </div>
-      {disabled && <p className="hint vertical-control-hint">Controls are inactive: roast not currently active.</p>}
     </div>
   );
 }

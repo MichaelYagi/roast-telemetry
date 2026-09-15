@@ -1441,10 +1441,6 @@ button:disabled {
   accent-color: var(--item-color, var(--accent));
 }
 
-.vertical-control-hint {
-  margin-top: 0.5rem;
-}
-
 @media (max-width: 700px) {
   .vertical-control-panel {
     flex-direction: row;
