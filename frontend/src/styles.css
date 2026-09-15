@@ -1309,48 +1309,48 @@ button:disabled {
 
 .vertical-control-stack {
   display: flex;
-  align-items: flex-end;
+  /* stretch, not flex-end -- a lane with room to spare should fill the
+     stack's full height (see .vertical-control-group below), not just
+     sit at its own natural content size pinned to the bottom. */
+  align-items: stretch;
   gap: 1.1rem;
   /* Plain --scope-chart-height, same as .scope-chart/.small-readout-col
      read directly -- an earlier version gave this its own taller floor
-     (260px) so a stacked lane wouldn't need to scroll in the common
-     case, but a flex row's height follows its tallest child regardless
-     of align-self, so that floor dragged the whole .scope-body row
-     taller than the chart's own real height, misaligning it from its
-     siblings. Staying matched to the chart takes priority -- when a
-     dragged-short chart genuinely doesn't leave enough room for a
-     stacked lane, .vertical-control-group's own overflow-y: auto below
-     is what handles it (a real scrollbar, contained to this column,
-     same as .small-readout-col already does for the identical squeeze),
-     not growing the shared row. */
+     so a stacked lane wouldn't need to scroll in the common case, but a
+     flex row's height follows its tallest child regardless of
+     align-self, so that floor dragged the whole .scope-body row taller
+     than the chart's own real height, misaligning it from its siblings.
+     Staying matched to the chart takes priority; overflow-y below is
+     what absorbs a lane that doesn't fit instead. */
   height: var(--scope-chart-height, 420px);
+  /* ONE scroll surface for the whole panel, not one per lane -- a lane
+     that fits (Drum/Air/every siloed single-member lane, in practice
+     always) never triggers this at all, since scrolling only engages
+     once something in the row is genuinely taller than the row's own
+     fixed height above. See .vertical-control-group's own comment for
+     how a too-tall lane gets there in the first place. */
+  overflow-y: auto;
 }
 
 /* A "group" is one lane -- one or more sliders sharing that lane's width,
    arranged one *above* the other (not side by side -- confirmed against
    the reference Artisan photo: Drum sits in the top half of its own lane,
-   Fan in the bottom half, same x-position throughout). A single-member
-   group is the plain siloed case: its one slider just fills the whole
-   lane height via flex:1 below. The gap *between* lanes is
-   .vertical-control-stack's own `gap`, not this.
-   overflow-y: auto is a hard guarantee, not just a common-case nicety --
-   a lane with 2+ members (each needing its own value/arrows/track-floor/
-   label) can easily need more height than a short --scope-chart-height
-   has to give (CHART_MIN_HEIGHT is 160px total for the whole row; two
-   stacked members with arrows on need well over that between them). Height
-   here is an explicit 100% (of the stack's own fixed height), so without
-   this, content that doesn't fit spills out past the panel's bottom edge
-   into whatever's below it (confirmed: the CHARGE button) instead of
-   being contained -- this scrolls that lane internally instead, same
-   fixed-height-plus-scroll pattern .small-readout-col already uses below
-   for the identical "many items, not enough room" problem. */
+   Fan in the bottom half, same x-position throughout). The gap *between*
+   lanes is .vertical-control-stack's own `gap`, not this.
+   Deliberately no explicit height here (was `height: 100%`) -- align-items:
+   stretch on the stack above already makes a lane fill the full row height
+   when its own content doesn't need more, exactly like a fixed height
+   would, but ALSO lets a lane whose members' combined natural minimum
+   size (see .vertical-slider-col's own comment) is taller than that grow
+   past it instead of being clamped -- which is what actually gives
+   .vertical-control-stack's overflow-y something real to scroll to. A
+   fixed height: 100% here would cap every lane at the row's height and
+   make that overflow physically impossible to reach. */
 .vertical-control-group {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0;
-  height: 100%;
-  overflow-y: auto;
 }
 
 .vertical-slider-col {
@@ -1366,10 +1366,11 @@ button:disabled {
      one stacked member visually run into the next member's, instead of
      clipping cleanly. Leaving this at its default (auto) means a flex
      item refuses to shrink past its own content's minimum size, so a
-     lane that genuinely doesn't have room overflows *the lane* as a
-     whole -- which is exactly what .vertical-control-group's own
-     overflow-y: auto above is there to catch (a real scrollbar instead
-     of overlapping text). */
+     lane whose members genuinely don't fit grows *the lane itself*
+     taller than the row (see .vertical-control-group's own comment) --
+     which is exactly what .vertical-control-stack's overflow-y: auto
+     is there to catch, as one shared scrollbar for the whole panel,
+     instead of overlapping text. */
   width: 100%;
   padding: 0 0.4rem;
 }
