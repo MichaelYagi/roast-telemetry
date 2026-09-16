@@ -1882,12 +1882,29 @@ button:disabled {
 
 .scope-header {
   margin-bottom: 0.25rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
 }
 
 .scope-title {
   color: #2e6da4;
   font-size: 1.4rem;
   margin: 0;
+}
+
+.scope-chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+
+.scope-reset-zoom {
+  font-size: 0.8rem;
 }
 
 .scope-toggles {

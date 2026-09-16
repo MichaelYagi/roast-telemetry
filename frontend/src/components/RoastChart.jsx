@@ -7,12 +7,13 @@ import {
   PointElement,
   Tooltip,
 } from "chart.js";
-import { useEffect, useMemo, useState } from "react";
+import zoomPlugin from "chartjs-plugin-zoom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 import { TERM_TOOLTIPS } from "../termTooltips.js";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, zoomPlugin);
 
 const EVENT_COLORS = {
   CHARGE: "#2563eb",
@@ -327,6 +328,8 @@ export default function RoastChart({
   const [visible, setVisible] = useState(() =>
     Object.fromEntries(SERIES_DEFS.map((s) => [s.key, s.defaultOn]))
   );
+  const [hideEventLabels, setHideEventLabels] = useState(false);
+  const chartRef = useRef(null);
 
   // Loading (or clearing) a background roast after mount introduces (or
   // drops) BG_BT/BG_ET keys -- this seeds any newly-appeared key at its
@@ -448,9 +451,22 @@ export default function RoastChart({
             },
           },
         },
-        eventMarkers: { events, tempUnit },
+        eventMarkers: { events: hideEventLabels ? [] : events, tempUnit },
         phaseBands: { phases },
         axisUnitLabels: { leftUnit: showTemp ? unitSuffix(tempUnit) : null, rightUnit: showRor ? `${unitSuffix(tempUnit)}/min` : null },
+        // Time-axis only (not the temp/RoR/control y-axes) -- this is a
+        // time-series chart with three differently-scaled y-axes already
+        // fixed to sensible ranges (0-100 for yControl, a fixed RoR band,
+        // etc.), so zooming those too would mostly just squash or stretch
+        // curves rather than reveal anything. Wheel handles both a mouse
+        // wheel and a trackpad's two-finger scroll; pinch covers an
+        // actual trackpad/touchscreen pinch gesture. Drag-to-pan (no
+        // modifier key) is safe alongside the existing hover tooltip --
+        // that only fires on mousemove-without-a-button-down.
+        zoom: {
+          pan: { enabled: true, mode: "x" },
+          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: "x" },
+        },
       },
       scales: {
         x: {
@@ -508,7 +524,7 @@ export default function RoastChart({
         },
       },
     }),
-    [events, phases, showTemp, showRor, showControl, tempUnit]
+    [events, phases, showTemp, showRor, showControl, tempUnit, hideEventLabels]
   );
 
   return (
@@ -516,6 +532,20 @@ export default function RoastChart({
       {title && (
         <div className="scope-header">
           <h2 className="scope-title">{title}</h2>
+          <div className="scope-chart-controls">
+            <label className="scope-toggle" title="Hides the CHARGE / Turning Point / Dry End / etc. callout boxes drawn on the curves">
+              <input type="checkbox" checked={hideEventLabels} onChange={() => setHideEventLabels((v) => !v)} />
+              <span>Hide event labels</span>
+            </label>
+            <button
+              type="button"
+              className="link-like scope-reset-zoom"
+              onClick={() => chartRef.current?.resetZoom()}
+              title="Scroll/pinch the chart to zoom, drag to pan"
+            >
+              Reset zoom
+            </button>
+          </div>
         </div>
       )}
       <div className="scope-toggles">
@@ -532,7 +562,7 @@ export default function RoastChart({
         ))}
       </div>
       <div style={{ height }}>
-        <Line data={data} options={options} />
+        <Line ref={chartRef} data={data} options={options} />
       </div>
     </div>
   );
