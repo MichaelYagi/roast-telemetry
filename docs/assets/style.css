@@ -292,3 +292,43 @@ tbody tr:nth-child(even) {
   margin-left: 0.4rem;
   white-space: nowrap;
 }
+
+/* Floating "back to top" button -- injected by assets/back-to-top.js,
+   not present in any page's own HTML. Hidden (opacity 0 + no pointer
+   events, not display:none, so the fade transition below actually has
+   something to animate) until that script's scroll listener adds
+   .visible. */
+.back-to-top {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 1.3rem;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 20;
+}
+
+.back-to-top.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.back-to-top:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
