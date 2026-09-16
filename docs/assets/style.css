@@ -46,6 +46,12 @@ body {
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   line-height: 1.6;
+  /* Last-resort safety net on a narrow/phone-width screen -- everything
+     else on this page is already sized to wrap or scroll internally
+     (tables, pre/code blocks) rather than overflow, so this should
+     rarely if ever actually clip anything; it's here purely so an edge
+     case doesn't add a page-wide horizontal scrollbar. */
+  overflow-x: hidden;
 }
 
 header.site-header {
@@ -185,6 +191,15 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.92rem;
+  /* display:block + overflow-x:auto on the table itself, no wrapper div
+     needed -- a no-op on any screen wide enough for the table to just
+     fit (its normal cell-wrapping already handles most narrow cases
+     fine), but a real horizontal-scroll safety net on a phone-width
+     screen for a table with several columns of real content
+     (architecture.html's API summary table especially) instead of
+     silently overflowing the page or getting crushed illegibly. */
+  display: block;
+  overflow-x: auto;
 }
 
 caption {
@@ -339,4 +354,64 @@ tbody tr:nth-child(even) {
 .back-to-top:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+/* Sticky "on this page" table of contents -- injected by assets/toc.js,
+   not present in any page's own HTML. Positioned a fixed distance to the
+   right of the content column's own right edge (main's max-width is
+   780px, so 50% + 390px is that edge) rather than pinned to the
+   viewport's right edge, so it stays close to the content instead of
+   drifting away on an ultra-wide screen. Hidden below 1400px -- narrower
+   than that and there's no longer real room for it beside the 780px
+   column without either overlapping or getting cramped. */
+.page-toc {
+  position: fixed;
+  top: 5.5rem;
+  left: calc(50% + 390px + 2rem);
+  width: 220px;
+  max-height: calc(100vh - 8rem);
+  overflow-y: auto;
+  font-size: 0.85rem;
+}
+
+.page-toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 2px solid var(--border);
+}
+
+.page-toc li {
+  margin: 0;
+}
+
+.page-toc a {
+  display: block;
+  padding: 0.3rem 0 0.3rem 0.75rem;
+  margin-left: -2px;
+  border-left: 2px solid transparent;
+  color: var(--text-muted);
+  text-decoration: none;
+  line-height: 1.3;
+}
+
+.page-toc li.page-toc-sub a {
+  padding-left: 1.5rem;
+  font-size: 0.8rem;
+}
+
+.page-toc a:hover {
+  color: var(--text);
+}
+
+.page-toc a.active {
+  border-left-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+@media (max-width: 1400px) {
+  .page-toc {
+    display: none;
+  }
 }
