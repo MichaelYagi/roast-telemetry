@@ -57,14 +57,45 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
     }
   }
 
-  async function handleCopy() {
+  // navigator.clipboard only exists in a secure context (HTTPS or
+  // localhost) -- this app deliberately runs over plain HTTP on a LAN
+  // (see auth.py's start_session comment), so on a real LAN deployment
+  // navigator.clipboard is simply undefined, not just permission-denied.
+  // document.execCommand("copy") is older/deprecated but still broadly
+  // supported and, unlike the Clipboard API, isn't restricted to secure
+  // contexts -- the actual fallback that makes this work at all there.
+  function legacyCopy(text) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    let ok = false;
     try {
-      await navigator.clipboard.writeText(revealedKey);
-      setCopied(true);
+      ok = document.execCommand("copy");
     } catch {
-      // Clipboard API can fail (permissions, non-HTTPS context) -- the key
-      // text is still selectable/visible either way, nothing more to do.
+      ok = false;
     }
+    document.body.removeChild(textarea);
+    return ok;
+  }
+
+  async function handleCopy() {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(revealedKey);
+        setCopied(true);
+        return;
+      } catch {
+        // Falls through to the legacy path below -- e.g. permission denied
+        // even though the API exists.
+      }
+    }
+    if (legacyCopy(revealedKey)) setCopied(true);
+    // Either way, the key text itself is still visible and selectable
+    // (user-select: all on .account-key-value) as a manual last resort.
   }
 
   return (
