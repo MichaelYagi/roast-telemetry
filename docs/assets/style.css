@@ -30,6 +30,14 @@
 
 html {
   color-scheme: light dark;
+  /* header.site-header is position:sticky -- without this, jumping to
+     an anchor (glossary term links, the A-Z jump-nav, any #fragment)
+     scrolls the target to the very top of the viewport and then the
+     sticky header sits on top of it, hiding the heading itself and
+     making it look like the page landed a line or two into the content
+     instead. Generous enough to clear the header (~54px) with a little
+     breathing room above the target either way. */
+  scroll-padding-top: 4.5rem;
 }
 
 body {
