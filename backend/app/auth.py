@@ -84,8 +84,14 @@ def get_user_for_token(token: str | None) -> dict | None:
 # random bytes (secrets.token_urlsafe), so a plain fast hash is both
 # sufficient and the standard choice for this exact case (this is how
 # GitHub hashes personal access tokens too).
+_API_KEY_PREFIX = "rt_"
+
+
 def generate_api_key() -> str:
-    return secrets.token_urlsafe(32)
+    # rt_ prefix -- recognizable at a glance (which secret is this?) and
+    # also sidesteps token_urlsafe occasionally starting with "_" or "-"
+    # on its own, which reads oddly as the very first character of a key.
+    return _API_KEY_PREFIX + secrets.token_urlsafe(32)
 
 
 def hash_api_key(key: str) -> str:

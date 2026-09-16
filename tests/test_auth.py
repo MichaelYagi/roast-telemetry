@@ -247,6 +247,7 @@ def test_generating_an_api_key_returns_it_once_and_reports_has_api_key(anon_clie
     assert resp.status_code == 200
     key = resp.json()["api_key"]
     assert len(key) > 20  # secrets.token_urlsafe(32) -- not a short/guessable value
+    assert key.startswith("rt_")
 
     # The key itself is never echoed back anywhere else -- only whether one exists.
     me = anon_client.get("/api/auth/me").json()
