@@ -335,7 +335,20 @@ export default function RoastChart({
     Object.fromEntries(SERIES_DEFS.map((s) => [s.key, s.defaultOn]))
   );
   const [hideEventLabels, setHideEventLabels] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const chartRef = useRef(null);
+  const menuRef = useRef(null);
+
+  // Closes the chart-options menu on any click outside it -- a plain
+  // popover, no library, since it's just these two controls.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    function onPointerDown(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [menuOpen]);
 
   // Loading (or clearing) a background roast after mount introduces (or
   // drops) BG_BT/BG_ET keys -- this seeds any newly-appeared key at its
@@ -539,30 +552,9 @@ export default function RoastChart({
 
   return (
     <div className="scope">
-      {/* Independent of `title` -- LiveRoastView passes title={null} (it
-          has its own heading elsewhere and doesn't want "Roaster Scope"
-          repeated), but the controls below are useful there too whenever
-          they're actually usable, so this renders whenever either half
-          has something to show. */}
-      {(title || interactive) && (
+      {title && (
         <div className="scope-header">
-          {title && <h2 className="scope-title">{title}</h2>}
-          {interactive && (
-            <div className="scope-chart-controls">
-              <label className="scope-toggle" title="Hides the CHARGE / Turning Point / Dry End / etc. callout boxes drawn on the curves">
-                <input type="checkbox" checked={hideEventLabels} onChange={() => setHideEventLabels((v) => !v)} />
-                <span>Hide event labels</span>
-              </label>
-              <button
-                type="button"
-                className="link-like scope-reset-zoom"
-                onClick={() => chartRef.current?.resetZoom()}
-                title="Scroll/pinch the chart to zoom, drag to pan"
-              >
-                Reset zoom
-              </button>
-            </div>
-          )}
+          <h2 className="scope-title">{title}</h2>
         </div>
       )}
       <div className="scope-toggles">
@@ -578,7 +570,39 @@ export default function RoastChart({
           </label>
         ))}
       </div>
-      <div style={{ height }}>
+      <div className="scope-chart-area" style={{ height }}>
+        {interactive && (
+          <div className="scope-chart-menu" ref={menuRef}>
+            <button
+              type="button"
+              className="scope-chart-menu-btn"
+              aria-label="Chart options"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              ⋮
+            </button>
+            {menuOpen && (
+              <div className="scope-chart-menu-panel">
+                <label className="scope-toggle" title="Hides the CHARGE / Turning Point / Dry End / etc. callout boxes drawn on the curves">
+                  <input type="checkbox" checked={hideEventLabels} onChange={() => setHideEventLabels((v) => !v)} />
+                  <span>Hide event labels</span>
+                </label>
+                <button
+                  type="button"
+                  className="link-like"
+                  onClick={() => {
+                    chartRef.current?.resetZoom();
+                    setMenuOpen(false);
+                  }}
+                  title="Scroll/pinch the chart to zoom, drag to pan"
+                >
+                  Reset zoom
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <Line ref={chartRef} data={data} options={options} />
       </div>
     </div>

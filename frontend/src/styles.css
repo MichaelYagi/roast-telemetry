@@ -1882,11 +1882,6 @@ button:disabled {
 
 .scope-header {
   margin-bottom: 0.25rem;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.25rem 1rem;
 }
 
 .scope-title {
@@ -1895,20 +1890,58 @@ button:disabled {
   margin: 0;
 }
 
-.scope-chart-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem 1rem;
-  flex-wrap: wrap;
-  font-size: 0.8rem;
-  /* Pushes this to the row's right edge even when it's the only child
-     (LiveRoastView passes title={null}, so .scope-header has no <h2>
-     there) -- justify-content: space-between on the parent only spaces
-     *multiple* children apart, it doesn't right-align a lone one. */
-  margin-left: auto;
+/* Wraps the actual <canvas> so the options menu below can be positioned
+   relative to the chart itself rather than the page. */
+.scope-chart-area {
+  position: relative;
 }
 
-.scope-reset-zoom {
+.scope-chart-menu {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 5;
+}
+
+.scope-chart-menu-btn {
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.scope-chart-menu-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.scope-chart-menu-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.65rem 0.8rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+  font-size: 0.8rem;
+}
+
+.scope-chart-menu-panel .link-like {
   font-size: 0.8rem;
 }
 
