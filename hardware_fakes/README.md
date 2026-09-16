@@ -15,10 +15,17 @@ a real roast no matter which one you're using.
 **Quick start:** `../scripts/fake-hardware.sh fz94` or
 `../scripts/fake-hardware.sh ms6514` wraps the whole socat-pair +
 fake-process dance below into one command, with a fresh port name every
-run, and prints the port to paste into the app when it's ready. The
-manual steps below are what it's doing under the hood, useful if you
-need something the wrapper doesn't expose (e.g. `--drive-port` for a
-genuinely separate Air/Drum connection).
+run, and prints the port to paste into the app when it's ready. Add
+`--tcp` (optionally `--tcp <port>`, default 5020) if the app is running
+natively on Windows rather than in WSL alongside the fake -- a
+WSL-internal `/tmp/...` path isn't reachable from a native-Windows
+process at all, so this bridges to a TCP listener instead and prints a
+`socket://127.0.0.1:<port>` URL to paste in instead (pyserial treats
+that as a live serial connection; verified working -- reads and writes
+both -- over WSL2's default localhost port forwarding). The manual
+steps below are what it's doing under the hood either way, useful if
+you need something the wrapper doesn't expose (e.g. `--drive-port` for
+a genuinely separate Air/Drum connection).
 
 ## Virtual serial port setup
 

@@ -190,18 +190,27 @@ PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code></pre>
   </p>
   <div class="callout">
     <strong>Windows note</strong>: <code>socat</code> doesn't exist on
-    Windows. If you're running the backend natively on Windows
+    Windows, and this fake only runs on Linux/WSL either way. If you're
+    running the <em>real</em> FZ-94 with the backend natively on Windows
     (recommended over WSL2 for a real serial connection — see
-    <a href="../getting-started.html">Getting started</a>), either
-    install a virtual-COM-port driver (search "com0com signed driver" —
-    the original com0com's driver is unsigned and gets blocked by Secure
-    Boot on modern Windows), or run <code>socat</code> inside WSL2 as
-    above but bridge its second end to a TCP listener instead of a second
-    PTY (<code>socat ... TCP-LISTEN:5020,reuseaddr</code> in place of the
-    second <code>pty,...</code> argument) and point the Windows app's
-    Serial port field at <code>socket://127.0.0.1:5020</code> — pyserial
-    treats that URL as a live connection, no virtual COM port needed at
-    all, using WSL2's default localhost port forwarding.
+    <a href="../getting-started.html">Getting started</a>) but want to
+    test against this <em>fake</em> first, run
+    <code>scripts/fake-hardware.sh fz94 --tcp</code> from WSL2 instead of
+    the plain form above — it bridges the fake to a TCP listener rather
+    than a WSL-internal virtual port, and prints a
+    <code>socket://127.0.0.1:&lt;port&gt;</code> URL to paste into the
+    Windows app's Serial port field instead of a <code>/tmp/...</code>
+    path (which a native-Windows process can't open at all). pyserial
+    treats that URL as a live connection with no virtual COM port needed,
+    using WSL2's default localhost port forwarding — verified working
+    end to end (reads and writes both) against a real
+    <code>ModbusSerialClient</code>. For the real roaster itself rather
+    than this fake, you'll need an actual USB connection, e.g. a
+    virtual-COM-port driver if bridging through WSL for some other
+    reason (search "com0com signed driver" — the original com0com's
+    driver is unsigned and gets blocked by Secure Boot on modern
+    Windows), though native Windows talking to the real USB device
+    directly avoids needing that at all.
   </div>
 
   <h3>Suggested manual test settings</h3>
