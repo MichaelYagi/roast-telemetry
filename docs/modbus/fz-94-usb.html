@@ -5,10 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FZ-94 (USB) — Roast Telemetry</title>
 <link rel="stylesheet" href="../assets/style.css">
+<link rel="icon" href="../assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16x16.png">
 </head>
 <body>
 <header class="site-header">
-  <a class="brand" href="../index.html">Roast Telemetry</a>
+  <a class="brand" href="../index.html"><img src="../assets/icon-48x48.png" alt="" width="24" height="24"> Roast Telemetry</a>
   <nav>
     <a href="../index.html">Docs</a>
     <a href="../getting-started.html">Getting Started</a>
@@ -87,10 +90,14 @@
     all. This app maps its 0–100 <code>heater_pct</code> UI onto a
     configurable SV range (default 100–250°C, comfortably spanning
     Coffee-Tech's own factory-recommended 190°C starting point) as its
-    own approximation, not something documented anywhere. Since it's a
-    holding register, it's also <em>read back</em> (same address as the
-    write) and reported as the PLC's actual current setpoint — not just
-    an echo of this app's own last command.
+    own approximation, not something documented anywhere. The UI also
+    offers a second slider that writes the SV in native °C directly
+    (<code>burner_sv_c</code>) — same register, same write, just the
+    other unit; moving either slider moves the other, since they're two
+    representations of the one PID setpoint, not independent targets.
+    Since it's a holding register, it's also <em>read back</em> (same
+    address as the write) and reported as the PLC's actual current
+    setpoint — not just an echo of this app's own last command.
   </p>
   <p>
     <strong>Air and Drum are Delta VFD-L drives</strong> needing two
@@ -199,7 +206,8 @@ PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code></pre>
   <h3>Suggested manual test settings</h3>
   <p>
     Right after clicking START, set <strong>Burner=85%, Air=15%</strong>
-    (Drum at the default 50%) in the Controls panel. Every milestone is a
+    (Drum at the default 50%) using the vertical control sliders beside
+    the chart. Every milestone is a
     manual click by default for <code>modbus_live</code> (real hardware
     means a real operator marking them by hand, not an algorithm guessing
     from the curve — see <a href="index.html#testing-mode">Testing

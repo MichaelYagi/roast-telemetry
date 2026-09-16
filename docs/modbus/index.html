@@ -5,10 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Direct Modbus Bridge — Roast Telemetry</title>
 <link rel="stylesheet" href="../assets/style.css">
+<link rel="icon" href="../assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16x16.png">
 </head>
 <body>
 <header class="site-header">
-  <a class="brand" href="../index.html">Roast Telemetry</a>
+  <a class="brand" href="../index.html"><img src="../assets/icon-48x48.png" alt="" width="24" height="24"> Roast Telemetry</a>
   <nav>
     <a href="../index.html">Docs</a>
     <a href="../getting-started.html">Getting Started</a>
@@ -138,8 +141,9 @@
       state.</strong> Since Burner/Air/Drum are all genuinely read back
       from the PLC (not just echoed from the last command sent),
       connecting never writes a "starting value" on your behalf — the
-      Controls panel's sliders reflect whatever the roaster is actually
-      doing (an operator's own manual setting, or state left over from a
+      vertical control sliders beside the chart reflect whatever the
+      roaster is actually doing (an operator's own manual setting, or
+      state left over from a
       previous session), and nothing changes on the machine until you
       move a slider yourself.
     </li>
@@ -179,22 +183,29 @@
     </li>
   </ul>
   <p>
-    <strong>Burner and Drum are never touched by either check,
-    automatically or otherwise.</strong> Burner because any nonzero
-    setpoint can make the machine's own bang-bang controller start
-    actually firing heating elements if DT reads below it; Drum because
-    it's a moving mechanical part. If the write check passes, an
-    optional, separately-confirmed <strong>"nudge"</strong> is offered for
-    anyone who wants a <em>visible</em> confirmation instead of just a
-    silent round-trip — it bumps Air by 5% for about 2 seconds, then sets
-    it back, with its own explicit confirm step and up-front description
-    of exactly what will happen before it runs.
+    <strong>Burner is never touched by either check, automatically or
+    otherwise</strong> — any nonzero setpoint can make the machine's own
+    bang-bang controller start actually firing heating elements if DT
+    reads below it, so it's excluded entirely, no exceptions. If the
+    write check passes, an optional, separately-confirmed
+    <strong>"nudge"</strong> is offered for anyone who wants a
+    <em>visible</em> confirmation instead of just a silent round-trip —
+    it bumps Air by 5% for about 2 seconds, then sets it back, with its
+    own explicit confirm step and up-front description of exactly what
+    will happen before it runs. After the nudge, you're asked directly
+    whether it actually moved (a register-level "done" only proves the
+    feedback register echoed the commanded value, not that the fan
+    physically spun) — answering "no" offers <strong>Drum as a
+    differential test</strong>: same register numbers, same confidence
+    level, different slave ID, so if Drum also doesn't visibly respond
+    that's real evidence the shared register scheme itself is wrong for
+    your unit, not something specific to Air.
   </p>
   <p>
     None of this ever creates a roast record — the whole panel only
     exists during the armed-not-recording window, and both checks work
-    purely through the same connection/command paths a manual
-    Controls-panel slider adjustment would use.
+    purely through the same connection/command paths a manual slider
+    adjustment (the vertical control sliders beside the chart) would use.
   </p>
   <p>
     For the actual procedure — what to check before you even connect, and
@@ -274,7 +285,7 @@
     <li>
       A failed bound action (a device write error, or the roast having
       already ended) never fails the milestone click itself — the
-      milestone is recorded either way; the Controls panel reflects
+      milestone is recorded either way; the control sliders reflect
       whatever the roaster's real state actually is either way, same as
       any other write.
     </li>

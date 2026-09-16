@@ -54,11 +54,19 @@ header.site-header {
 }
 
 header.site-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-weight: 700;
   font-size: 1.05rem;
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
+}
+
+header.site-header .brand img {
+  width: 24px;
+  height: 24px;
 }
 
 header.site-header nav {

@@ -5,10 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Roast Telemetry Docs</title>
 <link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
 </head>
 <body>
 <header class="site-header">
-  <a class="brand" href="index.html">Roast Telemetry</a>
+  <a class="brand" href="index.html"><img src="assets/icon-48x48.png" alt="" width="24" height="24"> Roast Telemetry</a>
   <nav>
     <a href="index.html" aria-current="page">Docs</a>
     <a href="getting-started.html">Getting Started</a>
@@ -34,7 +37,7 @@
       <ul>
         <li><strong>Artisan Simulator</strong> — a thermal model producing realistic BT/ET/RoR curves and auto-detected roast events. No hardware needed.</li>
         <li><strong>.alog Playback</strong> — replays a real roast log, including events and notes, at real or accelerated speed. Reads genuine Artisan-exported <code>.alog</code> files too, not just this project's own.</li>
-        <li><strong>Direct Modbus</strong> — talks straight to a real roaster's PLC over Modbus RTU, bypassing Artisan entirely, with full read <em>and</em> write control (Burner/Air/Drum). Ships configured for Coffee-Tech's FZ-94, expressed as a built-in <strong>Device Profile</strong> — a named, reusable register map covering any number of temperature channels and three control mechanisms (setpoint-temperature, VFD drive, plain direct-register), so supporting a different roaster brand is building/saving a profile, not writing new code. The 26 individual flat register-override fields still work exactly as before for anyone not using a profile. Up to two extra temperature channels beyond BT/ET/DT (e.g. a flue probe) are recorded and charted live; the first two round-trip through a real <code>.alog</code> export too (a fixed capacity in Artisan's own file format). See <a href="modbus/index.html#device-profiles">Direct Modbus &rarr; Device profiles</a>.</li>
+        <li><strong>Direct Modbus</strong> — talks straight to a real roaster's PLC over Modbus RTU, bypassing Artisan entirely, with full read <em>and</em> write control (Burner/Air/Drum — Burner as both a 0&ndash;100% slider and a direct-&deg;C setpoint slider, two units for the one PID target). Ships configured for Coffee-Tech's FZ-94, expressed as a built-in <strong>Device Profile</strong> — a named, reusable register map covering any number of temperature channels and three control mechanisms (setpoint-temperature, VFD drive, plain direct-register), so supporting a different roaster brand is building/saving a profile, not writing new code. The 26 individual flat register-override fields still work exactly as before for anyone not using a profile. Up to two extra temperature channels beyond BT/ET/DT (e.g. a flue probe) are recorded and charted live; the first two round-trip through a real <code>.alog</code> export too (a fixed capacity in Artisan's own file format). See <a href="modbus/index.html#device-profiles">Direct Modbus &rarr; Device profiles</a>.</li>
         <li><strong>Direct USB (thermocouple meter)</strong> — reads a Mastech MS6514 dual K-type thermocouple meter straight over USB-serial.</li>
       </ul>
     </li>
@@ -47,6 +50,7 @@
     <li><strong>Background Profile overlay</strong> — load any previously recorded, finished roast onto the live chart as a dashed BT/ET reference to pace against, same idea as Artisan's own Background Profile. Both curves are already measured from their own Charge event, so no realignment is needed — purely a visual overlay picked per session; it never reads from or affects the live roast's own recording, automation, or control state.</li>
     <li><strong>CSV export and a printable roast report</strong> — every roast (finished or still recording) has a spreadsheet-friendly CSV download alongside the Artisan-native <code>.alog</code> one, plus a "Print report" button using the browser's own print-to-PDF (no extra dependency) for a clean, chart-included summary sheet.</li>
     <li><strong>Login, with the first registrant becoming admin.</strong> No built-in default account — the first person to register gets immediate admin access; everyone after that is pending until the admin allows them from the Manage Access page (Allow/Deny/Delete, and a denied account can be sent back to pending). Every allowed account, admin or not, has full access to everything else — no per-feature permissions, just the one gate. See <a href="getting-started.html#accounts-and-access">Getting started &rarr; Accounts and access</a>.</li>
+    <li><strong>Per-user API keys</strong> for calling the API directly (a script, a Home Assistant integration, <code>curl</code>) without the browser's cookie-based login — generate/regenerate/revoke from Account (click your username in the header). Cryptographically random, hashed at rest, shown in full exactly once at generation time. An alternative credential alongside session cookies, not a replacement for them.</li>
   </ul>
 
   <h2>Where to start</h2>

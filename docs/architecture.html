@@ -5,10 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Architecture Reference — Roast Telemetry</title>
 <link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
 </head>
 <body>
 <header class="site-header">
-  <a class="brand" href="index.html">Roast Telemetry</a>
+  <a class="brand" href="index.html"><img src="assets/icon-48x48.png" alt="" width="24" height="24"> Roast Telemetry</a>
   <nav>
     <a href="index.html">Docs</a>
     <a href="getting-started.html">Getting Started</a>
@@ -55,8 +58,11 @@
     <tbody>
       <tr><td><code>roasts</code></td><td>Per-roast metadata: title, mode, status, beans, weights, duration, playback speed, and the path to its <code>.alog</code> file. The full per-second profile/events/notes live in that <code>.alog</code> file on disk (<code>backend/data/roasts/&lt;id&gt;.alog</code>), not in SQLite — this table just indexes it for fast history listing/filtering.</td></tr>
       <tr><td><code>roast_presets</code></td><td>"Load saved config" entries — the full Configure Roast form plus its starting Burner/Air/Drum values.</td></tr>
-      <tr><td><code>settings</code></td><td>Ollama URL/model (AI Roast Review), and which panels are enabled/ordered in the Big Readout Panel / Small Readout column.</td></tr>
+      <tr><td><code>settings</code></td><td>Ollama URL/model (AI Roast Review); which panels are enabled/ordered in the Big Readout Panel / Small Readout column; the vertical control panel's stack layout and which sliders show +/- buttons; display temperature unit (&deg;C/&deg;F).</td></tr>
       <tr><td><code>roast_reviews</code></td><td>The latest AI-generated review per roast (one row each, overwritten on regenerate).</td></tr>
+      <tr><td><code>users</code></td><td>Accounts: username, password hash, role (admin/user), status (pending/allowed/denied), and an optional API key hash (see <a href="#accounts-and-api-keys">below</a>) — never the plaintext password or API key themselves.</td></tr>
+      <tr><td><code>sessions</code></td><td>Opaque bearer tokens backing the login cookie — deleting a row revokes that session immediately (logout, or an admin denying/deleting the account).</td></tr>
+      <tr><td><code>device_profiles</code></td><td>Named, reusable Modbus register maps for a roaster brand/model (temp + control channels) — see <a href="modbus/index.html#device-profiles">Direct Modbus</a>.</td></tr>
     </tbody>
   </table>
 
@@ -80,15 +86,35 @@
     now" goes in <code>localStorage</code>.
   </p>
 
-  <h2>API summary</h2>
+  <h2 id="accounts-and-api-keys">API summary</h2>
   <p>
     All routes live under <code>/api</code> (e.g. <code>/api/roasts</code>);
     omitted below for brevity. <code>/docs</code>, <code>/redoc</code> and
-    <code>/openapi.json</code> stay at the root, unprefixed.
+    <code>/openapi.json</code> stay at the root, unprefixed. Every route
+    except <code>/auth/status</code>/<code>register</code>/<code>login</code>/<code>logout</code>
+    and <code>/health</code> requires an authenticated, <code>allowed</code>
+    account — either the browser's session cookie, or an
+    <code>X-API-Key</code> header carrying a key generated from
+    <strong>Account</strong> (click your username in the header) as an
+    alternative for scripts/curl/Home Assistant. See
+    <a href="getting-started.html#accounts-and-access">Getting started</a>
+    for the account-approval flow.
   </p>
   <table>
     <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
     <tbody>
+      <tr><td>GET</td><td><code>/auth/status</code></td><td>Public — whether an admin exists yet, for the login screen</td></tr>
+      <tr><td>POST</td><td><code>/auth/register</code></td><td>Public — first account ever becomes admin (auto-allowed); every account after starts <code>pending</code></td></tr>
+      <tr><td>POST</td><td><code>/auth/login</code></td><td>Public</td></tr>
+      <tr><td>POST</td><td><code>/auth/logout</code></td><td>Public — clears the session cookie</td></tr>
+      <tr><td>GET</td><td><code>/auth/me</code></td><td>The logged-in user's own account</td></tr>
+      <tr><td>POST</td><td><code>/auth/api-key</code></td><td>Generate or regenerate your own API key — the plaintext is returned exactly once; only its hash is stored</td></tr>
+      <tr><td>DELETE</td><td><code>/auth/api-key</code></td><td>Revoke your own API key without issuing a replacement</td></tr>
+      <tr><td>GET</td><td><code>/auth/users</code></td><td>Admin only: list every account</td></tr>
+      <tr><td>POST</td><td><code>/auth/users/{id}/allow</code></td><td>Admin only</td></tr>
+      <tr><td>POST</td><td><code>/auth/users/{id}/deny</code></td><td>Admin only — also ends that user's active session immediately</td></tr>
+      <tr><td>POST</td><td><code>/auth/users/{id}/reset-to-pending</code></td><td>Admin only — the only way back from denied</td></tr>
+      <tr><td>DELETE</td><td><code>/auth/users/{id}</code></td><td>Admin only</td></tr>
       <tr><td>GET</td><td><code>/devices</code></td><td>Mock devices currently bound to active roasts</td></tr>
       <tr><td>POST</td><td><code>/devices/{id}/fault</code></td><td>Testing hook: force a device into an error state</td></tr>
       <tr><td>GET</td><td><code>/serial-ports</code></td><td>Serial ports currently visible to the OS, for the Configure Roast form's port picker</td></tr>
@@ -98,17 +124,30 @@
       <tr><td>GET</td><td><code>/roasts/{id}</code></td><td>Full roast detail (profile, events, notes) — live or historical</td></tr>
       <tr><td>DELETE</td><td><code>/roasts/{id}</code></td><td>Delete a roast + its <code>.alog</code> file (409 if still roasting/cooling)</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/stop</code></td><td>Deliberately stop a roast (status <code>stopped</code>), persist its <code>.alog</code></td></tr>
-      <tr><td>POST</td><td><code>/roasts/{id}/commands</code></td><td><code>heater_pct</code> / <code>fan_pct</code> / <code>drum_speed_pct</code> (simulator, modbus_live) or <code>speed</code> (playback)</td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/commands</code></td><td><code>heater_pct</code> / <code>fan_pct</code> / <code>drum_speed_pct</code> / <code>burner_sv_c</code> (modbus_live's alternate &deg;C write for the same Burner setpoint) (simulator, modbus_live) or <code>speed</code> (playback)</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/notes</code></td><td>Append a timestamped note</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/events</code></td><td>Append a custom event marker</td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/weight</code></td><td>Record the roasted (post-roast) weight</td></tr>
       <tr><td>GET</td><td><code>/roasts/{id}/alog</code></td><td>Download the roast's <code>.alog</code> file</td></tr>
+      <tr><td>GET</td><td><code>/roasts/{id}/csv</code></td><td>Download a CSV export — works on an in-progress roast too, unlike <code>.alog</code></td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/review</code></td><td>Kick off an AI review (Ollama) — <code>202</code>, async</td></tr>
+      <tr><td>GET</td><td><code>/roasts/{id}/review</code></td><td>Poll for the review's status/result</td></tr>
       <tr><td>POST</td><td><code>/roasts/import</code></td><td>Import an existing <code>.alog</code> file as history (<code>path</code>, optional <code>title</code>)</td></tr>
       <tr><td>WS</td><td><code>/roasts/{id}/stream</code></td><td>Live sample/event stream (sends a <code>snapshot</code> first)</td></tr>
       <tr><td>GET</td><td><code>/roasts/{id}/stream/sse</code></td><td>Same stream over Server-Sent Events</td></tr>
       <tr><td>GET</td><td><code>/presets</code></td><td>List saved roast configurations</td></tr>
       <tr><td>POST</td><td><code>/presets</code></td><td>Save the current Configure-Roast form as a named preset</td></tr>
+      <tr><td>PUT</td><td><code>/presets/{id}</code></td><td>Update a saved preset</td></tr>
       <tr><td>GET</td><td><code>/presets/{id}</code></td><td>One saved preset's full config</td></tr>
       <tr><td>DELETE</td><td><code>/presets/{id}</code></td><td>Delete a saved preset</td></tr>
+      <tr><td>GET</td><td><code>/device-profiles</code></td><td>List saved + built-in Modbus register maps</td></tr>
+      <tr><td>POST</td><td><code>/device-profiles</code></td><td>Save a new one</td></tr>
+      <tr><td>PUT</td><td><code>/device-profiles/{id}</code></td><td>Update one (not built-in)</td></tr>
+      <tr><td>GET</td><td><code>/device-profiles/{id}</code></td><td>One profile's full channel map</td></tr>
+      <tr><td>DELETE</td><td><code>/device-profiles/{id}</code></td><td>Delete one (not built-in)</td></tr>
+      <tr><td>GET</td><td><code>/settings</code></td><td>App-wide settings (readout panels, control-panel layout, Ollama, temperature unit)</td></tr>
+      <tr><td>PUT</td><td><code>/settings</code></td><td>Save app-wide settings</td></tr>
+      <tr><td>GET</td><td><code>/settings/stream</code></td><td>Server-Sent Events push whenever any client saves settings, for hot-apply</td></tr>
     </tbody>
   </table>
 

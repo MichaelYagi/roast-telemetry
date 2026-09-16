@@ -5,10 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Getting Started — Roast Telemetry</title>
 <link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
 </head>
 <body>
 <header class="site-header">
-  <a class="brand" href="index.html">Roast Telemetry</a>
+  <a class="brand" href="index.html"><img src="assets/icon-48x48.png" alt="" width="24" height="24"> Roast Telemetry</a>
   <nav>
     <a href="index.html">Docs</a>
     <a href="getting-started.html" aria-current="page">Getting Started</a>
@@ -74,12 +77,16 @@ npm run dev</code></pre>
   </p>
   <p>
     The Live Roast screen deliberately mirrors Artisan desktop's own
-    layout: the icon toolbar, ON/OFF device toggle + START recording
-    button, digital elapsed-time clock, DRY%/&raquo;DRY/&raquo;FCs
-    milestone boxes, the banded "Roaster Scope" chart with color-coded ET
-    (crimson) / BT (blue) curves and a matching ET/BT/&Delta;BT readout
-    column, and the CHARGE/DRY END/FC START/FC END/SC START/DROP manual
-    event-marker buttons underneath the chart.
+    layout: a toolbar with the title, ON/OFF device toggle + START
+    recording button, and digital elapsed-time clock; vertical control
+    sliders (Burner/Air/Drum, plus Burner SV in native &deg;C for
+    <code>modbus_live</code>) beside the banded "Roaster Scope" chart,
+    with color-coded ET (crimson) / BT (blue) curves and a matching
+    ET/BT/&Delta;BT readout column; and the CHARGE/DRY END/FC START/FC
+    END/SC START/DROP manual event-marker buttons underneath the chart.
+    DRY%/&raquo;DRY/&raquo;FCs and other milestone-derived readouts are
+    available as optional items in the configurable Breakout Panel
+    (Settings) rather than a fixed row.
   </p>
   <div class="callout">
     <strong>Note:</strong> if this repo lives under a Windows-mounted
@@ -112,6 +119,20 @@ npm run dev</code></pre>
     the browser's own JS-accessible storage, and login persists across a
     backend restart (accounts and sessions are both in the same SQLite
     file as everything else, <code>backend/data/roasts.db</code>).
+  </p>
+  <p>
+    For calling the API directly — a script, a Home Assistant
+    integration, <code>curl</code> — without going through the browser's
+    cookie-based login at all, click your username in the header to open
+    <strong>Account</strong> and generate an API key. Send it as an
+    <code>X-API-Key</code> header; it's an alternative credential
+    alongside the session cookie, not a replacement for it (the browser
+    app itself keeps using cookies). The key is shown in full exactly
+    once, right when you generate/regenerate it — only its hash is
+    stored, so neither this app nor its database can show it to you
+    again afterward. <strong>Regenerate</strong> replaces it (the old one
+    stops working immediately); <strong>Revoke</strong> turns off
+    API-key access entirely without issuing a replacement.
   </p>
 
   <h2 id="the-four-data-sources">The four data sources</h2>
