@@ -116,6 +116,19 @@ npm run dev</code></pre>
     sets <code>server.watch.usePolling</code> to work around this — if
     you still see stale behavior, restart <code>npm run dev</code>.
   </div>
+  <div class="callout">
+    <strong>Note:</strong> a venv created inside WSL only runs inside
+    WSL — its files are Linux binaries, not runnable from native Windows
+    even though they're visible from Windows too if the repo sits under
+    a Windows-mounted path. If you're on WSL, just use
+    <code>scripts/run-server.sh</code> from a WSL terminal, same as
+    everything else on this page. <code>scripts/run-server.ps1</code>
+    (same flags, PowerShell-flavored: <code>-Port</code>,
+    <code>-Reload</code>, <code>-SkipBuild</code>) is for a <em>separate</em>
+    venv created natively on Windows instead — the one real reason to
+    bother is reaching a real roaster's actual COM port directly, which
+    WSL doesn't expose without extra tooling (<code>usbipd-win</code>).
+  </div>
 
   <h2 id="accounts-and-access">Accounts and access</h2>
   <p>
