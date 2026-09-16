@@ -300,6 +300,12 @@ export default function RoastChart({
   height = 420,
   title = "Roaster Scope",
   tempUnit = "c",
+  // False only on LiveRoastView while a roast is actively roasting/cooling
+  // -- zoom/pan and the hide-labels control are for reviewing a finished
+  // curve, not for fighting with a chart whose x-axis is still growing
+  // every second. Every other caller (history detail, or Live before
+  // START / after STOP) leaves this at the default, fully interactive.
+  interactive = true,
 }) {
   // Cheap to recompute every tick (profile grows every second during a
   // live roast anyway, same cost the data/availability useMemos below
@@ -462,10 +468,14 @@ export default function RoastChart({
         // wheel and a trackpad's two-finger scroll; pinch covers an
         // actual trackpad/touchscreen pinch gesture. Drag-to-pan (no
         // modifier key) is safe alongside the existing hover tooltip --
-        // that only fires on mousemove-without-a-button-down.
+        // that only fires on mousemove-without-a-button-down. All of it
+        // off while !interactive (a live roast's x-axis is still growing
+        // every second -- panning/zooming a range that keeps shifting
+        // under you doesn't work well, so this is a reviewing-a-curve
+        // feature, not a live one).
         zoom: {
-          pan: { enabled: true, mode: "x" },
-          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: "x" },
+          pan: { enabled: interactive, mode: "x" },
+          zoom: { wheel: { enabled: interactive }, pinch: { enabled: interactive }, mode: "x" },
         },
       },
       scales: {
@@ -524,32 +534,37 @@ export default function RoastChart({
         },
       },
     }),
-    [events, phases, showTemp, showRor, showControl, tempUnit, hideEventLabels]
+    [events, phases, showTemp, showRor, showControl, tempUnit, hideEventLabels, interactive]
   );
 
   return (
     <div className="scope">
       {/* Independent of `title` -- LiveRoastView passes title={null} (it
           has its own heading elsewhere and doesn't want "Roaster Scope"
-          repeated), but these controls are useful there too, so the row
-          itself always renders; only the <h2> inside is conditional. */}
-      <div className="scope-header">
-        {title && <h2 className="scope-title">{title}</h2>}
-        <div className="scope-chart-controls">
-          <label className="scope-toggle" title="Hides the CHARGE / Turning Point / Dry End / etc. callout boxes drawn on the curves">
-            <input type="checkbox" checked={hideEventLabels} onChange={() => setHideEventLabels((v) => !v)} />
-            <span>Hide event labels</span>
-          </label>
-          <button
-            type="button"
-            className="link-like scope-reset-zoom"
-            onClick={() => chartRef.current?.resetZoom()}
-            title="Scroll/pinch the chart to zoom, drag to pan"
-          >
-            Reset zoom
-          </button>
+          repeated), but the controls below are useful there too whenever
+          they're actually usable, so this renders whenever either half
+          has something to show. */}
+      {(title || interactive) && (
+        <div className="scope-header">
+          {title && <h2 className="scope-title">{title}</h2>}
+          {interactive && (
+            <div className="scope-chart-controls">
+              <label className="scope-toggle" title="Hides the CHARGE / Turning Point / Dry End / etc. callout boxes drawn on the curves">
+                <input type="checkbox" checked={hideEventLabels} onChange={() => setHideEventLabels((v) => !v)} />
+                <span>Hide event labels</span>
+              </label>
+              <button
+                type="button"
+                className="link-like scope-reset-zoom"
+                onClick={() => chartRef.current?.resetZoom()}
+                title="Scroll/pinch the chart to zoom, drag to pan"
+              >
+                Reset zoom
+              </button>
+            </div>
+          )}
         </div>
-      </div>
+      )}
       <div className="scope-toggles">
         {seriesDefs.map((s) => (
           <label

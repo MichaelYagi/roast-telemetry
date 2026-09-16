@@ -1553,6 +1553,7 @@ export default function LiveRoastView() {
                   title={null}
                   height={chartHeight}
                   tempUnit={tempUnit}
+                  interactive={!isRecording}
                 />
               </div>
               {/* Independent from the split breakout panel now (see
