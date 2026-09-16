@@ -53,9 +53,16 @@ if [[ "$HOST_ADDR" == "0.0.0.0" ]]; then
   # covering Linux/WSL2 (hostname -I) and macOS (ipconfig getifaddr,
   # guessing the common Wi-Fi/Ethernet interface names) without hard-
   # failing the whole script over a convenience feature.
-  LAN_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  #
+  # The trailing "|| true" on each assignment matters under `set -eo
+  # pipefail`: macOS's hostname has no -I flag at all, so that pipeline
+  # exits non-zero, pipefail propagates that to the assignment itself,
+  # and without "|| true" set -e would silently kill the whole script
+  # right here -- confirmed live (script printed "Starting Roast
+  # Telemetry..." then exited with no error and never started uvicorn).
+  LAN_IP="$(hostname -I 2>/dev/null | awk '{print $1}')" || true
   if [[ -z "$LAN_IP" ]]; then
-    LAN_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
+    LAN_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)" || true
   fi
   if [[ -n "$LAN_IP" ]]; then
     echo "Also reachable from other devices on your LAN at: http://$LAN_IP:$PORT"
