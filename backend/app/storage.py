@@ -80,13 +80,20 @@ CREATE TABLE IF NOT EXISTS roast_reviews (
 
 -- The first row ever inserted (by created_at) is the admin, auto-allowed;
 -- every account after that starts 'pending' (see api/auth.py's register()).
+-- api_key_hash is NULL until the user generates one (see api/auth.py's
+-- POST/DELETE /auth/api-key) -- a hash, never the plaintext key itself,
+-- same reasoning as password_hash. Uniqueness is a separate index below
+-- (not an inline UNIQUE here) since SQLite's ALTER TABLE ADD COLUMN --
+-- needed for the idempotent migration path, see init_db() -- can't add a
+-- UNIQUE column after the fact, only a plain one.
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL,
     status TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    api_key_hash TEXT
 );
 
 -- An opaque bearer token in an httponly cookie (see auth.py), not a JWT --
@@ -131,6 +138,15 @@ def init_db() -> None:
         for col in ("heater_pct", "fan_pct", "drum_speed_pct"):
             if col not in preset_cols:
                 c.execute(f"ALTER TABLE roast_presets ADD COLUMN {col} REAL")
+        # Idempotent migration for DBs created before users carried an API
+        # key. The uniqueness index has to be created here, after the
+        # column definitely exists (ADD COLUMN can't itself carry UNIQUE --
+        # see the users table's own comment), rather than inside _SCHEMA
+        # above, which only runs the bare CREATE TABLE on an existing DB.
+        user_cols = {row[1] for row in c.execute("PRAGMA table_info(users)")}
+        if "api_key_hash" not in user_cols:
+            c.execute("ALTER TABLE users ADD COLUMN api_key_hash TEXT")
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_api_key_hash ON users(api_key_hash)")
 
 
 def alog_path_for(roast_id: str) -> str:
@@ -520,6 +536,20 @@ def list_users() -> list[dict]:
 def set_user_status(user_id: str, status: str) -> None:
     with _conn() as c:
         c.execute("UPDATE users SET status = ? WHERE id = ?", (status, user_id))
+
+
+def set_user_api_key_hash(user_id: str, api_key_hash: Optional[str]) -> None:
+    """None clears it (revoke) -- see api/auth.py's DELETE /auth/api-key.
+    A regenerate is just this same call with a new hash, no separate
+    "clear first" step needed."""
+    with _conn() as c:
+        c.execute("UPDATE users SET api_key_hash = ? WHERE id = ?", (api_key_hash, user_id))
+
+
+def get_user_by_api_key_hash(api_key_hash: str) -> Optional[dict]:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM users WHERE api_key_hash = ?", (api_key_hash,)).fetchone()
+        return dict(row) if row else None
 
 
 def delete_sessions_for_user(user_id: str) -> None:

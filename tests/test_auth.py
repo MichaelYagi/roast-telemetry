@@ -234,3 +234,89 @@ def test_logout_clears_the_session_so_the_gate_blocks_again(anon_client):
     assert anon_client.get("/api/auth/me").status_code == 200
     anon_client.post("/api/auth/logout")
     assert anon_client.get("/api/auth/me").status_code == 401
+
+
+# -- API keys (X-API-Key) ----------------------------------------------------
+
+
+def test_generating_an_api_key_returns_it_once_and_reports_has_api_key(anon_client):
+    register(anon_client, "alice")
+    assert anon_client.get("/api/auth/me").json()["has_api_key"] is False
+
+    resp = anon_client.post("/api/auth/api-key")
+    assert resp.status_code == 200
+    key = resp.json()["api_key"]
+    assert len(key) > 20  # secrets.token_urlsafe(32) -- not a short/guessable value
+
+    # The key itself is never echoed back anywhere else -- only whether one exists.
+    me = anon_client.get("/api/auth/me").json()
+    assert me["has_api_key"] is True
+    assert "api_key" not in me
+    assert "api_key_hash" not in me
+
+
+def test_api_key_header_authenticates_like_a_session_cookie(anon_client):
+    register(anon_client, "alice")
+    key = anon_client.post("/api/auth/api-key").json()["api_key"]
+
+    # Drop the session cookie entirely -- only the header should carry auth now.
+    anon_client.cookies.clear()
+    assert anon_client.get("/api/roasts").status_code == 401  # confirms the cookie really is gone
+
+    resp = anon_client.get("/api/roasts", headers={"X-API-Key": key})
+    assert resp.status_code == 200
+
+
+def test_wrong_api_key_is_rejected(anon_client):
+    register(anon_client, "alice")
+    anon_client.post("/api/auth/api-key")
+    anon_client.cookies.clear()
+
+    resp = anon_client.get("/api/roasts", headers={"X-API-Key": "not-the-real-key"})
+    assert resp.status_code == 401
+
+
+def test_regenerating_an_api_key_invalidates_the_previous_one(anon_client):
+    register(anon_client, "alice")
+    old_key = anon_client.post("/api/auth/api-key").json()["api_key"]
+    new_key = anon_client.post("/api/auth/api-key").json()["api_key"]
+    assert new_key != old_key
+
+    anon_client.cookies.clear()
+    assert anon_client.get("/api/roasts", headers={"X-API-Key": old_key}).status_code == 401
+    assert anon_client.get("/api/roasts", headers={"X-API-Key": new_key}).status_code == 200
+
+
+def test_revoking_an_api_key_turns_off_access_without_issuing_a_new_one(anon_client):
+    register(anon_client, "alice")
+    key = anon_client.post("/api/auth/api-key").json()["api_key"]
+
+    resp = anon_client.delete("/api/auth/api-key")
+    assert resp.status_code == 204
+    assert anon_client.get("/api/auth/me").json()["has_api_key"] is False
+
+    anon_client.cookies.clear()
+    assert anon_client.get("/api/roasts", headers={"X-API-Key": key}).status_code == 401
+
+
+def test_api_key_still_gated_by_allowed_status(anon_client):
+    # A key generated while ALLOWED shouldn't keep working if the account
+    # is later denied -- the same status check the cookie path gets.
+    register(anon_client, "alice")
+    admin_client = anon_client
+    admin_client.post("/api/auth/logout")
+    register(admin_client, "bob", password="bobs-password")
+    _login(admin_client, "alice", "a-fine-password")
+    bob_id = next(u for u in admin_client.get("/api/auth/users").json() if u["username"] == "bob")["id"]
+    admin_client.post(f"/api/auth/users/{bob_id}/allow")
+    admin_client.post("/api/auth/logout")
+    _login(admin_client, "bob", "bobs-password")
+    key = admin_client.post("/api/auth/api-key").json()["api_key"]
+
+    admin_client.post("/api/auth/logout")
+    _login(admin_client, "alice", "a-fine-password")
+    admin_client.post(f"/api/auth/users/{bob_id}/deny")
+    admin_client.post("/api/auth/logout")
+
+    resp = admin_client.get("/api/roasts", headers={"X-API-Key": key})
+    assert resp.status_code == 401

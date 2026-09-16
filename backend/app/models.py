@@ -587,15 +587,28 @@ class LoginRequest(BaseModel):
 
 
 class UserPublic(BaseModel):
-    """A user row with password_hash stripped -- the only shape ever sent
-    to a client, whether that's the logged-in user's own /auth/me or the
-    admin-only /auth/users list."""
+    """A user row with password_hash/api_key_hash stripped -- the only
+    shape ever sent to a client, whether that's the logged-in user's own
+    /auth/me or the admin-only /auth/users list. has_api_key says whether
+    one is currently active, never the key itself -- see ApiKeyIssued,
+    the one-time response that actually carries it."""
 
     id: str
     username: str
     role: UserRole
     status: UserStatus
     created_at: str
+    has_api_key: bool = False
+
+
+class ApiKeyIssued(BaseModel):
+    """Returned exactly once, by POST /auth/api-key -- the plaintext key
+    is never recoverable after this response; only its hash is stored
+    (see auth.hash_api_key), so even this app's own admin/DB access can't
+    show it again. Generating or regenerating both return this same
+    shape (regenerating just means the previous key stops working)."""
+
+    api_key: str
 
 
 class SerialPortInfo(BaseModel):

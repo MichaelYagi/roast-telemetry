@@ -74,6 +74,24 @@ def get_user_for_token(token: str | None) -> dict | None:
     return storage.get_session_user(token) if token else None
 
 
+# API keys (X-API-Key header, see main.py's require_login) -- a second,
+# independent credential a user can generate for themselves (Account ->
+# API key) to call the API directly (a script, a Home Assistant
+# integration, curl) without going through the browser's cookie-based
+# login at all. Deliberately NOT hashed with hash_password's PBKDF2 above
+# -- that expense exists specifically to slow down brute-forcing a
+# low-entropy human password; an API key is already 32 cryptographically
+# random bytes (secrets.token_urlsafe), so a plain fast hash is both
+# sufficient and the standard choice for this exact case (this is how
+# GitHub hashes personal access tokens too).
+def generate_api_key() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def hash_api_key(key: str) -> str:
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
 def require_admin(request: Request) -> dict:
     """request.state.user is already guaranteed present (and ALLOWED) by
     the require_login gate for any route this is called from -- those

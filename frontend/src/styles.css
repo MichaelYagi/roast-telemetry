@@ -410,6 +410,61 @@ body.breakout-split-active .app-header-inner {
   gap: 0.6rem;
 }
 
+/* Account modal (see AccountModal.jsx, opened via the username button in
+   the header) -- API key generate/regenerate/revoke. */
+.account-username {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.account-role-badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.account-key-reveal {
+  background: var(--accent-soft);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.account-key-warning {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.account-key-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.account-key-value {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.85rem;
+  user-select: all;
+}
+
+.account-key-actions {
+  margin-top: 1rem;
+  justify-content: flex-start;
+}
+
 .form-row {
   display: flex;
   gap: 1rem;
@@ -2234,11 +2289,24 @@ button:disabled {
   margin-left: auto;
 }
 
+/* Now a <button> (opens the Account modal -- see App.jsx/AccountModal.jsx),
+   reset back to reading as plain text with just a pointer cursor, not a
+   visible button. */
 .app-username {
+  background: none;
+  border: none;
+  padding: 0;
   color: var(--text-muted);
+  font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.app-username:hover {
+  color: var(--text);
+  text-decoration: underline;
 }
 
 .logout-button {

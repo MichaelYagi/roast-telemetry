@@ -349,3 +349,33 @@ def test_concurrent_same_username_registration_one_wins_one_is_duplicate(isolate
 
     outcomes = sorted(r[0] for r in results)
     assert outcomes == ["duplicate", "ok"]  # never both "ok" (two rows), never both erroring unhandled
+
+
+def test_api_key_hash_roundtrip_and_null_by_default(isolated_db):
+    user = {
+        "id": str(uuid.uuid4()), "username": "alice",
+        "password_hash": "x", "created_at": "2026-01-01T00:00:00",
+    }
+    isolated_db.insert_user_and_check_first(user)
+
+    assert isolated_db.get_user_by_api_key_hash("some-hash") is None  # nothing set yet
+
+    isolated_db.set_user_api_key_hash(user["id"], "some-hash")
+    found = isolated_db.get_user_by_api_key_hash("some-hash")
+    assert found["id"] == user["id"]
+
+    isolated_db.set_user_api_key_hash(user["id"], None)  # revoke
+    assert isolated_db.get_user_by_api_key_hash("some-hash") is None
+
+
+def test_multiple_users_can_each_have_no_api_key_at_once(isolated_db):
+    # NULL api_key_hash must not collide against the unique index -- SQLite
+    # treats each NULL as distinct for UNIQUE purposes, but worth nailing
+    # down explicitly since this column's uniqueness is a separate index,
+    # not an inline column constraint (see storage.py's own comment on why).
+    for name in ("alice", "bob", "carol"):
+        isolated_db.insert_user_and_check_first({
+            "id": str(uuid.uuid4()), "username": name,
+            "password_hash": "x", "created_at": "2026-01-01T00:00:00",
+        })
+    assert len(isolated_db.list_users()) == 3

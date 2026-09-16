@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
+import AccountModal from "./components/AccountModal.jsx";
 import { DialogProvider } from "./components/DialogProvider.jsx";
 import ThemePicker from "./components/ThemePicker.jsx";
 import HistoryDashboard from "./views/HistoryDashboard.jsx";
@@ -21,7 +23,8 @@ export default function App() {
 }
 
 function AppShell() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, refresh } = useAuth();
+  const [accountOpen, setAccountOpen] = useState(false);
 
   // Nothing rendered yet during the one-time /auth/me check on mount --
   // faster than a spinner for what's normally a same-machine round trip,
@@ -53,13 +56,19 @@ function AppShell() {
             {user.role === "admin" && <NavLink to="/users">Manage Access</NavLink>}
           </nav>
           <div className="app-user-group">
-            <span className="app-username">{user.username}</span>
+            {/* Opens the Account modal (API key management) -- see
+                AccountModal.jsx. A plain button, not a link, since this
+                never navigates anywhere. */}
+            <button type="button" className="app-username" onClick={() => setAccountOpen(true)}>
+              {user.username}
+            </button>
             <button type="button" className="logout-button" onClick={logout}>
               Log out
             </button>
           </div>
         </div>
       </header>
+      <AccountModal open={accountOpen} onClose={() => setAccountOpen(false)} user={user} onUserChange={refresh} />
       <main className="app-main">
         <Routes>
           <Route path="/" element={<LiveRoastView />} />
