@@ -1675,6 +1675,12 @@ button:disabled {
   overflow-wrap: break-word;
 }
 
+.artisan-toolbar-meta {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
 .artisan-toolbar-controls {
   display: flex;
   align-items: center;

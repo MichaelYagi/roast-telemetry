@@ -898,6 +898,8 @@ export default function LiveRoastView() {
   const toolbarElement = (
     <ArtisanToolbar
       title={roast?.title || form.title}
+      beans={roast?.beans || form.beans}
+      weightGreenG={roast?.weight_green_g ?? (form.weight_green_g ? Number(form.weight_green_g) : null)}
       phase={phase}
       elapsedLabel={elapsedLabel}
       statusText={STATUS_TEXT[phase] + presetHint}

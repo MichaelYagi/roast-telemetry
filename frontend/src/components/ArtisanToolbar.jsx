@@ -6,6 +6,8 @@
 // Panel now, so hardcoding this one fixed trio here was redundant.
 export default function ArtisanToolbar({
   title,
+  beans,
+  weightGreenG,
   phase,
   elapsedLabel,
   statusText,
@@ -14,6 +16,10 @@ export default function ArtisanToolbar({
 }) {
   const connected = phase !== "idle";
   const recording = phase === "roasting" || phase === "cooling" || phase === "finished";
+  // Beans/weight are both optional (Configure Roast never requires
+  // either) -- only append what's actually there, and only the " · "
+  // separator between them when both are, rather than a dangling one.
+  const meta = [beans, weightGreenG != null ? `${weightGreenG} g` : null].filter(Boolean).join(" · ");
 
   return (
     <div className="artisan-toolbar-wrap">
@@ -25,7 +31,10 @@ export default function ArtisanToolbar({
             line sits directly under it, not as its own separate row --
             both are on the left, controls/clock on the right, same row. */}
         <div className="artisan-toolbar-title-group">
-          <h2 className="artisan-toolbar-title">{title || "Untitled roast"}</h2>
+          <h2 className="artisan-toolbar-title">
+            {title || "Untitled roast"}
+            {meta && <span className="artisan-toolbar-meta"> · {meta}</span>}
+          </h2>
           <div className="status-line">{statusText}</div>
         </div>
 
