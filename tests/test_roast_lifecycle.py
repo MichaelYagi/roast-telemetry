@@ -24,8 +24,14 @@ import asyncio
 import pytest
 
 from backend.app.models import ControlCommand, RoastCreateRequest, RoastMode, RoastStatus
-from backend.app.roast_session.session import RoastSessionManager
+from backend.app.roast_session.session import RoastSession, RoastSessionError, RoastSessionManager
 from backend.app.ws_manager import pubsub
+
+# Used only by the stale-same-port-release tests below -- ModbusEngine's own
+# __init__ catches the resulting connect failure internally (never raises),
+# so constructing a RoastSession against this never touches real/virtual
+# hardware and stays fast (same convention as test_modbus_register_overrides.py).
+BOGUS_PORT = "/dev/nonexistent-for-tests"
 
 
 async def _stop_background_task(session) -> None:
@@ -155,3 +161,75 @@ def test_sample_messages_carry_the_current_status_after_begin_recording(isolated
             await _stop_background_task(session)
 
     asyncio.run(body())
+
+
+# -- RoastSessionManager._release_stale_same_port_session --------------------
+# Real bug found live: a modbus_live/ms6514_live session that's merely
+# connected (ON) but never started recording has no DB row and isn't found
+# by the frontend's reconnectActiveRoast() (which only looks for roasting/
+# cooling roasts) -- if the operator navigates away without clicking OFF
+# first, it sits forever holding the real serial port with no way to
+# discover or release it short of restarting the backend. A new connect
+# attempt to the exact same port now releases that abandoned session first
+# instead of failing against it.
+
+
+def test_create_releases_a_stale_idle_unrecorded_session_on_the_same_port():
+    manager = RoastSessionManager()
+    stale_request = RoastCreateRequest(title="Forgotten", mode=RoastMode.MODBUS_LIVE, modbus_port=BOGUS_PORT)
+    stale = RoastSession("stale-id", stale_request)
+    manager.sessions["stale-id"] = stale
+    assert stale.status == RoastStatus.IDLE
+    assert not stale._recorded
+
+    new_request = RoastCreateRequest(title="Retry", mode=RoastMode.MODBUS_LIVE, modbus_port=BOGUS_PORT)
+    # BOGUS_PORT genuinely can't connect, so create() itself still raises --
+    # this test is about the stale session being released regardless of
+    # that, not about a bogus port successfully connecting.
+    with pytest.raises(RoastSessionError):
+        manager.create(new_request)
+
+    assert "stale-id" not in manager.sessions
+
+
+def test_does_not_release_an_actually_recording_session_on_the_same_port():
+    manager = RoastSessionManager()
+    active_request = RoastCreateRequest(title="In progress", mode=RoastMode.MODBUS_LIVE, modbus_port=BOGUS_PORT)
+    active = RoastSession("active-id", active_request)
+    active.status = RoastStatus.ROASTING
+    active._recorded = True
+    manager.sessions["active-id"] = active
+
+    new_request = RoastCreateRequest(title="Retry", mode=RoastMode.MODBUS_LIVE, modbus_port=BOGUS_PORT)
+    with pytest.raises(RoastSessionError):
+        manager.create(new_request)
+
+    assert "active-id" in manager.sessions
+
+
+def test_does_not_release_a_stale_session_on_a_different_port():
+    manager = RoastSessionManager()
+    stale_request = RoastCreateRequest(title="Forgotten", mode=RoastMode.MODBUS_LIVE, modbus_port=BOGUS_PORT)
+    stale = RoastSession("stale-id", stale_request)
+    manager.sessions["stale-id"] = stale
+
+    new_request = RoastCreateRequest(title="Retry", mode=RoastMode.MODBUS_LIVE, modbus_port="/dev/nonexistent-a-different-one")
+    with pytest.raises(RoastSessionError):
+        manager.create(new_request)
+
+    assert "stale-id" in manager.sessions
+
+
+def test_does_not_release_a_stale_session_of_a_different_mode():
+    manager = RoastSessionManager()
+    stale_request = RoastCreateRequest(title="Forgotten", mode=RoastMode.MS6514_LIVE, ms6514_port=BOGUS_PORT)
+    stale = RoastSession("stale-id", stale_request)
+    manager.sessions["stale-id"] = stale
+
+    # Same literal port string, but modbus_live -- shouldn't collide with an
+    # ms6514_live session on it (different protocols, different meaning).
+    new_request = RoastCreateRequest(title="Retry", mode=RoastMode.MODBUS_LIVE, modbus_port=BOGUS_PORT)
+    with pytest.raises(RoastSessionError):
+        manager.create(new_request)
+
+    assert "stale-id" in manager.sessions

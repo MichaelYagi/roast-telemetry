@@ -679,6 +679,37 @@ class RoastSessionManager:
     def __init__(self) -> None:
         self.sessions: dict[str, RoastSession] = {}
 
+    def _release_stale_same_port_session(self, request: RoastCreateRequest) -> None:
+        """A modbus_live/ms6514_live session that was merely connected (ON)
+        but never started recording has no DB row (see create()'s own
+        comment) and isn't found by the frontend's reconnectActiveRoast()
+        (which only looks for roasting/cooling roasts) -- if the operator
+        navigates away without clicking OFF first, it sits forever holding
+        the real serial port with no way to discover or release it short
+        of restarting the backend. A serial port only accepts one client
+        at a time (see ModbusEngine's own module docstring), so a new
+        connect attempt to the exact same port is treated as implicit
+        proof the old one was abandoned, not a deliberate second
+        connection -- release it first instead of letting the new attempt
+        fail against it. Deliberately scoped to IDLE-and-unrecorded only:
+        an actually active (roasting/cooling) session on the same port is
+        never touched here, even if that's also technically a collision --
+        this is about cleaning up a leak, not tearing down a real roast."""
+        if request.mode == RoastMode.MODBUS_LIVE:
+            port = request.modbus_port
+        elif request.mode == RoastMode.MS6514_LIVE:
+            port = request.ms6514_port
+        else:
+            return
+        if not port:
+            return
+        for stale_id, stale in list(self.sessions.items()):
+            if stale.mode != request.mode or stale.status != RoastStatus.IDLE or stale._recorded:
+                continue
+            if getattr(stale._engine, "port", None) == port:
+                stale._engine.close()
+                del self.sessions[stale_id]
+
     def create(self, request: RoastCreateRequest) -> RoastSession:
         """Builds the session and, for modbus_live/ms6514_live, makes the
         real synchronous connect attempt (inside the engine's own
@@ -687,6 +718,8 @@ class RoastSessionManager:
         RoastSession.start()/begin_recording()'s _persist_new_roast_row()
         calls), since a modbus_live/ms6514_live session can now sit
         connected-but-not-recording for a while first (see connect())."""
+        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE):
+            self._release_stale_same_port_session(request)
         roast_id = str(uuid.uuid4())
         session = RoastSession(roast_id, request)
         if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE):
