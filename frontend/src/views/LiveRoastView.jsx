@@ -25,6 +25,19 @@ function numOrNull(v) {
   return v === "" || v == null ? null : Number(v);
 }
 
+// YYYYMMDDHHMMSS in local time (not UTC) -- a human reading it back later
+// expects it to match the wall-clock time they actually started the roast
+// at, not a UTC-shifted one. Just a starting point in the Title field, not
+// a silent fallback -- it's visible and editable before you ever connect,
+// so (unlike the old auto-generated-on-submit "Roast <timestamp>" this
+// replaced) you actually see it and can overwrite it with something more
+// descriptive, rather than only discovering it later in History.
+function defaultTitle() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
 function formatElapsed(seconds) {
   if (seconds == null) return "00:00";
   const m = Math.floor(seconds / 60);
@@ -101,7 +114,7 @@ const STATUS_TEXT = {
 
 export default function LiveRoastView() {
   const [form, setForm] = useState({
-    title: "",
+    title: defaultTitle(),
     mode: "simulator",
     beans: "",
     weight_green_g: "",
@@ -517,13 +530,15 @@ export default function LiveRoastView() {
     setRoastId(null);
     setPhase("idle");
     setError(null);
-    setForm((f) => ({ ...f, title: "" }));
+    setForm((f) => ({ ...f, title: defaultTitle() }));
   }
 
-  // Required, not auto-generated -- this used to silently fall back to
-  // "Roast <timestamp>" when left blank, which meant it was never
-  // actually possible to notice you forgot to name a roast until you
-  // were looking at an unhelpfully-titled entry in History later.
+  // Still required (this only guards against deliberately clearing the
+  // field) -- the field itself starts pre-filled with defaultTitle(), a
+  // visible starting point you can see and overwrite before connecting,
+  // not a silent submit-time fallback the old "Roast <timestamp>"
+  // auto-generation used to be (which meant you only ever discovered an
+  // unhelpfully-titled roast later in History).
   function requireTitle() {
     if (form.title.trim()) return true;
     setError("Title is required.");
