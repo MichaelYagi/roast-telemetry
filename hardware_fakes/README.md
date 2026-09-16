@@ -14,8 +14,10 @@ a real roast no matter which one you're using.
 
 **Quick start:** `../scripts/fake-hardware.sh fz94` or
 `../scripts/fake-hardware.sh ms6514` wraps the whole socat-pair +
-fake-process dance below into one command, with a fresh port name every
-run, and prints the port to paste into the app when it's ready. Add
+fake-process dance below into one command, using the same fixed port
+name every run (so a serial port you've already saved in a Configure
+Roast preset keeps working across restarts), and prints the port to
+paste into the app when it's ready. Add
 `--tcp` (optionally `--tcp <port>`, default 5020) if the app is running
 natively on Windows rather than in WSL alongside the fake -- a
 WSL-internal `/tmp/...` path isn't reachable from a native-Windows

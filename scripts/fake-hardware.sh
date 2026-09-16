@@ -21,11 +21,14 @@
 # too and skip --tcp entirely.
 #
 # Prints the value to paste into the app once it's up, and cleans up
-# both the socat process and the fake on Ctrl+C. Picks a fresh link name
-# every run (suffixed with this shell's own PID) rather than a fixed one
-# -- reusing the same name across restarts carries over the fake's own
-# internal thermal clock from the previous run, corrupting timing (see
-# hardware_fakes/README.md).
+# both the socat process and the fake on Ctrl+C. Uses a fixed link name
+# (not suffixed with this run's PID) so a serial port you've already
+# saved in a Configure Roast preset keeps working across restarts of
+# this script instead of needing to be re-typed every time. Safe to
+# reuse: the fake's own "thermal clock" lives entirely in the fake
+# Python process's memory, reset by starting a fresh process, not by
+# the link's path staying the same (see hardware_fakes/modbus_fz94.py's
+# run()) -- so there's nothing stale to carry over.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -60,7 +63,7 @@ if ! command -v socat >/dev/null; then
   exit 1
 fi
 
-LINK="/tmp/ttyFAKE_${KIND}_$$"
+LINK="/tmp/ttyFAKE_${KIND}"
 APP_LINK="${LINK}_APP"
 
 SOCAT_PID=""
