@@ -37,4 +37,15 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
 fi
 
 echo "Starting Roast Telemetry on http://localhost:$PORT (Ctrl+C to stop)"
+# set +u/-u around just this expansion -- macOS ships bash 3.2 by default
+# (no updates since 2007, licensing reasons), where expanding an empty
+# array under `set -u` raises "unbound variable" even though the array
+# was declared. The tempting fix, "${RELOAD[@]:-}", actually introduces a
+# *different* bug instead of avoiding this one: on an empty array it
+# expands to one stray empty-string argument (confirmed: $# is 1, not 0),
+# which would get passed to uvicorn as a bogus extra CLI argument.
+# Toggling nounset off for just this line is what actually reproduces
+# plain bash's own correct empty-array-expands-to-zero-args behavior on
+# both old and new bash.
+set +u
 PYTHONPATH=. .venv/bin/uvicorn backend.app.main:app --port "$PORT" "${RELOAD[@]}"
