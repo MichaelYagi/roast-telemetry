@@ -26,26 +26,39 @@
 
   <h2>One port (recommended for demos)</h2>
   <p>
-    Build the frontend once, then run only the backend — it serves the
-    compiled UI itself:
+    Set up once, then use <code>scripts/run-server.sh</code> to start it
+    from then on — no command to remember:
   </p>
   <pre><code>cd roast-telemetry
 python3 -m venv .venv &amp;&amp; source .venv/bin/activate   # first time only
 pip install -r backend/requirements.txt               # first time only
-cd frontend &amp;&amp; npm install &amp;&amp; npm run build &amp;&amp; cd ..   # first time / after UI changes
-PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code></pre>
+cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first time only
+scripts/run-server.sh</code></pre>
   <p>
     Open <code>http://localhost:8000</code> — that's it, one process, one
     port. The API lives under <code>/api/*</code> on the same port (docs
     still at <code>/docs</code>), and any other path falls back to the
     React app's <code>index.html</code> so client-side routing
     (<code>/roasts/:id</code>, <code>/compare</code>, etc.) works on a
-    hard refresh too. Re-run <code>npm run build</code> after frontend
-    changes; the backend doesn't rebuild it for you, and this fallback
-    only activates when <code>frontend/dist/</code> exists — without it,
-    the backend just runs as an API-only server (handy for the two-port
-    dev flow below).
+    hard refresh too.
   </p>
+  <div class="callout">
+    <strong>Note:</strong> <code>scripts/run-server.sh</code> rebuilds the
+    frontend every time before starting, since the backend serves
+    whatever's already sitting in <code>frontend/dist/</code> and never
+    rebuilds it for you — a stale build silently keeps serving old code
+    with no error of any kind, including old login/auth behavior (this
+    is a real thing that happened: an old pre-login build let anyone
+    straight into the app with no login screen, even though the backend
+    itself correctly rejected every API call underneath it). Pass
+    <code>--skip-build</code> once you know your build is current, for
+    faster restarts; a port number to use something other than 8000
+    (e.g. <code>scripts/run-server.sh 7890</code>); or
+    <code>--reload</code> to auto-restart on backend code changes.
+    Equivalent to running
+    <code>cd frontend &amp;&amp; npm run build &amp;&amp; cd .. &amp;&amp; PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code>
+    by hand every time.
+  </div>
 
   <h2>Two ports (for frontend development)</h2>
   <p>
@@ -57,7 +70,13 @@ PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code></pre>
   <pre><code>cd roast-telemetry
 python3 -m venv .venv &amp;&amp; source .venv/bin/activate
 pip install -r backend/requirements.txt
-PYTHONPATH=. uvicorn backend.app.main:app --reload --port 8000</code></pre>
+scripts/run-server.sh --skip-build --reload</code></pre>
+  <p>
+    <code>--skip-build</code> since Vite (not this backend) is serving the
+    frontend here — nothing to build/serve from <code>frontend/dist/</code>
+    in this flow. <code>--reload</code> auto-restarts the backend on
+    backend code changes.
+  </p>
   <p>
     Docs at <code>http://localhost:8000/docs</code>. Roast data persists
     to <code>backend/data/roasts.db</code> (SQLite index) and
@@ -190,12 +209,22 @@ npm run dev</code></pre>
     extra — fully self-contained. The two modes that talk to real
     hardware (<code>modbus_live</code>, <code>ms6514_live</code>) can
     each be exercised end-to-end, through the app's actual connection
-    code, using a fake standing in for the real device — see the
-    project's <code>hardware_fakes/README.md</code> for the MS6514 fake,
-    and
+    code, using a fake standing in for the real device:
+  </p>
+  <pre><code>scripts/fake-hardware.sh fz94      # Coffee-Tech FZ-94 (Direct Modbus)
+scripts/fake-hardware.sh ms6514    # Mastech MS6514 meter (Direct USB)</code></pre>
+  <p>
+    Prints the serial port to paste into the app's Configure Roast form
+    once it's up, and cleans up after itself on Ctrl+C. Wraps the
+    two-step <code>socat</code> (creates a linked pair of fake serial
+    ports) + <code>hardware_fakes</code> (drives the fake behind one end
+    of that pair) dance into one command, with a fresh port name every
+    run — see the project's <code>hardware_fakes/README.md</code> for
+    what it's doing under the hood, or
     <a href="modbus/fz-94-usb.html#testing-without-real-hardware">docs/modbus/fz-94-usb.html</a>
-    for the FZ-94 one specifically, since it's the one that can also be
-    <em>controlled</em> (Burner/Air/Drum), not just read.
+    for the FZ-94 one specifically (the one that can also be
+    <em>controlled</em> — Burner/Air/Drum — not just read), including
+    options this wrapper doesn't expose (like a separate drive port).
   </p>
 
   <h2>Next steps</h2>

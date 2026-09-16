@@ -12,6 +12,14 @@ a real roast no matter which one you're using.
 | `modbus_fz94.py` | Coffee-Tech FZ-94 (plain, not EVO) | Modbus RTU (hand-rolled framing) | Yes — one (two only for unusual wiring) |
 | `ms6514_device.py` | Mastech MS6514 meter | Raw 18-byte serial frames | Yes |
 
+**Quick start:** `../scripts/fake-hardware.sh fz94` or
+`../scripts/fake-hardware.sh ms6514` wraps the whole socat-pair +
+fake-process dance below into one command, with a fresh port name every
+run, and prints the port to paste into the app when it's ready. The
+manual steps below are what it's doing under the hood, useful if you
+need something the wrapper doesn't expose (e.g. `--drive-port` for a
+genuinely separate Air/Drum connection).
+
 ## Virtual serial port setup
 
 `ModbusSerialClient` and `pyserial.Serial` (used by the real engines)
