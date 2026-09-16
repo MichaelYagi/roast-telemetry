@@ -23,39 +23,99 @@
 </header>
 <main>
   <h1>Getting started</h1>
-
-  <h2>One port (recommended for demos)</h2>
   <p>
-    Set up once, then use <code>scripts/run-server.sh</code> to start it
-    from then on — no command to remember:
+    Setup and the run command differ slightly by platform — find yours
+    below, then the rest of this page (accounts, data sources, saving a
+    roast...) is the same regardless.
   </p>
+
+  <h2 id="setup-and-run">Setup &amp; run</h2>
+
+  <h3 id="windows-powershell">Windows — PowerShell (native)</h3>
+  <p>
+    Only worth it for one specific reason: reaching a real roaster's
+    actual COM port directly. WSL doesn't expose USB serial devices
+    without extra tooling (<code>usbipd-win</code>), so if you're
+    connecting to a real FZ-94 (or any real Modbus roaster) over USB,
+    this is the recommended path over WSL2.
+  </p>
+  <pre><code>cd roast-telemetry
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
+cd frontend; npm install; cd ..
+scripts\run-server.ps1</code></pre>
+  <div class="callout">
+    <strong>Note:</strong> if <code>Activate.ps1</code> refuses to run
+    ("running scripts is disabled on this system"), run once:
+    <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code>,
+    then retry. Requires Python and Node.js installed natively on
+    Windows — a venv created inside WSL only runs inside WSL (its files
+    are Linux binaries), it's not usable from PowerShell even though the
+    files are visible from Windows too if the repo sits under a
+    Windows-mounted path.
+  </div>
+  <p>
+    <code>scripts\run-server.ps1</code> takes the same options as the
+    WSL2/Linux/macOS script below, PowerShell-flavored:
+    <code>-Port 7890</code>, <code>-Reload</code>,
+    <code>-SkipBuild</code>.
+  </p>
+
+  <h3 id="wsl2-linux">Windows (WSL2) / Linux</h3>
   <pre><code>cd roast-telemetry
 python3 -m venv .venv &amp;&amp; source .venv/bin/activate   # first time only
 pip install -r backend/requirements.txt               # first time only
 cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first time only
 scripts/run-server.sh</code></pre>
   <p>
-    Open <code>http://localhost:8000</code> — that's it, one process, one
-    port. The API lives under <code>/api/*</code> on the same port (docs
-    still at <code>/docs</code>), and any other path falls back to the
-    React app's <code>index.html</code> so client-side routing
-    (<code>/roasts/:id</code>, <code>/compare</code>, etc.) works on a
-    hard refresh too.
+    <code>scripts/run-server.sh</code> takes a port number
+    (<code>scripts/run-server.sh 7890</code>, default 8000),
+    <code>--reload</code> (auto-restart on backend code changes), and
+    <code>--skip-build</code> (see the callout below).
   </p>
   <div class="callout">
-    <strong>Note:</strong> <code>scripts/run-server.sh</code> rebuilds the
-    frontend every time before starting, since the backend serves
+    <strong>Note:</strong> if this repo lives under a Windows-mounted
+    path in WSL (e.g. <code>/mnt/c/...</code>), filesystem change events
+    don't propagate to Vite's watcher, so Hot Module Reload can silently
+    serve stale code after an edit. <code>vite.config.js</code> already
+    sets <code>server.watch.usePolling</code> to work around this — if
+    you still see stale behavior, restart <code>npm run dev</code>.
+  </div>
+
+  <h3 id="macos">macOS</h3>
+  <p>Same as WSL2/Linux above:</p>
+  <pre><code>cd roast-telemetry
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate   # first time only
+pip install -r backend/requirements.txt               # first time only
+cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first time only
+scripts/run-server.sh</code></pre>
+  <p>
+    Real USB serial access (for a real roaster) works natively on macOS
+    with no equivalent of WSL's USB-passthrough problem. For the fake
+    hardware below, <code>socat</code> installs via
+    <code>brew install socat</code>.
+  </p>
+
+  <p>
+    Whichever platform: open <code>http://localhost:8000</code> — one
+    process, one port. The API lives under <code>/api/*</code> on the
+    same port (docs still at <code>/docs</code>), and any other path
+    falls back to the React app's <code>index.html</code> so
+    client-side routing (<code>/roasts/:id</code>, <code>/compare</code>,
+    etc.) works on a hard refresh too.
+  </p>
+  <div class="callout">
+    <strong>Note:</strong> every one of these scripts rebuilds the
+    frontend before starting by default, since the backend serves
     whatever's already sitting in <code>frontend/dist/</code> and never
     rebuilds it for you — a stale build silently keeps serving old code
     with no error of any kind, including old login/auth behavior (this
     is a real thing that happened: an old pre-login build let anyone
     straight into the app with no login screen, even though the backend
     itself correctly rejected every API call underneath it). Pass
-    <code>--skip-build</code> once you know your build is current, for
-    faster restarts; a port number to use something other than 8000
-    (e.g. <code>scripts/run-server.sh 7890</code>); or
-    <code>--reload</code> to auto-restart on backend code changes.
-    Equivalent to running
+    <code>--skip-build</code>/<code>-SkipBuild</code> once you know your
+    build is current, for faster restarts. Equivalent to running
     <code>cd frontend &amp;&amp; npm run build &amp;&amp; cd .. &amp;&amp; PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code>
     by hand every time.
   </div>
@@ -67,15 +127,14 @@ scripts/run-server.sh</code></pre>
   </p>
 
   <h3>Backend</h3>
-  <pre><code>cd roast-telemetry
-python3 -m venv .venv &amp;&amp; source .venv/bin/activate
-pip install -r backend/requirements.txt
-scripts/run-server.sh --skip-build --reload</code></pre>
+  <pre><code>scripts/run-server.sh --skip-build --reload</code></pre>
   <p>
-    <code>--skip-build</code> since Vite (not this backend) is serving the
-    frontend here — nothing to build/serve from <code>frontend/dist/</code>
-    in this flow. <code>--reload</code> auto-restarts the backend on
-    backend code changes.
+    (<code>scripts\run-server.ps1 -SkipBuild -Reload</code> on native
+    Windows PowerShell.) <code>--skip-build</code>/<code>-SkipBuild</code>
+    since Vite (not this backend) is serving the frontend here — nothing
+    to build/serve from <code>frontend/dist/</code> in this flow.
+    <code>--reload</code>/<code>-Reload</code> auto-restarts the backend
+    on backend code changes.
   </p>
   <p>
     Docs at <code>http://localhost:8000/docs</code>. Roast data persists
@@ -93,7 +152,8 @@ npm run dev</code></pre>
   <p>
     Opens on <code>http://localhost:5173</code> and proxies
     <code>/api/*</code> (including WebSockets) to the backend on port
-    8000 — see <code>frontend/vite.config.js</code>.
+    8000 — see <code>frontend/vite.config.js</code>. Same on every
+    platform.
   </p>
   <p>
     The Live Roast screen deliberately mirrors Artisan desktop's own
@@ -108,27 +168,6 @@ npm run dev</code></pre>
     available as optional items in the configurable Breakout Panel
     (Settings) rather than a fixed row.
   </p>
-  <div class="callout">
-    <strong>Note:</strong> if this repo lives under a Windows-mounted
-    path in WSL (e.g. <code>/mnt/c/...</code>), filesystem change events
-    don't propagate to Vite's watcher, so Hot Module Reload can silently
-    serve stale code after an edit. <code>vite.config.js</code> already
-    sets <code>server.watch.usePolling</code> to work around this — if
-    you still see stale behavior, restart <code>npm run dev</code>.
-  </div>
-  <div class="callout">
-    <strong>Note:</strong> a venv created inside WSL only runs inside
-    WSL — its files are Linux binaries, not runnable from native Windows
-    even though they're visible from Windows too if the repo sits under
-    a Windows-mounted path. If you're on WSL, just use
-    <code>scripts/run-server.sh</code> from a WSL terminal, same as
-    everything else on this page. <code>scripts/run-server.ps1</code>
-    (same flags, PowerShell-flavored: <code>-Port</code>,
-    <code>-Reload</code>, <code>-SkipBuild</code>) is for a <em>separate</em>
-    venv created natively on Windows instead — the one real reason to
-    bother is reaching a real roaster's actual COM port directly, which
-    WSL doesn't expose without extra tooling (<code>usbipd-win</code>).
-  </div>
 
   <h2 id="accounts-and-access">Accounts and access</h2>
   <p>
@@ -222,18 +261,32 @@ npm run dev</code></pre>
     extra — fully self-contained. The two modes that talk to real
     hardware (<code>modbus_live</code>, <code>ms6514_live</code>) can
     each be exercised end-to-end, through the app's actual connection
-    code, using a fake standing in for the real device:
+    code, using a fake standing in for the real device. The fake itself
+    always runs via <code>scripts/fake-hardware.sh</code> in WSL2/Linux/
+    macOS (it depends on <code>socat</code>, which doesn't exist on
+    Windows) — <strong>which flag you pass depends on where your app is
+    running</strong>, not your own platform:
   </p>
+  <p><strong>App running in WSL2/Linux/macOS</strong> (the <a href="#wsl2-linux">WSL2/Linux</a>/<a href="#macos">macOS</a> setup above):</p>
   <pre><code>scripts/fake-hardware.sh fz94      # Coffee-Tech FZ-94 (Direct Modbus)
 scripts/fake-hardware.sh ms6514    # Mastech MS6514 meter (Direct USB)</code></pre>
+  <p>Prints a <code>/tmp/...</code> serial port to paste into the app's Configure Roast form.</p>
+  <p><strong>App running natively on Windows PowerShell</strong> (the <a href="#windows-powershell">Windows — PowerShell</a> setup above) — run this in WSL2 instead, add <code>--tcp</code>:</p>
+  <pre><code>scripts/fake-hardware.sh fz94 --tcp      # default port 5020
+scripts/fake-hardware.sh fz94 --tcp 5030 # or a specific port</code></pre>
   <p>
-    Prints the serial port to paste into the app's Configure Roast form
-    once it's up, and cleans up after itself on Ctrl+C. Wraps the
-    two-step <code>socat</code> (creates a linked pair of fake serial
-    ports) + <code>hardware_fakes</code> (drives the fake behind one end
-    of that pair) dance into one command, with a fresh port name every
-    run — see the project's <code>hardware_fakes/README.md</code> for
-    what it's doing under the hood, or
+    Prints a <code>socket://127.0.0.1:&lt;port&gt;</code> URL to paste
+    instead — a WSL-internal <code>/tmp/...</code> path isn't reachable
+    from a native-Windows process at all, so this bridges to a TCP
+    listener over WSL2's own localhost port forwarding instead (pyserial
+    treats that URL as a live serial connection; verified working end to
+    end — both reads and writes — against a real Modbus client).
+  </p>
+  <p>
+    Either way it cleans up after itself on Ctrl+C, and picks a fresh
+    port name every run. See the project's
+    <code>hardware_fakes/README.md</code> for what it's doing under the
+    hood, or
     <a href="modbus/fz-94-usb.html#testing-without-real-hardware">docs/modbus/fz-94-usb.html</a>
     for the FZ-94 one specifically (the one that can also be
     <em>controlled</em> — Burner/Air/Drum — not just read), including
