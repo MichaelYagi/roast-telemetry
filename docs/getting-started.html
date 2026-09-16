@@ -40,11 +40,21 @@
     this is the recommended path over WSL2.
   </p>
   <pre><code>cd roast-telemetry
-python -m venv .venv
+scripts\install.ps1
+scripts\run-server.ps1</code></pre>
+  <p>
+    <code>install.ps1</code> installs Python/Node.js themselves too (via
+    <code>winget</code>, asking first) if either is missing, then creates
+    the venv and installs everything below — so this is the whole setup,
+    not just a shortcut for part of it. It also offers to set up WSL2 (if
+    present) for <code>fake-hardware.sh</code>, the fake-hardware testing
+    tool — skipped automatically if WSL2 isn't installed; the app itself
+    never needs it. Equivalent by hand:
+  </p>
+  <pre><code>python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r backend\requirements.txt
-cd frontend; npm install; cd ..
-scripts\run-server.ps1</code></pre>
+cd frontend; npm install; cd ..</code></pre>
   <div class="callout">
     <strong>Note:</strong> if <code>Activate.ps1</code> refuses to run
     ("running scripts is disabled on this system"), run once:
@@ -64,10 +74,17 @@ scripts\run-server.ps1</code></pre>
 
   <h3 id="wsl2-linux">Windows (WSL2) / Linux</h3>
   <pre><code>cd roast-telemetry
-python3 -m venv .venv &amp;&amp; source .venv/bin/activate   # first time only
-pip install -r backend/requirements.txt               # first time only
-cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first time only
+scripts/install.sh
 scripts/run-server.sh</code></pre>
+  <p>
+    <code>install.sh</code> installs Python 3.10+/Node.js/<code>socat</code>
+    themselves too (via <code>apt-get</code>, asking first) if any are
+    missing, then creates the venv and installs everything below.
+    Equivalent by hand:
+  </p>
+  <pre><code>python3 -m venv .venv &amp;&amp; source .venv/bin/activate   # first time only
+pip install -r backend/requirements.txt               # first time only
+cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first time only</code></pre>
   <p>
     <code>scripts/run-server.sh</code> takes a port number
     (<code>scripts/run-server.sh 7890</code>, default 8000),
@@ -84,17 +101,21 @@ scripts/run-server.sh</code></pre>
   </div>
 
   <h3 id="macos">macOS</h3>
-  <p>Same as WSL2/Linux above:</p>
+  <p>Same script as WSL2/Linux above (it detects macOS and uses
+    <code>brew</code> instead of <code>apt-get</code>):</p>
   <pre><code>cd roast-telemetry
-python3 -m venv .venv &amp;&amp; source .venv/bin/activate   # first time only
-pip install -r backend/requirements.txt               # first time only
-cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first time only
+scripts/install.sh
 scripts/run-server.sh</code></pre>
+  <p>Equivalent by hand:</p>
+  <pre><code>python3 -m venv .venv &amp;&amp; source .venv/bin/activate   # first time only
+pip install -r backend/requirements.txt               # first time only
+cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first time only</code></pre>
   <p>
     Real USB serial access (for a real roaster) works natively on macOS
     with no equivalent of WSL's USB-passthrough problem. For the fake
     hardware below, <code>socat</code> installs via
-    <code>brew install socat</code>.
+    <code>brew install socat</code> (or let <code>install.sh</code> offer
+    to do it).
   </p>
 
   <p>
