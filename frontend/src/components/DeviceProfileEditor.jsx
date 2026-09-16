@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
+import { useConfirm } from "./DialogProvider.jsx";
 
 const TEMP_ROLES = ["bt", "et", "dt", "extra"];
 const CONTROL_KINDS = [
@@ -37,6 +38,7 @@ function summarizeControlChannel(ch) {
 // the custom ones (built-in profiles aren't editable here or anywhere,
 // see api/device_profiles.py).
 export default function DeviceProfileEditor({ onChange }) {
+  const confirm = useConfirm();
   const [profiles, setProfiles] = useState([]);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -166,7 +168,7 @@ export default function DeviceProfileEditor({ onChange }) {
   }
 
   async function deleteProfile(id) {
-    if (!window.confirm("Delete this device profile? Any preset referencing it will fall back to no profile selected.")) return;
+    if (!(await confirm("Delete this device profile? Any preset referencing it will fall back to no profile selected."))) return;
     try {
       await api.deleteDeviceProfile(id);
       loadProfiles();

@@ -1,5 +1,6 @@
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
+import { DialogProvider } from "./components/DialogProvider.jsx";
 import ThemePicker from "./components/ThemePicker.jsx";
 import HistoryDashboard from "./views/HistoryDashboard.jsx";
 import LiveRoastView from "./views/LiveRoastView.jsx";
@@ -12,7 +13,9 @@ import UsersView from "./views/UsersView.jsx";
 export default function App() {
   return (
     <AuthProvider>
-      <AppShell />
+      <DialogProvider>
+        <AppShell />
+      </DialogProvider>
     </AuthProvider>
   );
 }

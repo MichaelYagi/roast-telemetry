@@ -338,6 +338,78 @@ body.breakout-split-active .app-header-inner {
   margin-top: 0;
 }
 
+/* Custom closable modal (see Modal.jsx/DialogProvider.jsx) -- replaces
+   window.confirm/window.alert app-wide. z-index 100 is comfortably above
+   everything else in this file (.theme-picker-menu, the previous highest,
+   uses 30) since a modal should always sit on top of any other overlay. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 420px;
+  max-height: calc(100vh - 2.5rem);
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.modal-close {
+  padding: 0.1rem 0.5rem;
+  font-size: 1.3rem;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.modal-close:hover {
+  color: var(--text);
+}
+
+.modal-body {
+  padding: 1rem;
+}
+
+.dialog-message {
+  margin: 0 0 1rem;
+  /* pre-line, not the default normal -- see DialogProvider.jsx's own
+     comment: a multi-line notice would otherwise collapse to one line. */
+  white-space: pre-line;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
 .form-row {
   display: flex;
   gap: 1rem;

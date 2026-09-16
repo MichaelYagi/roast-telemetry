@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../AuthContext.jsx";
 import { api } from "../api/client.js";
+import { useConfirm } from "../components/DialogProvider.jsx";
 
 // Admin-only -- App.jsx doesn't even route here for a non-admin (see its
 // role check), but this loads its own list independently either way, so
 // it's never relying on the router alone to keep a non-admin out.
 export default function UsersView() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [users, setUsers] = useState(null);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -108,8 +110,8 @@ export default function UsersView() {
                       type="button"
                       className="danger"
                       disabled={busy}
-                      onClick={() => {
-                        if (window.confirm(`Delete ${u.username}? This can't be undone.`)) {
+                      onClick={async () => {
+                        if (await confirm(`Delete ${u.username}? This can't be undone.`)) {
                           runAction(u.id, () => api.deleteUser(u.id));
                         }
                       }}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
+import { useConfirm, useNotify } from "../components/DialogProvider.jsx";
 
 function formatDuration(seconds) {
   if (seconds == null) return "—";
@@ -10,6 +11,8 @@ function formatDuration(seconds) {
 }
 
 export default function HistoryDashboard() {
+  const confirm = useConfirm();
+  const notify = useNotify();
   const [roasts, setRoasts] = useState([]);
   const [filters, setFilters] = useState({ mode: "", status: "" });
   const [loading, setLoading] = useState(true);
@@ -77,7 +80,7 @@ export default function HistoryDashboard() {
   }
 
   async function handleDelete(id, title) {
-    if (!window.confirm(`Delete "${title}"? This removes it from history and deletes its .alog file. This can't be undone.`)) {
+    if (!(await confirm(`Delete "${title}"? This removes it from history and deletes its .alog file. This can't be undone.`))) {
       return;
     }
     try {
@@ -89,20 +92,17 @@ export default function HistoryDashboard() {
       });
       refresh();
     } catch (err) {
-      window.alert(err.message);
+      notify(err.message, { title: "Delete failed" });
     }
   }
 
   async function handleDeleteSelected() {
     const ids = [...selectedIds];
     if (!ids.length) return;
-    if (
-      !window.confirm(
-        `Delete ${ids.length} roast${ids.length === 1 ? "" : "s"}? This removes them from history and deletes their .alog files. This can't be undone.`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm(
+      `Delete ${ids.length} roast${ids.length === 1 ? "" : "s"}? This removes them from history and deletes their .alog files. This can't be undone.`
+    );
+    if (!confirmed) return;
     setDeletingSelected(true);
     try {
       const results = await Promise.allSettled(ids.map((id) => api.deleteRoast(id)));
@@ -116,7 +116,7 @@ export default function HistoryDashboard() {
           const roast = roasts.find((r) => r.id === f.id);
           return `${roast ? roast.title : f.id}: ${f.reason}`;
         });
-        window.alert(`${failed.length} of ${ids.length} couldn't be deleted:\n${titles.join("\n")}`);
+        notify(`${failed.length} of ${ids.length} couldn't be deleted:\n${titles.join("\n")}`, { title: "Delete failed" });
       }
     } finally {
       setDeletingSelected(false);
