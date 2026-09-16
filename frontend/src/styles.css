@@ -1901,6 +1901,11 @@ button:disabled {
   gap: 0.35rem 1rem;
   flex-wrap: wrap;
   font-size: 0.8rem;
+  /* Pushes this to the row's right edge even when it's the only child
+     (LiveRoastView passes title={null}, so .scope-header has no <h2>
+     there) -- justify-content: space-between on the parent only spaces
+     *multiple* children apart, it doesn't right-align a lone one. */
+  margin-left: auto;
 }
 
 .scope-reset-zoom {

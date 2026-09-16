@@ -529,25 +529,27 @@ export default function RoastChart({
 
   return (
     <div className="scope">
-      {title && (
-        <div className="scope-header">
-          <h2 className="scope-title">{title}</h2>
-          <div className="scope-chart-controls">
-            <label className="scope-toggle" title="Hides the CHARGE / Turning Point / Dry End / etc. callout boxes drawn on the curves">
-              <input type="checkbox" checked={hideEventLabels} onChange={() => setHideEventLabels((v) => !v)} />
-              <span>Hide event labels</span>
-            </label>
-            <button
-              type="button"
-              className="link-like scope-reset-zoom"
-              onClick={() => chartRef.current?.resetZoom()}
-              title="Scroll/pinch the chart to zoom, drag to pan"
-            >
-              Reset zoom
-            </button>
-          </div>
+      {/* Independent of `title` -- LiveRoastView passes title={null} (it
+          has its own heading elsewhere and doesn't want "Roaster Scope"
+          repeated), but these controls are useful there too, so the row
+          itself always renders; only the <h2> inside is conditional. */}
+      <div className="scope-header">
+        {title && <h2 className="scope-title">{title}</h2>}
+        <div className="scope-chart-controls">
+          <label className="scope-toggle" title="Hides the CHARGE / Turning Point / Dry End / etc. callout boxes drawn on the curves">
+            <input type="checkbox" checked={hideEventLabels} onChange={() => setHideEventLabels((v) => !v)} />
+            <span>Hide event labels</span>
+          </label>
+          <button
+            type="button"
+            className="link-like scope-reset-zoom"
+            onClick={() => chartRef.current?.resetZoom()}
+            title="Scroll/pinch the chart to zoom, drag to pan"
+          >
+            Reset zoom
+          </button>
         </div>
-      )}
+      </div>
       <div className="scope-toggles">
         {seriesDefs.map((s) => (
           <label
