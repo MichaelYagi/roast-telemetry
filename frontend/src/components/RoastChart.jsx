@@ -10,6 +10,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
+import { TERM_TOOLTIPS } from "../termTooltips.js";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -526,7 +527,7 @@ export default function RoastChart({
           >
             <input type="checkbox" checked={!!visible[s.key]} onChange={() => toggle(s.key)} />
             <span className="toggle-swatch" style={{ background: s.color }} />
-            {s.label}
+            <span title={TERM_TOOLTIPS[s.label]}>{s.label}</span>
           </label>
         ))}
       </div>

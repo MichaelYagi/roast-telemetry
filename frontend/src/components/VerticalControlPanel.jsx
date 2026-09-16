@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { TERM_TOOLTIPS } from "../termTooltips.js";
 import { normalizeLayout, verticalControlItem } from "../verticalControl.js";
 
 // Replaces the old horizontal Controls panel entirely -- no fallback
@@ -149,7 +150,7 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
             ▼
           </button>
         )}
-        <div className="vertical-slider-label">{item.label}</div>
+        <div className="vertical-slider-label" title={TERM_TOOLTIPS[item.label]}>{item.label}</div>
       </div>
     );
   }

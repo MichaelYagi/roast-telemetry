@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Glossary — Roast Telemetry</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="index.html"><img src="assets/icon-48x48.png" alt="" width="24" height="24"> Roast Telemetry</a>
+  <nav>
+    <a href="index.html">Docs</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="modbus/index.html">Direct Modbus</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="glossary.html" aria-current="page">Glossary</a>
+  </nav>
+</header>
+<main>
+  <h1>Glossary</h1>
+  <p>
+    Plain-language explanations of the terms this app (and roasting in
+    general) throws around — both the coffee-roasting vocabulary
+    (BT, Turning Point, First Crack...) and the hardware/Modbus terms
+    that show up on the Direct Modbus connection screens (Slave ID,
+    Register, Divisor...). Written for someone who isn't an engineer or
+    a professional roaster — if a definition still assumes knowledge you
+    don't have, that's a bug in the definition, not you.
+  </p>
+  <p>
+    Terms tagged <span class="glossary-tag">Modbus / FZ-94</span> are
+    specific to how this app talks to real roaster hardware over Modbus
+    — the example numbers given are for the one machine this app ships
+    detailed support for, the Coffee-Tech FZ-94 (see
+    <a href="modbus/fz-94-usb.html">the FZ-94 page</a> for the full
+    citation trail). A different Modbus roaster would have its own,
+    different numbers for the same concepts.
+  </p>
+
+  <nav class="glossary-jump" aria-label="Jump to letter">
+    <a href="#letter-a">A</a>
+    <a href="#letter-b">B</a>
+    <a href="#letter-c">C</a>
+    <a href="#letter-d">D</a>
+    <a href="#letter-e">E</a>
+    <a href="#letter-f">F</a>
+    <a href="#letter-h">H</a>
+    <a href="#letter-k">K</a>
+    <a href="#letter-m">M</a>
+    <a href="#letter-p">P</a>
+    <a href="#letter-r">R</a>
+    <a href="#letter-s">S</a>
+    <a href="#letter-t">T</a>
+    <a href="#letter-v">V</a>
+    <a href="#letter-w">W</a>
+  </nav>
+
+  <h2 class="glossary-letter" id="letter-a">A</h2>
+  <dl class="glossary-list">
+    <dt>Air</dt>
+    <dd>
+      One of the three things this app can control on a real roaster
+      (along with Burner and Drum) — the fan that pushes air through the
+      roast chamber, carrying heat and smoke/chaff out. More airflow
+      generally cools/slows the roast and helps clear smoke; less
+      airflow holds heat in. The Air slider always shows what the fan is
+      <em>actually</em> doing right now, read back from the hardware
+      itself, not just a memory of the last command sent.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-b">B</h2>
+  <dl class="glossary-list">
+    <dt>Baud rate <span class="glossary-tag">Modbus / FZ-94</span></dt>
+    <dd>
+      How fast data moves over the wire between this app and the
+      roaster, in bits per second. Both ends have to be set to the exact
+      same number or the connection simply won't work — it's not
+      something you tune for better performance, just a setting that has
+      to match. The FZ-94 uses 19200.
+    </dd>
+    <dt>BT (Bean Temperature)</dt>
+    <dd>
+      How hot the actual coffee beans are right now. This is the number
+      most roasters watch closest — it climbs, mostly steadily, from
+      room temperature up past 200&deg;C over the course of a roast, and
+      every milestone (Turning Point, Dry End, First Crack...) is
+      defined by what BT is doing.
+    </dd>
+    <dt>Burner</dt>
+    <dd>
+      One of the three things this app can control on a real roaster —
+      the heat source. On most roasters this is a straightforward power
+      percentage; on the FZ-94 specifically it's stranger — see
+      <strong>SV</strong> below.
+    </dd>
+    <dt>Bytesize <span class="glossary-tag">Modbus / FZ-94</span></dt>
+    <dd>
+      How many bits make up one character sent over the serial
+      connection. Almost always 8 (the FZ-94 included) — part of the
+      same "both ends must agree exactly" framing as Baud rate, Parity,
+      and Stop bits below.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-c">C</h2>
+  <dl class="glossary-list">
+    <dt>CHARGE</dt>
+    <dd>
+      The moment green (unroasted) coffee beans go into the hot roaster.
+      This is when the clock starts — every other milestone's timing is
+      measured from Charge, at 0:00.
+    </dd>
+    <dt>Control channel <span class="glossary-tag">Device Profile</span></dt>
+    <dd>
+      One of the three adjustable things a Device Profile (see below)
+      knows how to operate on a given roaster — Burner, Air, or Drum —
+      along with exactly which register(s) and mechanism it takes to
+      move that one.
+    </dd>
+    <dt>COOL END</dt>
+    <dd>
+      The moment the post-roast cooling cycle finishes and the beans
+      have dropped down to a safe handling temperature.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-d">D</h2>
+  <dl class="glossary-list">
+    <dt>Damper</dt>
+    <dd>
+      A physical flap some roasters have that controls how much air/smoke
+      flows through the machine, independent of the fan itself. Shown on
+      the chart as an option if your setup reports one — most direct-Modbus
+      setups (including the FZ-94) don't have this wired up as a
+      separate control.
+    </dd>
+    <dt>Device Profile</dt>
+    <dd>
+      A named, saved "map" this app uses to talk to one specific roaster
+      brand/model over Modbus — which temperature probes exist and where
+      to find them, which controls exist and how to move them. Building
+      one once (or picking the built-in FZ-94 profile) means this app can
+      support a new roaster without anyone writing new code.
+    </dd>
+    <dt>DEV% (Development percent)</dt>
+    <dd>
+      What percentage of the whole roast, so far, was spent in the
+      development phase — the stretch from First Crack Start to Drop.
+    </dd>
+    <dt>DEV TIME (Development time)</dt>
+    <dd>
+      How long the development phase (First Crack Start to Drop) has
+      lasted, or is currently lasting, in minutes:seconds.
+    </dd>
+    <dt>Direct register <span class="glossary-tag">Modbus</span></dt>
+    <dd>
+      The simplest of the three ways this app can write a control value
+      over Modbus — one plain number written straight to one register,
+      no separate "start" command needed first. Plenty of non-FZ-94
+      roasters use this simpler mechanism for a fan or damper.
+    </dd>
+    <dt>Divisor <span class="glossary-tag">Modbus / FZ-94</span></dt>
+    <dd>
+      A roaster's controller often stores a temperature as a plain whole
+      number scaled up, rather than as a decimal — cheaper and simpler
+      for the hardware to handle. E.g. 96.5&deg;C gets stored as the
+      whole number 965. The divisor (10, on every FZ-94 probe) is what
+      undoes that scaling back into a real, readable temperature: 965
+      &divide; 10 = 96.5.
+    </dd>
+    <dt>DRY END</dt>
+    <dd>
+      The moment the beans finish driving off their internal moisture
+      and the roast moves into the browning ("Maillard") stage. One of
+      the milestones this app can optionally auto-detect from the
+      temperature curve instead of requiring a manual click.
+    </dd>
+    <dt>DRY% (Dry percent)</dt>
+    <dd>
+      What percentage of the whole roast, so far, was spent in the
+      drying phase — the stretch from Charge to Dry End.
+    </dd>
+    <dt>Drum</dt>
+    <dd>
+      One of the three things this app can control on a real roaster —
+      how fast the drum rotates, which tumbles the beans so they roast
+      evenly. Not to be confused with <strong>DT</strong> below, a
+      temperature reading, not a control.
+    </dd>
+    <dt>DT (Drum Temperature)</dt>
+    <dd>
+      A separate temperature probe some roasters (the FZ-94 included)
+      have, reading the air inside the drum chamber itself — not the
+      beans (that's BT) and not a duplicate of the exhaust reading
+      (that's ET). Not every unit has this probe wired up; "no data" for
+      DT is often just how a particular machine is configured, not a
+      fault.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-e">E</h2>
+  <dl class="glossary-list">
+    <dt>ET (Environmental/Exhaust Temperature)</dt>
+    <dd>
+      How hot the air immediately around the beans is, as opposed to the
+      beans themselves (that's BT). ET reacts faster to a burner change
+      than BT does, so a sudden move in ET is often the first hint of
+      what BT is about to do a little later.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-f">F</h2>
+  <dl class="glossary-list">
+    <dt>FC END (First Crack End)</dt>
+    <dd>
+      The moment the audible cracking that marked First Crack Start
+      tapers off and stops.
+    </dd>
+    <dt>FC START (First Crack Start)</dt>
+    <dd>
+      The moment the beans start audibly cracking — genuinely audible,
+      a bit like popcorn, a real physical event rather than a guess.
+      Typically happens somewhere around 196&deg;C bean temperature,
+      though the exact number varies by bean. One of the milestones this
+      app can optionally auto-detect from the curve.
+    </dd>
+    <dt>Feedback register <span class="glossary-tag">Modbus</span></dt>
+    <dd>
+      A register some devices offer purely for reading back what they're
+      <em>actually</em> doing right now — e.g. a fan's real current
+      speed — kept separate from whatever register you write a command
+      to. Lets this app confirm a command genuinely took effect, instead
+      of just hoping the write worked.
+    </dd>
+    <dt>Frequency register <span class="glossary-tag">Modbus / FZ-94</span></dt>
+    <dd>
+      On a VFD-driven motor (see <strong>VFD</strong> below — Air and
+      Drum on the FZ-94), this is the register that actually sets the
+      speed, once a separate run/stop register has told the motor to run
+      at all.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-h">H</h2>
+  <dl class="glossary-list">
+    <dt><code>heater_pct</code></dt>
+    <dd>
+      The internal name this app's API and Device Profiles use for the
+      Burner control — same thing the app's own screens label "Burner,"
+      just written differently in code/JSON than what you see in the UI.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-k">K</h2>
+  <dl class="glossary-list">
+    <dt>K-type (thermocouple)</dt>
+    <dd>
+      A common, inexpensive type of temperature probe, named for the
+      pair of metals inside it. The Mastech MS6514 meter this app can
+      read from directly uses two K-type probes, wired to BT and ET.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-m">M</h2>
+  <dl class="glossary-list">
+    <dt>Maillard% <span class="glossary-tag">named for the Maillard reaction, the browning chemistry</span></dt>
+    <dd>
+      What percentage of the whole roast, so far, was spent in the
+      Maillard/browning phase — the stretch from Dry End to First Crack
+      Start.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-p">P</h2>
+  <dl class="glossary-list">
+    <dt>Parity <span class="glossary-tag">Modbus / FZ-94</span></dt>
+    <dd>
+      An extra error-checking bit added to each byte sent over the
+      serial connection — a simple way for the receiving end to catch a
+      corrupted byte. The FZ-94 uses no parity at all ("N").
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-r">R</h2>
+  <dl class="glossary-list">
+    <dt>Register / Register address <span class="glossary-tag">Modbus</span></dt>
+    <dd>
+      A single labeled storage slot inside a device's own controller,
+      holding one value — think of it like one labeled cubbyhole in a
+      wall of them. "Register 5" on the FZ-94's burner controller is
+      specifically where its temperature setpoint lives; reading or
+      writing that register is how this app checks or changes it.
+    </dd>
+    <dt>RoR (BT) / &Delta;BT (Rate of Rise)</dt>
+    <dd>
+      How fast the bean temperature is climbing (or falling) right now,
+      in degrees per minute — not the temperature itself, but its speed
+      of change. Roasters watch this closely: a sudden crash usually
+      means too little heat for where the roast currently is, a spike
+      can mean scorching risk.
+    </dd>
+    <dt>RoR (ET)</dt>
+    <dd>
+      The same idea as RoR (BT) above, but for the exhaust temperature
+      (ET) instead of the bean temperature.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-s">S</h2>
+  <dl class="glossary-list">
+    <dt>SC END (Second Crack End)</dt>
+    <dd>
+      The moment the (quieter, higher-pitched) Second Crack sound stops.
+      Reaching Second Crack at all is a choice, not a default — most
+      lighter roasts are dropped well before it.
+    </dd>
+    <dt>SC START (Second Crack Start)</dt>
+    <dd>
+      A second, distinct round of audible cracking that can happen later
+      in a darker roast, driven by a different underlying process than
+      First Crack.
+    </dd>
+    <dt>Slave ID <span class="glossary-tag">Modbus / FZ-94</span></dt>
+    <dd>
+      Several separate devices (the bean-temperature probe, the burner
+      controller, the fan motor...) can all share one physical wire back
+      to this app. Slave ID is simply which one you're addressing on
+      that shared wire — like a phone extension number at an office
+      where everyone shares one main line in. On the FZ-94, BT is slave
+      11, Air is slave 1, Drum is slave 2, and so on — every probe/motor
+      has its own number even though they're all on the same cable.
+    </dd>
+    <dt>Stop bits <span class="glossary-tag">Modbus / FZ-94</span></dt>
+    <dd>
+      Another piece of the serial "both ends must agree" framing (along
+      with Baud rate, Bytesize, and Parity) — marks where one byte ends
+      and the next begins. The FZ-94 uses 2.
+    </dd>
+    <dt>SV (Setpoint Value)</dt>
+    <dd>
+      The target a device's own built-in controller is actively trying
+      to hold, in its native unit. The FZ-94's Burner is the clearest
+      example: it doesn't take a power percentage at all — you give it a
+      target drum temperature (its SV, in &deg;C), and the machine's own
+      thermostat-like logic switches its heating elements on and off to
+      hold that target. This app shows Burner both ways — a familiar
+      0&ndash;100% slider, and a second slider for the SV directly in
+      &deg;C — moving either one moves the other, since they're just two
+      units for the same underlying target.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-t">T</h2>
+  <dl class="glossary-list">
+    <dt>Temp channel <span class="glossary-tag">Device Profile</span></dt>
+    <dd>
+      One of the temperature probes a Device Profile knows how to read —
+      BT, ET, DT, or an extra one you name yourself (e.g. a flue probe on
+      a roaster that has one).
+    </dd>
+    <dt>TURNING POINT</dt>
+    <dd>
+      Right after cold green beans go into a hot roaster, the
+      temperature briefly <em>drops</em> before it starts climbing — the
+      cold beans are soaking up heat faster than the roaster can add it
+      back in. Turning Point is the moment that reverses: the lowest
+      point on the curve, where BT stops falling and starts rising for
+      good. It's a pure observation (the bottom of a dip), not a
+      judgment call, which is why this app always detects it
+      automatically rather than asking for a manual click.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-v">V</h2>
+  <dl class="glossary-list">
+    <dt>VFD (Variable Frequency Drive) <span class="glossary-tag">Modbus / FZ-94</span></dt>
+    <dd>
+      The type of motor controller the FZ-94 uses to run Air and Drum —
+      it adjusts the electrical frequency going to the motor to change
+      its speed. Needs two separate writes to actually move: a run/stop
+      command first, then a separate speed command, which is why Air and
+      Drum are slightly more involved to control than the simpler
+      "Direct register" mechanism above.
+    </dd>
+  </dl>
+
+  <h2 class="glossary-letter" id="letter-w">W</h2>
+  <dl class="glossary-list">
+    <dt>Write register <span class="glossary-tag">Modbus</span></dt>
+    <dd>
+      The register a "Direct register" control (see above) actually
+      writes its value to — simpler roasters that don't use a VFD or a
+      setpoint-style burner take a plain number straight to one register
+      like this.
+    </dd>
+  </dl>
+
+  <div class="page-nav"><a href="index.html">&larr; Back to docs home</a></div>
+</main>
+</body>
+</html>

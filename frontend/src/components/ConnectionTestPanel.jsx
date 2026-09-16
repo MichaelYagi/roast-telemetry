@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client.js";
 import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
+import { TERM_TOOLTIPS } from "../termTooltips.js";
 
 // Every channel worth checking on a full modbus_live connection -- ms6514
 // only ever has bt/et (see canWrite/channelsForMode below), everything
@@ -257,7 +258,7 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
           {readResults.map((r) => (
             <li key={r.key} className={`connection-test-row connection-test-${r.status}`}>
               <span className="connection-test-icon">{r.status === "pass" ? "✓" : r.status === "warn" ? "•" : "✗"}</span>
-              <span className="connection-test-label">{r.label}</span>
+              <span className="connection-test-label" title={TERM_TOOLTIPS[r.label]}>{r.label}</span>
               <span className="connection-test-detail">{r.detail}</span>
             </li>
           ))}

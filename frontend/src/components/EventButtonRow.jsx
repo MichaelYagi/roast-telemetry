@@ -1,3 +1,5 @@
+import { TERM_TOOLTIPS } from "../termTooltips.js";
+
 // The row of manual event-marker buttons Artisan shows under the scope,
 // for logging milestones by hand. CHARGE is auto-detected for
 // simulator/alog_playback (SimulatorEngine fires it immediately on
@@ -56,13 +58,18 @@ export default function EventButtonRow({ disabled, events = [], onFire, manualCh
         const alreadyFired = fired.has(btn.type);
         const laterFired = EVENT_BUTTONS.slice(i + 1).some((b) => fired.has(b.type));
         const locked = alwaysAuto || alreadyFired || laterFired;
-        const title = alwaysAuto
+        // FC/SC are genuine abbreviations (First/Second Crack) -- prefixed
+        // onto whatever lock-state message applies, if any, since a
+        // button only gets one title attribute.
+        const lockMessage = alwaysAuto
           ? "Always auto-detected -- not manually markable"
           : alreadyFired
             ? "Already marked for this roast"
             : laterFired
               ? "Can't mark -- a later milestone is already recorded"
               : undefined;
+        const term = TERM_TOOLTIPS[btn.label];
+        const title = term && lockMessage ? `${term} -- ${lockMessage}` : term || lockMessage;
         return (
           <button
             key={btn.type}

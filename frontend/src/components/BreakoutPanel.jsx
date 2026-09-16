@@ -1,5 +1,6 @@
 import { BREAKOUT_PANEL_ITEMS } from "../breakoutPanels.js";
 import { formatTemp } from "../tempUnits.js";
+import { TERM_TOOLTIPS } from "../termTooltips.js";
 
 // Optional large-digit sidebar for the Live Roast screen -- purely
 // additive (see Settings: "Big Readout Panel"), nothing here replaces
@@ -52,7 +53,7 @@ export default function BreakoutPanel({ enabledKeys, latest, milestones, elapsed
           // pull off by reading a custom property, not an inline style
           // meant for something else.
           <div key={item.key} className="breakout-box" style={{ borderColor: color, "--item-color": color }}>
-            <span className="breakout-label">{item.label}</span>
+            <span className="breakout-label" title={TERM_TOOLTIPS[item.label]}>{item.label}</span>
             <span className="breakout-value" style={{ color, "--value-chars": String(values[item.key]).length }}>
               {values[item.key]}
             </span>

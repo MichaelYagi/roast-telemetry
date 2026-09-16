@@ -232,3 +232,63 @@ tbody tr:nth-child(even) {
 .feature-list li {
   margin-bottom: 0.6rem;
 }
+
+/* Glossary (glossary.html) -- A-Z jump nav + per-letter term lists. */
+.glossary-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 2rem;
+  padding: 0.75rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.glossary-jump a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.glossary-jump a:hover {
+  background: var(--accent-soft);
+}
+
+.glossary-letter {
+  font-size: 1.3rem;
+  color: var(--accent);
+}
+
+.glossary-list dt {
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 1.1rem;
+}
+
+.glossary-list dt:first-child {
+  margin-top: 0;
+}
+
+.glossary-list dd {
+  margin: 0.25rem 0 0;
+}
+
+.glossary-tag {
+  font-weight: 500;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  background: var(--code-bg);
+  border-radius: 4px;
+  padding: 0.1em 0.45em;
+  margin-left: 0.4rem;
+  white-space: nowrap;
+}
