@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from .. import auth, storage
-from ..models import ApiKeyIssued, LoginRequest, RegisterRequest, UserPublic, UserStatus
+from ..models import ApiKeyIssued, ChangePasswordRequest, LoginRequest, RegisterRequest, UserPublic, UserStatus
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -92,6 +92,23 @@ def me(request: Request) -> UserPublic:
     # in the gate's public-path exemption list, so the middleware has
     # already resolved and attached it (or this route would never run).
     return _public(request.state.user)
+
+
+@router.post("/change-password", status_code=204)
+def change_password(payload: ChangePasswordRequest, request: Request) -> None:
+    """Self-service password change (Account -> Change password). Requires
+    the current password, not just a valid session. Every *other* active
+    session for this account is ended on success (see
+    storage.delete_other_sessions_for_user) -- an old password shouldn't
+    keep working anywhere else, but the browser that just supplied it
+    correctly stays signed in rather than being logged out too."""
+    user = request.state.user
+    if not auth.verify_password(payload.current_password, user["password_hash"]):
+        raise HTTPException(401, "Current password is incorrect")
+    storage.set_user_password_hash(user["id"], auth.hash_password(payload.new_password))
+    token = request.cookies.get(auth.SESSION_COOKIE)
+    if token:
+        storage.delete_other_sessions_for_user(user["id"], token)
 
 
 @router.post("/api-key", response_model=ApiKeyIssued)

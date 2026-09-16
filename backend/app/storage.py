@@ -552,6 +552,21 @@ def get_user_by_api_key_hash(api_key_hash: str) -> Optional[dict]:
         return dict(row) if row else None
 
 
+def set_user_password_hash(user_id: str, password_hash: str) -> None:
+    with _conn() as c:
+        c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+
+
+def delete_other_sessions_for_user(user_id: str, keep_token: str) -> None:
+    """Kills every other active session for this account, keeping only
+    the one that just proved it knows the (soon-to-be-old) password --
+    see api/auth.py's change_password. Used instead of
+    delete_sessions_for_user so changing your own password doesn't log
+    the browser you just changed it from back out."""
+    with _conn() as c:
+        c.execute("DELETE FROM sessions WHERE user_id = ? AND token != ?", (user_id, keep_token))
+
+
 def delete_sessions_for_user(user_id: str) -> None:
     """Kills every active session for one account -- without this, a
     browser holding a still-valid cookie for a just-denied/deleted user

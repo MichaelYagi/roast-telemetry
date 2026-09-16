@@ -25,6 +25,8 @@ export const api = {
   logout: () => request("/auth/logout", { method: "POST" }),
   me: () => request("/auth/me"),
   listUsers: () => request("/auth/users"),
+  changePassword: (currentPassword, newPassword) =>
+    request("/auth/change-password", { method: "POST", body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }) }),
   generateApiKey: () => request("/auth/api-key", { method: "POST" }),
   revokeApiKey: () => request("/auth/api-key", { method: "DELETE" }),
   allowUser: (id) => request(`/auth/users/${id}/allow`, { method: "POST" }),

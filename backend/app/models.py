@@ -576,6 +576,16 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=200)
 
 
+class ChangePasswordRequest(BaseModel):
+    """Self-service -- see api/auth.py's change_password. Requires the
+    current password (not just a valid session) so a browser left signed
+    in somewhere doesn't let anyone who walks up to it lock the real
+    owner out by setting a new one."""
+
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=200)
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str

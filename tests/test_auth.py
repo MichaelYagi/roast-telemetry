@@ -321,3 +321,62 @@ def test_api_key_still_gated_by_allowed_status(anon_client):
 
     resp = admin_client.get("/api/roasts", headers={"X-API-Key": key})
     assert resp.status_code == 401
+
+
+def test_change_password_requires_correct_current_password(anon_client):
+    register(anon_client, "alice", password="correct-horse")
+    resp = anon_client.post(
+        "/api/auth/change-password",
+        json={"current_password": "wrong-password", "new_password": "battery-staple"},
+    )
+    assert resp.status_code == 401
+    # Rejected -- the old password should still work.
+    anon_client.post("/api/auth/logout")
+    assert _login(anon_client, "alice", "correct-horse").status_code == 200
+
+
+def test_change_password_updates_the_password(anon_client):
+    register(anon_client, "alice", password="correct-horse")
+    resp = anon_client.post(
+        "/api/auth/change-password",
+        json={"current_password": "correct-horse", "new_password": "battery-staple"},
+    )
+    assert resp.status_code == 204
+
+    anon_client.post("/api/auth/logout")
+    old_login = anon_client.post("/api/auth/login", json={"username": "alice", "password": "correct-horse"})
+    assert old_login.status_code == 401
+    assert _login(anon_client, "alice", "battery-staple").status_code == 200
+
+
+def test_change_password_logs_out_other_sessions_but_not_this_one(anon_client):
+    from fastapi.testclient import TestClient
+
+    from backend.app.main import app
+
+    register(anon_client, "alice", password="correct-horse")
+    # A second "browser" -- its own cookie jar (a separate TestClient
+    # against the same app/isolated DB), logged in as the same user.
+    with TestClient(app) as other:
+        _login(other, "alice", "correct-horse")
+        assert other.get("/api/auth/me").status_code == 200
+
+        resp = anon_client.post(
+            "/api/auth/change-password",
+            json={"current_password": "correct-horse", "new_password": "battery-staple"},
+        )
+        assert resp.status_code == 204
+
+        # The session that made the change is still logged in...
+        assert anon_client.get("/api/auth/me").status_code == 200
+        # ...but the other browser's session was ended.
+        assert other.get("/api/auth/me").status_code == 401
+
+
+def test_change_password_rejects_a_too_short_new_password(anon_client):
+    register(anon_client, "alice", password="correct-horse")
+    resp = anon_client.post(
+        "/api/auth/change-password",
+        json={"current_password": "correct-horse", "new_password": "short"},
+    )
+    assert resp.status_code == 422

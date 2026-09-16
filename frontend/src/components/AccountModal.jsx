@@ -18,11 +18,54 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwError, setPwError] = useState(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
+
   function handleClose() {
     setRevealedKey(null);
     setCopied(false);
     setError(null);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setPwError(null);
+    setPwSuccess(false);
     onClose();
+  }
+
+  async function handleChangePassword(e) {
+    e.preventDefault();
+    setPwError(null);
+    setPwSuccess(false);
+    // Mirrors the backend's own Field(min_length=8) (models.py's
+    // ChangePasswordRequest) -- catching this here instead of just
+    // letting the request 422 avoids surfacing FastAPI's raw validation
+    // error shape (a list of objects, not a plain string) as the error
+    // message.
+    if (newPassword.length < 8) {
+      setPwError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwError("New passwords don't match.");
+      return;
+    }
+    setPwBusy(true);
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPwSuccess(true);
+    } catch (err) {
+      setPwError(err.message);
+    } finally {
+      setPwBusy(false);
+    }
   }
 
   async function handleGenerate() {
@@ -104,6 +147,55 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
         Signed in as <strong>{user?.username}</strong>
         {user?.role === "admin" && <span className="account-role-badge">admin</span>}
       </p>
+
+      <h4>Change password</h4>
+      <form className="account-password-form" onSubmit={handleChangePassword}>
+        <div className="form-row">
+          <label>
+            Current password
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </label>
+        </div>
+        <div className="form-row">
+          <label>
+            New password
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+            />
+          </label>
+        </div>
+        <div className="form-row">
+          <label>
+            Confirm new password
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+          </label>
+        </div>
+
+        {pwError && <p className="error">{pwError}</p>}
+        {pwSuccess && <p className="hint account-password-success">Password changed. Any other signed-in browser has been logged out.</p>}
+
+        <div className="dialog-actions">
+          <button type="submit" disabled={pwBusy}>
+            Change password
+          </button>
+        </div>
+      </form>
 
       <h4>API key</h4>
       <p className="hint">

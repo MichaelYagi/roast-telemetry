@@ -465,6 +465,21 @@ body.breakout-split-active .app-header-inner {
   justify-content: flex-start;
 }
 
+.account-password-form {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-password-form .dialog-actions {
+  justify-content: flex-start;
+}
+
+.account-password-success {
+  color: #15803d;
+  font-weight: 600;
+}
+
 .form-row {
   display: flex;
   gap: 1rem;
