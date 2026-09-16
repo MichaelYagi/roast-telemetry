@@ -125,9 +125,8 @@ body {
 .app-header-inner {
   display: flex;
   align-items: center;
-  /* Was space-between, for the old 3-group layout (title/nav/user) --
-     now it's just the hamburger + page title, which should sit together
-     on the left, not pushed to opposite ends of the row. */
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.75rem;
   width: 100%;
 }
@@ -201,141 +200,42 @@ body.breakout-split-active .app-header-inner {
   margin: 0;
 }
 
-/* Opens the drawer (see App.jsx's AppDrawer) -- a plain 3-bar icon built
-   from spans rather than an image/icon font, so it inherits color/theme
-   for free the same way text does. */
-.hamburger-button {
+.app-header nav {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
 }
 
-.hamburger-button span {
-  display: block;
-  height: 2px;
-  width: 100%;
-  background: var(--text);
-  border-radius: 1px;
-}
-
-/* -- Drawer (see App.jsx's AppDrawer) --------------------------------- */
-
-.app-drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 199;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-.app-drawer-backdrop.open {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Always mounted, slid off-screen via transform when closed (see App.jsx's
-   own comment) -- a high z-index (.theme-picker-menu, the previous
-   highest in this file, uses 30) guarantees this sits above every other
-   position:fixed element in the app regardless of DOM order, including
-   .breakout-split-divider/.breakout-split-panel-pane, which render later
-   in the DOM (inside <main>, after this) and would otherwise win ties in
-   the default stacking order. */
-.app-drawer {
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: min(280px, 85vw);
-  background: var(--panel);
-  border-right: 1px solid var(--border);
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
-  z-index: 200;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
-  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
-  overflow-y: auto;
-  transform: translateX(-100%);
-  transition: transform 0.2s ease;
-}
-
-.app-drawer.open {
-  transform: translateX(0);
-}
-
-.app-drawer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.app-drawer-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  color: var(--text);
-  text-decoration: none;
-  font-weight: 700;
-  font-size: 1.05rem;
-}
-
-.app-drawer-close {
-  padding: 0.2rem 0.55rem;
-  font-size: 1.3rem;
-  line-height: 1;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.app-drawer-close:hover {
-  color: var(--text);
-}
-
-.app-drawer-links {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.app-drawer-links a {
+.app-header nav a {
   color: var(--text-muted);
   text-decoration: none;
   font-weight: 600;
-  padding: 0.5rem 0.6rem;
+  padding: 0.35rem 0.6rem;
   border-radius: 6px;
+  white-space: nowrap;
 }
 
-.app-drawer-links a.active {
+/* All 5 nav links plus the title never fit on one line at phone widths --
+   without this they forced the whole page to scroll horizontally instead
+   of wrapping to a second/third line. */
+@media (max-width: 640px) {
+  .app-header nav {
+    gap: 0.3rem 0.5rem;
+  }
+  .app-header nav a {
+    padding: 0.3rem 0.45rem;
+    font-size: 0.9rem;
+  }
+}
+
+.app-header nav a.active {
   color: var(--accent);
   background: var(--accent-soft);
 }
 
-.app-drawer-theme {
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border);
-}
-
-.app-drawer-user {
-  margin-top: auto;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
+.app-title-group {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.6rem;
 }
 
@@ -2249,6 +2149,13 @@ button:disabled {
   margin-top: 0.25rem;
 }
 
+.app-user-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+
 .app-username {
   color: var(--text-muted);
   font-size: 0.85rem;
@@ -2342,7 +2249,7 @@ button:disabled {
   transform: rotate(-2deg);
   display: inline-block;
 }
-:root[data-theme="garbagefire"] .app-drawer-links a {
+:root[data-theme="garbagefire"] .app-header nav a {
   border: 3px dotted #ff00ff !important;
   border-radius: 50% 0 50% 0 !important;
   background: #39ff14 !important;
@@ -2350,12 +2257,12 @@ button:disabled {
   font-weight: 900 !important;
   transform: rotate(-1deg);
 }
-:root[data-theme="garbagefire"] .app-drawer-links a.active {
+:root[data-theme="garbagefire"] .app-header nav a.active {
   background: #00ffff !important;
   color: #ff0000 !important;
   transform: rotate(2deg);
 }
-:root[data-theme="garbagefire"] .app-drawer-links a:hover {
+:root[data-theme="garbagefire"] .app-header nav a:hover {
   filter: invert(1) hue-rotate(90deg) !important;
   transform: rotate(5deg) scale(1.15) !important;
 }
@@ -2454,8 +2361,6 @@ button:disabled {
   }
 
   .app-header,
-  .app-drawer,
-  .app-drawer-backdrop,
   .no-print {
     display: none !important;
   }
