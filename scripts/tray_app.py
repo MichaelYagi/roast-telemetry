@@ -40,6 +40,7 @@ ICON_PATH = REPO_ROOT / "frontend" / "public" / "icon-256x256.png"
 # already creates, so no separate mkdir concern here.
 LOG_PATH = REPO_ROOT / "backend" / "data" / "server.log"
 CONFIG_PATH = REPO_ROOT / "backend" / "data" / "tray_config.json"
+LOCK_PATH = REPO_ROOT / "backend" / "data" / "tray.lock"
 
 DEFAULT_CONFIG = {
     "port": 7890,
@@ -67,6 +68,59 @@ def load_config() -> dict:
 def save_config(config: dict) -> None:
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     CONFIG_PATH.write_text(json.dumps(config, indent=2))
+
+
+# -- Single-instance lock ------------------------------------------------
+# Nothing previously stopped double-clicking the launcher twice from
+# running two independent tray icons at once, each with its own idea of
+# whether the server is running -- confirmed live (a real "why are there
+# two of these" report). A PID lock file, checked before the pystray
+# Icon is even constructed, closes that: the second launch bails out
+# with a message instead of spawning a second icon.
+def _is_process_alive(pid: int) -> bool:
+    if platform.system() == "Windows":
+        # os.kill(pid, 0) doesn't work as a liveness check on Windows
+        # (0 isn't a valid signal there) -- tasklist is a native,
+        # always-present tool that does the job with no new dependency.
+        try:
+            result = subprocess.run(["tasklist", "/FI", f"PID eq {pid}"], capture_output=True, text=True, timeout=5)
+            return str(pid) in result.stdout
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+    try:
+        os.kill(pid, 0)  # sends no actual signal on POSIX -- just checks whether the PID exists
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # exists, just owned by someone else -- still alive
+    except OSError:
+        return False
+
+
+def _acquire_single_instance_lock() -> bool:
+    """True if this process now holds the lock (the only instance);
+    False if another instance is already running. A leftover lock file
+    from a previous crash (process no longer alive) is treated as stale
+    and safely taken over, not as "someone else is running"."""
+    if LOCK_PATH.exists():
+        try:
+            existing_pid = int(LOCK_PATH.read_text().strip())
+        except (ValueError, OSError):
+            existing_pid = None
+        if existing_pid is not None and _is_process_alive(existing_pid):
+            return False
+    LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LOCK_PATH.write_text(str(os.getpid()))
+    return True
+
+
+def _release_single_instance_lock() -> None:
+    try:
+        if LOCK_PATH.exists() and int(LOCK_PATH.read_text().strip()) == os.getpid():
+            LOCK_PATH.unlink()
+    except (ValueError, OSError):
+        pass  # already gone, or never ours to begin with -- fine either way
 
 
 def _badge(base: Image.Image, color: str) -> Image.Image:
@@ -472,4 +526,10 @@ class TrayApp:
 
 
 if __name__ == "__main__":
-    TrayApp().run()
+    if not _acquire_single_instance_lock():
+        print("Roast Telemetry is already running -- check your system tray (it may be in the hidden/overflow icons area, not pinned).")
+        sys.exit(0)
+    try:
+        TrayApp().run()
+    finally:
+        _release_single_instance_lock()

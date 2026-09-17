@@ -1,13 +1,17 @@
 # Python
 __pycache__/
 *.pyc
-.venv/
+# Covers .venv/ and any renamed-aside copy (e.g. .venv-wsl2, from
+# working around the WSL2-venv-vs-Windows-venv layout mismatch --
+# see scripts/install.ps1's own check for that).
+.venv*/
 
 # Backend runtime data (sample_roasts/ demo asset is intentionally tracked)
 backend/data/roasts.db
 backend/data/roasts/*.alog
 backend/data/server.log
 backend/data/tray_config.json
+backend/data/tray.lock
 
 # Frontend
 frontend/node_modules/
