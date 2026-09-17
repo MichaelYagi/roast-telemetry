@@ -187,34 +187,25 @@ echo
 echo "Installing frontend dependencies (npm install)..."
 (cd frontend && npm install)
 
-# --- Linux desktop launcher paths ---
-# "Roast Telemetry.desktop" needs the repo's real absolute path baked
-# into both Exec= and Icon= -- originally Exec= tried the Desktop Entry
-# spec's %k field code (location of the .desktop file itself) to
-# self-locate the way .command/.bat do, but that turned out unreliable
-# in practice: confirmed live, a real file manager's "Execute in
-# Terminal" path left %k un-substituted entirely, so `dirname "%k"`
-# just returned "." and the launcher looked for scripts/start.sh in
-# whatever directory the terminal happened to start in instead. Icon=
-# never had that option to begin with -- it's a plain string in the
-# spec, no field codes at all, absolute path or nothing. Both now get
-# the same treatment: a fixed __REPO_ROOT__ placeholder in the
-# committed file, replaced here with the real path. Rewriting this
-# every run is harmless (idempotent) and means there's no separate
-# manual step beyond running this script, matching Roast Telemetry.bat/
-# .command's zero-extra-steps experience on the other two platforms.
-# Skipped on WSL2/headless -- harmless there too (nothing reads this
-# file without a real desktop), just pointless.
+# --- Linux desktop launcher icon ---
+# "Roast Telemetry.desktop" self-locates via the Desktop Entry spec's
+# %k field code (location of the .desktop file itself), passed as a
+# trailing unquoted argument to `bash -c '...' bash %k` and read back
+# inside the script as $1 -- NOT interpolated directly into the quoted
+# script string the way an earlier version of this file did. That
+# distinction matters: the spec says field-code expansion inside a
+# quoted argument is undefined, and that's exactly what broke -- a real
+# file manager's "Execute in Terminal" path left a quoted %k
+# un-substituted entirely (confirmed live). As a trailing bare word
+# it's a normal, spec-compliant field-code position, verified working.
+#
+# Icon= has no such option -- it's a plain string in the spec, no field
+# codes at all, so it still needs the real absolute path written in
+# here, same as before. Rewriting this every run is harmless
+# (idempotent). Skipped on WSL2/headless -- harmless there too (nothing
+# reads this file without a real desktop), just pointless.
 if [[ "$IS_MAC" -eq 0 ]] && [[ -f "Roast Telemetry.desktop" ]]; then
-  REPO_ROOT_ABS="$(pwd)"
-  ICON_ABS="$REPO_ROOT_ABS/frontend/public/icon-256x256.png"
-  # Matches the cd "..." portion regardless of what's currently there --
-  # the committed placeholder on a first run, or a stale absolute path
-  # left over from a previous run at a different location (the repo got
-  # moved/re-cloned elsewhere) -- rather than only working the one time
-  # the placeholder is still literally present, same robustness Icon=
-  # below already has (always re-derived fresh, never "consumed once").
-  sed -i "s|cd \"[^\"]*\" && ./scripts/start.sh|cd \"$REPO_ROOT_ABS\" \&\& ./scripts/start.sh|" "Roast Telemetry.desktop"
+  ICON_ABS="$(pwd)/frontend/public/icon-256x256.png"
   if grep -q "^Icon=" "Roast Telemetry.desktop"; then
     sed -i "s|^Icon=.*|Icon=$ICON_ABS|" "Roast Telemetry.desktop"
   else

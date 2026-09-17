@@ -3,6 +3,6 @@ Type=Application
 Version=1.0
 Name=Roast Telemetry
 Comment=Install (if needed) and start the tray icon
-Exec=bash -c 'cd "__REPO_ROOT__" && ./scripts/start.sh; echo; read -p "Press Enter to close this window..." _'
+Exec=bash -c 'cd "$(dirname "$1")" && ./scripts/start.sh; echo; read -p "Press Enter to close this window..." _' bash %k
 Terminal=true
 Categories=Utility;
