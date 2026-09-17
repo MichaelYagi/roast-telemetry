@@ -10,7 +10,14 @@ $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
 function TrayDepsReady {
-    if (-not (Test-Path .venv)) { return $false }
+    # .venv\Scripts\python.exe specifically, not just the bare folder --
+    # a .venv can exist here without being a *Windows* venv (e.g. one
+    # left over from running scripts/install.sh under WSL2 in this same
+    # repo folder, which uses .venv/bin/python instead), and treating
+    # that as "ready" would crash the next line with a confusing
+    # PowerShell error instead of correctly routing through install.ps1
+    # below, which explains the actual problem.
+    if (-not (Test-Path .venv\Scripts\python.exe)) { return $false }
     & .\.venv\Scripts\python.exe -c "import pystray" 2>$null
     return ($LASTEXITCODE -eq 0)
 }
