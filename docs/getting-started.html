@@ -172,14 +172,36 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
     then comes straight here.
   </p>
   <p>
-    Right-click the icon for Start/Stop/Open in browser/Quit. Same
-    rebuild-frontend-on-start behavior as the terminal scripts above — a
-    color badge on the icon shows building (amber) / running (green) /
+    Right-click the icon for Start/Stop/Restart/Open in browser. A color
+    badge on the icon shows building (amber) / running (green) /
     stopped or crashed (gray/red) at a glance. The server's own output
     (started this way) goes to <code>backend/data/server.log</code>,
     appended across restarts, rather than to the console window, which
-    would otherwise lose it once closed.
+    would otherwise lose it once closed — <strong>Save logs...</strong>
+    copies it wherever you choose (e.g. to send someone for
+    troubleshooting).
   </p>
+  <p>
+    The menu also has:
+  </p>
+  <ul>
+    <li><strong>Port</strong> / <strong>Host</strong> — click either to
+      change it (a text prompt, defaulting to <code>7890</code> /
+      <code>127.0.0.1</code>). Saved permanently, and if the server's
+      already running, it restarts automatically so the change takes
+      effect right away. <code>127.0.0.1</code> means this computer
+      only; type <code>0.0.0.0</code> (or a specific address) for LAN
+      access — see the LAN-exposure notes on this page before doing
+      that for anything that actually controls a real roaster.</li>
+    <li><strong>Copy URL to clipboard</strong> — the address to paste
+      into another device's browser.</li>
+    <li><strong>Rebuild frontend on start</strong> (checkbox, on by
+      default) — same idea as <code>--skip-build</code> above, turn off
+      once you know your build is current for faster restarts.</li>
+    <li><strong>Launch at login</strong> (checkbox) — starts the tray
+      automatically next time you log in (Windows Startup folder / macOS
+      LaunchAgent / Linux autostart, whichever applies).</li>
+  </ul>
 
   <h2>Two ports (for frontend development)</h2>
   <p>

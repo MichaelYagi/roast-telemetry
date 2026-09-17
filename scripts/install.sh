@@ -97,6 +97,24 @@ if [[ -z "$PYTHON" ]]; then
 fi
 echo "Using $("$PYTHON" --version)"
 
+# --- tkinter (Linux only -- needed for scripts/tray_app.py's Port/Host/
+# save-logs dialogs). Debian/Ubuntu split this out of the main python3
+# package into python3-tk, so having Python itself doesn't guarantee
+# this is present the way it generally does on macOS/Windows -- a
+# separate check is needed regardless of whether the Python section
+# above just installed anything. ---
+if [[ "$IS_MAC" -eq 0 ]] && ! "$PYTHON" -c "import tkinter" 2>/dev/null; then
+  echo
+  echo "tkinter not found -- needed for the tray icon's Port/Host/save-logs dialogs (scripts/tray.sh), not the app itself."
+  if have apt-get; then
+    if ask "Install it now via 'sudo apt-get install -y python3-tk'?"; then
+      sudo apt-get install -y python3-tk
+    fi
+  else
+    echo "No apt-get found -- install your distro's tkinter package for Python 3, then re-run this script if you want the tray icon."
+  fi
+fi
+
 # --- Node.js / npm ---
 if ! have node || ! have npm; then
   echo
