@@ -175,7 +175,10 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
     Right-click the icon for Start/Stop/Open in browser/Quit. Same
     rebuild-frontend-on-start behavior as the terminal scripts above — a
     color badge on the icon shows building (amber) / running (green) /
-    stopped or crashed (gray/red) at a glance.
+    stopped or crashed (gray/red) at a glance. The server's own output
+    (started this way) goes to <code>backend/data/server.log</code>,
+    appended across restarts, rather than to the console window, which
+    would otherwise lose it once closed.
   </p>
 
   <h2>Two ports (for frontend development)</h2>
