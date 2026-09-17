@@ -187,25 +187,33 @@ echo
 echo "Installing frontend dependencies (npm install)..."
 (cd frontend && npm install)
 
-# --- Linux desktop launcher icon ---
-# "Roast Telemetry.desktop" self-locates via the Desktop Entry spec's
-# %k field code (location of the .desktop file itself), passed as a
-# trailing unquoted argument to `bash -c '...' bash %k` and read back
-# inside the script as $1 -- NOT interpolated directly into the quoted
-# script string the way an earlier version of this file did. That
-# distinction matters: the spec says field-code expansion inside a
-# quoted argument is undefined, and that's exactly what broke -- a real
-# file manager's "Execute in Terminal" path left a quoted %k
-# un-substituted entirely (confirmed live). As a trailing bare word
-# it's a normal, spec-compliant field-code position, verified working.
+# --- Linux desktop launcher paths ---
+# "Roast Telemetry.desktop" needs the repo's real absolute path baked
+# into both Exec= and Icon=. %k (the Desktop Entry spec's field code
+# for "location of this .desktop file") was tried twice -- embedded in
+# a quoted argument first, then correctly as a spec-compliant trailing
+# unquoted word (`bash -c '...' bash %k`, read back as $1) -- and both
+# failed on a real Raspberry Pi OS desktop (confirmed live, twice). The
+# second attempt was genuinely spec-compliant, so the conclusion isn't
+# "used it wrong" anymore, it's that this file manager's execution path
+# for this file (its Execute/Execute in Terminal/Open chooser
+# specifically) doesn't perform field-code substitution here at all,
+# regardless of how it's written. Not chasing %k further -- baking in
+# the real path directly has no such dependency on file-manager-
+# specific behavior.
 #
-# Icon= has no such option -- it's a plain string in the spec, no field
-# codes at all, so it still needs the real absolute path written in
-# here, same as before. Rewriting this every run is harmless
+# Both keys get the same treatment: Exec='s cd target and Icon= are
+# each matched by their current content (whatever that is -- the
+# committed placeholder on a first run, or a stale absolute path left
+# over from a previous run at a different location) and replaced with
+# the real path, so a moved/re-cloned repo gets fixed on the next run
+# too, not just handled once. Rewriting this every run is harmless
 # (idempotent). Skipped on WSL2/headless -- harmless there too (nothing
 # reads this file without a real desktop), just pointless.
 if [[ "$IS_MAC" -eq 0 ]] && [[ -f "Roast Telemetry.desktop" ]]; then
-  ICON_ABS="$(pwd)/frontend/public/icon-256x256.png"
+  REPO_ROOT_ABS="$(pwd)"
+  ICON_ABS="$REPO_ROOT_ABS/frontend/public/icon-256x256.png"
+  sed -i "s|cd \"[^\"]*\" && ./scripts/start.sh|cd \"$REPO_ROOT_ABS\" \&\& ./scripts/start.sh|" "Roast Telemetry.desktop"
   if grep -q "^Icon=" "Roast Telemetry.desktop"; then
     sed -i "s|^Icon=.*|Icon=$ICON_ABS|" "Roast Telemetry.desktop"
   else
