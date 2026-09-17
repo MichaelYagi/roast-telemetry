@@ -26,7 +26,10 @@ import pystray
 from PIL import Image, ImageDraw
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-ICON_PATH = REPO_ROOT / "frontend" / "public" / "icon-64x64.png"
+# A larger source than the tray actually needs (typically 16-32px) --
+# the OS downscales it, which looks crisp on a high-DPI/Retina tray;
+# starting from an already-tray-sized image looks soft by comparison.
+ICON_PATH = REPO_ROOT / "frontend" / "public" / "icon-256x256.png"
 PORT = 8000  # matches run-server.sh/ps1's own default; edit here to change it
 
 
