@@ -97,16 +97,29 @@ if [[ -z "$PYTHON" ]]; then
 fi
 echo "Using $("$PYTHON" --version)"
 
-# --- tkinter (Linux only -- needed for scripts/tray_app.py's Port/Host/
-# save-logs dialogs). Debian/Ubuntu split this out of the main python3
-# package into python3-tk, so having Python itself doesn't guarantee
-# this is present the way it generally does on macOS/Windows -- a
-# separate check is needed regardless of whether the Python section
-# above just installed anything. ---
-if [[ "$IS_MAC" -eq 0 ]] && ! "$PYTHON" -c "import tkinter" 2>/dev/null; then
+# --- tkinter -- needed for scripts/tray_app.py's Port/Host/save-logs
+# dialogs, not the app itself. Not guaranteed just because Python is
+# present, on either platform this section covers -- both split it out
+# of the main Python package: Debian/Ubuntu into python3-tk (apt),
+# Homebrew's python formula into a separate python-tk@X.Y formula
+# matching the installed Python's own minor version. Confirmed live:
+# a fresh Homebrew-installed Python on macOS raised "No module named
+# '_tkinter'" the first time the tray actually tried to start --
+# Homebrew's python formula doesn't bundle Tk support at all, so this
+# isn't a Linux-only gap the way it looked at first. ---
+if ! "$PYTHON" -c "import tkinter" 2>/dev/null; then
   echo
   echo "tkinter not found -- needed for the tray icon's Port/Host/save-logs dialogs (scripts/tray.sh), not the app itself."
-  if have apt-get; then
+  if [[ "$IS_MAC" -eq 1 ]]; then
+    PY_MINOR="$("$PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+    if have brew; then
+      if ask "Install it now via 'brew install python-tk@$PY_MINOR'?"; then
+        brew install "python-tk@$PY_MINOR"
+      fi
+    else
+      echo "Homebrew isn't available -- install python-tk@$PY_MINOR (or whatever matches your Python's own version) yourself if you want the tray icon."
+    fi
+  elif have apt-get; then
     if ask "Install it now via 'sudo apt-get install -y python3-tk'?"; then
       sudo apt-get install -y python3-tk
     fi
