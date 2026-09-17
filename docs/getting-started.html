@@ -45,6 +45,16 @@
     manager asking to confirm launching it ("Allow Launching" in
     GNOME) — normal for any unsigned script, only needed once.
   </div>
+  <div class="callout">
+    <strong>Linux specifically:</strong> unlike the Windows/macOS
+    launchers, <code>Roast Telemetry.desktop</code> can't fully
+    bootstrap itself from a completely fresh clone — it needs this
+    repo's real folder path written into it first, which only happens
+    once <code>scripts/install.sh</code> has actually run. So the very
+    first time, run <code>./scripts/install.sh</code> from a terminal
+    yourself; the double-click launcher works from then on (it doesn't
+    need to be re-run unless the repo folder moves).
+  </div>
 
   <h3 id="windows-powershell">Windows — PowerShell (native)</h3>
   <p>
