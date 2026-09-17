@@ -18,14 +18,15 @@ if ! .venv/bin/python -c "import pystray" 2>/dev/null; then
   exit 1
 fi
 
-# A separate check from the above -- tkinter doesn't come from
-# tray_requirements.txt (pystray/Pillow) at all, it's a system package
-# (python3-tk on Debian/Ubuntu, python-tk@X.Y via Homebrew on macOS --
-# confirmed live: a real Mac had pystray installed fine but no
-# tkinter, crashing tray_app.py on its first `import tkinter`), so
-# pip can't fix a missing one and the message has to say something
-# different.
-if ! .venv/bin/python -c "import tkinter" 2>/dev/null; then
+# A separate check from the above (Linux only) -- tkinter doesn't come
+# from tray_requirements.txt (pystray/Pillow) at all, it's a system
+# package (python3-tk on Debian/Ubuntu), so pip can't fix a missing one
+# and the message has to say something different. Not checked on
+# macOS: tray_app.py deliberately doesn't use tkinter there at all --
+# Tk 9.0 hard-crashes on a real Mac the instant it tries to create a
+# window (an upstream Tk/macOS bug, confirmed live), so macOS uses
+# osascript instead, which needs nothing this check would catch.
+if [[ "$(uname -s)" != "Darwin" ]] && ! .venv/bin/python -c "import tkinter" 2>/dev/null; then
   echo "tkinter isn't installed. Re-run scripts/install.sh, which knows how to fix this per-OS (apt/brew), then try again." >&2
   exit 1
 fi

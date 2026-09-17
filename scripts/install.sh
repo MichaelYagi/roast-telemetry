@@ -111,29 +111,20 @@ if [[ -z "$PYTHON" ]]; then
 fi
 echo "Using $("$PYTHON" --version)"
 
-# --- tkinter -- needed for scripts/tray_app.py's Port/Host/save-logs
-# dialogs, not the app itself. Not guaranteed just because Python is
-# present, on either platform this section covers -- both split it out
-# of the main Python package: Debian/Ubuntu into python3-tk (apt),
-# Homebrew's python formula into a separate python-tk@X.Y formula
-# matching the installed Python's own minor version. Confirmed live:
-# a fresh Homebrew-installed Python on macOS raised "No module named
-# '_tkinter'" the first time the tray actually tried to start --
-# Homebrew's python formula doesn't bundle Tk support at all, so this
-# isn't a Linux-only gap the way it looked at first. ---
-if ! "$PYTHON" -c "import tkinter" 2>/dev/null; then
+# --- tkinter (Linux only) -- needed for scripts/tray_app.py's
+# Port/Host/save-logs dialogs on Windows/Linux, not the app itself, and
+# not guaranteed just because Python is present -- Debian/Ubuntu split
+# it out of the main python3 package into python3-tk (apt). NOT checked
+# on macOS: tray_app.py deliberately doesn't use tkinter there at all
+# -- Tk 9.0 (via Homebrew's python-tk@X.Y, which this used to offer to
+# install) hard-crashes the whole process on a real Mac the instant it
+# tries to create a window (an upstream Tk/macOS bug, confirmed live),
+# so macOS uses osascript (AppleScript) instead, which needs nothing
+# from Homebrew at all. ---
+if [[ "$IS_MAC" -eq 0 ]] && ! "$PYTHON" -c "import tkinter" 2>/dev/null; then
   echo
   echo "tkinter not found -- needed for the tray icon's Port/Host/save-logs dialogs (scripts/tray.sh), not the app itself."
-  if [[ "$IS_MAC" -eq 1 ]]; then
-    PY_MINOR="$("$PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-    if have brew; then
-      if ask "Install it now via 'brew install python-tk@$PY_MINOR'?"; then
-        brew install "python-tk@$PY_MINOR"
-      fi
-    else
-      echo "Homebrew isn't available -- install python-tk@$PY_MINOR (or whatever matches your Python's own version) yourself if you want the tray icon."
-    fi
-  elif have apt-get; then
+  if have apt-get; then
     if ask "Install it now via 'sudo apt-get install -y python3-tk'?"; then
       sudo apt-get install -y python3-tk
     fi
