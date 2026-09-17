@@ -133,6 +133,32 @@ if [[ "$IS_MAC" -eq 0 ]] && ! "$PYTHON" -c "import tkinter" 2>/dev/null; then
   fi
 fi
 
+# --- AppIndicator/GTK bindings (Linux only) -- needed for the tray
+# MENU to actually work, not just the icon itself. Without python3-gi
+# + the AppIndicator GI typelib, pystray silently falls back to its own
+# plain Xorg backend, which -- confirmed live, not just documented --
+# shows the icon fine but implements no menu functionality at all (not
+# a click-detection bug; that backend just doesn't have one). Debian/
+# Ubuntu (Raspberry Pi OS included) package this as
+# gir1.2-appindicator3-0.1, though newer releases have moved to the
+# Ayatana fork under gir1.2-ayatanaappindicator3-0.1 -- tried in that
+# order, falling back to the second name if the first isn't in this
+# distro's repos.
+if [[ "$IS_MAC" -eq 0 ]] && have apt-get; then
+  if ! dpkg -s python3-gi gir1.2-gtk-3.0 >/dev/null 2>&1 || \
+     { ! dpkg -s gir1.2-appindicator3-0.1 >/dev/null 2>&1 && ! dpkg -s gir1.2-ayatanaappindicator3-0.1 >/dev/null 2>&1; }; then
+    echo
+    echo "AppIndicator GTK bindings not found -- without them, the tray icon shows up but its menu won't open at all."
+    if ask "Install them now via apt (python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1)?"; then
+      sudo apt-get update
+      if ! sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1; then
+        echo "gir1.2-appindicator3-0.1 not found -- trying the newer Ayatana package name instead..."
+        sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1
+      fi
+    fi
+  fi
+fi
+
 # --- Node.js / npm ---
 if ! have node || ! have npm; then
   echo
@@ -186,9 +212,23 @@ fi
 echo
 if [[ -d .venv ]]; then
   echo "Reusing existing .venv"
+  # Retrofit: an existing venv predating the --system-site-packages
+  # flag below won't have it -- flip pyvenv.cfg's own setting in place
+  # instead of requiring a full recreate. Needed on Linux specifically
+  # so the venv can actually see the AppIndicator GTK bindings just
+  # installed above -- python3-gi is a system package, tied to the
+  # system Python + GTK libraries, not something pip can install into
+  # an isolated venv the normal way.
+  if [[ "$IS_MAC" -eq 0 ]] && [[ -f .venv/pyvenv.cfg ]] && grep -q "^include-system-site-packages = false" .venv/pyvenv.cfg; then
+    sed -i "s|^include-system-site-packages = false|include-system-site-packages = true|" .venv/pyvenv.cfg
+  fi
 else
   echo "Creating .venv..."
-  "$PYTHON" -m venv .venv
+  if [[ "$IS_MAC" -eq 0 ]]; then
+    "$PYTHON" -m venv --system-site-packages .venv
+  else
+    "$PYTHON" -m venv .venv
+  fi
 fi
 echo "Installing backend dependencies..."
 .venv/bin/pip install --upgrade pip >/dev/null
