@@ -79,6 +79,8 @@ if (Test-Path .venv) {
 Write-Host "Installing backend dependencies..."
 & .venv\Scripts\python.exe -m pip install --upgrade pip | Out-Null
 & .venv\Scripts\pip.exe install -r backend\requirements.txt
+Write-Host "Installing tray icon dependencies..."
+& .venv\Scripts\pip.exe install -r scripts\tray_requirements.txt
 
 # --- Frontend deps ---
 Write-Host ""
@@ -110,4 +112,5 @@ if (-not $wslAvailable) {
 Write-Host ""
 Write-Host "Done. Next:"
 Write-Host "  scripts\run-server.ps1               # build + start the app at http://localhost:8000"
+Write-Host "  scripts\tray.ps1                     # optional -- a tray icon instead of the terminal"
 Write-Host "  scripts\fake-hardware.sh fz94 --tcp  # optional, run from WSL2 -- test without real hardware"

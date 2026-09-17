@@ -30,6 +30,18 @@
   </p>
 
   <h2 id="setup-and-run">Setup &amp; run</h2>
+  <div class="callout">
+    <strong>Windows or macOS, prefer not to type commands at all?</strong>
+    Double-click <strong>Install Roast Telemetry.bat</strong> (Windows) /
+    <strong>Install Roast Telemetry.command</strong> (macOS) in the
+    repo's root folder — same install script as below, just launched
+    without opening a terminal yourself. A first double-click on macOS
+    may show a Gatekeeper warning ("cannot be opened because the
+    developer cannot be verified") — right-click → Open once to bypass
+    it, only needed the first time. See
+    <a href="#tray-icon">Tray icon</a> below for the equivalent
+    double-click way to start/stop the server afterward.
+  </div>
 
   <h3 id="windows-powershell">Windows — PowerShell (native)</h3>
   <p>
@@ -147,11 +159,18 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
     click, instead of a terminal command — works on Windows, macOS, and a
     real Linux desktop (not WSL2, which has no tray without WSLg; WSL2's
     own role stays the terminal-based install/fake-hardware workflow
-    above, unchanged). One-time setup on top of the regular install
-    script:
+    above, unchanged). <code>scripts/install.sh</code>/<code>install.ps1</code>
+    already install its dependencies (<code>pystray</code>, Pillow) by
+    default, so there's no separate setup step — just run it:
   </p>
-  <pre><code>.venv/bin/pip install -r scripts/tray_requirements.txt   # Windows: .venv\Scripts\pip.exe
-scripts/tray.sh                                           # Windows: scripts\tray.ps1</code></pre>
+  <pre><code>scripts/tray.sh      # Windows: scripts\tray.ps1</code></pre>
+  <p>
+    Or on Windows/macOS, double-click
+    <strong>Start Tray Icon.bat</strong> /
+    <strong>Start Tray Icon.command</strong> in the repo's root folder —
+    same thing, no terminal needed (see the double-click launchers
+    callout above).
+  </p>
   <p>
     Right-click the icon for Start/Stop/Open in browser/Quit. Same
     rebuild-frontend-on-start behavior as the terminal scripts above — a

@@ -134,6 +134,12 @@ fi
 echo "Installing backend dependencies..."
 .venv/bin/pip install --upgrade pip >/dev/null
 .venv/bin/pip install -r backend/requirements.txt
+# Tray icon deps too (pystray/Pillow) -- installs fine even on a
+# headless/WSL2 box with no display (pure Python packages, no X server
+# needed until scripts/tray.sh actually *runs*), so there's no reason to
+# gate this behind a prompt or a separate step; see scripts/tray_app.py.
+echo "Installing tray icon dependencies..."
+.venv/bin/pip install -r scripts/tray_requirements.txt
 
 # --- Frontend deps ---
 echo
@@ -143,4 +149,5 @@ echo "Installing frontend dependencies (npm install)..."
 echo
 echo "Done. Next:"
 echo "  scripts/run-server.sh          # build + start the app at http://localhost:8000"
+echo "  scripts/tray.sh                # optional -- a tray icon instead of the terminal (needs a real desktop, not WSL2)"
 echo "  scripts/fake-hardware.sh fz94  # optional -- test without real hardware"
