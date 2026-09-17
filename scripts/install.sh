@@ -58,6 +58,20 @@ if [[ "$IS_MAC" -eq 1 ]] && ! have brew; then
   echo
 fi
 
+# Apple Silicon quirk: if this shell is itself running under Rosetta 2
+# (x86_64 translation) but Homebrew is the native-ARM install (the
+# default, /opt/homebrew), brew refuses to install anything at all --
+# confirmed live: "Cannot install under Rosetta 2 in ARM default
+# prefix (/opt/homebrew)!", with the fix being to prefix every brew
+# invocation with `arch -arm64`. Wrapping brew itself here (resolved to
+# its real path first, so the wrapper doesn't just call itself) means
+# every brew install call below (Python, node, socat, python-tk) gets
+# this fix for free, not just whichever one happened to be hit first.
+if [[ "$IS_MAC" -eq 1 ]] && have brew && [[ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" == "1" ]]; then
+  BREW_BIN="$(command -v brew)"
+  brew() { arch -arm64 "$BREW_BIN" "$@"; }
+fi
+
 # --- Python 3.10+ ---
 PYTHON=""
 for candidate in python3 python; do
