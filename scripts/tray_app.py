@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import queue
 import shutil
 import subprocess
 import sys
@@ -137,56 +138,48 @@ def _badge(base: Image.Image, color: str) -> Image.Image:
 
 
 # -- Dialogs -----------------------------------------------------------
-# tkinter is used for the text-entry/save-file dialogs -- a short-lived
-# hidden root is created fresh per dialog rather than one kept alive
-# for the tray's whole lifetime; simpledialog/filedialog's own calls run
-# their own small internal loop and return synchronously, so this
-# doesn't need to fight pystray's own event loop for the "real" mainloop.
-#
-# Known, disclosed risk: pystray invokes menu actions (and so these
-# dialogs) on its own worker thread, not the thread that called
-# icon.run(). tkinter is documented as main-thread-only on macOS (same
-# restriction pystray's own Cocoa backend has) -- this is the common
-# workaround pattern for small pystray+tkinter tools and works in
-# practice on Windows/Linux, but isn't verified here on macOS (no
-# macOS in this environment). Worth a real test there.
-def _ask_string(prompt: str, initial: str) -> str | None:
-    import tkinter as tk
+# tkinter needs to be driven from one consistent thread -- confirmed
+# live, not just a theoretical risk: creating a throwaway tk.Tk() root
+# inside a pystray menu callback (pystray runs each callback on its own
+# fresh worker thread, never the thread that called icon.run()) produced
+# a dialog that rendered but never responded to clicks or even its own
+# close button. TrayApp.run() below now creates one persistent hidden
+# root on the real main thread and runs pystray detached instead
+# (icon.run_detached()) so that thread is free to run Tk's own
+# mainloop(); every dialog call is marshaled onto that thread via
+# TrayApp._run_on_main_thread rather than touching tkinter from
+# wherever pystray happened to invoke the callback. These two functions
+# just take that shared root as a parameter -- by the time they're
+# called (always from inside _run_on_main_thread's wrapper) they're
+# already running on the right thread.
+def _ask_string(root, prompt: str, initial: str) -> str | None:
     from tkinter import simpledialog
 
-    root = tk.Tk()
-    root.withdraw()
-    try:
-        return simpledialog.askstring("Roast Telemetry", prompt, initialvalue=initial, parent=root)
-    finally:
-        root.destroy()
+    return simpledialog.askstring("Roast Telemetry", prompt, initialvalue=initial, parent=root)
 
 
-def _ask_save_path(initial_name: str) -> str | None:
-    import tkinter as tk
+def _ask_save_path(root, initial_name: str) -> str | None:
     from tkinter import filedialog
 
-    root = tk.Tk()
-    root.withdraw()
-    try:
-        path = filedialog.asksaveasfilename(
-            title="Save Roast Telemetry logs", initialfile=initial_name, defaultextension=".log", parent=root
-        )
-        return path or None
-    finally:
-        root.destroy()
+    path = filedialog.asksaveasfilename(
+        title="Save Roast Telemetry logs", initialfile=initial_name, defaultextension=".log", parent=root
+    )
+    return path or None
 
 
-def _copy_to_clipboard(text: str) -> bool:
+def _copy_to_clipboard(text: str, root) -> bool:
     """True on success. Prefers each OS's own dedicated clipboard tool
     (clip/pbcopy -- always present, zero new dependency, a single
     stdin-piping subprocess call, nothing to get wrong) over tkinter's
-    own clipboard, which is unreliable on Linux/X11 specifically: X11's
-    clipboard model only keeps content available while the owning
-    window/process is still alive unless a clipboard manager is
-    running, which a briefly-created-then-destroyed Tk root defeats.
-    tkinter is only the last-resort fallback, for Linux without
-    xclip/xsel/wl-copy installed."""
+    own clipboard, which is only the last-resort fallback for Linux
+    without xclip/xsel/wl-copy installed. Takes the shared persistent
+    root (see the dialogs comment above) rather than creating its own --
+    besides the same cross-thread issue every other dialog here had,
+    reusing the persistent root actually makes the X11 fallback *more*
+    reliable than a throwaway one would be: X11's clipboard only stays
+    available while the owning window is alive unless a clipboard
+    manager is running, and this root lives for the tray's whole
+    session, not just for one call."""
     system = platform.system()
     try:
         if system == "Windows":
@@ -204,15 +197,9 @@ def _copy_to_clipboard(text: str) -> bool:
         pass
 
     try:
-        import tkinter as tk
-
-        root = tk.Tk()
-        root.withdraw()
         root.clipboard_clear()
         root.clipboard_append(text)
         root.update()
-        root.after(200, root.destroy)  # give the clipboard a moment to actually take before tearing the window down
-        root.mainloop()
         return True
     except Exception:
         return False
@@ -313,6 +300,11 @@ class TrayApp:
         self.proc: subprocess.Popen | None = None
         self.log_file = None
         self.config = load_config()
+        # Set in run(), on the real main thread -- see this module's
+        # dialogs comment for why every tkinter call has to go through
+        # this one root via _run_on_main_thread rather than being
+        # touched from wherever pystray happened to invoke a callback.
+        self._tk_root = None
 
         base = Image.open(ICON_PATH)
         self.icon_idle = base.convert("RGBA")
@@ -356,6 +348,29 @@ class TrayApp:
         # already in use, etc.) between clicks, not just an explicit Stop,
         # since nothing else here polls the subprocess continuously.
         return self.proc is not None and self.proc.poll() is None
+
+    def _run_on_main_thread(self, func):
+        """Runs func() on the thread that owns self._tk_root (see run()
+        below) and blocks the caller -- always a pystray callback thread
+        -- until it finishes, returning its result (or re-raising its
+        exception). This is what actually fixes the unresponsive-dialog
+        bug: tk.after(0, ...) is tkinter's own thread-safe way to
+        schedule work onto the thread running its mainloop, and the
+        queue is just how the result gets back to the calling thread
+        synchronously, since after() itself doesn't return one."""
+        result: queue.Queue = queue.Queue(maxsize=1)
+
+        def wrapper():
+            try:
+                result.put((True, func()))
+            except Exception as exc:  # noqa: BLE001 -- re-raised on the caller's own thread below, not swallowed
+                result.put((False, exc))
+
+        self._tk_root.after(0, wrapper)
+        ok, value = result.get()
+        if not ok:
+            raise value
+        return value
 
     def _set_status(self, image: Image.Image, title: str) -> None:
         self.icon.icon = image
@@ -451,7 +466,7 @@ class TrayApp:
         if not self.is_running():
             return
         url = f"http://{self.config['host']}:{self.config['port']}"
-        if _copy_to_clipboard(url):
+        if self._run_on_main_thread(lambda: _copy_to_clipboard(url, self._tk_root)):
             self._notify(f"Copied {url}")
         else:
             self._notify(f"Couldn't copy automatically -- the URL is {url}")
@@ -460,7 +475,7 @@ class TrayApp:
         if not LOG_PATH.exists():
             self._notify("No logs yet -- start the server at least once first.")
             return
-        dest = _ask_save_path("roast-telemetry-server.log")
+        dest = self._run_on_main_thread(lambda: _ask_save_path(self._tk_root, "roast-telemetry-server.log"))
         if not dest:
             return  # cancelled
         try:
@@ -481,7 +496,7 @@ class TrayApp:
             self.restart()
 
     def change_port(self, _icon=None, _item=None) -> None:
-        value = _ask_string("Port number:", str(self.config["port"]))
+        value = self._run_on_main_thread(lambda: _ask_string(self._tk_root, "Port number:", str(self.config["port"])))
         if value is None:
             return  # cancelled
         try:
@@ -495,7 +510,9 @@ class TrayApp:
         self._apply_setting_change()
 
     def change_host(self, _icon=None, _item=None) -> None:
-        value = _ask_string("Host/IP (127.0.0.1 = this computer only, 0.0.0.0 = your whole LAN):", self.config["host"])
+        value = self._run_on_main_thread(
+            lambda: _ask_string(self._tk_root, "Host/IP (127.0.0.1 = this computer only, 0.0.0.0 = your whole LAN):", self.config["host"])
+        )
         if not value:
             return  # cancelled or cleared
         self.config["host"] = value.strip()
@@ -520,9 +537,27 @@ class TrayApp:
     def quit(self, _icon=None, _item=None) -> None:
         self.stop()
         self.icon.stop()
+        # root.quit() has to run on the thread that owns the root too --
+        # it's what makes root.mainloop() in run() below actually return,
+        # which is what lets the process exit. Marshaled the same way as
+        # every dialog call, but fire-and-forget (no result needed).
+        self._tk_root.after(0, self._tk_root.quit)
 
     def run(self) -> None:
-        self.icon.run()
+        # icon.run_detached() runs pystray's own event loop (and so
+        # every menu callback) on a background thread instead of this
+        # one, freeing this thread -- the real main thread -- to run
+        # tkinter's mainloop() instead. See the module-level dialogs
+        # comment: tkinter needs to be driven from one consistent
+        # thread, confirmed live by a dialog that rendered but never
+        # responded to input when created from wherever pystray
+        # happened to invoke a callback.
+        import tkinter as tk
+
+        self._tk_root = tk.Tk()
+        self._tk_root.withdraw()
+        self.icon.run_detached()
+        self._tk_root.mainloop()
 
 
 if __name__ == "__main__":
