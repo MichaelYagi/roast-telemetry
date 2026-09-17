@@ -35,6 +35,29 @@ ask() {
 echo "== Roast Telemetry setup =="
 echo
 
+# --- Homebrew (macOS only) -- bootstraps itself if missing, so it's not
+# a prerequisite you have to already have; everything below (Python/
+# Node/socat) leans on `have brew` and just quietly skips its own
+# offer if this was declined or failed, same as always. ---
+if [[ "$IS_MAC" -eq 1 ]] && ! have brew; then
+  echo "Homebrew not found -- needed to install Python/Node/socat automatically on macOS."
+  if ask "Install Homebrew now via its official installer (https://brew.sh)?"; then
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # A fresh install isn't on PATH yet in this shell -- Homebrew's own
+    # installer prints the permanent fix (add this to your shell
+    # profile) at the end, but this script still needs `brew` usable
+    # for the rest of *this* run. Apple Silicon -> /opt/homebrew, Intel
+    # -> /usr/local -- the two locations the installer itself picks
+    # based on CPU architecture.
+    if [[ -x /opt/homebrew/bin/brew ]]; then
+      eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [[ -x /usr/local/bin/brew ]]; then
+      eval "$(/usr/local/bin/brew shellenv)"
+    fi
+  fi
+  echo
+fi
+
 # --- Python 3.10+ ---
 PYTHON=""
 for candidate in python3 python; do
@@ -53,7 +76,7 @@ if [[ -z "$PYTHON" ]]; then
         have python3 && PYTHON=python3
       fi
     else
-      echo "Homebrew isn't installed either -- install it from https://brew.sh, then re-run this script."
+      echo "Homebrew still isn't available (declined above, or its install failed) -- install it from https://brew.sh, then re-run this script."
     fi
   else
     if have apt-get; then
@@ -84,7 +107,7 @@ if ! have node || ! have npm; then
         brew install node
       fi
     else
-      echo "Homebrew isn't installed either -- install it from https://brew.sh, then re-run this script."
+      echo "Homebrew still isn't available (declined above, or its install failed) -- install it from https://brew.sh, then re-run this script."
     fi
   else
     if have apt-get; then
