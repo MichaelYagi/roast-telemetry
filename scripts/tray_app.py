@@ -138,32 +138,74 @@ def _badge(base: Image.Image, color: str) -> Image.Image:
 
 
 # -- Dialogs -----------------------------------------------------------
-# tkinter needs to be driven from one consistent thread -- confirmed
-# live, not just a theoretical risk: creating a throwaway tk.Tk() root
-# inside a pystray menu callback (pystray runs each callback on its own
-# fresh worker thread, never the thread that called icon.run()) produced
-# a dialog that rendered but never responded to clicks or even its own
-# close button. TrayApp.run() below now creates one persistent hidden
-# root on the real main thread and runs pystray detached instead
-# (icon.run_detached()) so that thread is free to run Tk's own
-# mainloop(); every dialog call is marshaled onto that thread via
-# TrayApp._run_on_main_thread rather than touching tkinter from
-# wherever pystray happened to invoke the callback. These two functions
-# just take that shared root as a parameter -- by the time they're
-# called (always from inside _run_on_main_thread's wrapper) they're
-# already running on the right thread.
+# Windows/Linux: tkinter, marshaled onto one consistent thread -- see
+# TrayApp.run()/_run_on_main_thread. Confirmed live, not just a
+# theoretical risk: creating a throwaway tk.Tk() root inside a pystray
+# menu callback (pystray runs each callback on its own fresh worker
+# thread, never the thread that called icon.run()) produced a dialog
+# that rendered but never responded to clicks or even its own close
+# button -- fixed by always driving tkinter from one persistent root on
+# the real main thread instead.
+#
+# macOS: NOT tkinter at all, deliberately -- confirmed live, a real Mac
+# hard-crashed the whole process (NSInvalidArgumentException inside
+# Tk's own Cocoa color-handling code, `libtcl9tk9.0.dylib`) the instant
+# tk.Tk() tried to create a window. This is Tk 9.0 (via Homebrew's
+# python-tk@X.Y) itself, an upstream Tk/macOS compatibility bug, not
+# something fixable from here. Uses `osascript` (AppleScript) instead --
+# a separate process per call, so it has no shared-GUI-toolkit state
+# and no cross-thread concern either, unlike tkinter.
 def _ask_string(root, prompt: str, initial: str) -> str | None:
+    if platform.system() == "Darwin":
+        return _osascript_ask_string(prompt, initial)
     from tkinter import simpledialog
 
     return simpledialog.askstring("Roast Telemetry", prompt, initialvalue=initial, parent=root)
 
 
 def _ask_save_path(root, initial_name: str) -> str | None:
+    if platform.system() == "Darwin":
+        return _osascript_ask_save_path(initial_name)
     from tkinter import filedialog
 
     path = filedialog.asksaveasfilename(
         title="Save Roast Telemetry logs", initialfile=initial_name, defaultextension=".log", parent=root
     )
+    return path or None
+
+
+def _applescript_escape(s: str) -> str:
+    # AppleScript string literals: backslash and double-quote both need
+    # escaping, backslash first so it doesn't double-escape the quotes'
+    # own backslashes.
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _osascript_ask_string(prompt: str, initial: str) -> str | None:
+    script = (
+        f'display dialog "{_applescript_escape(prompt)}" '
+        f'default answer "{_applescript_escape(initial)}" with title "Roast Telemetry"'
+    )
+    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    if result.returncode != 0:
+        return None  # Cancel (or anything else non-zero) -- same "cancelled" meaning callers already expect
+    # stdout looks like "text returned:VALUE, button returned:OK"
+    out = result.stdout.strip()
+    marker = "text returned:"
+    if marker not in out:
+        return None
+    return out.split(marker, 1)[1].rsplit(", button returned:", 1)[0]
+
+
+def _osascript_ask_save_path(initial_name: str) -> str | None:
+    script = (
+        f'POSIX path of (choose file name with prompt "Save Roast Telemetry logs" '
+        f'default name "{_applescript_escape(initial_name)}")'
+    )
+    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    if result.returncode != 0:
+        return None  # Cancel
+    path = result.stdout.strip()
     return path or None
 
 
@@ -357,7 +399,15 @@ class TrayApp:
         bug: tk.after(0, ...) is tkinter's own thread-safe way to
         schedule work onto the thread running its mainloop, and the
         queue is just how the result gets back to the calling thread
-        synchronously, since after() itself doesn't return one."""
+        synchronously, since after() itself doesn't return one.
+
+        On macOS, self._tk_root is never set (see run()) -- dialogs
+        there are osascript subprocess calls instead of tkinter, with
+        no shared GUI-toolkit state and so no thread to marshal onto in
+        the first place, so this just calls func() directly."""
+        if self._tk_root is None:
+            return func()
+
         result: queue.Queue = queue.Queue(maxsize=1)
 
         def wrapper():
@@ -537,13 +587,28 @@ class TrayApp:
     def quit(self, _icon=None, _item=None) -> None:
         self.stop()
         self.icon.stop()
-        # root.quit() has to run on the thread that owns the root too --
-        # it's what makes root.mainloop() in run() below actually return,
-        # which is what lets the process exit. Marshaled the same way as
-        # every dialog call, but fire-and-forget (no result needed).
-        self._tk_root.after(0, self._tk_root.quit)
+        if self._tk_root is not None:
+            # root.quit() has to run on the thread that owns the root
+            # too -- it's what makes root.mainloop() in run() below
+            # actually return, which is what lets the process exit.
+            # Marshaled the same way as every dialog call, but
+            # fire-and-forget (no result needed). Not applicable on
+            # macOS -- no root there at all (see run()), and
+            # icon.stop() alone is enough to end the plain icon.run()
+            # call below.
+            self._tk_root.after(0, self._tk_root.quit)
 
     def run(self) -> None:
+        if platform.system() == "Darwin":
+            # No tkinter on macOS at all -- see the module-level
+            # dialogs comment for why (a real, confirmed hard crash in
+            # Tk 9.0's own Cocoa integration, not fixable from here).
+            # Dialogs use osascript instead, which needs no Tk root and
+            # no thread-marshaling, so this can just run pystray
+            # directly -- no detached-thread/mainloop combo needed.
+            self.icon.run()
+            return
+
         # icon.run_detached() runs pystray's own event loop (and so
         # every menu callback) on a background thread instead of this
         # one, freeing this thread -- the real main thread -- to run
