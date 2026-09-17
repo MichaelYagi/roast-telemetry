@@ -187,6 +187,26 @@ echo
 echo "Installing frontend dependencies (npm install)..."
 (cd frontend && npm install)
 
+# --- Linux desktop launcher icon ---
+# "Roast Telemetry.desktop"'s Exec= line self-locates the repo via the
+# %k field code (same trick run-server.sh's own dirname-based anchoring
+# uses, just spelled the .desktop-file way) -- but Icon= has no field
+# codes in the Desktop Entry spec, it's a plain string, so it needs the
+# real absolute path written in up front. Rewriting this every run is
+# harmless (idempotent) and means there's no separate manual step
+# beyond running this script, matching Roast Telemetry.bat/.command's
+# zero-extra-steps experience on the other two platforms. Skipped on
+# WSL2/headless -- harmless there too (nothing reads this file without
+# a real desktop), just pointless.
+if [[ "$IS_MAC" -eq 0 ]] && [[ -f "Roast Telemetry.desktop" ]]; then
+  ICON_ABS="$(pwd)/frontend/public/icon-256x256.png"
+  if grep -q "^Icon=" "Roast Telemetry.desktop"; then
+    sed -i "s|^Icon=.*|Icon=$ICON_ABS|" "Roast Telemetry.desktop"
+  else
+    sed -i "/^Exec=/a Icon=$ICON_ABS" "Roast Telemetry.desktop"
+  fi
+fi
+
 echo
 echo "Done. Next:"
 echo "  scripts/run-server.sh          # build + start the app at http://localhost:8000"

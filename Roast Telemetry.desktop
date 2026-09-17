@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Roast Telemetry
+Comment=Install (if needed) and start the tray icon
+Exec=bash -c 'cd "$(dirname "%k")" && ./scripts/start.sh'
+Terminal=true
+Categories=Utility;
