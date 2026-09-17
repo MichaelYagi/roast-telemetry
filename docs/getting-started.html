@@ -141,6 +141,24 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
     by hand every time.
   </div>
 
+  <h2 id="tray-icon">Tray icon (optional)</h2>
+  <p>
+    A system tray / menu-bar icon that starts and stops the server with a
+    click, instead of a terminal command — works on Windows, macOS, and a
+    real Linux desktop (not WSL2, which has no tray without WSLg; WSL2's
+    own role stays the terminal-based install/fake-hardware workflow
+    above, unchanged). One-time setup on top of the regular install
+    script:
+  </p>
+  <pre><code>.venv/bin/pip install -r scripts/tray_requirements.txt   # Windows: .venv\Scripts\pip.exe
+scripts/tray.sh                                           # Windows: scripts\tray.ps1</code></pre>
+  <p>
+    Right-click the icon for Start/Stop/Open in browser/Quit. Same
+    rebuild-frontend-on-start behavior as the terminal scripts above — a
+    color badge on the icon shows building (amber) / running (green) /
+    stopped or crashed (gray/red) at a glance.
+  </p>
+
   <h2>Two ports (for frontend development)</h2>
   <p>
     Use this instead when you're actively editing the frontend and want

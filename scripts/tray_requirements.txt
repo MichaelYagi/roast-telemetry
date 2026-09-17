@@ -1,0 +1,6 @@
+# Only for scripts/tray_app.py -- kept separate from backend/requirements.txt
+# so a headless server deployment (no desktop at all) never needs GUI
+# dependencies it can't use. Install into the same .venv as everything
+# else: .venv/bin/pip install -r scripts/tray_requirements.txt
+pystray>=0.19
+Pillow>=10.0
