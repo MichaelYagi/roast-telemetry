@@ -77,10 +77,10 @@ if (Test-Path .venv) {
     python -m venv .venv
 }
 Write-Host "Installing backend dependencies..."
-& .venv\Scripts\python.exe -m pip install --upgrade pip | Out-Null
-& .venv\Scripts\pip.exe install -r backend\requirements.txt
+& .\.venv\Scripts\python.exe -m pip install --upgrade pip | Out-Null
+& .\.venv\Scripts\pip.exe install -r backend\requirements.txt
 Write-Host "Installing tray icon dependencies..."
-& .venv\Scripts\pip.exe install -r scripts\tray_requirements.txt
+& .\.venv\Scripts\pip.exe install -r scripts\tray_requirements.txt
 
 # --- Frontend deps ---
 Write-Host ""

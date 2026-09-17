@@ -7,7 +7,7 @@
 # a Windows Python, not the WSL .venv directory -- the two aren't
 # interchangeable, their executables target different platforms):
 #   python -m venv .venv
-#   .venv\Scripts\Activate.ps1
+#   .\.venv\Scripts\Activate.ps1
 #   pip install -r backend\requirements.txt
 #   cd frontend; npm install; cd ..
 #
@@ -46,4 +46,4 @@ $env:PYTHONPATH = "."
 Write-Host "Starting Roast Telemetry on http://localhost:$Port (Ctrl+C to stop)"
 $uvicornArgs = @("backend.app.main:app", "--port", $Port)
 if ($Reload) { $uvicornArgs += "--reload" }
-& .venv\Scripts\uvicorn.exe @uvicornArgs
+& .\.venv\Scripts\uvicorn.exe @uvicornArgs

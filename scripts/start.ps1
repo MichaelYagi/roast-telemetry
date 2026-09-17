@@ -11,7 +11,7 @@ Set-Location (Split-Path $PSScriptRoot -Parent)
 
 function TrayDepsReady {
     if (-not (Test-Path .venv)) { return $false }
-    & .venv\Scripts\python.exe -c "import pystray" 2>$null
+    & .\.venv\Scripts\python.exe -c "import pystray" 2>$null
     return ($LASTEXITCODE -eq 0)
 }
 

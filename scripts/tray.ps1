@@ -9,12 +9,12 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
-& .venv\Scripts\python.exe -c "import pystray" 2>$null
+& .\.venv\Scripts\python.exe -c "import pystray" 2>$null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Tray dependencies aren't installed yet. Run this once:" -ForegroundColor Red
-    Write-Host "    .venv\Scripts\pip.exe install -r scripts\tray_requirements.txt"
+    Write-Host "    .\.venv\Scripts\pip.exe install -r scripts\tray_requirements.txt"
     Write-Host "(or just re-run scripts\install.ps1, which installs this by default now)"
     exit 1
 }
 
-& .venv\Scripts\python.exe scripts\tray_app.py
+& .\.venv\Scripts\python.exe scripts\tray_app.py
