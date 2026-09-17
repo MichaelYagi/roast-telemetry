@@ -19,6 +19,15 @@ function TrayDepsReady {
     # below, which explains the actual problem.
     if (-not (Test-Path .venv\Scripts\python.exe)) { return $false }
     & .\.venv\Scripts\python.exe -c "import pystray" 2>$null
+    if ($LASTEXITCODE -ne 0) { return $false }
+    # pystray and tkinter are two separate dependencies (tkinter doesn't
+    # come from pystray/Pillow at all) -- checked independently so a
+    # .venv with pystray already installed but tkinter missing (the
+    # real bug found on macOS's Homebrew Python, which splits Tk support
+    # into its own formula -- see install.sh) doesn't read as "ready"
+    # here too and skip straight to a crash in tray.ps1 instead of
+    # routing through install.ps1.
+    & .\.venv\Scripts\python.exe -c "import tkinter" 2>$null
     return ($LASTEXITCODE -eq 0)
 }
 

@@ -17,4 +17,17 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# A separate check -- tkinter doesn't come from tray_requirements.txt
+# (pystray/Pillow) at all, it's bundled with the Python installer
+# itself (usually on by default, but not guaranteed for every Python
+# install) -- pip can't fix a missing one, so the message has to say
+# something different. See install.sh's own macOS/Linux equivalent of
+# this check -- confirmed live on a real Mac that this gap is real,
+# not just theoretical.
+& .\.venv\Scripts\python.exe -c "import tkinter" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "tkinter isn't installed for this Python. Reinstall Python from https://python.org with the 'tcl/tk' option checked, then try again." -ForegroundColor Red
+    exit 1
+}
+
 & .\.venv\Scripts\python.exe scripts\tray_app.py
