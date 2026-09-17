@@ -121,6 +121,10 @@ export default function RoastDetailView() {
               <span>Mode</span>
               <span>{MODE_LABELS[roast.mode] || roast.mode}</span>
             </li>
+            <li>
+              <span>Roasted by</span>
+              <span>{roast.created_by_username || "—"}</span>
+            </li>
             {roast.mode === "alog_playback" && (
               <>
                 <li>

@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS roasts (
     duration_s REAL,
     alog_path TEXT,
     source_alog_path TEXT,
-    playback_speed REAL
+    playback_speed REAL,
+    created_by_username TEXT
 );
 
 CREATE TABLE IF NOT EXISTS roast_presets (
@@ -132,6 +133,15 @@ def init_db() -> None:
             c.execute("ALTER TABLE roasts ADD COLUMN source_alog_path TEXT")
         if "playback_speed" not in existing_cols:
             c.execute("ALTER TABLE roasts ADD COLUMN playback_speed REAL")
+        # Username, not user_id -- usernames are immutable (no rename
+        # endpoint exists) and this is meant as a permanent historical
+        # record, so it should survive the account itself being deleted
+        # later rather than going stale/dangling like a foreign key would.
+        # NULL for every roast created before this column existed, and for
+        # any deleted-user's old roasts if that matters someday -- both
+        # read back as "no attribution", not an error.
+        if "created_by_username" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN created_by_username TEXT")
         # Idempotent migration for DBs created before roast_presets carried
         # control-channel starting values.
         preset_cols = {row[1] for row in c.execute("PRAGMA table_info(roast_presets)")}
@@ -158,11 +168,12 @@ def insert_roast(summary: dict) -> None:
         c.execute(
             """INSERT INTO roasts
                (id, title, mode, status, created_at, beans,
-                weight_green_g, weight_roasted_g, duration_s, alog_path, source_alog_path, playback_speed)
+                weight_green_g, weight_roasted_g, duration_s, alog_path, source_alog_path, playback_speed,
+                created_by_username)
                VALUES (:id, :title, :mode, :status, :created_at, :beans,
                        :weight_green_g, :weight_roasted_g, :duration_s, :alog_path, :source_alog_path,
-                       :playback_speed)""",
-            {"source_alog_path": None, "playback_speed": None, **summary},
+                       :playback_speed, :created_by_username)""",
+            {"source_alog_path": None, "playback_speed": None, "created_by_username": None, **summary},
         )
 
 

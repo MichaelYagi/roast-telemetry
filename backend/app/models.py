@@ -406,6 +406,11 @@ class RoastSummary(BaseModel):
     weight_roasted_g: Optional[float] = None
     duration_s: Optional[float] = None
     alog_path: Optional[str] = None
+    # Whoever was logged in when this roast was created/imported -- a
+    # username, not a user_id, so it stays meaningful even if that account
+    # is later deleted (see storage.py's migration comment). None for any
+    # roast recorded before this field existed.
+    created_by_username: Optional[str] = None
     # alog_playback mode only: the server-side file being replayed (distinct
     # from `alog_path`, which is where *this* roast's own recording gets
     # saved) and the speed it was started at.

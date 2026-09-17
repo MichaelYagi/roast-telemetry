@@ -49,3 +49,53 @@ def test_simulator_mode_still_creates_and_starts_atomically(client):
     assert any(r["id"] == body["id"] for r in resp.json())
 
     client.post(f"/api/roasts/{body['id']}/stop")
+
+
+def test_roast_records_which_user_created_it(client):
+    """The `client` fixture's auto-registered admin is "test-admin" (see
+    conftest.py) -- create_roast/import_alog should stamp that onto the
+    new roast, surfaced in the create response, the history list, and the
+    detail view alike."""
+    resp = client.post("/api/roasts", json={"title": "Attributed Roast", "mode": "simulator"})
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["created_by_username"] == "test-admin"
+    roast_id = body["id"]
+
+    resp = client.get("/api/roasts")
+    listed = next(r for r in resp.json() if r["id"] == roast_id)
+    assert listed["created_by_username"] == "test-admin"
+
+    resp = client.get(f"/api/roasts/{roast_id}")
+    assert resp.json()["created_by_username"] == "test-admin"
+
+    client.post(f"/api/roasts/{roast_id}/stop")
+
+
+def test_roast_created_before_this_field_existed_has_no_attribution(client):
+    """A roast row with created_by_username left NULL (the migration's own
+    backfill-nothing default -- see storage.py) should read back as None,
+    not error or a placeholder string. Pops the in-memory session too
+    (not just editing the DB row) -- otherwise get_roast_detail would
+    still answer from the live session's own created_by_username instead
+    of the DB row, which isn't what a genuinely pre-migration roast (no
+    session at all, wiped by the process restart that brought the
+    migration in) would look like -- see RoastSessionManager.
+    get_roast_detail's session-first-then-DB-row fallback."""
+    import backend.app.storage as storage
+    from backend.app.roast_session.session import session_manager
+
+    resp = client.post("/api/roasts", json={"title": "Old Roast", "mode": "simulator"})
+    roast_id = resp.json()["id"]
+    client.post(f"/api/roasts/{roast_id}/stop")
+    session_manager.sessions.pop(roast_id, None)
+
+    with storage._conn() as c:
+        c.execute("UPDATE roasts SET created_by_username = NULL WHERE id = ?", (roast_id,))
+
+    resp = client.get(f"/api/roasts/{roast_id}")
+    assert resp.json()["created_by_username"] is None
+
+    resp = client.get("/api/roasts")
+    listed = next(r for r in resp.json() if r["id"] == roast_id)
+    assert listed["created_by_username"] is None

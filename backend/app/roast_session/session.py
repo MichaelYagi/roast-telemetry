@@ -83,8 +83,9 @@ def _modbus_register_overrides(request: RoastCreateRequest) -> dict:
 
 
 class RoastSession:
-    def __init__(self, roast_id: str, request: RoastCreateRequest):
+    def __init__(self, roast_id: str, request: RoastCreateRequest, created_by_username: Optional[str] = None):
         self.id = roast_id
+        self.created_by_username = created_by_username
         self.title = request.title
         self.mode = request.mode
         self.beans = request.beans
@@ -236,6 +237,7 @@ class RoastSession:
             "alog_path": None,
             "source_alog_path": self.source_alog_path,
             "playback_speed": self.playback_speed,
+            "created_by_username": self.created_by_username,
         })
         self._recorded = True
 
@@ -663,6 +665,7 @@ class RoastSession:
             weight_roasted_g=self.weight_roasted_g,
             duration_s=self.duration_s,
             alog_path=self.alog_path if self.status in (RoastStatus.COMPLETE, RoastStatus.STOPPED, RoastStatus.ABORTED) else None,
+            created_by_username=self.created_by_username,
             source_alog_path=self.source_alog_path,
             playback_speed=self.playback_speed,
             auto_detect_milestones=self.auto_detect_milestones,
@@ -710,7 +713,7 @@ class RoastSessionManager:
                 stale._engine.close()
                 del self.sessions[stale_id]
 
-    def create(self, request: RoastCreateRequest) -> RoastSession:
+    def create(self, request: RoastCreateRequest, created_by_username: Optional[str] = None) -> RoastSession:
         """Builds the session and, for modbus_live/ms6514_live, makes the
         real synchronous connect attempt (inside the engine's own
         __init__) -- but no longer inserts a DB row itself; that now only
@@ -721,7 +724,7 @@ class RoastSessionManager:
         if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE):
             self._release_stale_same_port_session(request)
         roast_id = str(uuid.uuid4())
-        session = RoastSession(roast_id, request)
+        session = RoastSession(roast_id, request, created_by_username=created_by_username)
         if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE):
             # ModbusEngine/MS6514Engine's __init__ already made the real
             # connect attempt above and caught/swallowed any failure into
@@ -796,6 +799,7 @@ class RoastSessionManager:
             weight_roasted_g=row["weight_roasted_g"],
             duration_s=row["duration_s"],
             alog_path=row["alog_path"],
+            created_by_username=row.get("created_by_username"),
             source_alog_path=row.get("source_alog_path"),
             playback_speed=row.get("playback_speed"),
             profile=parsed["profile"],
@@ -827,11 +831,12 @@ class RoastSessionManager:
                 status=RoastStatus(r["status"]), created_at=r["created_at"], beans=r["beans"],
                 weight_green_g=r["weight_green_g"], weight_roasted_g=r["weight_roasted_g"],
                 duration_s=r["duration_s"], alog_path=r["alog_path"],
+                created_by_username=r.get("created_by_username"),
             )
             for r in rows
         ]
 
-    def import_alog(self, source_path: str, title: Optional[str] = None) -> RoastSummary:
+    def import_alog(self, source_path: str, title: Optional[str] = None, created_by_username: Optional[str] = None) -> RoastSummary:
         roast_id = str(uuid.uuid4())
         dest_path = storage.alog_path_for(roast_id)
         data = load_alog(source_path)
@@ -854,6 +859,7 @@ class RoastSessionManager:
             "weight_roasted_g": parsed["weight_roasted_g"],
             "duration_s": duration_s,
             "alog_path": dest_path,
+            "created_by_username": created_by_username,
         }
         storage.insert_roast(summary)
         return RoastSummary(**{k: v for k, v in summary.items() if k in RoastSummary.model_fields})

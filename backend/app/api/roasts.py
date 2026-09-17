@@ -9,7 +9,7 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
 from sse_starlette.sse import EventSourceResponse
 
@@ -126,14 +126,14 @@ def list_roasts(
 
 
 @router.post("", response_model=RoastSummary, status_code=201)
-async def create_roast(request: RoastCreateRequest) -> RoastSummary:
+async def create_roast(request: RoastCreateRequest, http_request: Request) -> RoastSummary:
     """modbus_live/ms6514_live: this is the ON action -- connects and
     starts streaming live readings, but doesn't create a roast yet (see
     begin_recording below for that, the START action). Every other mode
     doesn't have a real connection worth verifying separately, so this
     still connects *and* starts recording in one step, exactly as before."""
     try:
-        session = session_manager.create(request)
+        session = session_manager.create(request, created_by_username=http_request.state.user["username"])
         if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE):
             await session_manager.connect(session.id)
         else:
@@ -320,9 +320,9 @@ def get_review(roast_id: str) -> RoastReview:
 
 
 @router.post("/import", response_model=RoastSummary, status_code=201)
-def import_alog(path: str, title: Optional[str] = None) -> RoastSummary:
+def import_alog(path: str, http_request: Request, title: Optional[str] = None) -> RoastSummary:
     try:
-        return session_manager.import_alog(path, title)
+        return session_manager.import_alog(path, title, created_by_username=http_request.state.user["username"])
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

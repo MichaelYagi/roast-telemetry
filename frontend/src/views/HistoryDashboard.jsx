@@ -227,18 +227,19 @@ export default function HistoryDashboard() {
               <th>Duration</th>
               <th>Beans</th>
               <th>Created</th>
+              <th>Roasted by</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={8}>Loading…</td>
+                <td colSpan={9}>Loading…</td>
               </tr>
             )}
             {!loading && roasts.length === 0 && (
               <tr>
-                <td colSpan={8}>No roasts yet.</td>
+                <td colSpan={9}>No roasts yet.</td>
               </tr>
             )}
             {roasts.map((r) => (
@@ -254,6 +255,7 @@ export default function HistoryDashboard() {
                 <td>{formatDuration(r.duration_s)}</td>
                 <td>{r.beans || "—"}</td>
                 <td>{new Date(r.created_at).toLocaleString()}</td>
+                <td>{r.created_by_username || "—"}</td>
                 <td>
                   <Link to={`/roasts/${r.id}`}>View</Link>
                   {" · "}
