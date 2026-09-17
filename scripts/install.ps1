@@ -113,7 +113,16 @@ if (Get-Command wsl -ErrorAction SilentlyContinue) {
 if (-not $wslAvailable) {
     Write-Host "WSL2 not found -- skipping (only needed for scripts/fake-hardware.sh's fake FZ-94/meter; the app itself runs fine without it)."
 } elseif (Confirm-Action "WSL2 found. Set it up too, for scripts/fake-hardware.sh (fake hardware for testing)?") {
-    $wslPath = wsl wslpath -u $PWD.Path
+    # wsl.exe's own argument marshaling treats backslashes as shell
+    # escape characters when passing them through to the Linux-side
+    # command, silently stripping every one -- confirmed live:
+    # C:\Users\Michael\...\roast-telemetry arrived at wslpath as
+    # "C:UsersMichaelDocumentsdevelopmentroast-telemetry", which then
+    # failed to parse as a path at all. wslpath accepts forward slashes
+    # just as well, so converting first sidesteps the stripping
+    # entirely instead of fighting escaping rules.
+    $winPathForwardSlash = $PWD.Path -replace '\\', '/'
+    $wslPath = wsl wslpath -u $winPathForwardSlash
     if (-not $wslPath) {
         Write-Host "Couldn't resolve this folder's WSL path -- skipping. You can run scripts/install.sh from inside WSL2 yourself instead." -ForegroundColor Yellow
     } else {
