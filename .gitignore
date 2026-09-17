@@ -6,6 +6,7 @@ __pycache__/
 # Backend runtime data (sample_roasts/ demo asset is intentionally tracked)
 backend/data/roasts.db
 backend/data/roasts/*.alog
+backend/data/server.log
 
 # Frontend
 frontend/node_modules/
