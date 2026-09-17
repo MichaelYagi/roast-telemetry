@@ -187,19 +187,34 @@ echo
 echo "Installing frontend dependencies (npm install)..."
 (cd frontend && npm install)
 
-# --- Linux desktop launcher icon ---
-# "Roast Telemetry.desktop"'s Exec= line self-locates the repo via the
-# %k field code (same trick run-server.sh's own dirname-based anchoring
-# uses, just spelled the .desktop-file way) -- but Icon= has no field
-# codes in the Desktop Entry spec, it's a plain string, so it needs the
-# real absolute path written in up front. Rewriting this every run is
-# harmless (idempotent) and means there's no separate manual step
-# beyond running this script, matching Roast Telemetry.bat/.command's
-# zero-extra-steps experience on the other two platforms. Skipped on
-# WSL2/headless -- harmless there too (nothing reads this file without
-# a real desktop), just pointless.
+# --- Linux desktop launcher paths ---
+# "Roast Telemetry.desktop" needs the repo's real absolute path baked
+# into both Exec= and Icon= -- originally Exec= tried the Desktop Entry
+# spec's %k field code (location of the .desktop file itself) to
+# self-locate the way .command/.bat do, but that turned out unreliable
+# in practice: confirmed live, a real file manager's "Execute in
+# Terminal" path left %k un-substituted entirely, so `dirname "%k"`
+# just returned "." and the launcher looked for scripts/start.sh in
+# whatever directory the terminal happened to start in instead. Icon=
+# never had that option to begin with -- it's a plain string in the
+# spec, no field codes at all, absolute path or nothing. Both now get
+# the same treatment: a fixed __REPO_ROOT__ placeholder in the
+# committed file, replaced here with the real path. Rewriting this
+# every run is harmless (idempotent) and means there's no separate
+# manual step beyond running this script, matching Roast Telemetry.bat/
+# .command's zero-extra-steps experience on the other two platforms.
+# Skipped on WSL2/headless -- harmless there too (nothing reads this
+# file without a real desktop), just pointless.
 if [[ "$IS_MAC" -eq 0 ]] && [[ -f "Roast Telemetry.desktop" ]]; then
-  ICON_ABS="$(pwd)/frontend/public/icon-256x256.png"
+  REPO_ROOT_ABS="$(pwd)"
+  ICON_ABS="$REPO_ROOT_ABS/frontend/public/icon-256x256.png"
+  # Matches the cd "..." portion regardless of what's currently there --
+  # the committed placeholder on a first run, or a stale absolute path
+  # left over from a previous run at a different location (the repo got
+  # moved/re-cloned elsewhere) -- rather than only working the one time
+  # the placeholder is still literally present, same robustness Icon=
+  # below already has (always re-derived fresh, never "consumed once").
+  sed -i "s|cd \"[^\"]*\" && ./scripts/start.sh|cd \"$REPO_ROOT_ABS\" \&\& ./scripts/start.sh|" "Roast Telemetry.desktop"
   if grep -q "^Icon=" "Roast Telemetry.desktop"; then
     sed -i "s|^Icon=.*|Icon=$ICON_ABS|" "Roast Telemetry.desktop"
   else
