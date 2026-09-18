@@ -198,19 +198,21 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
     const unknown = ch.value == null;
     const displayValue = unknown ? ch.min : ch.value;
     const showArrows = Boolean(arrows?.[key]);
-    // arrows[key] now carries the actual step size (see
-    // VerticalControlSettingsEditor.jsx), not just an on/off flag --
-    // STEP=1 only survives as a defensive fallback, the checkbox+number
-    // input pairing there should never actually leave this unset while
-    // arrows are shown.
-    const step = arrows?.[key] || STEP;
+    // arrows[key] carries the +/- buttons' own step size (see
+    // VerticalControlSettingsEditor.jsx) -- deliberately NOT the same
+    // value as the range input's own `step` below. Dragging (or
+    // arrow-key nudging while the slider has focus, the native range
+    // input behavior) always moves by 1 regardless of what the +/-
+    // buttons are configured to skip by -- only a dedicated ▲/▼ click
+    // uses the configured amount.
+    const arrowStep = arrows?.[key] || STEP;
     const toggle = TOGGLES[key];
     const isOn = toggle ? toggle[0] : true;
     const isDisabled = disabled || unknown || !isOn;
 
     function nudge(dir) {
       const base = unknown ? ch.min : ch.value;
-      const next = Math.max(ch.min, Math.min(ch.max, base + dir * step));
+      const next = Math.max(ch.min, Math.min(ch.max, base + dir * arrowStep));
       ch.onChange(next);
     }
 
@@ -218,7 +220,7 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
       <div className={`vertical-slider-col${isOn ? "" : " vertical-slider-col-off"}`} key={key} style={{ "--item-color": item.color }}>
         <div className="vertical-slider-value">{unknown ? "—" : `${Math.round(displayValue)}${unit}`}</div>
         {showArrows && (
-          <button type="button" className="vertical-slider-arrow" disabled={isDisabled} onClick={() => nudge(1)} title={`+${step}${unit}`}>
+          <button type="button" className="vertical-slider-arrow" disabled={isDisabled} onClick={() => nudge(1)} title={`+${arrowStep}${unit}`}>
             ▲
           </button>
         )}
@@ -227,14 +229,14 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
           className="vertical-slider-track"
           min={ch.min}
           max={ch.max}
-          step={step}
+          step={STEP}
           value={displayValue}
           disabled={isDisabled}
           title={unknown ? "Waiting for a real reading from the device" : !isOn ? `${item.label} is off` : undefined}
           onChange={(e) => ch.onChange(Number(e.target.value))}
         />
         {showArrows && (
-          <button type="button" className="vertical-slider-arrow" disabled={isDisabled} onClick={() => nudge(-1)} title={`-${step}${unit}`}>
+          <button type="button" className="vertical-slider-arrow" disabled={isDisabled} onClick={() => nudge(-1)} title={`-${arrowStep}${unit}`}>
             ▼
           </button>
         )}
