@@ -24,6 +24,8 @@ def _row_to_preset(row: dict) -> RoastPreset:
         heater_pct=row.get("heater_pct"),
         fan_pct=row.get("fan_pct"),
         drum_speed_pct=row.get("drum_speed_pct"),
+        manufacturer=row.get("manufacturer"),
+        built_in=bool(row.get("built_in")),
     )
 
 
@@ -44,10 +46,12 @@ def create_preset(request: RoastPresetCreateRequest) -> RoastPreset:
         "heater_pct": request.heater_pct,
         "fan_pct": request.fan_pct,
         "drum_speed_pct": request.drum_speed_pct,
+        "manufacturer": request.manufacturer,
     })
     return RoastPreset(
         id=preset_id, name=request.name, created_at=created_at, config=request.config,
         heater_pct=request.heater_pct, fan_pct=request.fan_pct, drum_speed_pct=request.drum_speed_pct,
+        manufacturer=request.manufacturer, built_in=False,
     )
 
 
@@ -56,16 +60,20 @@ def update_preset(preset_id: str, request: RoastPresetCreateRequest) -> RoastPre
     row = storage.get_preset_row(preset_id)
     if row is None:
         raise HTTPException(status_code=404, detail=f"preset {preset_id!r} not found")
+    if row["built_in"]:
+        raise HTTPException(status_code=403, detail="built-in presets can't be edited")
     storage.update_preset_row(preset_id, {
         "name": request.name,
         "config_json": request.config.model_dump_json(),
         "heater_pct": request.heater_pct,
         "fan_pct": request.fan_pct,
         "drum_speed_pct": request.drum_speed_pct,
+        "manufacturer": request.manufacturer,
     })
     return RoastPreset(
         id=preset_id, name=request.name, created_at=row["created_at"], config=request.config,
         heater_pct=request.heater_pct, fan_pct=request.fan_pct, drum_speed_pct=request.drum_speed_pct,
+        manufacturer=request.manufacturer, built_in=False,
     )
 
 
@@ -79,6 +87,9 @@ def get_preset(preset_id: str) -> RoastPreset:
 
 @router.delete("/{preset_id}", status_code=204)
 def delete_preset(preset_id: str) -> None:
-    if storage.get_preset_row(preset_id) is None:
+    row = storage.get_preset_row(preset_id)
+    if row is None:
         raise HTTPException(status_code=404, detail=f"preset {preset_id!r} not found")
+    if row["built_in"]:
+        raise HTTPException(status_code=403, detail="built-in presets can't be deleted")
     storage.delete_preset_row(preset_id)

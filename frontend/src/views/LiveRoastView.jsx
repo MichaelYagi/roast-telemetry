@@ -45,24 +45,29 @@ function formatElapsed(seconds) {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-const LIVE_MODES = ["modbus_live", "ms6514_live"];
-const CONTROLLABLE_MODES = ["simulator", "modbus_live"];
-// modbus_live reads Heater/Fan/Drum back from the device itself (genuine
-// PLC/VFD registers, not an echo of this app's own commands -- see
-// modbus_bridge/engine.py's tick()), so auto-sending a "starting value" on
-// connect would overwrite whatever the roaster's actually doing instead of
-// just reflecting it -- e.g. an operator's own manual setting, or state
-// left over from a previous session. simulator has no such real state to
-// clobber (and nothing to read back), so it still needs an explicit
-// starting point.
+const LIVE_MODES = ["modbus_live", "ms6514_live", "aillio_live"];
+// modbus_live and aillio_live both read Heater/Fan/Drum back from the
+// device itself (genuine PLC/VFD registers or, for Aillio, the device's
+// own last-reported state -- not an echo of this app's own commands, see
+// modbus_bridge/engine.py's and aillio_bridge/engine.py's own tick()) --
+// ms6514_live is excluded, it's a read-only meter with no control at all.
+const CONTROLLABLE_LIVE_MODES = ["modbus_live", "aillio_live"];
+const CONTROLLABLE_MODES = ["simulator", ...CONTROLLABLE_LIVE_MODES];
+// Reading Heater/Fan/Drum back from the device means auto-sending a
+// "starting value" on connect would overwrite whatever the roaster's
+// actually doing instead of just reflecting it -- e.g. an operator's own
+// manual setting, or state left over from a previous session. simulator
+// has no such real state to clobber (and nothing to read back), so it
+// still needs an explicit starting point.
 const AUTO_APPLY_STARTING_CONTROLS_MODES = ["simulator"];
-// modbus_live still won't auto-apply a *fresh* (no preset loaded) starting
-// value -- that's the clobbering concern above. But a saved preset is an
-// explicit choice to replace whatever's there with these specific values,
-// so once one's loaded (selectedPresetId), its starting controls should
-// actually reach the device at START, not just sit in the form -- see
-// shouldAutoApplyStartingControls below, computed with access to that
-// state (this constant alone can't express the modbus_live+preset case).
+// CONTROLLABLE_LIVE_MODES still won't auto-apply a *fresh* (no preset
+// loaded) starting value -- that's the clobbering concern above. But a
+// saved preset is an explicit choice to replace whatever's there with
+// these specific values, so once one's loaded (selectedPresetId), its
+// starting controls should actually reach the device at START, not just
+// sit in the form -- see shouldAutoApplyStartingControls below, computed
+// with access to that state (this constant alone can't express the
+// CONTROLLABLE_LIVE_MODES+preset case).
 
 // simulator/engine.py's SimulatorConfig defaults -- that engine has no
 // per-roast override for these (RoastSession always constructs a plain
@@ -131,12 +136,26 @@ export default function LiveRoastView() {
     modbus_baudrate: 19200,
     modbus_control_port: "",
     modbus_control_baudrate: 19200,
+    // "serial" (USB/RTU, uses modbus_port) or "tcp" (Modbus TCP/Ethernet,
+    // e.g. the Coffee-Tech FZ-94 Evo, uses modbus_host/modbus_tcp_port
+    // instead) -- see the Data Source dropdown below, which maps its
+    // "Direct Modbus (Ethernet)" option onto mode=modbus_live +
+    // modbus_transport="tcp" together (mode alone can't distinguish the
+    // two -- see backend/app/models.py's RoastCreateRequest.modbus_transport).
+    modbus_transport: "serial",
+    modbus_host: "",
+    modbus_tcp_port: 502,
     // "" = "Custom (advanced fields below)" -- today's exact flow, the
     // 26 flat modbus_* override fields still drive the register map.
     // Any other value is a DeviceProfile id, which takes over instead
     // (see buildConfigFromForm below) and hides the advanced section.
     modbus_device_profile_id: "",
     ms6514_port: "",
+    // aillio_live only -- a raw USB device, not a port/host, so this is
+    // the whole "connection config" (see backend's
+    // RoastCreateRequest.aillio_model docstring). "r1" is the only
+    // known value today.
+    aillio_model: "r1",
     // Off by default -- real hardware means a real operator marking
     // milestones by hand, not an algorithm guessing, unless explicitly
     // opted in. Manual clicks still work as an override even when on
@@ -612,10 +631,16 @@ export default function LiveRoastView() {
       payload.playback_speed = Number(form.playback_speed) || 1;
     }
     if (form.mode === "modbus_live") {
-      payload.modbus_port = form.modbus_port;
-      payload.modbus_baudrate = Number(form.modbus_baudrate) || 19200;
-      payload.modbus_control_port = form.modbus_control_port || null;
-      payload.modbus_control_baudrate = Number(form.modbus_control_baudrate) || 19200;
+      payload.modbus_transport = form.modbus_transport;
+      if (form.modbus_transport === "tcp") {
+        payload.modbus_host = form.modbus_host;
+        payload.modbus_tcp_port = Number(form.modbus_tcp_port) || 502;
+      } else {
+        payload.modbus_port = form.modbus_port;
+        payload.modbus_baudrate = Number(form.modbus_baudrate) || 19200;
+        payload.modbus_control_port = form.modbus_control_port || null;
+        payload.modbus_control_baudrate = Number(form.modbus_control_baudrate) || 19200;
+      }
       payload.modbus_device_profile_id = form.modbus_device_profile_id || null;
       payload.modbus_bt_slave_id = numOrNull(form.modbus_bt_slave_id);
       payload.modbus_bt_register = numOrNull(form.modbus_bt_register);
@@ -648,6 +673,9 @@ export default function LiveRoastView() {
     if (form.mode === "ms6514_live") {
       payload.ms6514_port = form.ms6514_port;
     }
+    if (form.mode === "aillio_live") {
+      payload.aillio_model = form.aillio_model;
+    }
     if (LIVE_MODES.includes(form.mode)) {
       payload.auto_detect_milestones = form.auto_detect_milestones;
       payload.dry_end_c = form.dry_end_c === "" ? null : Number(form.dry_end_c);
@@ -657,10 +685,12 @@ export default function LiveRoastView() {
   }
 
   // See AUTO_APPLY_STARTING_CONTROLS_MODES's comment -- simulator always
-  // applies its starting values; modbus_live only does when those values
-  // came from an explicitly-loaded saved preset, not a fresh/blank start.
+  // applies its starting values; a CONTROLLABLE_LIVE_MODES mode only does
+  // when those values came from an explicitly-loaded saved preset, not a
+  // fresh/blank start.
   const shouldAutoApplyStartingControls =
-    AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) || (form.mode === "modbus_live" && Boolean(selectedPresetId));
+    AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) ||
+    (CONTROLLABLE_LIVE_MODES.includes(form.mode) && Boolean(selectedPresetId));
 
   function buildControlsFromForm() {
     if (!CONTROLLABLE_MODES.includes(form.mode)) return {};
@@ -793,8 +823,12 @@ export default function LiveRoastView() {
       modbus_baudrate: c.modbus_baudrate ?? f.modbus_baudrate,
       modbus_control_port: c.modbus_control_port || "",
       modbus_control_baudrate: c.modbus_control_baudrate ?? f.modbus_control_baudrate,
+      modbus_transport: c.modbus_transport || "serial",
+      modbus_host: c.modbus_host || "",
+      modbus_tcp_port: c.modbus_tcp_port ?? 502,
       modbus_device_profile_id: c.modbus_device_profile_id || "",
       ms6514_port: c.ms6514_port || "",
+      aillio_model: c.aillio_model || "r1",
       auto_detect_milestones: c.auto_detect_milestones ?? false,
       dry_end_c: c.dry_end_c ?? "",
       fc_start_c: c.fc_start_c ?? "",
@@ -965,13 +999,10 @@ export default function LiveRoastView() {
           : "--:--",
   };
 
-  // The Configure Roast form (with its "Load saved config" dropdown) only
-  // renders while phase === "idle" -- once ON is pressed it disappears,
-  // taking the only visible indication of which preset was loaded with
-  // it, from then until a roast object exists (whose live-header panel
-  // shows roast.title/beans/etc). presetName isn't cleared by
-  // handleToggleConnect, so it's still accurate here.
-  const presetHint = presetName && (phase === "idle" || phase === "armed") ? ` Loaded config: "${presetName}".` : "";
+  // Actual connection/config details (which port, which device profile,
+  // etc.) are shown per-mode in the .live-meta list below once `roast`
+  // exists, matching the existing alog_playback rows there (source
+  // file/speed) -- not appended to this status line.
   const toolbarElement = (
     <ArtisanToolbar
       title={roast?.title || form.title}
@@ -979,7 +1010,7 @@ export default function LiveRoastView() {
       weightGreenG={roast?.weight_green_g ?? (form.weight_green_g ? Number(form.weight_green_g) : null)}
       phase={phase}
       elapsedLabel={elapsedLabel}
-      statusText={STATUS_TEXT[phase] + presetHint}
+      statusText={STATUS_TEXT[phase]}
       onToggleConnect={handleToggleConnect}
       onStart={handleStart}
     />
@@ -1010,14 +1041,38 @@ export default function LiveRoastView() {
                 Load saved config
                 <select value={selectedPresetId} onChange={(e) => handleLoadPreset(e.target.value)}>
                   <option value="">(none)</option>
-                  {presets.map((p) => (
+                  {/* User's own configs first (in their existing order),
+                      built-ins appended at the bottom and grouped by
+                      manufacturer -- built-ins are non-deletable
+                      reference templates (see handleDeletePreset's own
+                      built_in check below), so keeping them out of the
+                      way of a user's own growing list matters more as
+                      more get added over time. */}
+                  {presets.filter((p) => !p.built_in).map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} — {p.config.mode}
                     </option>
                   ))}
+                  {Object.entries(
+                    presets
+                      .filter((p) => p.built_in)
+                      .reduce((groups, p) => {
+                        const label = p.manufacturer || "Built-in";
+                        (groups[label] = groups[label] || []).push(p);
+                        return groups;
+                      }, {})
+                  ).map(([manufacturer, group]) => (
+                    <optgroup key={manufacturer} label={manufacturer}>
+                      {group.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — {p.config.mode}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </label>
-              {selectedPresetId && (
+              {selectedPresetId && !presets.find((p) => p.id === selectedPresetId)?.built_in && (
                 <button
                   type="button"
                   className="danger"
@@ -1055,11 +1110,31 @@ export default function LiveRoastView() {
                 </label>
                 <label>
                   Data source
-                  <select value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
+                  {/* modbus_live covers both transports (see
+                      modbus_transport above) -- USB and Ethernet are two
+                      distinct dropdown entries here for clarity, but both
+                      set mode="modbus_live", so they need their own
+                      sentinel value/onChange mapping rather than just
+                      mirroring form.mode 1:1. */}
+                  <select
+                    value={form.mode === "modbus_live" && form.modbus_transport === "tcp" ? "modbus_live_tcp" : form.mode}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === "modbus_live_tcp") {
+                        setForm({ ...form, mode: "modbus_live", modbus_transport: "tcp" });
+                      } else if (value === "modbus_live") {
+                        setForm({ ...form, mode: "modbus_live", modbus_transport: "serial" });
+                      } else {
+                        setForm({ ...form, mode: value });
+                      }
+                    }}
+                  >
                     <option value="simulator">Simulator</option>
                     <option value="alog_playback">.alog Playback</option>
                     <option value="modbus_live">Direct Modbus (USB)</option>
+                    <option value="modbus_live_tcp">Direct Modbus (Ethernet)</option>
                     <option value="ms6514_live">Direct USB (thermocouple meter)</option>
+                    <option value="aillio_live">Aillio Bullet (USB)</option>
                   </select>
                 </label>
               </div>
@@ -1099,76 +1174,101 @@ export default function LiveRoastView() {
           )}
           {activeTab === "device" && form.mode === "modbus_live" && (
             <div className="form-row">
-              {/* Shared by both port fields below via list=. Plain text
-                  inputs, not a <select> -- this is a convenience list of
-                  what the OS currently sees, not a whitelist, so a port
-                  not currently enumerated (unplugged, or the fake
-                  hardware's /tmp path used for testing) still works by
-                  typing it in. label carries the driver's own
-                  description (e.g. "USB-SERIAL CH340") when there is
-                  one; value is the bare device name, so picking a
-                  suggestion fills in exactly what the field needs, not
-                  the description text too. */}
-              <datalist id="serial-ports-list">
-                {serialPorts.map((p) => (
-                  <option key={p.device} value={p.device} label={p.description || undefined} />
-                ))}
-              </datalist>
-              <label>
-                Serial port
-                <span className="serial-port-input-row">
-                  <input
-                    placeholder="COM3"
-                    list="serial-ports-list"
-                    value={form.modbus_port}
-                    onChange={(e) => setForm({ ...form, modbus_port: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    className="advanced-toggle"
-                    onClick={refreshSerialPorts}
-                    disabled={serialPortsLoading}
-                    title="Re-scan for connected serial ports"
-                  >
-                    {serialPortsLoading ? "…" : "⟳"}
-                  </button>
-                </span>
-                {serialPorts.length === 0 && !serialPortsLoading && (
-                  <span className="hint">No serial ports detected -- plug your adapter in, then ⟳.</span>
-                )}
-              </label>
-              <label>
-                Baud rate
-                <input
-                  type="number"
-                  value={form.modbus_baudrate}
-                  onChange={(e) => setForm({ ...form, modbus_baudrate: e.target.value })}
-                />
-              </label>
-              <label>
-                Separate drive port (optional)
-                <input
-                  placeholder="only if your own wiring needs a 2nd connection for Air/Drum"
-                  list="serial-ports-list"
-                  value={form.modbus_control_port}
-                  onChange={(e) => setForm({ ...form, modbus_control_port: e.target.value })}
-                />
-              </label>
-              <label>
-                Drive baud rate
-                <input
-                  type="number"
-                  value={form.modbus_control_baudrate}
-                  onChange={(e) => setForm({ ...form, modbus_control_baudrate: e.target.value })}
-                />
-              </label>
+              {form.modbus_transport === "tcp" ? (
+                <>
+                  <label>
+                    Host / IP address
+                    <input
+                      placeholder="192.168.1.2"
+                      value={form.modbus_host}
+                      onChange={(e) => setForm({ ...form, modbus_host: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    TCP port
+                    <input
+                      type="number"
+                      value={form.modbus_tcp_port}
+                      onChange={(e) => setForm({ ...form, modbus_tcp_port: e.target.value })}
+                    />
+                  </label>
+                </>
+              ) : (
+                <>
+                  {/* Shared by both port fields below via list=. Plain text
+                      inputs, not a <select> -- this is a convenience list of
+                      what the OS currently sees, not a whitelist, so a port
+                      not currently enumerated (unplugged, or the fake
+                      hardware's /tmp path used for testing) still works by
+                      typing it in. label carries the driver's own
+                      description (e.g. "USB-SERIAL CH340") when there is
+                      one; value is the bare device name, so picking a
+                      suggestion fills in exactly what the field needs, not
+                      the description text too. */}
+                  <datalist id="serial-ports-list">
+                    {serialPorts.map((p) => (
+                      <option key={p.device} value={p.device} label={p.description || undefined} />
+                    ))}
+                  </datalist>
+                  <label>
+                    Serial port
+                    <span className="serial-port-input-row">
+                      <input
+                        placeholder="COM3"
+                        list="serial-ports-list"
+                        value={form.modbus_port}
+                        onChange={(e) => setForm({ ...form, modbus_port: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        className="advanced-toggle"
+                        onClick={refreshSerialPorts}
+                        disabled={serialPortsLoading}
+                        title="Re-scan for connected serial ports"
+                      >
+                        {serialPortsLoading ? "…" : "⟳"}
+                      </button>
+                    </span>
+                    {serialPorts.length === 0 && !serialPortsLoading && (
+                      <span className="hint">No serial ports detected -- plug your adapter in, then ⟳.</span>
+                    )}
+                  </label>
+                  <label>
+                    Baud rate
+                    <input
+                      type="number"
+                      value={form.modbus_baudrate}
+                      onChange={(e) => setForm({ ...form, modbus_baudrate: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Separate drive port (optional)
+                    <input
+                      placeholder="only if your own wiring needs a 2nd connection for Air/Drum"
+                      list="serial-ports-list"
+                      value={form.modbus_control_port}
+                      onChange={(e) => setForm({ ...form, modbus_control_port: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Drive baud rate
+                    <input
+                      type="number"
+                      value={form.modbus_control_baudrate}
+                      onChange={(e) => setForm({ ...form, modbus_control_baudrate: e.target.value })}
+                    />
+                  </label>
+                </>
+              )}
               <label>
                 Device profile
                 <select
                   value={form.modbus_device_profile_id}
                   onChange={(e) => setForm({ ...form, modbus_device_profile_id: e.target.value })}
                 >
-                  <option value="">Custom (advanced fields below)</option>
+                  {/* TCP has no flat-register "Custom" fallback -- a
+                      profile is required (see RoastSession's own guard). */}
+                  {form.modbus_transport !== "tcp" && <option value="">Custom (advanced fields below)</option>}
                   {deviceProfiles.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
@@ -1185,7 +1285,7 @@ export default function LiveRoastView() {
                 </p>
               )}
               <DeviceProfileEditor onChange={refreshDeviceProfiles} />
-              {!form.modbus_device_profile_id && (
+              {form.modbus_transport !== "tcp" && !form.modbus_device_profile_id && (
                 <div className="advanced-modbus-fields">
                   <p className="hint">
                     Leave any of these blank to use the FZ-94 defaults above. Only worth touching once you've
@@ -1466,6 +1566,24 @@ export default function LiveRoastView() {
               </p>
             </div>
           )}
+          {activeTab === "device" && form.mode === "aillio_live" && (
+            <div className="form-row">
+              <label>
+                Model
+                <select
+                  value={form.aillio_model}
+                  onChange={(e) => setForm({ ...form, aillio_model: e.target.value })}
+                >
+                  <option value="r1">Bullet R1</option>
+                </select>
+              </label>
+              <p className="hint">
+                Talks directly to the roaster over USB (no port/host to configure — the app finds it by its
+                own USB vendor/product id). Heater/Fan/Drum read back the device's own last-reported state,
+                same "don't clobber real state" behavior as Direct Modbus.
+              </p>
+            </div>
+          )}
           {activeTab === "milestones" && LIVE_MODES.includes(form.mode) && (
             <div className="form-row">
               <label className="checkbox-label">
@@ -1496,7 +1614,7 @@ export default function LiveRoastView() {
               </label>
             </div>
           )}
-          {activeTab === "device" && (AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) || form.mode === "modbus_live") && (
+          {activeTab === "device" && (AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) || CONTROLLABLE_LIVE_MODES.includes(form.mode)) && (
             <div className="form-row">
               <label>
                 Burner % at start
@@ -1510,37 +1628,42 @@ export default function LiveRoastView() {
                 </span>
               </label>
               <label>
-                Air RPM at start
+                {/* "RPM" matches the FZ-94's own real VFD drives; aillio_live's
+                    Fan/Drum are a small device-native scale (remapped from
+                    this same 0-100% field server-side, see
+                    aillio_bridge/r1.py), not RPM, so it gets the generic "%"
+                    label instead rather than a unit that isn't true for it. */}
+                {form.mode === "modbus_live" ? "Air RPM at start" : "Fan % at start"}
                 <span className="input-suffix-group">
                   <input
                     type="number" min="0" max="100"
                     value={form.fan_pct}
                     onChange={(e) => setForm({ ...form, fan_pct: e.target.value })}
                   />
-                  <span className="input-suffix">RPM</span>
+                  <span className="input-suffix">{form.mode === "modbus_live" ? "RPM" : "%"}</span>
                 </span>
               </label>
               <label>
-                Drum RPM at start
+                {form.mode === "modbus_live" ? "Drum RPM at start" : "Drum % at start"}
                 <span className="input-suffix-group">
                   <input
                     type="number" min="0" max="100"
                     value={form.drum_speed_pct}
                     onChange={(e) => setForm({ ...form, drum_speed_pct: e.target.value })}
                   />
-                  <span className="input-suffix">RPM</span>
+                  <span className="input-suffix">{form.mode === "modbus_live" ? "RPM" : "%"}</span>
                 </span>
               </label>
               <p className="hint" style={{ flexBasis: "100%" }}>
                 {shouldAutoApplyStartingControls
                   ? "Sent as the roast's first command right after START, and used as the Controls panel's starting position."
-                  : form.mode === "modbus_live"
+                  : CONTROLLABLE_LIVE_MODES.includes(form.mode)
                     ? "Only applied at START when loaded from a saved preset (see \"Load saved config\" above) -- a fresh start like this one leaves the roaster wherever it already is, so it's not clobbered by an unrelated stale value. Otherwise these are just what gets saved into a new preset below."
                     : "Sent as the roast's first command right after START, and used as the Controls panel's starting position."}
               </p>
             </div>
           )}
-          {activeTab === "milestones" && form.mode === "modbus_live" && (
+          {activeTab === "milestones" && CONTROLLABLE_LIVE_MODES.includes(form.mode) && (
             <p className="hint">
               {shouldAutoApplyStartingControls
                 ? "Burner/Air/Drum start from this preset's saved values (see the Device tab), sent right after START -- from then on, the Controls panel on the Live Roast page reads and shows whatever the roaster is actually doing."
@@ -1565,7 +1688,7 @@ export default function LiveRoastView() {
                 }}
               />
             </label>
-            {selectedPresetId && (
+            {selectedPresetId && !presets.find((p) => p.id === selectedPresetId)?.built_in && (
               <button type="button" onClick={handleUpdatePreset} disabled={!presetName.trim()}>
                 Update "{presets.find((p) => p.id === selectedPresetId)?.name}"
               </button>
@@ -1719,6 +1842,29 @@ export default function LiveRoastView() {
                       <span className="meta-value">{roast.playback_speed}x</span>
                     </li>
                   )}
+                  {roast.mode === "modbus_live" && (
+                    <li>
+                      <span className="meta-label">Connection</span>
+                      <span className="meta-value">
+                        {roast.modbus_transport === "tcp"
+                          ? `${roast.modbus_host}:${roast.modbus_tcp_port}`
+                          : roast.modbus_port}
+                        {roast.modbus_device_profile_name ? ` — ${roast.modbus_device_profile_name}` : ""}
+                      </span>
+                    </li>
+                  )}
+                  {roast.mode === "ms6514_live" && roast.ms6514_port && (
+                    <li>
+                      <span className="meta-label">Serial port</span>
+                      <span className="meta-value">{roast.ms6514_port}</span>
+                    </li>
+                  )}
+                  {roast.mode === "aillio_live" && roast.aillio_model && (
+                    <li>
+                      <span className="meta-label">Model</span>
+                      <span className="meta-value">Aillio Bullet {roast.aillio_model.toUpperCase()}</span>
+                    </li>
+                  )}
                   {roast.beans && (
                     <li>
                       <span className="meta-label">Beans</span>
@@ -1794,7 +1940,8 @@ export default function LiveRoastView() {
             )}
             {activeMode === "modbus_live" && (
               <p className="hint" style={{ gridColumn: "1 / -1" }}>
-                The controls beside the chart read and write directly over {form.modbus_port || "the serial port"}:
+                The controls beside the chart read and write directly over{" "}
+                {form.modbus_transport === "tcp" ? form.modbus_host || "the configured host" : form.modbus_port || "the serial port"}:
                 Burner is a drum-temperature setpoint (register 5, default 100–250°C — not a power %, shown as
                 both a % slider and a direct °C slider that move each other), Air and Drum are VFD drives
                 (run/stop + frequency registers 8192/8193, default 0–100%/0–70%), each with its own feedback

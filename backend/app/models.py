@@ -13,6 +13,14 @@ class RoastMode(str, Enum):
     ALOG_PLAYBACK = "alog_playback"
     MODBUS_LIVE = "modbus_live"
     MS6514_LIVE = "ms6514_live"
+    # Genuinely different protocol family from modbus_live (raw USB, not
+    # Modbus/serial at all -- see aillio_bridge/engine.py), unlike the
+    # FZ-94 Evo's TCP transport, which stayed under modbus_live via
+    # modbus_transport since it shares the same register/channel
+    # abstraction. R1 vs R2 share this one mode via aillio_model instead,
+    # same reasoning as modbus_transport -- same engine contract, only
+    # the byte protocol underneath differs.
+    AILLIO_LIVE = "aillio_live"
 
 
 class RoastStatus(str, Enum):
@@ -350,6 +358,9 @@ class RoastCreateRequest(BaseModel):
     modbus_control_port: Optional[str] = Field(default=None, description="modbus_live mode only, optional: only set this if your own wiring genuinely needs a *separate* connection for Air/Drum drive control (uncommon) -- e.g. 'COM4'. Leave blank (the normal case) to send Air/Drum over modbus_port along with everything else.")
     modbus_control_baudrate: int = Field(default=19200, description="modbus_live mode only; baud rate for modbus_control_port, if that's set")
     modbus_device_profile_id: Optional[str] = Field(default=None, description="modbus_live, optional: use a saved/built-in DeviceProfile's full channel map instead of the individual modbus_* override fields below. When set, those flat fields are ignored (a profile fully replaces them, no merging) -- see api/device_profiles.py. Leave unset (the default) for exactly today's behavior.")
+    modbus_transport: str = Field(default="serial", description="modbus_live only: 'serial' (USB/RTU, the default -- uses modbus_port) or 'tcp' (Modbus TCP/Ethernet, e.g. the Coffee-Tech FZ-94 Evo -- uses modbus_host/modbus_tcp_port instead). A genuinely different wire protocol, not just a different port string -- see modbus_bridge/engine.py.")
+    modbus_host: Optional[str] = Field(default=None, description="Required when mode=modbus_live and modbus_transport='tcp': the roaster's IP/hostname, e.g. '192.168.1.2'.")
+    modbus_tcp_port: int = Field(default=502, description="modbus_live + modbus_transport='tcp' only: TCP port, default 502 (the standard Modbus TCP port).")
     # Full ModbusEngine register-map override set -- all optional and None
     # by default, meaning "use ModbusEngine's own (FZ-94) default"; only
     # set what your own unit actually needs overridden. BT/ET/DT/Burner's
@@ -388,6 +399,7 @@ class RoastCreateRequest(BaseModel):
     modbus_burner_sv_min_c: Optional[float] = Field(default=None, description="modbus_live, advanced: low end of the heater_pct(0%)->SV-temperature mapping, paired with modbus_burner_sv_max_c (both required together). Default 100.")
     modbus_burner_sv_max_c: Optional[float] = Field(default=None, description="modbus_live, advanced: high end of the heater_pct(100%)->SV-temperature mapping, paired with modbus_burner_sv_min_c (both required together). Default 250.")
     ms6514_port: Optional[str] = Field(default=None, description="Required when mode=ms6514_live: serial port the Mastech MS6514 is on, e.g. 'COM5'")
+    aillio_model: Optional[str] = Field(default=None, description="Required when mode=aillio_live: which Aillio Bullet model, e.g. 'r1' (see aillio_bridge.engine.PROTOCOLS for the known set). A raw USB device, not a port/host -- there's nothing else to configure per-install.")
     auto_detect_milestones: bool = Field(default=False, description="live-bridge modes only, opt-in: auto-fire Charge/Dry End/FC Start from the BT curve instead of manual clicks only (Turning Point stays automatic either way -- see roast_heuristics.LiveRoastDetector). Off by default -- real hardware means a real operator, not an algorithm guessing, unless explicitly turned on. Manual clicks still work as an override even when on.")
     dry_end_c: Optional[float] = Field(default=160.0, description="BT threshold for auto-detecting Dry End when auto_detect_milestones is on; live-bridge modes only. Null disables it.")
     fc_start_c: Optional[float] = Field(default=196.0, description="BT threshold for auto-detecting FC Start when auto_detect_milestones is on; live-bridge modes only. Null disables it.")
@@ -429,6 +441,23 @@ class RoastSummary(BaseModel):
     # vertical control panel convert heater_pct<->burner_sv_c locally while
     # dragging either slider, instead of waiting on a telemetry round trip.
     burner_sv_range_c: Optional[tuple[float, float]] = None
+    # modbus_live only: what this roast was actually connected with, frozen
+    # at connect time -- shown in the live view, History detail, and the
+    # server log (see RoastSession.__init__) so "which config was this"
+    # is always answerable, not just visible transiently in the Configure
+    # Roast form's own state. modbus_device_profile_name is the resolved
+    # name (not just modbus_device_profile_id), so it still reads
+    # correctly even if that profile is later renamed or deleted.
+    modbus_transport: Optional[str] = None
+    modbus_port: Optional[str] = None
+    modbus_host: Optional[str] = None
+    modbus_tcp_port: Optional[int] = None
+    modbus_device_profile_name: Optional[str] = None
+    # ms6514_live only, same "freeze what was configured" reasoning as
+    # the modbus_* fields above.
+    ms6514_port: Optional[str] = None
+    # aillio_live only, same reasoning again.
+    aillio_model: Optional[str] = None
 
 
 class Roast(RoastSummary):
@@ -447,9 +476,13 @@ class RoastPresetCreateRequest(BaseModel):
     heater_pct: Optional[float] = Field(default=None, ge=0, le=100)
     fan_pct: Optional[float] = Field(default=None, ge=0, le=100)
     drum_speed_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    manufacturer: Optional[str] = Field(default=None, description="Optional grouping label for the Load saved config dropdown, e.g. 'Coffee-Tech'. Mainly used by built-in presets (see main.py's _DEFAULT_PRESETS) but settable on any preset.")
 
 
 class RoastPreset(BaseModel):
+    """`built_in` presets ship with the app and can't be deleted via the
+    API (see api/presets.py) -- same precedent as DeviceProfile.built_in."""
+
     id: str
     name: str
     created_at: str
@@ -457,6 +490,8 @@ class RoastPreset(BaseModel):
     heater_pct: Optional[float] = None
     fan_pct: Optional[float] = None
     drum_speed_pct: Optional[float] = None
+    manufacturer: Optional[str] = None
+    built_in: bool = False
 
 
 # Valid keys for AppSettings.vertical_control_layout/vertical_control_arrows
@@ -478,6 +513,13 @@ BREAKOUT_PANEL_KEYS = {
     "dry_pct", "maillard_pct", "dev_pct", "to_dry", "to_fcs", "to_dev",
     "heater", "fan", "drum", "burner_sv", "playback_speed",
 }
+
+# Valid keys for AppSettings.chart_series_visible -- the live chart's own
+# legend checkboxes (frontend/src/components/RoastChart.jsx's SERIES_DEFS).
+# Only the static, always-present curves -- background-roast overlay
+# (BG_BT/BG_ET) and per-roast extra temperature channels (EXTRA_<label>)
+# are built dynamically there and never meant to be toggled persistently.
+CHART_SERIES_KEYS = {"BT", "ET", "DT", "ROR_BT", "ROR_ET", "Burner", "Air", "Drum", "Damper"}
 
 
 class AppSettings(BaseModel):
@@ -535,6 +577,14 @@ class AppSettings(BaseModel):
     # plain bool (arrows shown or not, always stepping by a hardcoded 1) --
     # see storage.get_settings()'s own migration for old True/False rows.
     vertical_control_arrows: dict[str, float] = {}
+    # The live chart's own legend checkboxes (RoastChart.jsx's SERIES_DEFS
+    # -- BT/ET/DT/RoR BT/RoR ET/Burner/Air/Drum/Damper), so re-checking the
+    # same boxes every time a roast page loads isn't required. Missing key
+    # means "use that series' own defaultOn", not force-off -- same
+    # tolerant-missing-key convention as vertical_control_arrows/
+    # breakout_panel_colors above, resolved client-side in RoastChart.jsx
+    # (this dict only ever needs to hold actual overrides).
+    chart_series_visible: dict[str, bool] = {}
 
 
 class OllamaStatus(BaseModel):

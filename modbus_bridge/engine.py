@@ -144,10 +144,13 @@ way. Do not apply the EVO's registers here.
 """
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from pymodbus.client import ModbusSerialClient
 from pymodbus.exceptions import ModbusException
+
+logger = logging.getLogger(__name__)
 
 from backend.app.models import (
     DeviceProfile,
@@ -341,8 +344,11 @@ class ModbusEngine:
     def from_profile(
         cls,
         profile: DeviceProfile,
-        port: str,
+        port: Optional[str] = None,
         *,
+        transport: str = "serial",
+        host: Optional[str] = None,
+        tcp_port: int = 502,
         baudrate: Optional[int] = None,
         bytesize: Optional[int] = None,
         parity: Optional[str] = None,
@@ -370,7 +376,7 @@ class ModbusEngine:
         here -- nothing in tick()/apply_command() touches them; they only
         exist for the flat-constructor compatibility path above."""
         self = cls.__new__(cls)
-        self.port = port
+        self.port = port if transport != "tcp" else f"{host}:{tcp_port}"
         self.control_port = control_port
         self.temp_channels = list(profile.temp_channels)
         self.control_channels = list(profile.control_channels)
@@ -399,6 +405,9 @@ class ModbusEngine:
             control_stopbits if control_stopbits is not None else profile.stopbits,
             control_timeout,
             client_cls,
+            transport=transport,
+            host=host,
+            tcp_port=tcp_port,
         )
         return self
 
@@ -406,20 +415,38 @@ class ModbusEngine:
         self, port, baudrate, bytesize, parity, stopbits, timeout,
         control_port, control_baudrate, control_bytesize, control_parity, control_stopbits, control_timeout,
         client_cls,
+        *,
+        transport: str = "serial",
+        host: Optional[str] = None,
+        tcp_port: int = 502,
     ) -> None:
-        """Shared by both constructors above -- opens the primary serial
+        """Shared by both constructors above -- opens the primary
         connection (and, only if control_port is actually set, a second
         one for Air/Drum -- see the module docstring's confirmed
-        single-bus architecture)."""
-        if not port:
-            raise ValueError("port (e.g. 'COM3') is required to connect via Modbus RTU")
-        self._client = client_cls(
-            port=port, baudrate=baudrate, bytesize=bytesize, parity=parity, stopbits=stopbits, timeout=timeout,
-        )
+        single-bus architecture). ``transport="tcp"`` is the Modbus
+        TCP/Ethernet path (e.g. the Coffee-Tech FZ-94 Evo) -- a genuinely
+        different wire protocol from RTU (MBAP framing, no CRC), not
+        just a different port string, so it gets its own client
+        construction here rather than reusing pyserial's socket:// URL
+        trick (that still frames traffic as RTU over a raw socket,
+        which a true Modbus TCP device won't understand)."""
+        if transport == "tcp":
+            if not host:
+                raise ValueError("host is required to connect via Modbus TCP")
+            self._client = client_cls(host=host, port=tcp_port, timeout=timeout)
+        else:
+            if not port:
+                raise ValueError("port (e.g. 'COM3') is required to connect via Modbus RTU")
+            self._client = client_cls(
+                port=port, baudrate=baudrate, bytesize=bytesize, parity=parity, stopbits=stopbits, timeout=timeout,
+            )
         try:
             self._connected = bool(self._client.connect())
             if not self._connected:
-                self._last_error = f"could not open serial port {port!r}"
+                if transport == "tcp":
+                    self._last_error = f"could not open TCP host {host}:{tcp_port}"
+                else:
+                    self._last_error = f"could not open serial port {port!r}"
         except Exception as exc:  # pragma: no cover - depends on local hardware/OS
             self._last_error = str(exc)
             self._connected = False
@@ -464,6 +491,7 @@ class ModbusEngine:
         try:
             result = client.read_holding_registers(address, count=1, device_id=slave_id)
             if result.isError():
+                logger.debug("read slave=%s reg=%s -> error: %s", slave_id, address, result)
                 if is_heartbeat:
                     self._last_error = str(result)
                     self._connected = False
@@ -471,8 +499,10 @@ class ModbusEngine:
             if is_heartbeat:
                 self._last_error = None
                 self._connected = True
+            logger.debug("read slave=%s reg=%s -> %s", slave_id, address, result.registers[0])
             return result.registers[0]
         except ModbusException as exc:
+            logger.debug("read slave=%s reg=%s -> exception: %s", slave_id, address, exc)
             if is_heartbeat:
                 self._last_error = str(exc)
                 self._connected = False
@@ -568,9 +598,11 @@ class ModbusEngine:
         of the three write helpers below by that channel's own `kind`.
         See ModbusControlKind for why these don't share one simple
         "write a percentage to a register" shape."""
+        matched_keys = set()
         for ch in self.control_channels:
             value = cmd.get(ch.maps_to)
             if value is not None:
+                matched_keys.add(ch.maps_to)
                 if ch.kind == ModbusControlKind.SV_TEMPERATURE:
                     self._write_sv_temperature(ch, float(value))
                 elif ch.kind == ModbusControlKind.VFD_DRIVE:
@@ -586,23 +618,36 @@ class ModbusEngine:
                 sv_c = cmd.get("burner_sv_c")
                 if sv_c is not None:
                     self._write_sv_temperature_c(ch, float(sv_c))
+        # A commanded key with no matching channel on this profile is a
+        # silent no-op otherwise -- often means the device is in the
+        # wrong control mode for what's being asked of it (e.g. Damper
+        # commanded on a profile that never assigned it a channel).
+        for key in ("heater_pct", "fan_pct", "drum_speed_pct"):
+            if cmd.get(key) is not None and key not in matched_keys:
+                logger.warning(
+                    "commanded %s but this device profile has no matching control channel -- ignored", key
+                )
 
     def _write_sv_temperature(self, ch: ModbusControlChannel, pct: float) -> None:
         if ch.register_address is None:
             return
-        pct = max(0.0, min(100.0, pct))
+        clamped_pct = max(0.0, min(100.0, pct))
+        if clamped_pct != pct:
+            logger.warning("requested %s=%.2f%% out of range 0-100%%, clamped to %.2f%%", ch.maps_to, pct, clamped_pct)
         sv_lo, sv_hi = ch.sv_range_c or (0.0, 100.0)
-        sv_c = sv_lo + (pct / 100.0) * (sv_hi - sv_lo)
-        self._write_sv_raw(ch, sv_c, pct)
+        sv_c = sv_lo + (clamped_pct / 100.0) * (sv_hi - sv_lo)
+        self._write_sv_raw(ch, sv_c, clamped_pct)
 
     def _write_sv_temperature_c(self, ch: ModbusControlChannel, sv_c: float) -> None:
         if ch.register_address is None:
             return
         sv_lo, sv_hi = ch.sv_range_c or (0.0, 100.0)
         lo, hi = min(sv_lo, sv_hi), max(sv_lo, sv_hi)
-        sv_c = max(lo, min(hi, sv_c))
-        pct = max(0.0, min(100.0, (sv_c - sv_lo) / (sv_hi - sv_lo) * 100.0)) if sv_hi != sv_lo else None
-        self._write_sv_raw(ch, sv_c, pct)
+        clamped = max(lo, min(hi, sv_c))
+        if clamped != sv_c:
+            logger.warning("requested burner_sv_c=%.2f out of range %.2f-%.2f, clamped to %.2f", sv_c, lo, hi, clamped)
+        pct = max(0.0, min(100.0, (clamped - sv_lo) / (sv_hi - sv_lo) * 100.0)) if sv_hi != sv_lo else None
+        self._write_sv_raw(ch, clamped, pct)
 
     def _write_sv_raw(self, ch: ModbusControlChannel, sv_c: float, pct: Optional[float]) -> None:
         """Shared by both SV write paths above -- same register, same
@@ -611,10 +656,15 @@ class ModbusEngine:
         feedback (and the other write path) both stay in sync regardless
         of which unit was actually written."""
         raw = int(round(sv_c * (ch.divisor or 1.0)))
+        logger.debug("write slave=%s reg=%s <- %s (sv_c=%.2f)", ch.slave_id, ch.register_address, raw, sv_c)
         try:
             result = self._client.write_register(ch.register_address, raw, device_id=ch.slave_id)
             if result.isError():
                 self._last_error = str(result)
+                logger.warning(
+                    "write rejected by device (slave=%s reg=%s): %s -- device may not be in remote/PC control mode",
+                    ch.slave_id, ch.register_address, result,
+                )
             else:
                 self._last_error = None
                 self._connected = True
@@ -629,24 +679,34 @@ class ModbusEngine:
             return
         lo, hi = ch.value_range
         clamped = max(lo, min(hi, value))
+        if clamped != value:
+            logger.warning("requested %s=%.2f out of range %.2f-%.2f, clamped to %.2f", ch.maps_to, value, lo, hi, clamped)
         try:
             run_state = 2 if clamped > 0 else 1  # 2=Run, 1=Stop
+            logger.debug("write slave=%s reg=%s <- %s (run_state)", ch.slave_id, ch.control_register, run_state)
             run_result = self._control_client.write_register(ch.control_register, run_state, device_id=ch.slave_id)
             if clamped > 0:
+                freq_raw = int(round(clamped * ch.frequency_scale))
+                logger.debug("write slave=%s reg=%s <- %s (frequency)", ch.slave_id, ch.frequency_register, freq_raw)
                 freq_result = self._control_client.write_register(
-                    ch.frequency_register, int(round(clamped * ch.frequency_scale)), device_id=ch.slave_id
+                    ch.frequency_register, freq_raw, device_id=ch.slave_id
                 )
             else:
                 # Off: only touch the control (run/stop) register, same as
-                # Artisan's real button-based control (confirmed against a
-                # live FZ-94 -- its Off button sends just write(2,8192,1),
+                # a real button-based control (confirmed against a live
+                # FZ-94 -- its Off button sends just write(2,8192,1),
                 # leaving the frequency register alone). Zeroing the
                 # frequency register here too would forget the last speed,
                 # so turning back on would always resume at 0 instead of
                 # wherever the drive was left.
                 freq_result = run_result
             if run_result.isError() or freq_result.isError():
-                self._control_last_error = str(run_result) if run_result.isError() else str(freq_result)
+                error_result = run_result if run_result.isError() else freq_result
+                self._control_last_error = str(error_result)
+                logger.warning(
+                    "write rejected by device (slave=%s reg=%s): %s -- device may not be in remote/PC control mode",
+                    ch.slave_id, ch.control_register, error_result,
+                )
             else:
                 self._control_last_error = None
                 self._control_connected = True
@@ -660,12 +720,18 @@ class ModbusEngine:
             return
         lo, hi = ch.value_range
         clamped = max(lo, min(hi, value))
+        if clamped != value:
+            logger.warning("requested %s=%.2f out of range %.2f-%.2f, clamped to %.2f", ch.maps_to, value, lo, hi, clamped)
+        raw = int(round(clamped * ch.write_scale))
+        logger.debug("write slave=%s reg=%s <- %s", ch.slave_id, ch.write_register, raw)
         try:
-            result = self._control_client.write_register(
-                ch.write_register, int(round(clamped * ch.write_scale)), device_id=ch.slave_id
-            )
+            result = self._control_client.write_register(ch.write_register, raw, device_id=ch.slave_id)
             if result.isError():
                 self._control_last_error = str(result)
+                logger.warning(
+                    "write rejected by device (slave=%s reg=%s): %s -- device may not be in remote/PC control mode",
+                    ch.slave_id, ch.write_register, result,
+                )
             else:
                 self._control_last_error = None
                 self._control_connected = True

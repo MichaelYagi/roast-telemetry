@@ -6,19 +6,33 @@
 # Usage:
 #   scripts/fake-hardware.sh fz94              # WSL-internal link, for an app also running in WSL
 #   scripts/fake-hardware.sh ms6514
-#   scripts/fake-hardware.sh fz94 --tcp        # TCP bridge on port 5020, for an app running natively on Windows
-#   scripts/fake-hardware.sh fz94 --tcp 5030   # TCP bridge on a specific port
+#   scripts/fake-hardware.sh fz94 --tcp        # RTU-over-TCP bridge on port 5020, for an app running natively on Windows
+#   scripts/fake-hardware.sh fz94 --tcp 5030   # RTU-over-TCP bridge on a specific port
+#   scripts/fake-hardware.sh evo               # FZ-94 Evo fake -- genuine Modbus TCP, no socat needed at all
+#   scripts/fake-hardware.sh evo 5030          # on a specific port (default 5020)
 #
-# --tcp matters because a WSL-internal /tmp/... path only exists inside
-# WSL's own filesystem -- a native-Windows process (e.g. the app run via
-# scripts/run-server.ps1, the recommended way to reach a *real* roaster's
-# COM port) can't open it at all, no matter how the path is written. With
-# --tcp, socat's second end is a TCP listener instead of a second linked
-# port, and pyserial treats a socket://host:port URL as a live serial
-# connection -- paste socket://127.0.0.1:<port> into the app's Serial
-# port field instead of a /tmp/... path. Without a real roaster in the
-# picture, this is more setup than you need -- just run the app in WSL
-# too and skip --tcp entirely.
+# --tcp (fz94/ms6514 only) matters because a WSL-internal /tmp/... path
+# only exists inside WSL's own filesystem -- a native-Windows process
+# (e.g. the app run via scripts/run-server.ps1, the recommended way to
+# reach a *real* roaster's COM port) can't open it at all, no matter how
+# the path is written. With --tcp, socat's second end is a TCP listener
+# instead of a second linked port, and pyserial treats a
+# socket://host:port URL as a live serial connection -- paste
+# socket://127.0.0.1:<port> into the app's Serial port field instead of
+# a /tmp/... path. Without a real roaster in the picture, this is more
+# setup than you need -- just run the app in WSL too and skip --tcp
+# entirely.
+#
+# `evo` is a different thing entirely, not an alternative to --tcp above:
+# the FZ-94 Evo is a genuinely different roaster that speaks real Modbus
+# TCP natively (see modbus_bridge/engine.py's transport="tcp" path) --
+# it was never RTU/serial to begin with, so there's no virtual serial
+# port to bridge and no --tcp flag needed. `evo`'s own fake
+# (hardware_fakes/modbus_fz94_evo.py) is a real Modbus TCP server; point
+# the app's Data Source "Direct Modbus (Ethernet)" straight at its
+# host/port, no Serial port field or socat involved at all -- works the
+# same whether the app runs in WSL or natively on Windows (both can
+# reach 127.0.0.1 directly).
 #
 # Prints the value to paste into the app once it's up, and cleans up
 # both the socat process and the fake on Ctrl+C. Uses a fixed link name
@@ -41,11 +55,42 @@ if [[ -d .venv ]] && [[ ! -e .venv/bin/python ]] && [[ -e .venv/Scripts/python.e
 fi
 
 KIND="${1:-}"
-if [[ "$KIND" != "fz94" && "$KIND" != "ms6514" ]]; then
-  echo "Usage: $0 fz94|ms6514 [--tcp [port]]" >&2
+if [[ "$KIND" != "fz94" && "$KIND" != "ms6514" && "$KIND" != "evo" ]]; then
+  echo "Usage: $0 fz94|ms6514|evo [--tcp [port]] | $0 evo [port]" >&2
   exit 1
 fi
 shift || true
+
+# evo speaks genuine Modbus TCP natively -- no socat/virtual serial port
+# involved at all (see the header comment above), so it's handled
+# entirely separately from the fz94/ms6514 socat dance below.
+if [[ "$KIND" == "evo" ]]; then
+  EVO_PORT="${1:-5020}"
+  FAKE_PID=""
+  cleanup() {
+    echo
+    echo "Stopping fake hardware..."
+    [[ -n "$FAKE_PID" ]] && kill "$FAKE_PID" 2>/dev/null || true
+    wait 2>/dev/null || true
+  }
+  trap cleanup EXIT INT TERM
+  PYTHONPATH=. .venv/bin/python -m hardware_fakes.modbus_fz94_evo --port "$EVO_PORT" --quiet &
+  FAKE_PID=$!
+  echo
+  echo "Fake FZ-94 Evo hardware is running."
+  echo "In the app's Configure Roast form, Data source \"Direct Modbus (Ethernet)\":"
+  echo
+  echo "    Host: 127.0.0.1"
+  echo "    TCP port: $EVO_PORT"
+  echo "    Device profile: Coffee-Tech FZ-94 Evo (built-in)"
+  echo
+  echo "(Works the same whether the app runs in WSL or natively on Windows --"
+  echo "no bridging needed, unlike fz94/ms6514's socat setup.)"
+  echo
+  echo "Press Ctrl+C to stop."
+  wait "$FAKE_PID"
+  exit 0
+fi
 
 TCP_MODE=0
 TCP_PORT=5020

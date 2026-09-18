@@ -33,15 +33,47 @@ import pystray
 from PIL import Image, ImageDraw
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+# True only inside a PyInstaller-frozen build (see packaging/) -- every
+# existing dev/CI invocation of this file runs it as a plain script, so
+# this is always False there, and every branch below that checks it is
+# a no-op for that case, not a behavior change.
+FROZEN = bool(getattr(sys, "frozen", False))
+# Bundled read-only resources (icon, the sample .alog files shipped
+# with the app) -- sys._MEIPASS is where PyInstaller unpacks/exposes
+# them (set for both onefile and onedir builds), REPO_ROOT is the
+# equivalent when running from source.
+BASE_DIR = Path(getattr(sys, "_MEIPASS", REPO_ROOT))
+
+
+def _user_data_dir() -> Path:
+    """Per-user, per-OS writable directory for a packaged build -- never
+    write app data next to the executable itself (may not be writable,
+    e.g. Program Files, and gets wiped on every reinstall/upgrade
+    unlike a real per-user profile directory). Standard per-platform
+    convention, same one most desktop apps use."""
+    system = platform.system()
+    if system == "Windows":
+        base = Path(os.environ.get("APPDATA") or Path.home())
+    elif system == "Darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share"))
+    return base / "RoastTelemetry"
+
+
 # A larger source than the tray actually needs (typically 16-32px) --
 # the OS downscales it, which looks crisp on a high-DPI/Retina tray;
 # starting from an already-tray-sized image looks soft by comparison.
-ICON_PATH = REPO_ROOT / "frontend" / "public" / "icon-256x256.png"
-# Next to roasts.db/roasts/ -- same backend/data/ directory storage.py
-# already creates, so no separate mkdir concern here.
-LOG_PATH = REPO_ROOT / "backend" / "data" / "server.log"
-CONFIG_PATH = REPO_ROOT / "backend" / "data" / "tray_config.json"
-LOCK_PATH = REPO_ROOT / "backend" / "data" / "tray.lock"
+# Bundled under assets/ in a frozen build (see packaging/roast-telemetry.spec).
+ICON_PATH = (BASE_DIR / "assets" / "icon-256x256.png") if FROZEN else (REPO_ROOT / "frontend" / "public" / "icon-256x256.png")
+# Log/config/lock all move to the real per-user data directory in a
+# frozen build (see _user_data_dir's own docstring for why) -- when
+# running from source, unchanged: next to roasts.db/roasts/, same
+# backend/data/ directory storage.py already creates.
+_DATA_DIR = _user_data_dir() if FROZEN else (REPO_ROOT / "backend" / "data")
+LOG_PATH = _DATA_DIR / "server.log"
+CONFIG_PATH = _DATA_DIR / "tray_config.json"
+LOCK_PATH = _DATA_DIR / "tray.lock"
 
 DEFAULT_CONFIG = {
     "port": 7890,
@@ -50,7 +82,12 @@ DEFAULT_CONFIG = {
     # control of a real heat-producing machine). Type a real IP or
     # 0.0.0.0 via "Host: ..." to opt in.
     "host": "127.0.0.1",
-    "rebuild_on_start": True,
+    # No npm/frontend source exists inside a frozen build (frontend/dist
+    # is already baked into the bundle) -- default off there so a
+    # first-ever launch doesn't immediately hit "npm not found" and
+    # refuse to start (see start()'s own frozen check below, which also
+    # skips this regardless of what's saved, belt-and-suspenders).
+    "rebuild_on_start": not FROZEN,
     "launch_at_login": False,
 }
 
@@ -444,7 +481,7 @@ class TrayApp:
         port = self.config["port"]
         host = self.config["host"]
 
-        if self.config["rebuild_on_start"]:
+        if self.config["rebuild_on_start"] and not FROZEN:
             self._set_status(self.icon_building, "Roast Telemetry (building frontend...)")
             npm = shutil.which("npm")
             if npm is None:
@@ -465,7 +502,16 @@ class TrayApp:
                 return
 
         env = os.environ.copy()
-        env["PYTHONPATH"] = str(REPO_ROOT)
+        if FROZEN:
+            # The bundled backend package is already importable inside
+            # the frozen executable itself -- no source tree to point
+            # PYTHONPATH at. Points storage.py's own DATA_DIR override at
+            # the same per-user directory this file's own log/config/lock
+            # already use, so the server subprocess and this tray process
+            # agree on where roasts.db/roasts/ live.
+            env["ROAST_TELEMETRY_DATA_DIR"] = str(_DATA_DIR)
+        else:
+            env["PYTHONPATH"] = str(REPO_ROOT)
         LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         # Append, not overwrite -- a restart's worth of history is more
         # useful than only ever seeing the current run, and this isn't
@@ -475,12 +521,24 @@ class TrayApp:
         # large internal buffer fills or the process exits.
         self.log_file = open(LOG_PATH, "a", buffering=1)
         self.log_file.write(f"\n=== {datetime.now().isoformat(timespec='seconds')} -- starting on {host}:{port} ===\n")
-        # sys.executable is already this venv's own python (tray.sh/
-        # tray.ps1 launch this script with it) -- `-m uvicorn` sidesteps
-        # ever having to guess .venv/bin/uvicorn vs .venv\Scripts\uvicorn.exe.
+        if FROZEN:
+            # sys.executable is this frozen exe itself (there's no
+            # separate python.exe/uvicorn.exe bundled) -- re-invoke it
+            # with a hidden flag this same file's own __main__ block
+            # recognizes as "act as the server, not the tray icon" (a
+            # standard PyInstaller one-exe/multiple-roles pattern). Keeps
+            # the server as a genuinely separate process either way, same
+            # crash-isolation and stdout/stderr-into-server.log behavior
+            # as the source-tree `-m uvicorn` path below.
+            cmd = [sys.executable, "--run-server", "--host", host, "--port", str(port)]
+        else:
+            # sys.executable is already this venv's own python (tray.sh/
+            # tray.ps1 launch this script with it) -- `-m uvicorn` sidesteps
+            # ever having to guess .venv/bin/uvicorn vs .venv\Scripts\uvicorn.exe.
+            cmd = [sys.executable, "-m", "uvicorn", "backend.app.main:app", "--host", host, "--port", str(port)]
         self.proc = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "backend.app.main:app", "--host", host, "--port", str(port)],
-            cwd=REPO_ROOT,
+            cmd,
+            cwd=BASE_DIR if FROZEN else REPO_ROOT,
             env=env,
             stdout=self.log_file,
             stderr=subprocess.STDOUT,
@@ -625,7 +683,36 @@ class TrayApp:
         self._tk_root.mainloop()
 
 
+def _run_server_entrypoint() -> None:
+    """Only reachable via `--run-server` (see TrayApp.start()'s own
+    comment for why) -- a frozen build has no separate python.exe/
+    uvicorn.exe to shell out to, so the same one exe re-invokes itself
+    with this flag to act as the server instead of the tray icon,
+    a standard PyInstaller one-exe/multiple-roles pattern. Direct
+    Python import + uvicorn.run() rather than the source-tree path's
+    `-m uvicorn app:module` string form -- more robust inside a frozen
+    bundle than relying on uvicorn's own dynamic app-string import
+    machinery to resolve correctly there. Never used when running from
+    source (see TrayApp.start(), which only ever builds this argv shape
+    when FROZEN)."""
+    host = "127.0.0.1"
+    port = 7890
+    args = sys.argv[2:]
+    if "--host" in args:
+        host = args[args.index("--host") + 1]
+    if "--port" in args:
+        port = int(args[args.index("--port") + 1])
+    import uvicorn
+
+    from backend.app.main import app
+
+    uvicorn.run(app, host=host, port=port)
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--run-server":
+        _run_server_entrypoint()
+        sys.exit(0)
     if not _acquire_single_instance_lock():
         print("Roast Telemetry is already running -- check your system tray (it may be in the hidden/overflow icons area, not pinned).")
         sys.exit(0)

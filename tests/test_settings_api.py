@@ -19,6 +19,7 @@ def test_get_settings_defaults(client):
         "small_readout_panels": ["et", "bt", "dt", "ror_bt"], "temperature_unit": "c",
         "vertical_control_layout": [["drum_speed_pct"], ["fan_pct"], ["heater_pct"]],
         "vertical_control_arrows": {},
+        "chart_series_visible": {},
     }
 
 
@@ -165,3 +166,22 @@ def test_put_settings_drops_non_positive_vertical_control_arrows(client):
     })
 
     assert resp.json()["vertical_control_arrows"] == {"heater_pct": 5}
+
+
+def test_put_settings_filters_chart_series_visible(client):
+    resp = client.put("/api/settings", json={
+        "ollama_url": None,
+        "ollama_model": None,
+        "chart_series_visible": {"DT": True, "Damper": False, "not_a_real_series": True},
+    })
+
+    assert resp.json()["chart_series_visible"] == {"DT": True, "Damper": False}
+
+
+def test_chart_series_visible_round_trips_through_a_second_get(client):
+    client.put("/api/settings", json={
+        "ollama_url": None, "ollama_model": None, "chart_series_visible": {"ROR_ET": True},
+    })
+
+    resp = client.get("/api/settings")
+    assert resp.json()["chart_series_visible"] == {"ROR_ET": True}

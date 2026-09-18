@@ -216,6 +216,34 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
       LaunchAgent / Linux autostart, whichever applies).</li>
   </ul>
 
+  <h2 id="standalone-builds">Standalone builds (no Python/Node install needed to run)</h2>
+  <p>
+    Everything above assumes running from a cloned repo with Python and
+    Node installed. <code>packaging/</code> builds a standalone,
+    unsigned distributable instead — a folder (Windows/Linux) or a real
+    <code>.app</code> (macOS) with the same tray icon experience as
+    above, that someone else can just download and run with nothing
+    else installed. Must be built natively on each target platform
+    (there's no cross-compile path) — one command per platform, from a
+    machine with this repo's own dev setup (<code>install.sh</code>/
+    <code>install.ps1</code>) already done:
+  </p>
+  <pre><code>packaging\build-windows.ps1   # Windows, in PowerShell
+scripts/build-macos.sh        # macOS
+scripts/build-linux.sh        # Linux (needs a real desktop -- GTK/AppIndicator --
+                               # to *run* the tray icon; the build itself works from WSL2)</code></pre>
+  <p>
+    Unsigned means a one-time OS warning on whoever's machine first runs
+    it (Windows SmartScreen / macOS Gatekeeper) — expected, not a build
+    error; see
+    <a href="https://github.com/MichaelYagi/roast-telemetry/blob/main/packaging/README.md">packaging/README.md</a>
+    for the exact click-through steps, what actually changes to make a
+    frozen build behave correctly (per-user data directory, the
+    server's own re-exec instead of shelling out to <code>-m
+    uvicorn</code>), and what this does <em>not</em> do yet (code
+    signing, a real installer, auto-update).
+  </p>
+
   <h2>Two ports (for frontend development)</h2>
   <p>
     Use this instead when you're actively editing the frontend and want
@@ -303,19 +331,20 @@ npm run dev</code></pre>
     API-key access entirely without issuing a replacement.
   </p>
 
-  <h2 id="the-four-data-sources">The four data sources</h2>
+  <h2 id="the-data-sources">The data sources</h2>
   <p>
-    Every roast is driven by one of four modes, picked from the
+    Every roast is driven by one of these modes, picked from the
     Configure Roast form's "Data source" dropdown:
   </p>
   <ol>
     <li><strong>Artisan Simulator</strong> — a small thermal model that generates realistic BT/ET/RoR curves and auto-detects roast events (turning point, dry end, first crack, drop). No hardware needed.</li>
     <li><strong>.alog Playback</strong> — loads a real roast log and replays it at real (or accelerated) speed, including its events and notes. Also reads genuine Artisan-exported <code>.alog</code> files, not just this project's own.</li>
-    <li><strong>Direct Modbus (USB)</strong> — talks straight to a real roaster's PLC over Modbus RTU, bypassing Artisan entirely. Ships with defaults for Coffee-Tech's FZ-94; every register is overridable for a different Modbus roaster. See <a href="modbus/index.html">docs/modbus/</a>.</li>
+    <li><strong>Direct Modbus (USB or Ethernet)</strong> — talks straight to a real roaster's PLC over Modbus, bypassing Artisan entirely. Ships with defaults for Coffee-Tech's FZ-94 (USB/RTU) and FZ-94 Evo (Ethernet/TCP); every register is overridable for a different Modbus roaster. See <a href="modbus/index.html">docs/modbus/</a>.</li>
     <li><strong>Direct USB (thermocouple meter)</strong> — reads a Mastech MS6514 dual K-type thermocouple meter straight over USB-serial. Read-only (the meter has no command channel); T1 &rarr; BT, T2 &rarr; ET.</li>
+    <li><strong>Aillio Bullet (USB)</strong> — talks straight to a real Aillio Bullet over its own vendor-specific USB protocol (not Modbus/serial at all). Ships with the R1 model; nothing else to configure per-install (no port/host, the app finds it by its own USB id). See <a href="aillio/bullet-r1.html">docs/aillio/bullet-r1.html</a>.</li>
   </ol>
   <p>
-    Both live-hardware modes leave every milestone (Charge, Dry End, FC
+    Every live-hardware mode leaves every milestone (Charge, Dry End, FC
     Start, and the rest) to the operator's own click by default, rather
     than guessing them from the temperature curve the way the Simulator
     does &mdash; live RoR is still computed and shown either way, to help
@@ -329,11 +358,11 @@ npm run dev</code></pre>
     Clicking <strong>ON</strong> connects to the device and starts
     streaming live readings (nothing recorded yet); <strong>START</strong>
     begins actually recording that stream into a roast — for
-    <code>modbus_live</code>/<code>ms6514_live</code> these are two
-    genuinely separate steps (verify the connection before committing to
-    a roast), matching real Artisan's own connect-then-record model. For
-    <code>simulator</code>/<code>alog_playback</code>, connecting and
-    recording happen together in one step, since there's no real
+    <code>modbus_live</code>/<code>ms6514_live</code>/<code>aillio_live</code>
+    these are two genuinely separate steps (verify the connection before
+    committing to a roast), matching real Artisan's own connect-then-record
+    model. For <code>simulator</code>/<code>alog_playback</code>, connecting
+    and recording happen together in one step, since there's no real
     external connection to verify first.
   </p>
 
@@ -354,19 +383,22 @@ npm run dev</code></pre>
   <h2>Testing without real hardware</h2>
   <p>
     <code>simulator</code> and <code>alog_playback</code> need nothing
-    extra — fully self-contained. The two modes that talk to real
-    hardware (<code>modbus_live</code>, <code>ms6514_live</code>) can
-    each be exercised end-to-end, through the app's actual connection
-    code, using a fake standing in for the real device. The fake itself
-    always runs via <code>scripts/fake-hardware.sh</code> in WSL2/Linux/
-    macOS (it depends on <code>socat</code>, which doesn't exist on
-    Windows) — <strong>which flag you pass depends on where your app is
-    running</strong>, not your own platform:
+    extra — fully self-contained. Two of the three live-hardware modes
+    (<code>modbus_live</code>, <code>ms6514_live</code> — see
+    <code>aillio_live</code>'s own note further down) can each be
+    exercised end-to-end, through the app's actual connection code,
+    using a fake standing in for the real device. The fake itself always
+    runs via <code>scripts/fake-hardware.sh</code> in WSL2/Linux/macOS
+    (it depends on <code>socat</code>, which doesn't exist on Windows,
+    for the two serial-port-based fakes below — the Evo's own TCP fake
+    needs no <code>socat</code> at all) — <strong>which flag you pass
+    depends on where your app is running</strong>, not your own platform:
   </p>
   <p><strong>App running in WSL2/Linux/macOS</strong> (the <a href="#wsl2-linux">WSL2/Linux</a>/<a href="#macos">macOS</a> setup above):</p>
-  <pre><code>scripts/fake-hardware.sh fz94      # Coffee-Tech FZ-94 (Direct Modbus)
+  <pre><code>scripts/fake-hardware.sh fz94      # Coffee-Tech FZ-94, USB (Direct Modbus)
+scripts/fake-hardware.sh evo       # Coffee-Tech FZ-94 Evo, Ethernet (Direct Modbus) -- no socat needed
 scripts/fake-hardware.sh ms6514    # Mastech MS6514 meter (Direct USB)</code></pre>
-  <p>Prints a <code>/tmp/...</code> serial port to paste into the app's Configure Roast form.</p>
+  <p>Prints a <code>/tmp/...</code> serial port (or, for <code>evo</code>, a host/port) to paste into the app's Configure Roast form.</p>
   <p><strong>App running natively on Windows PowerShell</strong> (the <a href="#windows-powershell">Windows — PowerShell</a> setup above) — run this in WSL2 instead, add <code>--tcp</code>:</p>
   <pre><code>scripts/fake-hardware.sh fz94 --tcp      # default port 5020
 scripts/fake-hardware.sh fz94 --tcp 5030 # or a specific port</code></pre>
@@ -377,6 +409,9 @@ scripts/fake-hardware.sh fz94 --tcp 5030 # or a specific port</code></pre>
     listener over WSL2's own localhost port forwarding instead (pyserial
     treats that URL as a live serial connection; verified working end to
     end — both reads and writes — against a real Modbus client).
+    <code>evo</code>'s own fake already speaks real Modbus TCP, so it
+    needs no <code>--tcp</code> bridging at all — it works the same way
+    regardless of where the app runs.
   </p>
   <p>
     Either way it cleans up after itself on Ctrl+C, and picks a fresh
@@ -387,6 +422,16 @@ scripts/fake-hardware.sh fz94 --tcp 5030 # or a specific port</code></pre>
     for the FZ-94 one specifically (the one that can also be
     <em>controlled</em> — Burner/Air/Drum — not just read), including
     options this wrapper doesn't expose (like a separate drive port).
+  </p>
+  <p>
+    <strong>Aillio Bullet (<code>aillio_live</code>) has no fake</strong>
+    — it's a raw USB device, not a serial port or a TCP socket, and
+    convincingly faking a real USB device needs kernel-level emulation
+    well beyond what the other fakes need. It's still thoroughly covered
+    by the backend's own pytest suite (pure protocol-decoding tests, no
+    hardware involved), just not something you can click through in a
+    running instance of the app without a real Bullet. See
+    <a href="aillio/bullet-r1.html">docs/aillio/bullet-r1.html</a>.
   </p>
 
   <h2>Next steps</h2>

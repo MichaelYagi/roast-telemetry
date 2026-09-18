@@ -4,12 +4,14 @@ playback) over its lifecycle and streams samples out over pub/sub.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import shutil
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+from aillio_bridge import AillioEngine
 from alog_playback import (
     AlogPlayer,
     alog_dict_to_points,
@@ -20,6 +22,7 @@ from alog_playback import (
 from mock_device import MockDevice
 from modbus_bridge import ModbusEngine
 from ms6514_bridge import MS6514Engine
+from pymodbus.client import ModbusSerialClient, ModbusTcpClient
 from simulator import SimulatorEngine
 
 from .. import storage
@@ -42,6 +45,8 @@ from ..models import (
     RoastSummary,
 )
 from ..ws_manager import pubsub
+
+logger = logging.getLogger(__name__)
 
 
 class RoastSessionError(RuntimeError):
@@ -170,6 +175,35 @@ class RoastSession:
             self.source_alog_path = request.alog_path
             self.playback_speed = request.playback_speed
 
+        # modbus_live only -- what this roast was actually connected with,
+        # so it's visible later (live view, History detail, server log)
+        # instead of only living in the Configure Roast form's own
+        # transient state. modbus_device_profile_name is resolved once
+        # here (not just the id) so it still reads correctly even if that
+        # profile is later renamed or deleted -- same "freeze what was
+        # configured" reasoning as source_alog_path/auto_detect_milestones
+        # above, not a live pointer.
+        self.modbus_transport: Optional[str] = None
+        self.modbus_port: Optional[str] = None
+        self.modbus_host: Optional[str] = None
+        self.modbus_tcp_port: Optional[int] = None
+        self.modbus_device_profile_name: Optional[str] = None
+        if request.mode == RoastMode.MODBUS_LIVE:
+            self.modbus_transport = request.modbus_transport
+            self.modbus_port = request.modbus_port
+            self.modbus_host = request.modbus_host
+            self.modbus_tcp_port = request.modbus_tcp_port
+
+        # ms6514_live only -- same reasoning as the modbus_* fields above.
+        self.ms6514_port: Optional[str] = None
+        if request.mode == RoastMode.MS6514_LIVE:
+            self.ms6514_port = request.ms6514_port
+
+        # aillio_live only -- same reasoning again.
+        self.aillio_model: Optional[str] = None
+        if request.mode == RoastMode.AILLIO_LIVE:
+            self.aillio_model = request.aillio_model
+
         if request.mode == RoastMode.SIMULATOR:
             engine = SimulatorEngine()
         elif request.mode == RoastMode.ALOG_PLAYBACK:
@@ -177,7 +211,11 @@ class RoastSession:
                 raise RoastSessionError("alog_path is required for alog_playback mode")
             engine = AlogPlayer(request.alog_path, speed=request.playback_speed)
         elif request.mode == RoastMode.MODBUS_LIVE:
-            if not request.modbus_port:
+            is_tcp = request.modbus_transport == "tcp"
+            if is_tcp:
+                if not request.modbus_host:
+                    raise RoastSessionError("modbus_host is required for modbus_live mode with modbus_transport='tcp'")
+            elif not request.modbus_port:
                 raise RoastSessionError("modbus_port is required for modbus_live mode")
             try:
                 if request.modbus_device_profile_id:
@@ -201,14 +239,28 @@ class RoastSession:
                     if profile_row is None:
                         raise RoastSessionError(f"device profile {request.modbus_device_profile_id!r} not found")
                     profile = DeviceProfile.from_row(profile_row)
+                    self.modbus_device_profile_name = profile.name
                     engine = ModbusEngine.from_profile(
                         profile,
                         request.modbus_port,
+                        transport=request.modbus_transport,
+                        host=request.modbus_host,
+                        tcp_port=request.modbus_tcp_port,
                         control_port=request.modbus_control_port,
                         dry_end_c=request.dry_end_c,
                         fc_start_c=request.fc_start_c,
                         detect_milestones=request.auto_detect_milestones,
+                        client_cls=ModbusTcpClient if is_tcp else ModbusSerialClient,
                     )
+                elif is_tcp:
+                    # No sensible flat-register-override default exists for
+                    # TCP the way RTU's FZ-94 defaults do -- and nothing in
+                    # the Configure Roast form can produce this combination
+                    # (the Ethernet Data Source option always pairs with a
+                    # device profile). Guarded explicitly rather than
+                    # silently falling through to the RTU-shaped flat
+                    # constructor below.
+                    raise RoastSessionError("modbus_transport='tcp' requires modbus_device_profile_id")
                 else:
                     engine = ModbusEngine(
                         request.modbus_port,
@@ -234,10 +286,50 @@ class RoastSession:
                 )
             except ValueError as exc:
                 raise RoastSessionError(str(exc)) from exc
+        elif request.mode == RoastMode.AILLIO_LIVE:
+            if not request.aillio_model:
+                raise RoastSessionError("aillio_model is required for aillio_live mode")
+            try:
+                engine = AillioEngine(
+                    request.aillio_model,
+                    dry_end_c=request.dry_end_c,
+                    fc_start_c=request.fc_start_c,
+                    detect_milestones=request.auto_detect_milestones,
+                )
+            except ValueError as exc:
+                raise RoastSessionError(str(exc)) from exc
         else:  # pragma: no cover - guarded by enum
             raise RoastSessionError(f"unsupported mode {request.mode}")
 
         self._engine = engine
+        if request.mode == RoastMode.MODBUS_LIVE:
+            connection = (
+                f"host={self.modbus_host}:{self.modbus_tcp_port}"
+                if self.modbus_transport == "tcp"
+                else f"port={self.modbus_port}"
+            )
+            status = engine.status()
+            logger.info(
+                "roast %s connecting: modbus_live transport=%s %s profile=%s connected=%s%s",
+                self.id, self.modbus_transport, connection,
+                self.modbus_device_profile_name or "(custom/flat registers)",
+                status.get("connected"),
+                f" error={status.get('last_error')}" if not status.get("connected") else "",
+            )
+        elif request.mode == RoastMode.MS6514_LIVE:
+            status = engine.status()
+            logger.info(
+                "roast %s connecting: ms6514_live port=%s connected=%s%s",
+                self.id, self.ms6514_port, status.get("connected"),
+                f" error={status.get('last_error')}" if not status.get("connected") else "",
+            )
+        elif request.mode == RoastMode.AILLIO_LIVE:
+            status = engine.status()
+            logger.info(
+                "roast %s connecting: aillio_live model=%s connected=%s%s",
+                self.id, self.aillio_model, status.get("connected"),
+                f" error={status.get('last_error')}" if not status.get("connected") else "",
+            )
         # Exposed via summary() so the frontend's vertical control panel
         # can convert heater_pct <-> burner_sv_c locally while dragging
         # (optimistic preview -- see ModbusControlChannel.sv_range_c),
@@ -290,6 +382,13 @@ class RoastSession:
             "source_alog_path": self.source_alog_path,
             "playback_speed": self.playback_speed,
             "created_by_username": self.created_by_username,
+            "modbus_transport": self.modbus_transport,
+            "modbus_port": self.modbus_port,
+            "modbus_host": self.modbus_host,
+            "modbus_tcp_port": self.modbus_tcp_port,
+            "modbus_device_profile_name": self.modbus_device_profile_name,
+            "ms6514_port": self.ms6514_port,
+            "aillio_model": self.aillio_model,
         })
         self._recorded = True
 
@@ -774,6 +873,13 @@ class RoastSession:
             dry_end_c=self.dry_end_c,
             fc_start_c=self.fc_start_c,
             burner_sv_range_c=self.burner_sv_range_c,
+            modbus_transport=self.modbus_transport,
+            modbus_port=self.modbus_port,
+            modbus_host=self.modbus_host,
+            modbus_tcp_port=self.modbus_tcp_port,
+            modbus_device_profile_name=self.modbus_device_profile_name,
+            ms6514_port=self.ms6514_port,
+            aillio_model=self.aillio_model,
         )
 
     def to_roast(self) -> Roast:
@@ -800,10 +906,18 @@ class RoastSessionManager:
         an actually active (roasting/cooling) session on the same port is
         never touched here, even if that's also technically a collision --
         this is about cleaning up a leak, not tearing down a real roast."""
+        # aillio_live has no port/host at all (a raw USB device, not a
+        # serial port -- see aillio_bridge/engine.py) but the exact same
+        # leak risk applies to its claimed USB interface, so it's keyed
+        # on the engine's own `model` attribute instead of `port` below.
+        engine_attr = "port"
         if request.mode == RoastMode.MODBUS_LIVE:
-            port = request.modbus_port
+            port = f"{request.modbus_host}:{request.modbus_tcp_port}" if request.modbus_transport == "tcp" else request.modbus_port
         elif request.mode == RoastMode.MS6514_LIVE:
             port = request.ms6514_port
+        elif request.mode == RoastMode.AILLIO_LIVE:
+            port = request.aillio_model
+            engine_attr = "model"
         else:
             return
         if not port:
@@ -811,7 +925,7 @@ class RoastSessionManager:
         for stale_id, stale in list(self.sessions.items()):
             if stale.mode != request.mode or stale.status != RoastStatus.IDLE or stale._recorded:
                 continue
-            if getattr(stale._engine, "port", None) == port:
+            if getattr(stale._engine, engine_attr, None) == port:
                 stale._engine.close()
                 del self.sessions[stale_id]
 
@@ -823,12 +937,12 @@ class RoastSessionManager:
         RoastSession.start()/begin_recording()'s _persist_new_roast_row()
         calls), since a modbus_live/ms6514_live session can now sit
         connected-but-not-recording for a while first (see connect())."""
-        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE):
+        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE):
             self._release_stale_same_port_session(request)
         roast_id = str(uuid.uuid4())
         session = RoastSession(roast_id, request, created_by_username=created_by_username)
-        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE):
-            # ModbusEngine/MS6514Engine's __init__ already made the real
+        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE):
+            # ModbusEngine/MS6514Engine/AillioEngine's __init__ already made the real
             # connect attempt above and caught/swallowed any failure into
             # last_error rather than raising -- without this check, a bad
             # port (wrong COM number, or one Artisan is still holding open)
@@ -904,6 +1018,13 @@ class RoastSessionManager:
             created_by_username=row.get("created_by_username"),
             source_alog_path=row.get("source_alog_path"),
             playback_speed=row.get("playback_speed"),
+            modbus_transport=row.get("modbus_transport"),
+            modbus_port=row.get("modbus_port"),
+            modbus_host=row.get("modbus_host"),
+            modbus_tcp_port=row.get("modbus_tcp_port"),
+            modbus_device_profile_name=row.get("modbus_device_profile_name"),
+            ms6514_port=row.get("ms6514_port"),
+            aillio_model=row.get("aillio_model"),
             profile=parsed["profile"],
             events=parsed["events"],
             notes=parsed["notes"],

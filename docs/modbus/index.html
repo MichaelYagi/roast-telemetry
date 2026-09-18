@@ -25,11 +25,14 @@
   <h1>Direct Modbus Bridge</h1>
   <p>
     <code>modbus_bridge</code> (<code>ModbusEngine</code>) talks straight
-    to a real roaster's PLC over Modbus RTU (USB/serial), bypassing
-    Artisan entirely. It can also <em>control</em> the roaster
-    (Burner/Air/Drum), since that's just standard Modbus register reads
-    and writes — the only one of the four data sources that can, besides
-    the Simulator.
+    to a real roaster's PLC over Modbus RTU (USB/serial) or TCP
+    (Ethernet), bypassing Artisan entirely. It can also
+    <em>control</em> the roaster (Burner/Air/Drum), since that's just
+    standard Modbus register reads and writes — alongside the Simulator
+    and the Aillio Bullet (its own, genuinely different USB protocol —
+    see <a href="../aillio/bullet-r1.html">docs/aillio/bullet-r1.html</a>),
+    the only live data sources that can; Direct USB (thermocouple meter)
+    is read-only.
   </p>
   <p>
     This page covers what's true for <em>any</em> Modbus-connected
@@ -131,7 +134,7 @@
       <strong>ON connects and starts reading; START begins
       recording.</strong> These are two separate steps for Modbus
       specifically (see
-      <a href="../getting-started.html#the-four-data-sources">Getting started</a>)
+      <a href="../getting-started.html#the-data-sources">Getting started</a>)
       — clicking ON opens the connection and streams live values
       immediately, with nothing recorded and no roast created yet; a Test
       Connection panel appears at that point to verify reads (and
@@ -218,7 +221,7 @@
   <p>
     Every milestone (Charge, Dry End, First Crack, ...) is a plain manual
     click by default — see
-    <a href="../getting-started.html#the-four-data-sources">Getting started</a>.
+    <a href="../getting-started.html#the-data-sources">Getting started</a>.
     You can optionally bind a Burner/Air/Drum command, an in-app banner
     message, or both, to fire automatically — matching what Artisan calls
     "Alarms." Configured per saved preset, from the "Automation rules"

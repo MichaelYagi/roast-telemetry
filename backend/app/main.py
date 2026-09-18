@@ -26,11 +26,37 @@ FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "di
 # connection fields to begin with, so a preset for either would just be
 # an empty form.
 _DEFAULT_PRESETS = [
-    {"id": "default-fz94-usb", "name": "FZ-94, USB", "config": RoastCreateRequest(title="", mode="modbus_live")},
+    {
+        "id": "default-fz94-usb",
+        "name": "FZ-94, USB",
+        "config": RoastCreateRequest(title="", mode="modbus_live"),
+        "manufacturer": "Coffee-Tech",
+    },
+    {
+        "id": "default-fz94-evo",
+        "name": "FZ-94 Evo, Ethernet",
+        # Factory default IP/port -- see modbus_bridge/device_profiles.py
+        # for the full sourcing on this profile's register map.
+        "config": RoastCreateRequest(
+            title="", mode="modbus_live", modbus_transport="tcp",
+            modbus_host="192.168.1.2", modbus_tcp_port=502,
+            modbus_device_profile_id="coffeetech-fz94-evo",
+        ),
+        "manufacturer": "Coffee-Tech",
+    },
     {
         "id": "default-ms6514-usb",
         "name": "Mastech MS6514, USB",
         "config": RoastCreateRequest(title="", mode="ms6514_live"),
+    },
+    {
+        "id": "default-aillio-bullet-r1",
+        "name": "Bullet R1, USB",
+        # No port/host at all -- a raw USB device found by its own
+        # vendor/product id (see aillio_bridge/transport.py), genuinely
+        # nothing else to configure, unlike the serial-port presets above.
+        "config": RoastCreateRequest(title="", mode="aillio_live", aillio_model="r1"),
+        "manufacturer": "Aillio",
     },
 ]
 
@@ -50,6 +76,7 @@ async def lifespan(app: FastAPI):
             "name": p["name"],
             "created_at": datetime.now(timezone.utc).isoformat(),
             "config_json": p["config"].model_dump_json(),
+            "manufacturer": p.get("manufacturer"),
         }
         for p in _DEFAULT_PRESETS
     ])

@@ -1,10 +1,7 @@
 """backend/app/api/device_profiles.py -- the DeviceProfile CRUD router.
-Presets have no equivalent API-level test file (only storage-layer CRUD
-in test_storage.py, see test_preset_crud there) since they have no
-analogous protected-row concept; device profiles do (built_in=True
-seeded rows reject PUT/DELETE), which is worth exercising through the
-actual HTTP layer, not just storage.
-"""
+See tests/test_presets_api.py for the equivalent test file covering
+RoastPreset's own built_in=True protected-row concept, added later
+alongside this one (both reject PUT/DELETE on a seeded row)."""
 from __future__ import annotations
 
 

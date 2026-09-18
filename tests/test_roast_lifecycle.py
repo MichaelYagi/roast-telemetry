@@ -78,6 +78,56 @@ def test_begin_recording_persists_the_roast_row_and_sets_roasting(isolated_db):
     asyncio.run(body())
 
 
+def test_modbus_live_connection_details_are_persisted_and_summarized(isolated_db):
+    """What a modbus_live roast was actually connected with (transport,
+    port/host, device profile) should be visible later -- live summary()
+    and the persisted DB row both -- not just live in the Configure Roast
+    form's own transient state. See RoastSession.__init__.
+
+    Constructs RoastSession directly (not manager.create()), same as the
+    stale-same-port-release tests above -- BOGUS_PORT genuinely can't
+    connect, and manager.create() itself refuses that (by design), but
+    connect()/begin_recording() have no such gate, so this stays a fair,
+    fast, no-real-hardware test of the persistence itself."""
+    async def body():
+        request = RoastCreateRequest(
+            title="Test Roast", mode=RoastMode.MODBUS_LIVE,
+            modbus_transport="serial", modbus_port=BOGUS_PORT,
+        )
+        session = RoastSession("modbus-persist-test", request)
+        await session.connect()
+        try:
+            summary = session.summary()
+            assert summary.modbus_transport == "serial"
+            assert summary.modbus_port == BOGUS_PORT
+
+            await session.begin_recording()
+            row = isolated_db.get_roast_row(session.id)
+            assert row["modbus_transport"] == "serial"
+            assert row["modbus_port"] == BOGUS_PORT
+        finally:
+            await _stop_background_task(session)
+
+    asyncio.run(body())
+
+
+def test_ms6514_live_connection_details_are_persisted_and_summarized(isolated_db):
+    async def body():
+        request = RoastCreateRequest(title="Test Roast", mode=RoastMode.MS6514_LIVE, ms6514_port=BOGUS_PORT)
+        session = RoastSession("ms6514-persist-test", request)
+        await session.connect()
+        try:
+            assert session.summary().ms6514_port == BOGUS_PORT
+
+            await session.begin_recording()
+            row = isolated_db.get_roast_row(session.id)
+            assert row["ms6514_port"] == BOGUS_PORT
+        finally:
+            await _stop_background_task(session)
+
+    asyncio.run(body())
+
+
 def test_set_weight_roasted_persists_to_the_db_row(isolated_db):
     # Real workflow: roast finishes, beans cool, *then* get weighed -- by
     # which point this session may be the only thing standing between the

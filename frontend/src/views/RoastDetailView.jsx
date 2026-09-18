@@ -7,12 +7,22 @@ import { formatTemp } from "../tempUnits.js";
 
 // Mirrors the Configure Roast form's <option> labels (LiveRoastView.jsx)
 // so history shows the same human-readable name, not the raw mode enum.
-const MODE_LABELS = {
-  simulator: "Simulator",
-  alog_playback: ".alog Playback",
-  modbus_live: "Direct Modbus (USB)",
-  ms6514_live: "Direct USB (thermocouple meter)",
-};
+// modbus_live covers both USB and Ethernet (see roast.modbus_transport --
+// mode alone can't distinguish them, same reasoning as the Configure Roast
+// form's own Data Source dropdown), so this is a function, not a plain
+// lookup, for that one entry.
+function modeLabel(roast) {
+  if (roast.mode === "modbus_live") {
+    return roast.modbus_transport === "tcp" ? "Direct Modbus (Ethernet)" : "Direct Modbus (USB)";
+  }
+  const MODE_LABELS = {
+    simulator: "Simulator",
+    alog_playback: ".alog Playback",
+    ms6514_live: "Direct USB (thermocouple meter)",
+    aillio_live: "Aillio Bullet (USB)",
+  };
+  return MODE_LABELS[roast.mode] || roast.mode;
+}
 
 // Mirrors backend/app/api/roasts.py's alog_filename() exactly -- same
 // input (title + the raw created_at ISO string, sliced not reformatted),
@@ -190,7 +200,7 @@ export default function RoastDetailView() {
           <ul className="kv-list">
             <li>
               <span>Mode</span>
-              <span>{MODE_LABELS[roast.mode] || roast.mode}</span>
+              <span>{modeLabel(roast)}</span>
             </li>
             <li>
               <span>Roasted by</span>
@@ -207,6 +217,34 @@ export default function RoastDetailView() {
                   <span>{roast.playback_speed != null ? `${roast.playback_speed}x` : "—"}</span>
                 </li>
               </>
+            )}
+            {roast.mode === "modbus_live" && (
+              <>
+                <li>
+                  <span>Connection</span>
+                  <span>
+                    {roast.modbus_transport === "tcp"
+                      ? `${roast.modbus_host || "—"}:${roast.modbus_tcp_port || "—"}`
+                      : roast.modbus_port || "—"}
+                  </span>
+                </li>
+                <li>
+                  <span>Device profile</span>
+                  <span>{roast.modbus_device_profile_name || "Custom (advanced fields)"}</span>
+                </li>
+              </>
+            )}
+            {roast.mode === "ms6514_live" && (
+              <li>
+                <span>Serial port</span>
+                <span>{roast.ms6514_port || "—"}</span>
+              </li>
+            )}
+            {roast.mode === "aillio_live" && (
+              <li>
+                <span>Model</span>
+                <span>{roast.aillio_model ? `Aillio Bullet ${roast.aillio_model.toUpperCase()}` : "—"}</span>
+              </li>
             )}
           </ul>
 

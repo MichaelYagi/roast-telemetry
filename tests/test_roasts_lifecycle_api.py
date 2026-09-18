@@ -31,6 +31,65 @@ def test_create_roast_with_unreachable_modbus_port_creates_no_roast(client):
     assert resp.json() == []
 
 
+def test_create_roast_with_tcp_transport_and_no_profile_returns_an_error_not_201(client):
+    """modbus_transport='tcp' has no sensible flat-register-override
+    default the way RTU's FZ-94 defaults do -- see
+    RoastSession.__init__'s explicit guard for this combination."""
+    resp = client.post("/api/roasts", json={
+        "title": "Test Roast", "mode": "modbus_live", "modbus_transport": "tcp", "modbus_host": "192.168.1.2",
+    })
+
+    assert resp.status_code == 400
+    assert "modbus_device_profile_id" in resp.json()["detail"]
+
+
+def test_create_roast_with_tcp_transport_and_no_host_returns_an_error_not_201(client):
+    resp = client.post("/api/roasts", json={
+        "title": "Test Roast", "mode": "modbus_live", "modbus_transport": "tcp",
+        "modbus_device_profile_id": "coffeetech-fz94-evo",
+    })
+
+    assert resp.status_code == 400
+    assert "modbus_host" in resp.json()["detail"]
+
+
+def test_create_roast_with_unreachable_tcp_host_returns_an_error_not_201(client):
+    resp = client.post("/api/roasts", json={
+        "title": "Test Roast", "mode": "modbus_live", "modbus_transport": "tcp",
+        "modbus_host": "203.0.113.1",  # TEST-NET-3 (RFC 5737) -- guaranteed unroutable, never a real device
+        "modbus_device_profile_id": "coffeetech-fz94-evo",
+    })
+
+    assert resp.status_code == 400
+
+    resp = client.get("/api/roasts")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_create_aillio_roast_without_pyusb_returns_an_error_not_201(client):
+    """No real/fake USB device involved -- pyusb isn't installed in this
+    test environment, so AillioEngine's default real transport always
+    fails to import it, giving the exact same "engine caught the
+    connect failure internally, RoastSessionManager.create() turns it
+    into a real error" case the BOGUS_PORT tests above exercise for
+    modbus_live."""
+    resp = client.post("/api/roasts", json={"title": "Test Roast", "mode": "aillio_live", "aillio_model": "r1"})
+
+    assert resp.status_code == 400
+
+    resp = client.get("/api/roasts")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_create_aillio_roast_without_a_model_returns_an_error_not_201(client):
+    resp = client.post("/api/roasts", json={"title": "Test Roast", "mode": "aillio_live"})
+
+    assert resp.status_code == 400
+    assert "aillio_model" in resp.json()["detail"]
+
+
 def test_begin_recording_on_unknown_roast_returns_404(client):
     resp = client.post("/api/roasts/does-not-exist/start")
     assert resp.status_code == 404

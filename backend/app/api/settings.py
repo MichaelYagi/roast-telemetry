@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse
 
 from .. import ollama_client, storage
-from ..models import BREAKOUT_PANEL_KEYS, VERTICAL_CONTROL_KEYS, AppSettings, OllamaStatus
+from ..models import BREAKOUT_PANEL_KEYS, CHART_SERIES_KEYS, VERTICAL_CONTROL_KEYS, AppSettings, OllamaStatus
 from ..ws_manager import settings_pubsub
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -60,6 +60,10 @@ def _filter_arrows(arrows: dict[str, float]) -> dict[str, float]:
     return {k: v for k, v in arrows.items() if k in VERTICAL_CONTROL_KEYS and v and v > 0}
 
 
+def _filter_series_visible(visible: dict[str, bool]) -> dict[str, bool]:
+    return {k: bool(v) for k, v in visible.items() if k in CHART_SERIES_KEYS}
+
+
 @router.get("/stream")
 async def stream_settings() -> EventSourceResponse:
     """Pushes the current settings immediately, then again on every save
@@ -101,6 +105,7 @@ async def update_settings(settings: AppSettings) -> AppSettings:
     temperature_unit = settings.temperature_unit if settings.temperature_unit in ("c", "f") else "c"
     vertical_layout = _filter_vertical_layout(settings.vertical_control_layout)
     vertical_arrows = _filter_arrows(settings.vertical_control_arrows)
+    series_visible = _filter_series_visible(settings.chart_series_visible)
     storage.set_settings(
         ollama_url=settings.ollama_url,
         ollama_model=settings.ollama_model,
@@ -110,6 +115,7 @@ async def update_settings(settings: AppSettings) -> AppSettings:
         temperature_unit=temperature_unit,
         vertical_control_layout=vertical_layout,
         vertical_control_arrows=vertical_arrows,
+        chart_series_visible=series_visible,
     )
     result = AppSettings(
         ollama_url=settings.ollama_url,
@@ -120,6 +126,7 @@ async def update_settings(settings: AppSettings) -> AppSettings:
         temperature_unit=temperature_unit,
         vertical_control_layout=vertical_layout,
         vertical_control_arrows=vertical_arrows,
+        chart_series_visible=series_visible,
     )
     await settings_pubsub.publish(result.model_dump_json())
     return result

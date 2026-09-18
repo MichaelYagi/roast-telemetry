@@ -9,7 +9,8 @@ a real roast no matter which one you're using.
 
 | Fake | Stands in for | Protocol | Needs a virtual serial port? |
 |---|---|---|---|
-| `modbus_fz94.py` | Coffee-Tech FZ-94 (plain, not EVO) | Modbus RTU (hand-rolled framing) | Yes — one (two only for unusual wiring) |
+| `modbus_fz94.py` | Coffee-Tech FZ-94 (plain, not Evo) | Modbus RTU (hand-rolled framing) | Yes — one (two only for unusual wiring) |
+| `modbus_fz94_evo.py` | Coffee-Tech FZ-94 Evo | Modbus TCP (hand-rolled MBAP framing) | No — a real TCP listener, point the app straight at it |
 | `ms6514_device.py` | Mastech MS6514 meter | Raw 18-byte serial frames | Yes |
 
 **Quick start:** `../scripts/fake-hardware.sh fz94` or
@@ -28,6 +29,13 @@ both -- over WSL2's default localhost port forwarding). The manual
 steps below are what it's doing under the hood either way, useful if
 you need something the wrapper doesn't expose (e.g. `--drive-port` for
 a genuinely separate Air/Drum connection).
+
+`../scripts/fake-hardware.sh evo [port]` (default 5020) is the Evo's
+own equivalent, but genuinely simpler -- the Evo speaks real Modbus TCP
+natively, so there's no socat/virtual-serial-port step at all, no
+`--tcp` flag, and it works identically whether the app runs in WSL or
+natively on Windows. It prints the host/port/device-profile to paste
+into the app's Data Source "Direct Modbus (Ethernet)" fields.
 
 ## Virtual serial port setup
 
@@ -67,6 +75,21 @@ python -m hardware_fakes.ms6514_device --port /tmp/ttyFAKE_METER
 In the app, choose **Direct USB (thermocouple meter)**, serial port
 `/tmp/ttyFAKE_METER_APP`. This one's read-only in real life too, so
 there's nothing to control -- just BT/ET streaming in.
+
+## Modbus TCP (FZ-94 Evo)
+
+None of the virtual-serial-port setup above applies here -- the Evo
+speaks real Modbus TCP natively, so its fake is just a plain TCP
+listener:
+
+```
+python -m hardware_fakes.modbus_fz94_evo --port 5020
+```
+
+In the app, choose Data source **Direct Modbus (Ethernet)**, Host
+`127.0.0.1`, TCP port `5020`, Device profile "Coffee-Tech FZ-94 Evo
+(built-in)". Works identically whether the app runs in WSL or natively
+on Windows -- both reach `127.0.0.1` directly, no bridging needed.
 
 ## Notes
 

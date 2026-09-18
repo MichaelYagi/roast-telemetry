@@ -10,6 +10,7 @@ import {
 import zoomPlugin from "chartjs-plugin-zoom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
+import { api } from "../api/client.js";
 import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 import { TERM_TOOLTIPS } from "../termTooltips.js";
 
@@ -418,6 +419,29 @@ export default function RoastChart({
   const [visible, setVisible] = useState(() =>
     Object.fromEntries(SERIES_DEFS.map((s) => [s.key, s.defaultOn]))
   );
+  // Holds the *full* settings object (not just chart_series_visible) --
+  // PUT /api/settings has no partial-update semantics, it overwrites
+  // every field with whatever the request body provides (see
+  // backend/app/api/settings.py's update_settings docstring), so a
+  // toggle here has to send the whole object back, not just this one
+  // field, or every other setting (Ollama config, breakout panels,
+  // vertical control layout) would get silently wiped to its default.
+  const savedSettingsRef = useRef(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.getSettings().then((s) => {
+      if (cancelled) return;
+      savedSettingsRef.current = s;
+      // Defaults first, saved overrides second -- a series that's never
+      // been explicitly saved (a fresh install, or one added in a later
+      // version) still gets its own correct defaultOn instead of being
+      // forced off by an absent key.
+      setVisible((prev) => ({ ...prev, ...s.chart_series_visible }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [hideEventLabels, setHideEventLabels] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   // Right-click context menu: {eventId, x, y} in viewport coordinates
@@ -497,7 +521,25 @@ export default function RoastChart({
   }, [seriesDefs, profile, events, background]);
 
   function toggle(key) {
-    setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
+    setVisible((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      // Fire-and-forget -- don't block the checkbox's own responsiveness
+      // on the network round trip. Only persists for the static
+      // SERIES_DEFS keys (see CHART_SERIES_KEYS on the backend); a
+      // toggle on a dynamic background/extra-channel key (not one of
+      // those) still updates local `visible` above but is silently
+      // dropped by the backend's own filter rather than erroring, same
+      // as any other unknown key sent to PUT /api/settings.
+      if (savedSettingsRef.current) {
+        const updated = {
+          ...savedSettingsRef.current,
+          chart_series_visible: { ...savedSettingsRef.current.chart_series_visible, [key]: next[key] },
+        };
+        savedSettingsRef.current = updated;
+        api.saveSettings(updated).catch(() => {});
+      }
+      return next;
+    });
   }
 
   const data = useMemo(() => {

@@ -8,12 +8,22 @@ matter of changing the connection + a couple of ``?`` placeholders.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Optional
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+# Defaults to the source-tree-relative path every dev/CI usage has
+# always used (zero behavior change there -- this env var is never set
+# in any of those). Only a packaged desktop build (see packaging/, and
+# scripts/tray_app.py's own frozen-mode setup) sets it, to point at a
+# real per-user writable directory instead of a path relative to
+# wherever this file happens to be unpacked inside a frozen bundle,
+# which may not even be writable (e.g. Program Files).
+DATA_DIR = Path(os.environ["ROAST_TELEMETRY_DATA_DIR"]) if os.environ.get("ROAST_TELEMETRY_DATA_DIR") else (
+    Path(__file__).resolve().parent.parent / "data"
+)
 ROASTS_DIR = DATA_DIR / "roasts"
 SAMPLE_ROASTS_DIR = DATA_DIR / "sample_roasts"
 DB_PATH = DATA_DIR / "roasts.db"
@@ -36,7 +46,14 @@ CREATE TABLE IF NOT EXISTS roasts (
     alog_path TEXT,
     source_alog_path TEXT,
     playback_speed REAL,
-    created_by_username TEXT
+    created_by_username TEXT,
+    modbus_transport TEXT,
+    modbus_port TEXT,
+    modbus_host TEXT,
+    modbus_tcp_port INTEGER,
+    modbus_device_profile_name TEXT,
+    ms6514_port TEXT,
+    aillio_model TEXT
 );
 
 CREATE TABLE IF NOT EXISTS roast_presets (
@@ -46,7 +63,9 @@ CREATE TABLE IF NOT EXISTS roast_presets (
     config_json TEXT NOT NULL,
     heater_pct REAL,
     fan_pct REAL,
-    drum_speed_pct REAL
+    drum_speed_pct REAL,
+    manufacturer TEXT,
+    built_in INTEGER NOT NULL DEFAULT 0
 );
 
 -- A named Modbus register map (DeviceProfile) for one roaster brand/
@@ -142,12 +161,36 @@ def init_db() -> None:
         # read back as "no attribution", not an error.
         if "created_by_username" not in existing_cols:
             c.execute("ALTER TABLE roasts ADD COLUMN created_by_username TEXT")
+        # Idempotent migration for DBs created before roasts carried what
+        # they were actually connected with (modbus_live only -- see
+        # RoastSession.__init__/summary()).
+        if "modbus_transport" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN modbus_transport TEXT")
+        if "modbus_port" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN modbus_port TEXT")
+        if "modbus_host" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN modbus_host TEXT")
+        if "modbus_tcp_port" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN modbus_tcp_port INTEGER")
+        if "modbus_device_profile_name" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN modbus_device_profile_name TEXT")
+        if "ms6514_port" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN ms6514_port TEXT")
+        if "aillio_model" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN aillio_model TEXT")
         # Idempotent migration for DBs created before roast_presets carried
         # control-channel starting values.
         preset_cols = {row[1] for row in c.execute("PRAGMA table_info(roast_presets)")}
         for col in ("heater_pct", "fan_pct", "drum_speed_pct"):
             if col not in preset_cols:
                 c.execute(f"ALTER TABLE roast_presets ADD COLUMN {col} REAL")
+        # Idempotent migration for DBs created before roast_presets carried
+        # manufacturer grouping / built-in-and-undeletable support (see
+        # api/presets.py, DeviceProfile.built_in's own precedent).
+        if "manufacturer" not in preset_cols:
+            c.execute("ALTER TABLE roast_presets ADD COLUMN manufacturer TEXT")
+        if "built_in" not in preset_cols:
+            c.execute("ALTER TABLE roast_presets ADD COLUMN built_in INTEGER NOT NULL DEFAULT 0")
         # Idempotent migration for DBs created before users carried an API
         # key. The uniqueness index has to be created here, after the
         # column definitely exists (ADD COLUMN can't itself carry UNIQUE --
@@ -169,11 +212,17 @@ def insert_roast(summary: dict) -> None:
             """INSERT INTO roasts
                (id, title, mode, status, created_at, beans,
                 weight_green_g, weight_roasted_g, duration_s, alog_path, source_alog_path, playback_speed,
-                created_by_username)
+                created_by_username, modbus_transport, modbus_port, modbus_host, modbus_tcp_port,
+                modbus_device_profile_name, ms6514_port, aillio_model)
                VALUES (:id, :title, :mode, :status, :created_at, :beans,
                        :weight_green_g, :weight_roasted_g, :duration_s, :alog_path, :source_alog_path,
-                       :playback_speed, :created_by_username)""",
-            {"source_alog_path": None, "playback_speed": None, "created_by_username": None, **summary},
+                       :playback_speed, :created_by_username, :modbus_transport, :modbus_port, :modbus_host,
+                       :modbus_tcp_port, :modbus_device_profile_name, :ms6514_port, :aillio_model)""",
+            {
+                "source_alog_path": None, "playback_speed": None, "created_by_username": None,
+                "modbus_transport": None, "modbus_port": None, "modbus_host": None, "modbus_tcp_port": None,
+                "modbus_device_profile_name": None, "ms6514_port": None, "aillio_model": None, **summary,
+            },
         )
 
 
@@ -250,34 +299,56 @@ def seed_default_presets(seeds: list[dict]) -> None:
     because its own row is gone next time the app starts. Per-id (not one
     marker for the whole batch) so adding a *new* default preset in a
     later version still gets seeded for existing installs that already
-    have the marker for earlier ones."""
+    have the marker for earlier ones. Also re-syncs built_in/manufacturer
+    on already-seeded rows every startup (see the loop below) -- both are
+    always app-managed (the API blocks editing a built_in row), so an
+    install that seeded a preset before those columns existed gets them
+    backfilled instead of staying stuck at built_in=0/manufacturer=NULL
+    forever."""
     with _conn() as c:
         for preset in seeds:
             marker_key = f"seeded_default_preset:{preset['id']}"
             already_seeded = c.execute("SELECT 1 FROM settings WHERE key = ?", (marker_key,)).fetchone()
-            if already_seeded is not None:
+            if already_seeded is None:
+                # OR IGNORE, not a plain INSERT: an earlier version of this
+                # function tracked seeding with one marker for the whole
+                # batch, so on an install that already ran that version,
+                # this preset's row can already exist even though its own
+                # new per-id marker doesn't -- a plain INSERT there would
+                # hit the existing primary key and crash startup.
+                c.execute(
+                    """INSERT OR IGNORE INTO roast_presets
+                       (id, name, created_at, config_json, heater_pct, fan_pct, drum_speed_pct, manufacturer, built_in)
+                       VALUES (:id, :name, :created_at, :config_json, :heater_pct, :fan_pct, :drum_speed_pct, :manufacturer, :built_in)""",
+                    {"heater_pct": None, "fan_pct": None, "drum_speed_pct": None, "manufacturer": None, "built_in": 1, **preset},
+                )
+                c.execute("INSERT INTO settings (key, value) VALUES (:key, :value)", {"key": marker_key, "value": "1"})
                 continue
-            # OR IGNORE, not a plain INSERT: an earlier version of this
-            # function tracked seeding with one marker for the whole
-            # batch, so on an install that already ran that version, this
-            # preset's row can already exist even though its own new
-            # per-id marker doesn't -- a plain INSERT there would hit the
-            # existing primary key and crash startup.
+            # Already seeded (marker exists) -- but built_in/manufacturer
+            # were added to this table after the very first default
+            # presets shipped, so an install that seeded e.g.
+            # "default-fz94-usb" before then still has built_in=0,
+            # manufacturer=NULL on that row forever, since the block
+            # above never runs again for it. These two fields are always
+            # app-managed (the API blocks PUT on a built_in row, so a
+            # user could never have set them to anything else), so it's
+            # safe to keep them in sync with the current seed definition
+            # on every startup -- WHERE id = ... makes this a no-op if
+            # the row doesn't exist (e.g. deleted before built_in
+            # protection existed), which correctly leaves it deleted
+            # rather than resurrecting it.
             c.execute(
-                """INSERT OR IGNORE INTO roast_presets
-                   (id, name, created_at, config_json, heater_pct, fan_pct, drum_speed_pct)
-                   VALUES (:id, :name, :created_at, :config_json, :heater_pct, :fan_pct, :drum_speed_pct)""",
-                {"heater_pct": None, "fan_pct": None, "drum_speed_pct": None, **preset},
+                "UPDATE roast_presets SET built_in = :built_in, manufacturer = :manufacturer WHERE id = :id",
+                {"built_in": 1, "manufacturer": preset.get("manufacturer"), "id": preset["id"]},
             )
-            c.execute("INSERT INTO settings (key, value) VALUES (:key, :value)", {"key": marker_key, "value": "1"})
 
 
 def insert_preset(preset: dict) -> None:
     with _conn() as c:
         c.execute(
-            """INSERT INTO roast_presets (id, name, created_at, config_json, heater_pct, fan_pct, drum_speed_pct)
-               VALUES (:id, :name, :created_at, :config_json, :heater_pct, :fan_pct, :drum_speed_pct)""",
-            {"heater_pct": None, "fan_pct": None, "drum_speed_pct": None, **preset},
+            """INSERT INTO roast_presets (id, name, created_at, config_json, heater_pct, fan_pct, drum_speed_pct, manufacturer, built_in)
+               VALUES (:id, :name, :created_at, :config_json, :heater_pct, :fan_pct, :drum_speed_pct, :manufacturer, 0)""",
+            {"heater_pct": None, "fan_pct": None, "drum_speed_pct": None, "manufacturer": None, **preset},
         )
 
 
@@ -286,9 +357,10 @@ def update_preset_row(preset_id: str, preset: dict) -> None:
         c.execute(
             """UPDATE roast_presets
                SET name = :name, config_json = :config_json,
-                   heater_pct = :heater_pct, fan_pct = :fan_pct, drum_speed_pct = :drum_speed_pct
+                   heater_pct = :heater_pct, fan_pct = :fan_pct, drum_speed_pct = :drum_speed_pct,
+                   manufacturer = :manufacturer
                WHERE id = :id""",
-            {"heater_pct": None, "fan_pct": None, "drum_speed_pct": None, **preset, "id": preset_id},
+            {"heater_pct": None, "fan_pct": None, "drum_speed_pct": None, "manufacturer": None, **preset, "id": preset_id},
         )
 
 
@@ -424,6 +496,12 @@ def get_settings() -> dict:
         }
     except (json.JSONDecodeError, TypeError):
         vertical_control_arrows = {}
+    try:
+        chart_series_visible = (
+            json.loads(values["chart_series_visible"]) if values.get("chart_series_visible") else {}
+        )
+    except (json.JSONDecodeError, TypeError):
+        chart_series_visible = {}
     return {
         "ollama_url": values.get("ollama_url"),
         "ollama_model": values.get("ollama_model"),
@@ -433,6 +511,7 @@ def get_settings() -> dict:
         "temperature_unit": values.get("temperature_unit") or "c",
         "vertical_control_layout": vertical_control_layout,
         "vertical_control_arrows": vertical_control_arrows,
+        "chart_series_visible": chart_series_visible,
     }
 
 
@@ -447,6 +526,8 @@ def set_settings(**kv) -> None:
         kv["vertical_control_layout"] = json.dumps(kv["vertical_control_layout"])
     if "vertical_control_arrows" in kv:
         kv["vertical_control_arrows"] = json.dumps(kv["vertical_control_arrows"])
+    if "chart_series_visible" in kv:
+        kv["chart_series_visible"] = json.dumps(kv["chart_series_visible"])
     with _conn() as c:
         for key, value in kv.items():
             c.execute(
