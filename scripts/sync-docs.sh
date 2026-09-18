@@ -2,11 +2,14 @@
 # Publishes docs/ to the public site at https://michaelyagi.github.io/roast-telemetry
 # -- a genuinely separate GitHub repo (michaelyagi.github.io) from this
 # one, since this repo is private and GitHub Pages can't serve a
-# private repo's content directly. Nothing else in this repo runs this
-# automatically (deliberately not wired into packaging/'s build
-# scripts, which build platform executables, an unrelated concern --
-# this is its own explicit step, run whenever you actually want to
-# publish a docs change).
+# private repo's content directly. Runs automatically in CI on every
+# push to main that touches docs/ (.github/workflows/docs.yml) --
+# deliberately its own workflow, not folded into packaging/'s build
+# scripts (those build platform executables, an unrelated concern) or
+# ci.yml (that's PR-triggered too, and a PR isn't merged yet -- nothing
+# should publish from one). Also runnable by hand for the same reason
+# any CI step is: to test a change or force a sync without waiting on
+# a push.
 #
 # What it does:
 #   1. Clones/updates a local copy of michaelyagi.github.io next to
@@ -25,18 +28,38 @@
 #   3. Commits and pushes, but only if something actually changed.
 #
 # Usage: scripts/sync-docs.sh
+# Also runs in CI (.github/workflows/docs.yml, on every push to main
+# that touches docs/) -- set PAGES_DEPLOY_TOKEN (a PAT with push access
+# to michaelyagi.github.io; GITHUB_TOKEN's own default permissions
+# don't reach outside this repo) to authenticate non-interactively
+# instead of relying on whatever git credentials are already configured
+# locally. Same script either way -- one code path, not a separate CI
+# implementation to keep in sync with this one.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO_ROOT="$(pwd)"
 MIRROR_DIR="${MIRROR_DIR:-$REPO_ROOT/../michaelyagi.github.io}"
-MIRROR_REMOTE="https://github.com/MichaelYagi/michaelyagi.github.io.git"
+if [[ -n "${PAGES_DEPLOY_TOKEN:-}" ]]; then
+  MIRROR_REMOTE="https://x-access-token:${PAGES_DEPLOY_TOKEN}@github.com/MichaelYagi/michaelyagi.github.io.git"
+else
+  MIRROR_REMOTE="https://github.com/MichaelYagi/michaelyagi.github.io.git"
+fi
 
 if [[ ! -d "$MIRROR_DIR/.git" ]]; then
   echo "No local clone at $MIRROR_DIR -- cloning it now."
   git clone "$MIRROR_REMOTE" "$MIRROR_DIR"
 else
   echo "Updating existing clone at $MIRROR_DIR"
+  git -C "$MIRROR_DIR" remote set-url origin "$MIRROR_REMOTE"
   git -C "$MIRROR_DIR" pull --ff-only
+fi
+
+# CI has no git identity configured at all by default; a real local dev
+# run already has the user's own, left untouched. $CI is set to "true"
+# by GitHub Actions automatically -- not something to set by hand.
+if [[ "${CI:-}" == "true" ]]; then
+  git -C "$MIRROR_DIR" config user.name "github-actions[bot]"
+  git -C "$MIRROR_DIR" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 fi
 
 SOURCE_SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD)"

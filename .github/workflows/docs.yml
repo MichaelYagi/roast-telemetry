@@ -1,0 +1,37 @@
+name: Publish docs
+
+# Publishes docs/ to the public michaelyagi.github.io/roast-telemetry
+# site -- see scripts/sync-docs.sh (the actual sync logic; this workflow
+# just runs it non-interactively). Path-filtered to docs/** so this
+# doesn't fire (and doesn't need PAGES_DEPLOY_TOKEN checked) on every
+# unrelated push to main -- backend/frontend changes never touch the
+# public site on their own.
+#
+# Separate from ci.yml on purpose: that one also runs on pull_request,
+# and a PR isn't merged yet -- nothing should publish from one. This
+# only runs on an actual push to main.
+#
+# Requires a repo secret PAGES_DEPLOY_TOKEN: a GitHub Personal Access
+# Token with push access to the michaelyagi.github.io repo specifically
+# -- GITHUB_TOKEN's own default permissions are scoped to *this* repo
+# only and can't push anywhere else. Settings -> Secrets and variables
+# -> Actions -> New repository secret, named exactly PAGES_DEPLOY_TOKEN.
+# Until that secret exists, this workflow will fail at the push step
+# every time it runs -- scripts/sync-docs.sh still works fine run by
+# hand locally in the meantime (uses your own already-configured git
+# credentials instead).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync docs to michaelyagi.github.io
+        env:
+          PAGES_DEPLOY_TOKEN: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+        run: scripts/sync-docs.sh
