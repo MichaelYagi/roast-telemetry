@@ -1559,7 +1559,18 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0;
+  gap: 0.5rem;
+}
+
+/* gap alone wasn't enough -- confirmed live, the bottom member's value
+   readout sat close enough to the top member's label/button that it
+   read as belonging to it (e.g. "Drum [button]" directly followed by
+   "20 RPM" looked like Drum's own value, when the 20 RPM was actually
+   the next slider down). A visible divider line makes the boundary
+   between the two stacked sliders unambiguous. */
+.vertical-control-group > .vertical-slider-col:not(:first-child) {
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
 }
 
 .vertical-slider-col {
