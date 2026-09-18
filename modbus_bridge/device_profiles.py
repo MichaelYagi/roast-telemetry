@@ -6,11 +6,13 @@ The one entry here is a pure re-expression of ModbusEngine's own
 long-standing hardcoded FZ-94 defaults as data instead of constructor
 defaults -- see modbus_bridge/engine.py's module docstring for the full
 sourcing/confidence notes on every register below (Artisan's own
-shipped FZ94.aset for BT/ET/DT/Burner; Air/Drum slave IDs now confirmed
-against a real, live, independently control-tested FZ-94, superseding
-an earlier default that had them swapped based only on an unverified
-blog post). Not a behavior change from today's default (profile-less)
-ModbusEngine construction -- both were updated together.
+shipped FZ94.aset for BT/ET/DT/Burner; Air/Drum slave IDs default to a
+real, live, independently control-tested FZ-94's assignment, which is
+the *opposite* of an earlier default -- both are real, working
+installations that wired this aftermarket feature's slave IDs
+differently, not a case of one simply being wrong; see engine.py for the
+full explanation). Not a behavior change from today's default
+(profile-less) ModbusEngine construction -- both were updated together.
 """
 from __future__ import annotations
 

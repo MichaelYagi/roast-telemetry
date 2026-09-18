@@ -60,11 +60,13 @@
     preset selected (Modbus tab's Input 1-6 + the PID block) — matching
     this table exactly, independent of this app's own source reading of
     the <code>.aset</code> file. The <em>slave-ID assignment</em> for
-    Air/Drum specifically (which of the two is slave 1 vs. slave 2) is
-    now confirmed separately, against a real, live, independently
-    control-tested FZ-94's actual Device Assignment labels and
-    Slider/Button write commands, all agreeing with each other — see the
-    table below.
+    Air/Drum specifically (which of the two is slave 1 vs. slave 2) is a
+    configurable VFD parameter (see part 3, "communication address,
+    parameter 9-00"), not a fixed constant — the default used here comes
+    from a real, live, independently control-tested FZ-94's actual Device
+    Assignment labels and Slider/Button write commands, all agreeing with
+    each other, but part 3's own author documents wiring their own unit
+    the opposite way — see the table below for the full explanation.
   </p>
   <p>
     <strong>One serial connection handles everything</strong> — 19200
@@ -119,12 +121,23 @@
     set up for it either), so if Artisan is actually moving Air/Drum on a
     given installation, whoever set it up configured those write commands
     themselves, separately from the stock preset. The <strong>slave-ID
-    assignment (Drum = slave 1, Air = slave 2)</strong> is confirmed
-    directly against a real, live FZ-94: its Device Assignment labels,
-    Slider write commands, and Button write commands were all
-    independently checked and agree with each other — this supersedes an
-    earlier version of this table that had the two swapped, based only on
-    an unlabeled example screenshot.
+    assignment used here as the default (Drum = slave 1, Air = slave
+    2)</strong> is confirmed directly against a real, live FZ-94: its
+    Device Assignment labels, Slider write commands, and Button write
+    commands were all independently checked and agree with each other.
+    An earlier version of this table had the two the other way around
+    (Air = 1, Drum = 2) — and that wasn't simply a mistake either: the
+    "part 3" blog post above explicitly documents setting the Delta
+    VFD-L's own slaveID parameter (9-00, a configurable setting, not a
+    fixed constant) to "d1 (Air Flow Controller)" and "d2 (Drum Speed
+    Controller)" on that author's own real, working installation. Since
+    this wiring is an aftermarket addition the FZ-94 doesn't ship with,
+    two different real installations have now been documented with the
+    opposite slave-ID assignment — there may be no single universal
+    default here at all, only whichever way a given unit was actually
+    wired. Confirm against your own machine with <a
+    href="index.html#testing-mode">Test Connection</a> rather than
+    trusting either default.
   </p>
   <p>
     <code>modbus_control_port</code> exists only for wiring that

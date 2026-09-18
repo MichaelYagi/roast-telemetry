@@ -67,16 +67,26 @@ anything. The slave-ID assignment below (Air=2, Drum=1) is confirmed
 against a real, live, independently control-tested FZ-94 -- a working
 Artisan install's own Device Assignment labels, Slider commands, and
 Button commands all agree with each other (Drum writes go to slave 1,
-Fan/Air writes go to slave 2). This *replaces* an earlier default that
-had them the other way around, sourced only from one person's blog
-write-up of their own FZ-94/Delta VFD-L installation and never actually
-tested -- that blog post is still where the register *numbers* (8192/
-8193/8451) and value conventions below come from, just not the slave-ID
-assignment anymore. Given the wiring for this feature is an aftermarket
-addition (the FZ-94 doesn't ship with it -- see below), a different
-individual unit could in principle still be wired the other way; this is
-just the best real-world evidence available now, better than a blog post
-nobody had verified.
+Fan/Air writes go to slave 2).
+
+This *replaces* an earlier default that had them the other way around
+(Air=1, Drum=2), which was NOT simply wrong -- it came from a real,
+working installation too: the original blog series this app's register
+*numbers* (8192/8193/8451) and value conventions still come from
+explicitly documents setting the VFD's own slaveID parameter (Delta
+VFD-L parameter 9-00, itself a configurable setting, not a fixed
+constant) to "d1 (Air Flow Controller)" and "d2 (Drum Speed Controller)"
+on that author's own unit -- the opposite of what's used as the default
+now. Since this wiring is an aftermarket addition (the FZ-94 doesn't ship
+with it -- see below) that two different real, working installations
+have configured oppositely, there may genuinely be no single universal
+default -- whoever wires a given unit picks these slave IDs themselves.
+Air=2/Drum=1 is used as the default only because it's the more recent,
+more directly relevant confirmation (matches Device Assignment labels,
+not just a register write that happens to work), not because the blog's
+account was somehow mistaken. Test Connection's read+write check and the
+device profile override fields exist precisely for this -- don't assume
+either default without confirming against your own unit.
 
 - Drum: slave 1; Air: slave 2 -- same VFD model, same registers, different
   slave ID each.
