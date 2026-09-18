@@ -9,11 +9,11 @@
 # top of that and doesn't redo the rest of install.sh's own setup.
 #
 # Usage:
-#   scripts/build-macos.sh            # single-file executable inside the .app (default)
-#   scripts/build-macos.sh onedir     # a folder inside the .app instead -- faster
-#                                      # startup, no single-exe antivirus-heuristic
-#                                      # risk (less of a concern on macOS specifically
-#                                      # than Windows, but the same tradeoff exists)
+#   packaging/build-macos.sh            # single-file executable inside the .app (default)
+#   packaging/build-macos.sh onedir     # a folder inside the .app instead -- faster
+#                                        # startup, no single-exe antivirus-heuristic
+#                                        # risk (less of a concern on macOS specifically
+#                                        # than Windows, but the same tradeoff exists)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 MODE="${1:-onefile}"
@@ -69,6 +69,18 @@ echo "== Installing pyinstaller + tray dependencies into .venv =="
 echo "== Running PyInstaller ($MODE) =="
 rm -rf build dist
 PACKAGE_MODE="$MODE" .venv/bin/pyinstaller packaging/roast-telemetry.spec --distpath dist --workpath build
+
+# The spec's BUNDLE step wraps the exe/folder EXE()/COLLECT() already
+# wrote into dist/Roast Telemetry (or dist/Roast Telemetry/ for
+# onedir) into dist/Roast Telemetry.app -- it copies rather than moves,
+# so both sit in dist/ afterward unless removed. The loose one outside
+# the .app isn't a real double-clickable Mac app (no Info.plist, no
+# proper bundle structure) and isn't what should ever be distributed --
+# confirmed this is genuinely confusing in practice, not just
+# theoretically: it looks like two different builds side by side.
+if [[ -e "dist/Roast Telemetry.app" ]]; then
+  rm -rf "dist/Roast Telemetry"
+fi
 
 echo
 echo "Built: dist/Roast Telemetry.app"

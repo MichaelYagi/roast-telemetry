@@ -11,8 +11,8 @@
 # every backend + tray dependency).
 #
 # Usage:
-#   scripts/build-linux.sh          # single-file executable (default)
-#   scripts/build-linux.sh onedir   # a folder instead -- faster startup, but
+#   packaging/build-linux.sh          # single-file executable (default)
+#   packaging/build-linux.sh onedir   # a folder instead -- faster startup, but
 #                                    # 'Roast Telemetry' needs the rest of the
 #                                    # folder alongside it, can't move just the binary
 set -euo pipefail

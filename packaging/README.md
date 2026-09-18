@@ -58,7 +58,7 @@ not a formality.
 
 1. Clone/pull the repo onto the Mac.
 2. If you haven't already: `scripts/install.sh`.
-3. `scripts/build-macos.sh` (also generates `packaging/icon.icns` from
+3. `packaging/build-macos.sh` (also generates `packaging/icon.icns` from
    the existing PNGs the first time it runs, via `iconutil` -- only
    works on macOS, which is exactly where this script runs). Pass
    `onedir` as an argument for a folder-based `.app` instead of the
@@ -80,7 +80,7 @@ not a formality.
 
 1. Clone/pull the repo.
 2. If you haven't already: `scripts/install.sh`.
-3. `scripts/build-linux.sh` (or `scripts/build-linux.sh onedir` for a
+3. `packaging/build-linux.sh` (or `packaging/build-linux.sh onedir` for a
    folder instead of a single file). The build itself works fine from
    WSL2/any Linux with no display -- PyInstaller doesn't need one --
    but see step 5.
