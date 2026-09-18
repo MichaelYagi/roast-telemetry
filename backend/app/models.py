@@ -528,9 +528,13 @@ class AppSettings(BaseModel):
     # showed -- SV stays opt-in.
     vertical_control_layout: list[list[str]] = []
     # Per-channel: show +/- increment/decrement buttons above and below
-    # that slider. Missing key (the default -- "default to all off") means
-    # off, same tolerant-missing-key convention as breakout_panel_colors.
-    vertical_control_arrows: dict[str, bool] = {}
+    # that slider, and how far each press moves it. Missing key (the
+    # default -- "default to all off") or a non-positive value means off,
+    # same tolerant-missing-key convention as breakout_panel_colors; a
+    # positive number means on, moving that far per press. Used to be a
+    # plain bool (arrows shown or not, always stepping by a hardcoded 1) --
+    # see storage.get_settings()'s own migration for old True/False rows.
+    vertical_control_arrows: dict[str, float] = {}
 
 
 class OllamaStatus(BaseModel):

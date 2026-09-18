@@ -410,6 +410,18 @@ def get_settings() -> dict:
         vertical_control_arrows = (
             json.loads(values["vertical_control_arrows"]) if values.get("vertical_control_arrows") else {}
         )
+        # Migrates a pre-existing row saved back when this was a plain
+        # bool (arrows shown or not, always stepping by a hardcoded 1,
+        # not the per-channel step size it is now -- see AppSettings'
+        # own comment) -- True becomes step=1 (arrows were on, so this
+        # keeps them on at the step they always actually used), False is
+        # dropped entirely (same as never having been set, both mean
+        # off). Explicit here rather than leaning on Pydantic's own
+        # bool-to-float coercion for a dict field, which isn't something
+        # worth trusting to stay consistent across versions.
+        vertical_control_arrows = {
+            k: (1.0 if v is True else v) for k, v in vertical_control_arrows.items() if v is not False
+        }
     except (json.JSONDecodeError, TypeError):
         vertical_control_arrows = {}
     return {

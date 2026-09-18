@@ -80,6 +80,24 @@ def test_get_settings_defaults_on_empty_db(isolated_db):
     }
 
 
+def test_vertical_control_arrows_migrates_legacy_bool_shape(isolated_db):
+    # vertical_control_arrows used to be a plain bool (arrows shown or
+    # not, always a hardcoded step of 1) -- a row saved by an older
+    # version of this app would still have that literal True/False shape
+    # sitting in the DB. Writing it directly here (bypassing
+    # set_settings's own normal float-typed callers, and the API layer's
+    # _filter_arrows) simulates exactly that pre-existing row, not
+    # something this app would write today.
+    isolated_db.set_settings(vertical_control_arrows={"heater_pct": True, "fan_pct": False})
+
+    result = isolated_db.get_settings()
+
+    # True -> step 1 (arrows were on, so this keeps them on at the step
+    # they always actually used); False is dropped entirely, same as a
+    # never-saved key.
+    assert result["vertical_control_arrows"] == {"heater_pct": 1.0}
+
+
 def test_get_settings_tolerates_corrupt_panel_colors_json(isolated_db):
     with sqlite3.connect(isolated_db.DB_PATH) as conn:
         conn.execute(

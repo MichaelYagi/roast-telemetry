@@ -52,8 +52,12 @@ def _filter_vertical_layout(groups: list[list[str]]) -> list[list[str]]:
     return result
 
 
-def _filter_arrows(arrows: dict[str, bool]) -> dict[str, bool]:
-    return {k: bool(v) for k, v in arrows.items() if k in VERTICAL_CONTROL_KEYS}
+def _filter_arrows(arrows: dict[str, float]) -> dict[str, float]:
+    # Was `bool(v)` -- now that a positive value is a real step size, not
+    # just an on/off flag, coercing it away would silently throw out the
+    # step the moment it got saved. Non-positive/missing still means off,
+    # same convention as before, just without flattening a real number.
+    return {k: v for k, v in arrows.items() if k in VERTICAL_CONTROL_KEYS and v and v > 0}
 
 
 @router.get("/stream")

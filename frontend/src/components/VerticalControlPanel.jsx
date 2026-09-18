@@ -56,22 +56,33 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
   const [fan, setFan] = useState(initial?.fan_pct ?? null);
   const [heater, setHeater] = useState(initial?.heater_pct ?? null);
   const [sv, setSv] = useState(initial?.burner_sv_c ?? null);
+  // Drum/Air only -- a real on/off gesture separate from the slider's own
+  // position (see toggleDrumOn/toggleAirOn below), matching a real VFD
+  // drive's own run/stop control instead of overloading "value is 0" as
+  // the only way to stop it. Burner/SV have no equivalent -- they're a
+  // continuous setpoint, not a drive that's literally on or off.
+  const [drumOn, setDrumOn] = useState(true);
+  const [airOn, setAirOn] = useState(true);
   const lastLocalChangeAt = useRef({ drum_speed_pct: 0, fan_pct: 0, heater_pct: 0, burner_sv_c: 0 });
 
   // Same reasoning as ControlPanel.jsx's own version of this effect pair:
   // a live device read lags at least one tick behind a write, so without
   // the guard window, a stale reading from before the user's own drag can
-  // land moments after it and yank the slider back mid-drag.
+  // land moments after it and yank the slider back mid-drag. Also skipped
+  // entirely while toggled off (!drumOn/!airOn) -- the whole point of the
+  // toggle is that the displayed value stays frozen at whatever it was
+  // right up until toggled back on, not just for the short echo-guard
+  // window, even once the device's own feedback genuinely settles at 0.
   useEffect(() => {
-    if (initial?.drum_speed_pct == null) return;
+    if (initial?.drum_speed_pct == null || !drumOn) return;
     if (Date.now() - lastLocalChangeAt.current.drum_speed_pct < LOCAL_ECHO_GUARD_MS) return;
     setDrum(initial.drum_speed_pct);
-  }, [initial?.drum_speed_pct]);
+  }, [initial?.drum_speed_pct, drumOn]);
   useEffect(() => {
-    if (initial?.fan_pct == null) return;
+    if (initial?.fan_pct == null || !airOn) return;
     if (Date.now() - lastLocalChangeAt.current.fan_pct < LOCAL_ECHO_GUARD_MS) return;
     setFan(initial.fan_pct);
-  }, [initial?.fan_pct]);
+  }, [initial?.fan_pct, airOn]);
   useEffect(() => {
     if (initial?.heater_pct == null) return;
     if (Date.now() - lastLocalChangeAt.current.heater_pct < LOCAL_ECHO_GUARD_MS) return;
@@ -104,6 +115,26 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
     lastLocalChangeAt.current.fan_pct = Date.now();
     setFan(v);
     onSend({ fan_pct: v });
+  }
+
+  // Toggling off sends 0 (the backend already treats that as Stop
+  // without zeroing the stored frequency register -- see
+  // ModbusEngine._write_vfd_drive) but deliberately does NOT call
+  // setDrum/setFan, so the slider keeps showing its last real value
+  // instead of jumping to 0 -- matches a real VFD drive's own run/stop
+  // button, which doesn't forget its speed setpoint either. Toggling
+  // back on resends that same last value to actually resume at it.
+  function toggleDrumOn() {
+    const next = !drumOn;
+    setDrumOn(next);
+    lastLocalChangeAt.current.drum_speed_pct = Date.now();
+    onSend({ drum_speed_pct: next ? (drum ?? 0) : 0 });
+  }
+  function toggleAirOn() {
+    const next = !airOn;
+    setAirOn(next);
+    lastLocalChangeAt.current.fan_pct = Date.now();
+    onSend({ fan_pct: next ? (fan ?? 0) : 0 });
   }
   // Both of these stamp/preview the *other* unit too -- "one moves the
   // other", both writing the same underlying PID setpoint (see
@@ -151,6 +182,14 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
       : null,
   };
 
+  // Drum/Air only -- [isOn, toggle]. Burner/SV aren't in here at all,
+  // since they have no on/off concept; `TOGGLES[key]` being undefined is
+  // exactly how slider() below tells "plain text label" from "button."
+  const TOGGLES = {
+    drum_speed_pct: [drumOn, toggleDrumOn],
+    fan_pct: [airOn, toggleAirOn],
+  };
+
   function slider(key) {
     const item = verticalControlItem(key);
     const ch = CHANNELS[key];
@@ -159,7 +198,15 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
     const unknown = ch.value == null;
     const displayValue = unknown ? ch.min : ch.value;
     const showArrows = Boolean(arrows?.[key]);
-    const step = STEP;
+    // arrows[key] now carries the actual step size (see
+    // VerticalControlSettingsEditor.jsx), not just an on/off flag --
+    // STEP=1 only survives as a defensive fallback, the checkbox+number
+    // input pairing there should never actually leave this unset while
+    // arrows are shown.
+    const step = arrows?.[key] || STEP;
+    const toggle = TOGGLES[key];
+    const isOn = toggle ? toggle[0] : true;
+    const isDisabled = disabled || unknown || !isOn;
 
     function nudge(dir) {
       const base = unknown ? ch.min : ch.value;
@@ -168,10 +215,10 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
     }
 
     return (
-      <div className="vertical-slider-col" key={key} style={{ "--item-color": item.color }}>
+      <div className={`vertical-slider-col${isOn ? "" : " vertical-slider-col-off"}`} key={key} style={{ "--item-color": item.color }}>
         <div className="vertical-slider-value">{unknown ? "—" : `${Math.round(displayValue)}${unit}`}</div>
         {showArrows && (
-          <button type="button" className="vertical-slider-arrow" disabled={disabled || unknown} onClick={() => nudge(1)} title={`+${step}${unit}`}>
+          <button type="button" className="vertical-slider-arrow" disabled={isDisabled} onClick={() => nudge(1)} title={`+${step}${unit}`}>
             ▲
           </button>
         )}
@@ -182,16 +229,28 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
           max={ch.max}
           step={step}
           value={displayValue}
-          disabled={disabled || unknown}
-          title={unknown ? "Waiting for a real reading from the device" : undefined}
+          disabled={isDisabled}
+          title={unknown ? "Waiting for a real reading from the device" : !isOn ? `${item.label} is off` : undefined}
           onChange={(e) => ch.onChange(Number(e.target.value))}
         />
         {showArrows && (
-          <button type="button" className="vertical-slider-arrow" disabled={disabled || unknown} onClick={() => nudge(-1)} title={`-${step}${unit}`}>
+          <button type="button" className="vertical-slider-arrow" disabled={isDisabled} onClick={() => nudge(-1)} title={`-${step}${unit}`}>
             ▼
           </button>
         )}
-        <div className="vertical-slider-label" title={TERM_TOOLTIPS[item.label]}>{item.label}</div>
+        {toggle ? (
+          <button
+            type="button"
+            className="vertical-slider-toggle"
+            disabled={disabled}
+            onClick={toggle[1]}
+            title={`${TERM_TOOLTIPS[item.label] || item.label} -- click to turn ${isOn ? "off" : "on"}`}
+          >
+            {item.label}
+          </button>
+        ) : (
+          <div className="vertical-slider-label" title={TERM_TOOLTIPS[item.label]}>{item.label}</div>
+        )}
       </div>
     );
   }

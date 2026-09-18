@@ -147,7 +147,21 @@ def test_put_settings_filters_vertical_control_arrows(client):
     resp = client.put("/api/settings", json={
         "ollama_url": None,
         "ollama_model": None,
-        "vertical_control_arrows": {"heater_pct": True, "not_a_real_channel": True},
+        "vertical_control_arrows": {"heater_pct": 5, "not_a_real_channel": 5},
     })
 
-    assert resp.json()["vertical_control_arrows"] == {"heater_pct": True}
+    assert resp.json()["vertical_control_arrows"] == {"heater_pct": 5}
+
+
+def test_put_settings_drops_non_positive_vertical_control_arrows(client):
+    # A step of 0 (or negative) means "off", same convention as a missing
+    # key -- _filter_arrows used to just flatten every value to bool(v)
+    # (which would keep a real step number but silently lose it), now it
+    # has to actually drop the key instead.
+    resp = client.put("/api/settings", json={
+        "ollama_url": None,
+        "ollama_model": None,
+        "vertical_control_arrows": {"heater_pct": 5, "fan_pct": 0},
+    })
+
+    assert resp.json()["vertical_control_arrows"] == {"heater_pct": 5}

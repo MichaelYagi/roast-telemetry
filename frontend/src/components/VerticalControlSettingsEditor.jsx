@@ -63,8 +63,21 @@ export default function VerticalControlSettingsEditor({ layout, setLayout, arrow
     commit([...flat, { key, joinsPrevious: false }]);
   }
 
+  const ARROW_STEP_MAX = 100;
+  const DEFAULT_ARROW_STEP = 1;
+
   function toggleArrows(key) {
-    setArrows((prev) => ({ ...prev, [key]: !prev[key] }));
+    setArrows((prev) => {
+      const next = { ...prev };
+      if (next[key]) delete next[key];
+      else next[key] = DEFAULT_ARROW_STEP;
+      return next;
+    });
+  }
+
+  function setArrowStep(key, rawValue) {
+    const step = Math.max(1, Math.min(ARROW_STEP_MAX, Number(rawValue) || DEFAULT_ARROW_STEP));
+    setArrows((prev) => ({ ...prev, [key]: step }));
   }
 
   const availableToAdd = OPTIONAL_VERTICAL_CONTROL_KEYS.filter((key) => !flat.some((item) => item.key === key));
@@ -82,41 +95,61 @@ export default function VerticalControlSettingsEditor({ layout, setLayout, arrow
         its own full-height lane instead, side by side (scrolling sideways if they don't all fit) -- a
         stacked lane's already-limited height splitting further between 2 phone-sized sliders wasn't legible.
       </p>
-      <ul className="breakout-order-list">
+      <ul className="breakout-order-list vertical-control-order-list">
         {flat.map((item, i) => {
           const meta = verticalControlItem(item.key);
           const mandatory = MANDATORY_VERTICAL_CONTROL_KEYS.includes(item.key);
           return (
             <li key={item.key}>
-              <span className="vertical-control-order-label">{meta.label}</span>
-              {mandatory && <span className="hint vertical-control-mandatory-tag">always shown</span>}
+              <div className="vertical-control-order-row">
+                <span className="vertical-control-order-label">{meta.label}</span>
+                {mandatory && <span className="hint vertical-control-mandatory-tag">always shown</span>}
+                <span className="vertical-control-order-row-actions">
+                  <button type="button" onClick={() => move(item.key, -1)} disabled={i === 0} title="Move up">
+                    ▲
+                  </button>
+                  <button type="button" onClick={() => move(item.key, 1)} disabled={i === flat.length - 1} title="Move down">
+                    ▼
+                  </button>
+                  {!mandatory && (
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => remove(item.key)}
+                      disabled={includedOptionalCount <= 1}
+                      title={includedOptionalCount <= 1 ? "At least one of Burner %/Burner SV must stay visible" : "Remove"}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </span>
+              </div>
               {i > 0 && (
+                <div className="vertical-control-order-row">
+                  <label className="checkbox-label">
+                    <input type="checkbox" checked={item.joinsPrevious} onChange={() => toggleJoinsPrevious(item.key)} />
+                    Stack with the one above
+                  </label>
+                </div>
+              )}
+              <div className="vertical-control-order-row">
                 <label className="checkbox-label">
-                  <input type="checkbox" checked={item.joinsPrevious} onChange={() => toggleJoinsPrevious(item.key)} />
-                  Stack with the one above
+                  <input type="checkbox" checked={Boolean(arrows?.[item.key])} onChange={() => toggleArrows(item.key)} />
+                  +/- buttons
                 </label>
-              )}
-              <label className="checkbox-label">
-                <input type="checkbox" checked={Boolean(arrows?.[item.key])} onChange={() => toggleArrows(item.key)} />
-                +/- buttons
-              </label>
-              <button type="button" onClick={() => move(item.key, -1)} disabled={i === 0} title="Move up">
-                ▲
-              </button>
-              <button type="button" onClick={() => move(item.key, 1)} disabled={i === flat.length - 1} title="Move down">
-                ▼
-              </button>
-              {!mandatory && (
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={() => remove(item.key)}
-                  disabled={includedOptionalCount <= 1}
-                  title={includedOptionalCount <= 1 ? "At least one of Burner %/Burner SV must stay visible" : "Remove"}
-                >
-                  Remove
-                </button>
-              )}
+                {Boolean(arrows?.[item.key]) && (
+                  <label className="checkbox-label">
+                    steps by
+                    <input
+                      type="number"
+                      min={1}
+                      max={ARROW_STEP_MAX}
+                      value={arrows[item.key]}
+                      onChange={(e) => setArrowStep(item.key, e.target.value)}
+                    />
+                  </label>
+                )}
+              </div>
             </li>
           );
         })}

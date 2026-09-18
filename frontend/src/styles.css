@@ -855,6 +855,38 @@ button:disabled {
   background: var(--accent-soft);
 }
 
+/* Vertical Control's own rows carry more per-channel controls than
+   Big/Small Readout's (stack-with-above, +/- buttons, and now a step
+   size too) -- cramming all of it onto .breakout-order-list li's shared
+   single flex row read as noise once the step input joined it.
+   .vertical-control-order-list stacks each row's concerns onto their
+   own line instead, scoped so BreakoutSettingsEditor.jsx's own use of
+   the shared .breakout-order-list class is untouched. */
+.vertical-control-order-list li {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+
+.vertical-control-order-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.vertical-control-order-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.vertical-control-order-row .checkbox-label input[type="number"] {
+  width: 3.5rem;
+  margin-left: 0.35rem;
+}
+
 /* A native <input type="color"> styled to read as the same small square
    the old plain <span> swatch was -- clicking it opens the browser's own
    color picker (a modal popover, so "only one open at a time" is free).
@@ -1558,8 +1590,52 @@ button:disabled {
   white-space: nowrap;
 }
 
-.vertical-slider-label {
-  font-size: 0.65rem;
+/* Was 0.65rem/muted -- confirmed live as genuinely too small to read
+   comfortably. Shared by both the plain-text label (Burner/SV) and the
+   toggle-button version below (Drum/Air) so all 4 read consistently,
+   even though only 2 of them are actually clickable. Only the label
+   changed size -- .vertical-slider-value (the "50 RPM" readout) is
+   deliberately untouched. */
+.vertical-slider-label,
+.vertical-slider-toggle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Drum/Air's label doubles as an on/off toggle -- a real run/stop
+   gesture for the drive itself, separate from the slider's own value
+   (see VerticalControlPanel.jsx's toggleDrumOn/toggleAirOn). Button-reset
+   so it still just reads as a label at rest, not an obviously chrome-y
+   button, with a hover/pressed affordance so it doesn't look inert. */
+.vertical-slider-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.vertical-slider-toggle:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.vertical-slider-toggle:disabled {
+  cursor: not-allowed;
+}
+
+/* Toggled off -- the track/arrows grey out and lock (see isDisabled in
+   VerticalControlPanel.jsx), but the toggle button itself stays at full
+   opacity/legible, since it's still the one live control in this
+   column (the only way back on). No width/flex/gap changes here --
+   this must not touch how far apart the sliders sit. */
+.vertical-slider-col-off .vertical-slider-track,
+.vertical-slider-col-off .vertical-slider-arrow,
+.vertical-slider-col-off .vertical-slider-value {
+  opacity: 0.4;
+}
+
+.vertical-slider-col-off .vertical-slider-toggle {
   color: var(--text-muted);
 }
 
