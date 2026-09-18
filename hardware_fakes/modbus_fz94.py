@@ -325,10 +325,24 @@ class FZ94Simulator:
 
     def _handle_drive_write(self, bus: _SerialBus, slave_id: int, channel_key: str, address: int, value: int) -> None:
         if address == DRIVE_CONTROL_REGISTER:
-            # Run/stop word -- nothing to apply to the thermal model on
-            # its own; the frequency write (below) carries the actual
-            # value, same as the real engine only sends a meaningful
-            # command via _write_drive's pair of writes together.
+            # Stop drops the driver's own tracked value to 0 -- this is
+            # the feedback register's job (register 8451, "actual current
+            # speed"), a genuinely different thing from the frequency
+            # register's *stored setpoint* (untouched here, and no
+            # longer even written on Stop by the real engine -- see
+            # ModbusEngine._write_vfd_drive). A real VFD's measured speed
+            # drops to 0 once actually stopped regardless of what
+            # setpoint is still sitting in its frequency register; this
+            # fake was conflating the two by only ever updating its
+            # tracked value from a frequency write, so Stop alone left
+            # the chart/feedback reporting whatever was last commanded
+            # forever, never reflecting that the drive had genuinely
+            # stopped. Run (2) doesn't need its own case here -- this
+            # app's own engine always pairs Run with a fresh frequency
+            # write in the same call (see _write_vfd_drive), so the
+            # frequency-write branch below already covers resuming.
+            if value == DRIVE_STOP:
+                self.driver.apply_command({channel_key: 0.0})
             self._echo_write(bus, slave_id, address, value)
             self._log(f"[{bus.name}] write slave={slave_id} (run/stop) addr={address} value={value}")
             return

@@ -525,6 +525,13 @@ export default function RoastChart({
         const hasContinuous = continuousField && profile.some((p) => p[continuousField] != null);
         if (hasContinuous) {
           points = profile.map((p) => ({ x: p.time_s, y: p[continuousField] }));
+          // Air/Drum are Delta VFD-L drives that are actually just
+          // on/off on the FZ-94 (confirmed against real hardware) -- the
+          // real change between two samples is instant, not a ramp, so
+          // the curve shouldn't imply one either. Burner (and Damper,
+          // whenever it gets real data) stays smooth -- it's a genuine
+          // continuous PID setpoint, not a binary drive.
+          if (s.key === "Air" || s.key === "Drum") stepped = "before";
         } else {
           points = stepCurveFromEvents(events.filter((e) => e.channel === s.key), endTime);
           stepped = "before";
