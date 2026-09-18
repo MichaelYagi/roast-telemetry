@@ -14,9 +14,9 @@ module's docstring for the full citations):
                not a power % -- readable from the same register it's
                written to, so this also answers "what's it actually set
                to right now" for a device connected to mid-roast
-    - Air:     slave 1,  registers 8192 (run/stop, write) + 8193 (freq,
+    - Drum:    slave 1,  registers 8192 (run/stop, write) + 8193 (freq,
                write, x100) + 8451 (actual speed, read, x100)
-    - Drum:    slave 2,  same three registers, its own slave
+    - Air:     slave 2,  same three registers, its own slave
 
 One connection handles all of it by default (19200 baud, 8N2 -- Artisan's
 own shipped preset's exact settings), matching the real engine's default
@@ -361,8 +361,8 @@ def main() -> None:
     parser.add_argument("--burner-slave-id", type=int, default=12)
     parser.add_argument("--drive-port", default=None, help="optional: Air/Drum drive bus serial port, e.g. /tmp/ttyFAKE_ROASTER_DRIVES")
     parser.add_argument("--drive-baudrate", type=int, default=19200)
-    parser.add_argument("--air-slave-id", type=int, default=1)
-    parser.add_argument("--drum-slave-id", type=int, default=2)
+    parser.add_argument("--air-slave-id", type=int, default=2)
+    parser.add_argument("--drum-slave-id", type=int, default=1)
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
 

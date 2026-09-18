@@ -37,8 +37,8 @@ def test_built_in_fz94_profile_via_from_profile_matches_flat_defaults():
     assert sample["bt"] == pytest.approx(96.0)
 
     engine.apply_command({"heater_pct": 50.0})
-    # 50% across the default 100-250C range -> 175.0C -> raw 1750
-    assert (5, 1750, 12) in primary.writes
+    # 50% across the default 100-260C range -> 180.0C -> raw 1800
+    assert (5, 1800, 12) in primary.writes
 
 
 def test_direct_register_control_kind_writes_a_plain_percentage():

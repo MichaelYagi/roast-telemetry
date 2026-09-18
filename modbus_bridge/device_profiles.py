@@ -6,10 +6,11 @@ The one entry here is a pure re-expression of ModbusEngine's own
 long-standing hardcoded FZ-94 defaults as data instead of constructor
 defaults -- see modbus_bridge/engine.py's module docstring for the full
 sourcing/confidence notes on every register below (Artisan's own
-shipped FZ94.aset for BT/ET/DT/Burner, blog-sourced only for Air/Drum).
-Not a behavior change: connecting with this profile selected produces
-byte-for-byte the same reads/writes as today's default (profile-less)
-ModbusEngine construction.
+shipped FZ94.aset for BT/ET/DT/Burner; Air/Drum slave IDs now confirmed
+against a real, live, independently control-tested FZ-94, superseding
+an earlier default that had them swapped based only on an unverified
+blog post). Not a behavior change from today's default (profile-less)
+ModbusEngine construction -- both were updated together.
 """
 from __future__ import annotations
 
@@ -35,12 +36,12 @@ COFFEETECH_FZ94 = DeviceProfile(
             slave_id=12,
             register_address=5,
             divisor=10.0,
-            sv_range_c=(100.0, 250.0),
+            sv_range_c=(100.0, 260.0),
         ),
         ModbusControlChannel(
             maps_to="fan_pct",
             kind=ModbusControlKind.VFD_DRIVE,
-            slave_id=1,
+            slave_id=2,
             control_register=8192,
             frequency_register=8193,
             frequency_scale=100.0,
@@ -51,7 +52,7 @@ COFFEETECH_FZ94 = DeviceProfile(
         ModbusControlChannel(
             maps_to="drum_speed_pct",
             kind=ModbusControlKind.VFD_DRIVE,
-            slave_id=2,
+            slave_id=1,
             control_register=8192,
             frequency_register=8193,
             frequency_scale=100.0,

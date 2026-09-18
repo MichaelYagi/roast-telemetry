@@ -79,9 +79,9 @@ def test_modbus_live_session_defaults_match_modbus_engine_when_nothing_overridde
     assert engine.dt_slave_id == 12
     assert engine.burner_slave_id == 12
     assert engine.burner_register == 5
-    assert engine.air_slave_id == 1
-    assert engine.drum_slave_id == 2
-    assert engine.burner_sv_range_c == (100.0, 250.0)
+    assert engine.air_slave_id == 2
+    assert engine.drum_slave_id == 1
+    assert engine.burner_sv_range_c == (100.0, 260.0)
 
 
 def test_auto_detect_milestones_defaults_off():

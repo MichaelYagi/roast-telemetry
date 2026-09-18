@@ -78,14 +78,14 @@ def test_tick_reads_burner_sv_back_as_heater_pct_not_just_last_command():
 
     # Simulates a device an operator already has running -- this app never
     # wrote anything, but the PLC's own holding register already holds a
-    # real setpoint. 227.5C -> raw 2275 -> 85% across the default 100-250C
+    # real setpoint. 236.0C -> raw 2360 -> 85% across the default 100-260C
     # range, same math as the write-side test below, just the read side.
-    primary.register_values[(12, 5)] = 2275
+    primary.register_values[(12, 5)] = 2360
 
     sample = engine.tick(1.0)
 
     assert sample["heater_pct"] == pytest.approx(85.0)
-    assert sample["burner_sv_c"] == pytest.approx(227.5)  # the raw SV, not the % mapping
+    assert sample["burner_sv_c"] == pytest.approx(236.0)  # the raw SV, not the % mapping
     assert (5, 12) in primary.reads
 
 
@@ -118,9 +118,9 @@ def test_apply_command_heater_pct_writes_sv_setpoint_to_burner_slave():
 
     engine.apply_command({"heater_pct": 85.0})
 
-    # 85% across the default 100-250C SV range -> 227.5C -> x10 -> 2275,
+    # 85% across the default 100-260C SV range -> 236.0C -> x10 -> 2360,
     # written to slave 12 (same slave as the DT probe), register 5.
-    assert (5, 2275, 12) in primary.writes
+    assert (5, 2360, 12) in primary.writes
 
 
 def test_apply_command_heater_pct_extremes_map_to_sv_range_bounds():
@@ -132,7 +132,7 @@ def test_apply_command_heater_pct_extremes_map_to_sv_range_bounds():
     engine.apply_command({"heater_pct": 100.0})
 
     assert (5, 1000, 12) in primary.writes  # 0% -> 100.0C -> 1000
-    assert (5, 2500, 12) in primary.writes  # 100% -> 250.0C -> 2500
+    assert (5, 2600, 12) in primary.writes  # 100% -> 260.0C -> 2600
 
 
 def test_apply_command_burner_sv_c_writes_degrees_directly():
@@ -156,7 +156,7 @@ def test_apply_command_burner_sv_c_clamps_to_sv_range():
     engine.apply_command({"burner_sv_c": 9999.0})
     engine.apply_command({"burner_sv_c": -50.0})
 
-    assert (5, 2500, 12) in primary.writes  # clamped to the 250C ceiling
+    assert (5, 2600, 12) in primary.writes  # clamped to the 260C ceiling
     assert (5, 1000, 12) in primary.writes  # clamped to the 100C floor
 
 
@@ -167,7 +167,7 @@ def test_apply_command_burner_sv_c_and_heater_pct_stay_in_sync():
     client_cls, instances = _make_fake_client_cls()
     engine = ModbusEngine("PRIMARY", client_cls=client_cls)
 
-    engine.apply_command({"burner_sv_c": 175.0})  # 50% of the 100-250C range
+    engine.apply_command({"burner_sv_c": 180.0})  # 50% of the 100-260C range
 
     assert engine._last_values["heater_pct"] == pytest.approx(50.0)
 
@@ -190,12 +190,12 @@ def test_apply_command_fan_and_drum_write_run_and_frequency_to_control_client():
 
     engine.apply_command({"fan_pct": 60.0, "drum_speed_pct": 40.0})
 
-    # Air = slave 1: run (register 8192, value 2) then frequency (8193, 60*100=6000)
-    assert (8192, 2, 1) in control.writes
-    assert (8193, 6000, 1) in control.writes
-    # Drum = slave 2: same pair, its own slave
+    # Air = slave 2: run (register 8192, value 2) then frequency (8193, 60*100=6000)
     assert (8192, 2, 2) in control.writes
-    assert (8193, 4000, 2) in control.writes
+    assert (8193, 6000, 2) in control.writes
+    # Drum = slave 1: same pair, its own slave
+    assert (8192, 2, 1) in control.writes
+    assert (8193, 4000, 1) in control.writes
     # Drive writes never touch the temperature/burner connection.
     assert primary.writes == []
 
@@ -207,8 +207,8 @@ def test_apply_command_zero_drive_value_sends_stop_not_run():
 
     engine.apply_command({"fan_pct": 0.0})
 
-    assert (8192, 1, 1) in control.writes  # 1 = Stop
-    assert (8193, 0, 1) in control.writes
+    assert (8192, 1, 2) in control.writes  # 1 = Stop
+    assert (8193, 0, 2) in control.writes
 
 
 def test_drives_share_the_primary_connection_by_default():
@@ -258,15 +258,15 @@ def test_tick_prefers_real_drive_feedback_over_last_command_echo():
     # Real drive reports back a different speed than what was commanded --
     # tick() should surface *that* (register 8451, /100 divisor), not just
     # echo the command back.
-    control.register_values[(1, 8451)] = 5800  # Air actually running at 58.0%
-    control.register_values[(2, 8451)] = 3900  # Drum actually running at 39.0%
+    control.register_values[(2, 8451)] = 5800  # Air actually running at 58.0%
+    control.register_values[(1, 8451)] = 3900  # Drum actually running at 39.0%
 
     sample = engine.tick(1.0)
 
     assert sample["fan_pct"] == pytest.approx(58.0)
     assert sample["drum_speed_pct"] == pytest.approx(39.0)
-    assert (8451, 1) in control.reads
     assert (8451, 2) in control.reads
+    assert (8451, 1) in control.reads
 
 
 def test_tick_falls_back_to_command_echo_when_feedback_register_disabled():
@@ -293,7 +293,7 @@ def test_drum_range_clamps_above_70_percent():
 
     engine.apply_command({"drum_speed_pct": 95.0})  # above the FZ-94's own 0-70% drive limit
 
-    assert (8193, 7000, 2) in control.writes  # clamped to 70% -> 7000, not 9500
+    assert (8193, 7000, 1) in control.writes  # clamped to 70% -> 7000, not 9500
 
 
 def _feed_charge_sequence(engine, primary):

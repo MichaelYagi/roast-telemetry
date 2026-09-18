@@ -63,19 +63,27 @@ reading (function 3), confirmed identical in the .aset's `[Modbus]`
 
 **Air/Drum drives:** Delta VFD-L frequency drives, not simple registers --
 each needs a run/stop word written before a frequency command means
-anything. Precisely attributed (the .aset's own `[Sliders]` block ships
-with empty `slidercommands`, i.e. not pre-wired the way the temperature
-side is, so none of this is Artisan-preset-confirmed the way BT/ET/DT/
-Burner are -- it's all from one person's FZ-94/Delta VFD-L installation,
-written up across a 5-part blog series, not independently corroborated by
-a second source):
+anything. The slave-ID assignment below (Air=2, Drum=1) is confirmed
+against a real, live, independently control-tested FZ-94 -- a working
+Artisan install's own Device Assignment labels, Slider commands, and
+Button commands all agree with each other (Drum writes go to slave 1,
+Fan/Air writes go to slave 2). This *replaces* an earlier default that
+had them the other way around, sourced only from one person's blog
+write-up of their own FZ-94/Delta VFD-L installation and never actually
+tested -- that blog post is still where the register *numbers* (8192/
+8193/8451) and value conventions below come from, just not the slave-ID
+assignment anymore. Given the wiring for this feature is an aftermarket
+addition (the FZ-94 doesn't ship with it -- see below), a different
+individual unit could in principle still be wired the other way; this is
+just the best real-world evidence available now, better than a blog post
+nobody had verified.
 
-- Air: slave 1; Drum: slave 2 -- same VFD model, same registers, different
+- Drum: slave 1; Air: slave 2 -- same VFD model, same registers, different
   slave ID each.
 - Control register 8192 (2000H; 1=Stop, 2=Run), then frequency register
   8193 (2001H; value = percent x100, so 100% -> 10000, factor confirmed
-  as "we send 10.000 to indicate 100% speed") -- from
-  .../2016/08/fz-94-4-taking-control.html specifically.
+  as "we send 10.000 to indicate 100% speed") -- register numbers and
+  this convention from .../2016/08/fz-94-4-taking-control.html.
 - Feedback register 8451 -- reads the drive's *actual* current speed
   (divide raw by 100, same x100 convention as the write side), not an
   echo of the last command. Same register on both slave IDs. From
@@ -104,14 +112,14 @@ serial Modbus RTU port only accepts one client at a time. If Artisan is
 also running against this same roaster, pick one owner of the port --
 this engine can't share it.
 
-Not tested against real FZ-94 hardware (none available in this
-environment) -- verified against a mocked pymodbus client instead. The
-temperature/Burner slave IDs/registers/multiplier and the single-bus
-19200/8N2 communication settings are confirmed against Artisan's own
-shipped preset and source code (see above), the most authoritative
-source available without the hardware itself; the Air/Drum register
-numbers are still only blog-sourced; and the actual wire-level RTU
-behavior against your specific unit is unverified either way.
+Live-tested against a real FZ-94: read-only and read+write Test
+Connection checks, plus independent Air and Drum control tests, all
+passed on real hardware (see the Air/Drum slave-ID correction above,
+which came directly out of that same session). The temperature/Burner
+slave IDs/registers/multiplier and the single-bus 19200/8N2
+communication settings are also confirmed against Artisan's own shipped
+preset and source code; the Air/Drum register *numbers* (not the slave
+IDs, now live-confirmed) remain blog-sourced only.
 
 For comparison, not application: the FZ94 EVO's own shipped preset
 (``FZ94_EVO.aset``) is *not* empty the way the plain FZ94's is -- it has
@@ -168,7 +176,7 @@ class ModbusEngine:
         burner_slave_id: int = 12,
         burner_register: Optional[int] = 5,
         burner_divisor: float = 10.0,
-        burner_sv_range_c: tuple[float, float] = (100.0, 250.0),
+        burner_sv_range_c: tuple[float, float] = (100.0, 260.0),
         # Air/Drum drives -- share the primary connection above by
         # default (confirmed single-bus architecture; see module
         # docstring). control_port is an override for wiring that
@@ -179,7 +187,7 @@ class ModbusEngine:
         control_parity: str = "N",
         control_stopbits: int = 2,
         control_timeout: float = 0.4,
-        air_slave_id: int = 1,
+        air_slave_id: int = 2,
         air_control_register: Optional[int] = 8192,
         air_frequency_register: Optional[int] = 8193,
         air_range: tuple[float, float] = (0, 100),
@@ -189,7 +197,7 @@ class ModbusEngine:
         # echo below (see module docstring for the source/confidence).
         air_feedback_register: Optional[int] = 8451,
         air_feedback_divisor: float = 100.0,
-        drum_slave_id: int = 2,
+        drum_slave_id: int = 1,
         drum_control_register: Optional[int] = 8192,
         drum_frequency_register: Optional[int] = 8193,
         drum_range: tuple[float, float] = (0, 70),

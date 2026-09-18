@@ -59,7 +59,12 @@
     from Artisan's Ports Configuration dialog with the shipped FZ-94
     preset selected (Modbus tab's Input 1-6 + the PID block) — matching
     this table exactly, independent of this app's own source reading of
-    the <code>.aset</code> file.
+    the <code>.aset</code> file. The <em>slave-ID assignment</em> for
+    Air/Drum specifically (which of the two is slave 1 vs. slave 2) is
+    now confirmed separately, against a real, live, independently
+    control-tested FZ-94's actual Device Assignment labels and
+    Slider/Button write commands, all agreeing with each other — see the
+    table below.
   </p>
   <p>
     <strong>One serial connection handles everything</strong> — 19200
@@ -78,8 +83,8 @@
       <tr><td>ET</td><td>13</td><td>0</td><td>Same convention</td></tr>
       <tr><td>DT</td><td>12</td><td>0</td><td>Same convention</td></tr>
       <tr><td>Burner</td><td>12 (shares DT's slave)</td><td>5</td><td>Same ×10 convention (confirmed in source — <code>modbusport.py</code>'s <code>setTarget()</code> maps the <code>.aset</code>'s <code>SVmultiplier=1</code> to an actual ×10 multiplier)</td></tr>
-      <tr><td>Air</td><td>1</td><td>control 8192, frequency 8193, feedback 8451</td><td>Value = percent × 100</td></tr>
-      <tr><td>Drum</td><td>2</td><td>control 8192, frequency 8193, feedback 8451</td><td>Same convention, own slave</td></tr>
+      <tr><td>Drum</td><td>1</td><td>control 8192, frequency 8193, feedback 8451</td><td>Value = percent × 100</td></tr>
+      <tr><td>Air</td><td>2</td><td>control 8192, frequency 8193, feedback 8451</td><td>Same convention, own slave</td></tr>
     </tbody>
   </table>
   <p>
@@ -89,7 +94,7 @@
     independently confirms 3 separately-switched 1000W elements plus one
     "Drum heat limit controller," no per-element percentage control at
     all. This app maps its 0–100 <code>heater_pct</code> UI onto a
-    configurable SV range (default 100–250°C, comfortably spanning
+    configurable SV range (default 100–260°C, comfortably spanning
     Coffee-Tech's own factory-recommended 190°C starting point) as its
     own approximation, not something documented anywhere. The UI also
     offers a second slider that writes the SV in native °C directly
@@ -106,18 +111,20 @@
     for speed), plus a separate read-only feedback register reporting the
     drive's <em>actual</em> current speed — used instead of just echoing
     the last command back, so a rejected/misrouted write doesn't silently
-    look identical to a successful one. Confidence differs by direction:
-    the <strong>feedback register (8451, slave 1/Air, slave 2/Drum)</strong>
-    is confirmed the same way BT/ET/DT/Burner are — it's actually
-    configured in Artisan's shipped FZ-94 preset (visible as Input 5/6 in
-    Artisan's own Ports Configuration dialog). The
-    <strong>write side (control 8192, frequency 8193) is still
-    blog-sourced only</strong> — the <code>.aset</code>'s own
-    <code>[Sliders]</code> block genuinely ships with no write command
-    configured for it (confirmed by that same dialog having nothing set
-    up for it either), so if Artisan is actually moving Air/Drum on a
+    look identical to a successful one. The register numbers themselves
+    (control 8192, frequency 8193, feedback 8451) are still blog-sourced
+    only — the <code>.aset</code>'s own <code>[Sliders]</code> block
+    genuinely ships with no write command configured for either drive
+    (confirmed by Artisan's own Ports Configuration dialog having nothing
+    set up for it either), so if Artisan is actually moving Air/Drum on a
     given installation, whoever set it up configured those write commands
-    themselves, separately from the stock preset.
+    themselves, separately from the stock preset. The <strong>slave-ID
+    assignment (Drum = slave 1, Air = slave 2)</strong> is confirmed
+    directly against a real, live FZ-94: its Device Assignment labels,
+    Slider write commands, and Button write commands were all
+    independently checked and agree with each other — this supersedes an
+    earlier version of this table that had the two swapped, based only on
+    an unlabeled example screenshot.
   </p>
   <p>
     <code>modbus_control_port</code> exists only for wiring that
@@ -130,10 +137,12 @@
     Tested against a mocked <code>pymodbus</code> client plus actual
     serial traffic against <code>hardware_fakes/modbus_fz94.py</code>
     (register math, control-command clamping, and failure handling all
-    verified this way) — <strong>not real FZ-94 hardware</strong>. The
-    slave IDs/registers/baud rate themselves are from Artisan's own
-    source; the wire-level RTU behavior against your specific unit is
-    unverified until you try it.
+    verified this way), <strong>and now also live-tested against a real
+    FZ-94</strong>: Test Connection's read-only and read+write checks
+    both passed, plus independent Air and Drum control tests, all on
+    real hardware. The wire-level RTU behavior against your own specific
+    unit may still differ, but this is no longer purely a blog-sourced,
+    never-tried-on-hardware configuration.
   </p>
 
   <h2 id="testing-without-real-hardware">Testing without real hardware</h2>
