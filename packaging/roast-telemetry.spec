@@ -1,8 +1,9 @@
 # PyInstaller spec for Roast Telemetry's desktop tray app -- bundles the
 # tray icon (scripts/tray_app.py), the FastAPI backend it launches as a
 # subprocess (see that file's own FROZEN-mode handling), and the built
-# frontend into one distributable folder, no separate Python/npm/venv
-# install required to run it.
+# frontend into a single standalone executable (or a folder -- see
+# PACKAGE_MODE below), no separate Python/npm/venv install required to
+# run it.
 #
 # Must be run *on* the target platform -- Windows produces a Windows
 # build, macOS produces a macOS build; there is no supported
@@ -27,9 +28,36 @@
 # own first real build to confirm (no such environment available here),
 # but this exact path-resolution issue is now already caught and fixed
 # rather than something each platform would've hit independently.
+#
+# PACKAGE_MODE env var picks the output shape (all three build scripts
+# set it -- override by hand if you ever want the other one):
+#   onefile (default) -- a genuinely single executable, nothing else to
+#     keep alongside it. Costs something real: every launch re-extracts
+#     the whole bundle to a fresh temp directory first (slower startup
+#     than onedir, and since --run-server re-invokes the same exe as a
+#     second process -- see tray_app.py's own comment on that -- it
+#     happens *twice* per app launch, once for the tray icon, once for
+#     the server it spawns). Also more likely to trip antivirus
+#     false-positives on Windows specifically (single self-extracting
+#     exe is a common packing pattern for both legitimate installers and
+#     malware, and some AV heuristics can't tell them apart).
+#   onedir -- a folder (Roast Telemetry.exe + an _internal/ folder next
+#     to it that must travel with it) -- what this spec built and was
+#     actually verified against in this sandbox before onefile support
+#     was added; faster startup, no antivirus-heuristic risk, just not
+#     a single file. Set PACKAGE_MODE=onedir to build this instead.
+#
+# sys._MEIPASS-based path resolution (tray_app.py's own BASE_DIR) works
+# identically either way -- PyInstaller sets it to the same kind of
+# "where the bundled data actually is" location in both modes (a stable
+# _internal/ folder for onedir, a fresh per-launch temp dir for
+# onefile), so no application code needed to change for this at all,
+# only this spec's own final packaging step below.
 
 import os
 import sys
+
+ONEFILE = os.environ.get("PACKAGE_MODE", "onefile") == "onefile"
 
 block_cipher = None
 REPO_ROOT = os.path.dirname(SPECPATH)
@@ -122,11 +150,15 @@ a = Analysis(
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# exclude_binaries=True is the onedir shape (binaries deferred to the
+# COLLECT step below, next to the exe rather than inside it); onefile
+# wants them included directly in the exe itself instead, and skips
+# COLLECT entirely.
 exe = EXE(
     pyz,
     a.scripts,
-    [],
-    exclude_binaries=True,
+    a.binaries + a.zipfiles + a.datas if ONEFILE else [],
+    exclude_binaries=not ONEFILE,
     name="Roast Telemetry",
     debug=False,
     bootloader_ignore_signals=False,
@@ -134,25 +166,29 @@ exe = EXE(
     upx=False,
     console=False,  # windowed -- no console flash for the tray icon or the re-exec'd server subprocess
     icon=icon_path,
+    runtime_tmpdir=None,  # onefile only -- default per-launch temp dir; see this spec's own PACKAGE_MODE comment
 )
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name="Roast Telemetry",
-)
+if not ONEFILE:
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.zipfiles,
+        a.datas,
+        strip=False,
+        upx=False,
+        upx_exclude=[],
+        name="Roast Telemetry",
+    )
 
-# macOS only -- wraps the onedir COLLECT output into a real double-
-# clickable .app bundle. Windows/Linux just use the COLLECT folder
-# directly (dist/Roast Telemetry/), no BUNDLE step needed.
+# macOS only -- wraps the EXE/COLLECT output into a real double-
+# clickable .app bundle (works the same way whether exe above is a
+# onefile single binary or the onedir COLLECT folder -- BUNDLE accepts
+# either). Windows/Linux just use the exe/folder directly, no BUNDLE
+# equivalent there.
 if sys.platform == "darwin":
     app = BUNDLE(
-        coll,
+        exe if ONEFILE else coll,
         name="Roast Telemetry.app",
         icon=icon_path,
         bundle_identifier="com.roasttelemetry.app",

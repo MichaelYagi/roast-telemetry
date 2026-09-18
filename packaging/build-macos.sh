@@ -8,9 +8,19 @@
 # every backend + tray dependency). This script only adds pyinstaller on
 # top of that and doesn't redo the rest of install.sh's own setup.
 #
-# Usage: scripts/build-macos.sh
+# Usage:
+#   scripts/build-macos.sh            # single-file executable inside the .app (default)
+#   scripts/build-macos.sh onedir     # a folder inside the .app instead -- faster
+#                                      # startup, no single-exe antivirus-heuristic
+#                                      # risk (less of a concern on macOS specifically
+#                                      # than Windows, but the same tradeoff exists)
 set -euo pipefail
 cd "$(dirname "$0")/.."
+MODE="${1:-onefile}"
+if [[ "$MODE" != "onefile" && "$MODE" != "onedir" ]]; then
+  echo "Usage: $0 [onefile|onedir]" >&2
+  exit 1
+fi
 
 if [[ ! -e .venv/bin/python ]]; then
   echo "No .venv found -- run scripts/install.sh first." >&2
@@ -47,9 +57,9 @@ echo "== Building frontend =="
 echo "== Installing pyinstaller into .venv =="
 .venv/bin/pip install pyinstaller
 
-echo "== Running PyInstaller =="
+echo "== Running PyInstaller ($MODE) =="
 rm -rf build dist
-.venv/bin/pyinstaller packaging/roast-telemetry.spec --distpath dist --workpath build
+PACKAGE_MODE="$MODE" .venv/bin/pyinstaller packaging/roast-telemetry.spec --distpath dist --workpath build
 
 echo
 echo "Built: dist/Roast Telemetry.app"

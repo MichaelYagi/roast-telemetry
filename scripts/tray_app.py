@@ -694,7 +694,23 @@ def _run_server_entrypoint() -> None:
     bundle than relying on uvicorn's own dynamic app-string import
     machinery to resolve correctly there. Never used when running from
     source (see TrayApp.start(), which only ever builds this argv shape
-    when FROZEN)."""
+    when FROZEN).
+
+    Sets its own cwd to BASE_DIR before doing anything else -- required
+    for onefile builds specifically (PACKAGE_MODE=onefile, see
+    packaging/roast-telemetry.spec), caught by a real end-to-end test in
+    this sandbox: TrayApp.start()'s own `cwd=BASE_DIR` on the
+    subprocess.Popen call only reflects *this parent tray process's*
+    own extraction directory, but a onefile build re-extracts fresh to
+    a brand new temp directory on every single launch, including this
+    subprocess's own -- so the child needs to establish its own correct
+    cwd itself once it's actually running as that new process, not
+    inherit a stale directory from whoever launched it. Harmless
+    no-op for onedir (BASE_DIR is the same stable _internal/ folder
+    either way there) and for running from source (BASE_DIR is just
+    REPO_ROOT, already the expected cwd)."""
+    if FROZEN:
+        os.chdir(BASE_DIR)
     host = "127.0.0.1"
     port = 7890
     args = sys.argv[2:]

@@ -209,13 +209,16 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
   <p>
     Everything above assumes running from a cloned repo with Python and
     Node installed. <code>packaging/</code> builds a standalone,
-    unsigned distributable instead — a folder (Windows/Linux) or a real
-    <code>.app</code> (macOS) with the same tray icon experience as
-    above, that someone else can just download and run with nothing
-    else installed. Must be built natively on each target platform
-    (there's no cross-compile path) — one command per platform, from a
-    machine with this repo's own dev setup (<code>install.sh</code>/
-    <code>install.ps1</code>) already done:
+    unsigned distributable instead — by default a single file
+    (Windows/Linux) or a real <code>.app</code> (macOS, wrapping a
+    single file inside) with the same tray icon experience as above,
+    that someone else can just download and run with nothing else
+    installed (a folder-based build is available too, see
+    <code>packaging/README.md</code>, if you'd rather trade the
+    single-file convenience for faster startup). Must be built natively
+    on each target platform (there's no cross-compile path) — one
+    command per platform, from a machine with this repo's own dev setup
+    (<code>install.sh</code>/<code>install.ps1</code>) already done:
   </p>
   <pre><code>packaging\build-windows.ps1   # Windows, in PowerShell
 scripts/build-macos.sh        # macOS
