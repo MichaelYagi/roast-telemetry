@@ -1626,11 +1626,21 @@ button:disabled {
        of being reachable any way. .scope-body already goes to
        flex-direction:column on mobile (this same media query block,
        above), so unlike desktop this panel no longer has a chart height
-       to match -- let it size to its own content instead, and the page
-       itself scrolls to reveal it, the normal mobile pattern, rather
-       than a cramped scroll region inside a fixed box. overflow-x stays
-       for however many lanes don't fit the phone's width side by side. */
+       to match. First fix tried height:auto (shrink-wrap to content) --
+       that stopped the clipping, but also collapsed every flex:1 down
+       the chain (.vertical-control-group/.vertical-slider-col/
+       .vertical-slider-track) to its bare content minimum, since a
+       height:auto parent has no leftover space for flex:1 to grow into
+       -- confirmed live: every slider rendered as a tiny ~36px pill
+       instead of an actually-usable track, with a lot of dead white
+       space around them. min-height instead of height gives flex:1 a
+       real floor to distribute *into* (so tracks actually stretch to
+       fill it) while still being a floor, not a cap -- a lane that
+       genuinely needs more than this still grows past it exactly like
+       before. overflow-x stays for however many lanes don't fit the
+       phone's width side by side. */
     height: auto;
+    min-height: 260px;
     overflow-x: auto;
     overflow-y: visible;
     width: 100%;
