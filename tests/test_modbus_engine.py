@@ -208,7 +208,23 @@ def test_apply_command_zero_drive_value_sends_stop_not_run():
     engine.apply_command({"fan_pct": 0.0})
 
     assert (8192, 1, 2) in control.writes  # 1 = Stop
-    assert (8193, 0, 2) in control.writes
+    assert not any(addr == 8193 for addr, _, _ in control.writes)  # frequency left untouched
+
+
+def test_apply_command_zero_then_nonzero_drive_value_resumes_at_new_speed():
+    # Real VFD-L behavior (confirmed against a live FZ-94's Artisan button
+    # control): Off only stops the drive, it doesn't forget the frequency
+    # setpoint -- turning back on with a new value should still write that
+    # new value, not silently skip the frequency register a second time.
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", control_port="CONTROL", client_cls=client_cls)
+    control = instances["CONTROL"]
+
+    engine.apply_command({"fan_pct": 0.0})
+    engine.apply_command({"fan_pct": 45.0})
+
+    assert (8192, 2, 2) in control.writes  # 2 = Run
+    assert (8193, 4500, 2) in control.writes
 
 
 def test_drives_share_the_primary_connection_by_default():

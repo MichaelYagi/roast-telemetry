@@ -498,6 +498,25 @@ body.breakout-split-active .app-header-inner {
   min-width: 160px;
 }
 
+/* A number input's own value has no unit next to it -- the label text
+   above ("Burner % at start") isn't enough on its own while eyes are on
+   the typed number itself, so this pairs a "%" directly against the box. */
+.input-suffix-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.input-suffix-group input {
+  flex: 1;
+  min-width: 0;
+}
+
+.input-suffix {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 /* A checkbox+text label isn't a stacked "label above input" filter field
    like the .filters-row/.form-row selects it'd otherwise inherit column/
    flex:1/min-width from -- it should just sit compact and inline. The

@@ -56,6 +56,13 @@ const CONTROLLABLE_MODES = ["simulator", "modbus_live"];
 // clobber (and nothing to read back), so it still needs an explicit
 // starting point.
 const AUTO_APPLY_STARTING_CONTROLS_MODES = ["simulator"];
+// modbus_live still won't auto-apply a *fresh* (no preset loaded) starting
+// value -- that's the clobbering concern above. But a saved preset is an
+// explicit choice to replace whatever's there with these specific values,
+// so once one's loaded (selectedPresetId), its starting controls should
+// actually reach the device at START, not just sit in the form -- see
+// shouldAutoApplyStartingControls below, computed with access to that
+// state (this constant alone can't express the modbus_live+preset case).
 
 // simulator/engine.py's SimulatorConfig defaults -- that engine has no
 // per-roast override for these (RoastSession always constructs a plain
@@ -639,6 +646,12 @@ export default function LiveRoastView() {
     return payload;
   }
 
+  // See AUTO_APPLY_STARTING_CONTROLS_MODES's comment -- simulator always
+  // applies its starting values; modbus_live only does when those values
+  // came from an explicitly-loaded saved preset, not a fresh/blank start.
+  const shouldAutoApplyStartingControls =
+    AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) || (form.mode === "modbus_live" && Boolean(selectedPresetId));
+
   function buildControlsFromForm() {
     if (!CONTROLLABLE_MODES.includes(form.mode)) return {};
     return {
@@ -668,7 +681,7 @@ export default function LiveRoastView() {
         setRoastId(summary.id);
       }
       setPhase("roasting");
-      if (AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode)) {
+      if (shouldAutoApplyStartingControls) {
         const controls = buildControlsFromForm();
         if (Object.keys(controls).length) {
           api.sendCommand(summary.id, controls).catch((err) => setError(err.message));
@@ -1434,42 +1447,55 @@ export default function LiveRoastView() {
               </label>
             </div>
           )}
-          {activeTab === "device" && AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) && (
+          {activeTab === "device" && (AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) || form.mode === "modbus_live") && (
             <div className="form-row">
               <label>
                 Burner % at start
-                <input
-                  type="number" min="0" max="100"
-                  value={form.heater_pct}
-                  onChange={(e) => setForm({ ...form, heater_pct: e.target.value })}
-                />
+                <span className="input-suffix-group">
+                  <input
+                    type="number" min="0" max="100"
+                    value={form.heater_pct}
+                    onChange={(e) => setForm({ ...form, heater_pct: e.target.value })}
+                  />
+                  <span className="input-suffix">%</span>
+                </span>
               </label>
               <label>
                 Air % at start
-                <input
-                  type="number" min="0" max="100"
-                  value={form.fan_pct}
-                  onChange={(e) => setForm({ ...form, fan_pct: e.target.value })}
-                />
+                <span className="input-suffix-group">
+                  <input
+                    type="number" min="0" max="100"
+                    value={form.fan_pct}
+                    onChange={(e) => setForm({ ...form, fan_pct: e.target.value })}
+                  />
+                  <span className="input-suffix">%</span>
+                </span>
               </label>
               <label>
                 Drum % at start
-                <input
-                  type="number" min="0" max="100"
-                  value={form.drum_speed_pct}
-                  onChange={(e) => setForm({ ...form, drum_speed_pct: e.target.value })}
-                />
+                <span className="input-suffix-group">
+                  <input
+                    type="number" min="0" max="100"
+                    value={form.drum_speed_pct}
+                    onChange={(e) => setForm({ ...form, drum_speed_pct: e.target.value })}
+                  />
+                  <span className="input-suffix">%</span>
+                </span>
               </label>
               <p className="hint" style={{ flexBasis: "100%" }}>
-                Sent as the roast's first command right after START, and used as the Controls panel's starting position.
+                {shouldAutoApplyStartingControls
+                  ? "Sent as the roast's first command right after START, and used as the Controls panel's starting position."
+                  : form.mode === "modbus_live"
+                    ? "Only applied at START when loaded from a saved preset (see \"Load saved config\" above) -- a fresh start like this one leaves the roaster wherever it already is, so it's not clobbered by an unrelated stale value. Otherwise these are just what gets saved into a new preset below."
+                    : "Sent as the roast's first command right after START, and used as the Controls panel's starting position."}
               </p>
             </div>
           )}
           {activeTab === "milestones" && form.mode === "modbus_live" && (
             <p className="hint">
-              Burner/Air/Drum aren't set here -- once connected, the Controls panel on the Live Roast page reads and
-              shows whatever the roaster is actually doing (from the device itself, not a guess), and nothing is
-              written to it until you move a slider yourself.
+              {shouldAutoApplyStartingControls
+                ? "Burner/Air/Drum start from this preset's saved values (see the Device tab), sent right after START -- from then on, the Controls panel on the Live Roast page reads and shows whatever the roaster is actually doing."
+                : "Burner/Air/Drum aren't set here -- once connected, the Controls panel on the Live Roast page reads and shows whatever the roaster is actually doing (from the device itself, not a guess), and nothing is written to it until you move a slider yourself."}
             </p>
           )}
           {activeTab === "milestones" && form.mode === "modbus_live" && (

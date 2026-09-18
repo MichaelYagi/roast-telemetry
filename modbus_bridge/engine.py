@@ -622,9 +622,19 @@ class ModbusEngine:
         try:
             run_state = 2 if clamped > 0 else 1  # 2=Run, 1=Stop
             run_result = self._control_client.write_register(ch.control_register, run_state, device_id=ch.slave_id)
-            freq_result = self._control_client.write_register(
-                ch.frequency_register, int(round(clamped * ch.frequency_scale)), device_id=ch.slave_id
-            )
+            if clamped > 0:
+                freq_result = self._control_client.write_register(
+                    ch.frequency_register, int(round(clamped * ch.frequency_scale)), device_id=ch.slave_id
+                )
+            else:
+                # Off: only touch the control (run/stop) register, same as
+                # Artisan's real button-based control (confirmed against a
+                # live FZ-94 -- its Off button sends just write(2,8192,1),
+                # leaving the frequency register alone). Zeroing the
+                # frequency register here too would forget the last speed,
+                # so turning back on would always resume at 0 instead of
+                # wherever the drive was left.
+                freq_result = run_result
             if run_result.isError() or freq_result.isError():
                 self._control_last_error = str(run_result) if run_result.isError() else str(freq_result)
             else:
