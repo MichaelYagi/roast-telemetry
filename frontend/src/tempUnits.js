@@ -11,6 +11,14 @@ export function celsiusToUnit(celsius, unit) {
   return unit === "f" ? (celsius * 9) / 5 + 32 : celsius;
 }
 
+// Inverse of celsiusToUnit -- needed wherever a live *control* (not just a
+// readout) is displayed/dragged in the selected unit but must still write
+// Celsius underneath (e.g. VerticalControlPanel's burner_sv_c slider).
+export function unitToCelsius(value, unit) {
+  if (value == null) return null;
+  return unit === "f" ? ((value - 32) * 5) / 9 : value;
+}
+
 export function unitSuffix(unit) {
   return unit === "f" ? "°F" : "°C";
 }

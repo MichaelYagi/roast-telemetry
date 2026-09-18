@@ -1542,6 +1542,7 @@ export default function LiveRoastView() {
                   layout={verticalControlLayout}
                   arrows={verticalControlArrows}
                   svRangeC={roast?.burner_sv_range_c || null}
+                  tempUnit={tempUnit}
                 />
               )}
               <div className="scope-chart" ref={scopeChartRef}>

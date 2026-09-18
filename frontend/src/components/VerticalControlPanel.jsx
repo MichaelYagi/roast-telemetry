@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { TERM_TOOLTIPS } from "../termTooltips.js";
 import { normalizeLayout, verticalControlItem } from "../verticalControl.js";
+import { celsiusToUnit, unitToCelsius, unitSuffix } from "../tempUnits.js";
 
 // Replaces the old horizontal Controls panel entirely -- no fallback
 // below the chart any more (see the design discussion this came out of:
@@ -14,7 +15,7 @@ import { normalizeLayout, verticalControlItem } from "../verticalControl.js";
 const LOCAL_ECHO_GUARD_MS = 1500;
 const STEP = 1;
 
-export default function VerticalControlPanel({ disabled, onSend, initial, layout, arrows, svRangeC }) {
+export default function VerticalControlPanel({ disabled, onSend, initial, layout, arrows, svRangeC, tempUnit = "c" }) {
   const groups = normalizeLayout(layout, { svAvailable: svRangeC != null });
 
   // Two independent numeric-state pairs: Drum/Air are simple, one write
@@ -104,17 +105,29 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
     onSend({ burner_sv_c: v });
   }
 
+  // svRangeC/sv are always Celsius underneath (same setpoint ModbusEngine
+  // writes) -- only this slider's display/drag values convert to the
+  // selected tempUnit, same as every live reading elsewhere in the app.
+  const svRangeDisplay = svRangeC ? svRangeC.map((c) => celsiusToUnit(c, tempUnit)) : null;
   const CHANNELS = {
     drum_speed_pct: { value: drum, min: 0, max: 100, onChange: handleDrumChange },
     fan_pct: { value: fan, min: 0, max: 100, onChange: handleFanChange },
     heater_pct: { value: heater, min: 0, max: 100, onChange: handleBurnerPctChange },
-    burner_sv_c: svRangeC ? { value: sv, min: Math.min(...svRangeC), max: Math.max(...svRangeC), onChange: handleBurnerSvChange } : null,
+    burner_sv_c: svRangeDisplay
+      ? {
+          value: sv != null ? celsiusToUnit(sv, tempUnit) : null,
+          min: Math.min(...svRangeDisplay),
+          max: Math.max(...svRangeDisplay),
+          onChange: (displayV) => handleBurnerSvChange(unitToCelsius(displayV, tempUnit)),
+        }
+      : null,
   };
 
   function slider(key) {
     const item = verticalControlItem(key);
     const ch = CHANNELS[key];
     if (!item || !ch) return null;
+    const unit = key === "burner_sv_c" ? unitSuffix(tempUnit) : item.unit;
     const unknown = ch.value == null;
     const displayValue = unknown ? ch.min : ch.value;
     const showArrows = Boolean(arrows?.[key]);
@@ -128,9 +141,9 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
 
     return (
       <div className="vertical-slider-col" key={key} style={{ "--item-color": item.color }}>
-        <div className="vertical-slider-value">{unknown ? "—" : `${Math.round(displayValue)}${item.unit}`}</div>
+        <div className="vertical-slider-value">{unknown ? "—" : `${Math.round(displayValue)}${unit}`}</div>
         {showArrows && (
-          <button type="button" className="vertical-slider-arrow" disabled={disabled || unknown} onClick={() => nudge(1)} title={`+${step}${item.unit}`}>
+          <button type="button" className="vertical-slider-arrow" disabled={disabled || unknown} onClick={() => nudge(1)} title={`+${step}${unit}`}>
             ▲
           </button>
         )}
@@ -146,7 +159,7 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
           onChange={(e) => ch.onChange(Number(e.target.value))}
         />
         {showArrows && (
-          <button type="button" className="vertical-slider-arrow" disabled={disabled || unknown} onClick={() => nudge(-1)} title={`-${step}${item.unit}`}>
+          <button type="button" className="vertical-slider-arrow" disabled={disabled || unknown} onClick={() => nudge(-1)} title={`-${step}${unit}`}>
             ▼
           </button>
         )}
