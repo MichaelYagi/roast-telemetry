@@ -43,6 +43,14 @@ export default function RoastDetailView() {
   const [roast, setRoast] = useState(null);
   const [error, setError] = useState(null);
   const [tempUnit, setTempUnit] = useState("c"); // display only, see Settings > Temperature Unit
+  // Roasted weight is entered here, after the fact (beans weighed once
+  // cooled) -- see backend/app/api/roasts.py's set_weight route. Separate
+  // edit-mode state rather than always showing the input, so a roast that
+  // already has a value reads as a plain fact until "edit" is clicked.
+  const [editingWeight, setEditingWeight] = useState(false);
+  const [roastedWeightInput, setRoastedWeightInput] = useState("");
+  const [weightSaving, setWeightSaving] = useState(false);
+  const [weightError, setWeightError] = useState(null);
 
   useEffect(() => {
     api
@@ -50,6 +58,32 @@ export default function RoastDetailView() {
       .then(setRoast)
       .catch((err) => setError(err.message));
   }, [id]);
+
+  async function handleSaveRoastedWeight() {
+    const grams = Number(roastedWeightInput);
+    if (!roastedWeightInput.trim() || Number.isNaN(grams)) return;
+    setWeightSaving(true);
+    setWeightError(null);
+    try {
+      await api.setWeightRoasted(id, grams);
+      setRoast((r) => (r ? { ...r, weight_roasted_g: grams } : r));
+      setEditingWeight(false);
+    } catch (err) {
+      setWeightError(err.message);
+    } finally {
+      setWeightSaving(false);
+    }
+  }
+
+  // Matches Artisan's own "Weight loss" convention (a negative percentage,
+  // e.g. "-13.2%") -- roast_review.py computes the same ratio but as a
+  // positive "percent lost" for the AI review prompt; this is purely a
+  // different display convention for the same underlying numbers, not a
+  // second formula.
+  const weightLossPct =
+    roast?.weight_green_g && roast?.weight_roasted_g != null
+      ? (((roast.weight_roasted_g / roast.weight_green_g) - 1) * 100).toFixed(1)
+      : null;
 
   // One-time fetch, not the live SSE subscription LiveRoastView uses --
   // a finished roast's page doesn't need to react to a setting saved in
@@ -151,8 +185,54 @@ export default function RoastDetailView() {
             </li>
             <li>
               <span>Roasted weight</span>
-              <span>{roast.weight_roasted_g ? `${roast.weight_roasted_g} g` : "—"}</span>
+              <span>
+                {editingWeight ? (
+                  <span className="input-suffix-group">
+                    <input
+                      type="number" min="0" step="0.1"
+                      value={roastedWeightInput}
+                      onChange={(e) => setRoastedWeightInput(e.target.value)}
+                      placeholder="grams"
+                      autoFocus
+                    />
+                    <span className="input-suffix">g</span>
+                    <button type="button" onClick={handleSaveRoastedWeight} disabled={weightSaving || !roastedWeightInput.trim()}>
+                      {weightSaving ? "Saving…" : "Save"}
+                    </button>
+                    <button type="button" className="link-like" onClick={() => setEditingWeight(false)}>
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <>
+                    {roast.weight_roasted_g ? `${roast.weight_roasted_g} g` : "—"}{" "}
+                    <button
+                      type="button"
+                      className="link-like no-print"
+                      onClick={() => {
+                        setRoastedWeightInput(roast.weight_roasted_g != null ? String(roast.weight_roasted_g) : "");
+                        setWeightError(null);
+                        setEditingWeight(true);
+                      }}
+                    >
+                      {roast.weight_roasted_g ? "edit" : "add"}
+                    </button>
+                  </>
+                )}
+              </span>
             </li>
+            {weightError && (
+              <li>
+                <span></span>
+                <span className="error">{weightError}</span>
+              </li>
+            )}
+            {weightLossPct != null && (
+              <li>
+                <span>Weight loss</span>
+                <span>{weightLossPct}%</span>
+              </li>
+            )}
           </ul>
         </div>
 

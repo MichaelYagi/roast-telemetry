@@ -239,6 +239,16 @@ export default function LiveRoastView() {
   const [selectedPresetId, setSelectedPresetId] = useState("");
   const [presetName, setPresetName] = useState("");
   const [presetFeedback, setPresetFeedback] = useState(null);
+  // Quick post-roast weight capture, right here rather than forcing a
+  // navigation to the detail page first -- see RoastDetailView.jsx for
+  // the durable/editable version of the same field. `roast` comes from
+  // useRoastStream's websocket state (no setter exposed, and the backend
+  // doesn't push a message for this REST-only write), so this tracks the
+  // saved value locally instead of trying to mutate `roast` itself.
+  const [roastedWeightInput, setRoastedWeightInput] = useState("");
+  const [roastedWeightSaved, setRoastedWeightSaved] = useState(null);
+  const [weightSaving, setWeightSaving] = useState(false);
+  const [weightError, setWeightError] = useState(null);
   const [brokenOutPanels, setBrokenOutPanels] = useState([]); // ordered array, matches Settings' display order
   const [panelColors, setPanelColors] = useState({}); // key -> hex override, shared by both readout panels
   const [smallReadoutPanels, setSmallReadoutPanels] = useState([]); // ordered array, independent from brokenOutPanels
@@ -689,6 +699,21 @@ export default function LiveRoastView() {
       }
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  async function handleSaveRoastedWeight() {
+    const grams = Number(roastedWeightInput);
+    if (!roastId || !roastedWeightInput.trim() || Number.isNaN(grams)) return;
+    setWeightSaving(true);
+    setWeightError(null);
+    try {
+      await api.setWeightRoasted(roastId, grams);
+      setRoastedWeightSaved(grams);
+    } catch (err) {
+      setWeightError(err.message);
+    } finally {
+      setWeightSaving(false);
     }
   }
 
@@ -1678,6 +1703,43 @@ export default function LiveRoastView() {
                     <li>
                       <span className="meta-label">Green weight</span>
                       <span className="meta-value">{roast.weight_green_g} g</span>
+                    </li>
+                  )}
+                  {phase === "finished" && (roastedWeightSaved != null || roast.weight_roasted_g == null) && (
+                    <li>
+                      <span className="meta-label">Roasted weight</span>
+                      <span className="meta-value">
+                        {roastedWeightSaved != null ? (
+                          `${roastedWeightSaved} g`
+                        ) : (
+                          <span className="input-suffix-group">
+                            <input
+                              type="number" min="0" step="0.1"
+                              value={roastedWeightInput}
+                              onChange={(e) => setRoastedWeightInput(e.target.value)}
+                              placeholder="grams"
+                            />
+                            <span className="input-suffix">g</span>
+                            <button type="button" onClick={handleSaveRoastedWeight} disabled={weightSaving || !roastedWeightInput.trim()}>
+                              {weightSaving ? "Saving…" : "Save"}
+                            </button>
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  )}
+                  {phase === "finished" && roast.weight_green_g && (roastedWeightSaved ?? roast.weight_roasted_g) != null && (
+                    <li>
+                      <span className="meta-label">Weight loss</span>
+                      <span className="meta-value">
+                        {((((roastedWeightSaved ?? roast.weight_roasted_g) / roast.weight_green_g) - 1) * 100).toFixed(1)}%
+                      </span>
+                    </li>
+                  )}
+                  {weightError && (
+                    <li>
+                      <span className="meta-label"></span>
+                      <span className="meta-value error">{weightError}</span>
                     </li>
                   )}
                 </ul>
