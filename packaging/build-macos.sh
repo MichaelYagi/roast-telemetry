@@ -54,8 +54,17 @@ fi
 echo "== Building frontend =="
 (cd frontend && npm run build)
 
-echo "== Installing pyinstaller into .venv =="
+echo "== Installing pyinstaller + tray dependencies into .venv =="
+# The tray deps (pystray/Pillow) are a separate requirements file from
+# backend/requirements.txt (see that file's own comment) -- install.sh
+# already installs them for the from-source workflow, but re-asserting
+# it here too means a build can never silently produce a broken
+# "ModuleNotFoundError: No module named 'pystray'" exe just because
+# .venv happened to be missing them for some other reason (an older
+# install.sh run, a different venv than expected, etc.) -- confirmed
+# live on Windows: this exact failure happened before this line existed.
 .venv/bin/pip install pyinstaller
+.venv/bin/pip install -r scripts/tray_requirements.txt
 
 echo "== Running PyInstaller ($MODE) =="
 rm -rf build dist

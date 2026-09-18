@@ -35,8 +35,17 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "== Installing pyinstaller into .venv =="
+Write-Host "== Installing pyinstaller + tray dependencies into .venv =="
+# The tray deps (pystray/Pillow) are a separate requirements file from
+# backend/requirements.txt (see that file's own comment) -- install.ps1
+# already installs them for the from-source workflow, but re-asserting
+# it here too means a build can never silently produce a broken
+# "ModuleNotFoundError: No module named 'pystray'" exe just because
+# .venv happened to be missing them for some other reason (an older
+# install.ps1 run, a different venv than expected, etc.) -- confirmed
+# live: this exact failure happened before this line existed.
 & .\.venv\Scripts\pip.exe install pyinstaller
+& .\.venv\Scripts\pip.exe install -r scripts\tray_requirements.txt
 
 Write-Host "== Running PyInstaller ($Mode) =="
 Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue

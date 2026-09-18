@@ -76,6 +76,25 @@ def repo_path(*parts):
 # inside the packaged app with no traceback the user can usefully act
 # on, not a build-time error here.
 hidden_imports = [
+    # pystray picks its actual backend (_win32/_darwin/_xorg/_appindicator/
+    # _dummy) via a plain conditional import inside pystray/__init__.py,
+    # not something dynamic PyInstaller's analysis could miss on its
+    # own -- pyinstaller-hooks-contrib ships a dedicated hook for this
+    # already (collect_submodules("pystray")), so this entry is a second,
+    # cheap safety net for the case that hook doesn't fire for some
+    # reason (an older pyinstaller-hooks-contrib version without it,
+    # etc.) -- confirmed live: "ModuleNotFoundError: No module named
+    # 'pystray'" at runtime on a first Windows build, root-caused to
+    # tray_requirements.txt not actually being installed in that .venv
+    # (see this spec's build scripts, which now explicitly ensure that
+    # too) -- this alone wouldn't have caught that particular case
+    # (nothing to bundle if the package was never installed at all),
+    # but is still worth having for a *different* way this exact
+    # failure could otherwise recur.
+    "pystray",
+    "PIL",
+    "PIL.Image",
+    "PIL.ImageDraw",
     "uvicorn.logging",
     "uvicorn.loops",
     "uvicorn.loops.auto",
