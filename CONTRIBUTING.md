@@ -90,6 +90,18 @@ then `PYTHONPATH=. uvicorn backend.app.main:app` from the unzipped root
 (the frontend is already built into `frontend/dist`, which the backend
 serves directly — see `backend/app/main.py`).
 
+## Publishing docs
+
+`docs/` here isn't what's actually live at
+https://michaelyagi.github.io/roast-telemetry — that's a separate,
+public repo (`michaelyagi.github.io`), since this repo is private and
+GitHub Pages can't serve a private repo directly. A `docs/` change
+doesn't reach the public site on its own; run `scripts/sync-docs.sh`
+(clones/updates a local copy of that repo next to this one by default,
+override with `MIRROR_DIR`) to copy everything over, strip the couple
+of links that point back to this private repo, and push, but only when
+you actually want the public site updated.
+
 ## Reporting bugs / proposing features
 
 Open a GitHub issue. For a bug, include: what you did, what you expected,

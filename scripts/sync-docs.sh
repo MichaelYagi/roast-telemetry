@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Publishes docs/ to the public site at https://michaelyagi.github.io/roast-telemetry
+# -- a genuinely separate GitHub repo (michaelyagi.github.io) from this
+# one, since this repo is private and GitHub Pages can't serve a
+# private repo's content directly. Nothing else in this repo runs this
+# automatically (deliberately not wired into packaging/'s build
+# scripts, which build platform executables, an unrelated concern --
+# this is its own explicit step, run whenever you actually want to
+# publish a docs change).
+#
+# What it does:
+#   1. Clones/updates a local copy of michaelyagi.github.io next to
+#      this repo (../michaelyagi.github.io by default -- override with
+#      MIRROR_DIR).
+#   2. Copies every file under docs/ into that clone's roast-telemetry/
+#      subdirectory, rewriting each .html file's links to this
+#      (private) repo -- the nav bar's own "GitHub" link is dropped
+#      entirely, an inline reference like "see CONTRIBUTING.md" is
+#      unwrapped to plain text -- so nothing on the public site links
+#      somewhere a visitor can't actually reach. Never deletes a file
+#      already in the mirror that isn't in docs/ (a deliberately
+#      removed docs page needs its mirror copy cleaned up by hand --
+#      safer than a sync script silently deleting something it doesn't
+#      recognize).
+#   3. Commits and pushes, but only if something actually changed.
+#
+# Usage: scripts/sync-docs.sh
+set -euo pipefail
+cd "$(dirname "$0")/.."
+REPO_ROOT="$(pwd)"
+MIRROR_DIR="${MIRROR_DIR:-$REPO_ROOT/../michaelyagi.github.io}"
+MIRROR_REMOTE="https://github.com/MichaelYagi/michaelyagi.github.io.git"
+
+if [[ ! -d "$MIRROR_DIR/.git" ]]; then
+  echo "No local clone at $MIRROR_DIR -- cloning it now."
+  git clone "$MIRROR_REMOTE" "$MIRROR_DIR"
+else
+  echo "Updating existing clone at $MIRROR_DIR"
+  git -C "$MIRROR_DIR" pull --ff-only
+fi
+
+SOURCE_SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD)"
+
+python3 - "$REPO_ROOT/docs" "$MIRROR_DIR/roast-telemetry" <<'PYEOF'
+import re
+import shutil
+import sys
+from pathlib import Path
+
+src_dir, dest_dir = Path(sys.argv[1]), Path(sys.argv[2])
+
+# The nav bar's own GitHub link -- a bare link to the repo root, no
+# /blob/ path -- gets dropped entirely rather than left as plain text;
+# "GitHub" as an unlinked nav item wouldn't make sense.
+nav_link_re = re.compile(r'\s*<a href="https://github\.com/MichaelYagi/roast-telemetry">GitHub</a>\n')
+# An inline reference (e.g. "see CONTRIBUTING.md") keeps its own text,
+# just unwrapped from the link -- the sentence still reads fine without it.
+blob_link_re = re.compile(r'<a href="https://github\.com/MichaelYagi/roast-telemetry/blob/main/[^"]*">([^<]*)</a>')
+
+dest_dir.mkdir(parents=True, exist_ok=True)
+changed = False
+for src_path in src_dir.rglob("*"):
+    if src_path.is_dir():
+        continue
+    rel = src_path.relative_to(src_dir)
+    dest_path = dest_dir / rel
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    if src_path.suffix == ".html":
+        content = src_path.read_text(encoding="utf-8")
+        content = nav_link_re.sub("", content)
+        content = blob_link_re.sub(r"\1", content)
+        new_bytes = content.encode("utf-8")
+    else:
+        new_bytes = src_path.read_bytes()
+    if not dest_path.exists() or dest_path.read_bytes() != new_bytes:
+        dest_path.write_bytes(new_bytes)
+        changed = True
+        print(f"  updated {rel}")
+
+if not changed:
+    print("Nothing changed -- docs/ already matches the mirror.")
+PYEOF
+
+cd "$MIRROR_DIR"
+git add roast-telemetry/
+if git diff --cached --quiet; then
+  echo "Nothing to commit -- mirror is already up to date."
+  exit 0
+fi
+
+git commit -m "Sync: docs update
+
+Mirrors roast-telemetry@${SOURCE_SHA}.
+"
+git push origin main
+
+echo
+echo "Pushed. GitHub Pages usually takes a minute or two to rebuild --"
+echo "https://michaelyagi.github.io/roast-telemetry"
