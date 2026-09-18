@@ -95,6 +95,28 @@ hidden_imports = [
     "PIL",
     "PIL.Image",
     "PIL.ImageDraw",
+    # pyserial's serial_for_url() (used whenever a Serial port field is
+    # a URL like socket://host:port instead of a plain COM/tty path --
+    # see docs/modbus/fz-94-usb.html's own remote-roaster section, and
+    # the WSL2 fake-hardware --tcp bridge) picks its handler module via
+    # importlib.import_module() built from the URL scheme at *runtime*
+    # (serial/__init__.py's own serial_for_url, module_name =
+    # f".protocol_{protocol}") -- genuinely invisible to PyInstaller's
+    # static analysis, and unlike pystray there's no PyInstaller hook
+    # for plain pyserial at all (only for the unrelated Qt
+    # QtSerialPort bindings) to catch this automatically. Confirmed
+    # live: "could not open serial port 'socket://127.0.0.1:5020'" on
+    # a real Windows build, npm/pystray already fixed by that point --
+    # a plain COM port path never hits this code path at all (only a
+    # URL with "://" in it does), so this went unnoticed until someone
+    # actually used the WSL2 bridge against a packaged build specifically.
+    "serial.urlhandler",
+    "serial.urlhandler.protocol_socket",
+    "serial.urlhandler.protocol_rfc2217",  # the ser2net-based alternative docs/modbus/fz-94-usb.html mentions
+    "serial.urlhandler.protocol_loop",
+    "serial.urlhandler.protocol_hwgrep",
+    "serial.urlhandler.protocol_alt",
+    "serial.urlhandler.protocol_spy",
     "uvicorn.logging",
     "uvicorn.loops",
     "uvicorn.loops.auto",
