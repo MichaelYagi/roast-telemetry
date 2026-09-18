@@ -1609,11 +1609,30 @@ button:disabled {
    so it still just reads as a label at rest, not an obviously chrome-y
    button, with a hover/pressed affordance so it doesn't look inert. */
 .vertical-slider-toggle {
+  /* A <button> carries a bunch of browser UA-stylesheet defaults a
+     <div> (what this replaced) never had -- font isn't inherited by
+     default, line-height/box-sizing/min-height can differ, and some
+     browsers enforce their own min block size even with padding:0.
+     Left unreset, any of those can make this column measurably taller/
+     wider than the plain-text label version, which is exactly the kind
+     of thing that ripples into "the general layout" (lane height via
+     align-items:stretch, spacing via the mobile space-evenly fix) --
+     explicitly not supposed to change just from turning 2 of the 4
+     labels into buttons. */
+  font: inherit;
+  line-height: inherit;
+  display: block;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
   background: none;
   border: none;
   padding: 0;
   cursor: pointer;
   border-radius: 4px;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .vertical-slider-toggle:hover:not(:disabled) {
