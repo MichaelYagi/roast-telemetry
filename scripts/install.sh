@@ -210,6 +210,17 @@ fi
 
 # --- Backend venv ---
 echo
+# A .venv created by native Windows Python (install.ps1, or a manual
+# `python -m venv` from PowerShell) has .venv/Scripts/python.exe, not
+# .venv/bin/python -- confirmed live: reusing one of these from WSL2/
+# Linux (this script) says "Reusing existing .venv" here, then fails on
+# the very next line (.venv/bin/pip: No such file or directory) with no
+# explanation of why. Catch it before that, not after.
+if [[ -d .venv ]] && [[ ! -e .venv/bin/python ]] && [[ -e .venv/Scripts/python.exe ]]; then
+  echo ".venv exists but was created by native Windows Python (.venv/Scripts/python.exe, no .venv/bin/python) -- that can't be reused from WSL2/Linux." >&2
+  echo "Rename or delete .venv, then re-run this script to create a proper Linux one (your Windows one, if you still need it, can be recreated later via install.ps1)." >&2
+  exit 1
+fi
 if [[ -d .venv ]]; then
   echo "Reusing existing .venv"
   # Retrofit: an existing venv predating the --system-site-packages

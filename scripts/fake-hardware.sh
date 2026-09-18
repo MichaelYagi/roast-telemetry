@@ -32,6 +32,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Same check as run-server.sh -- a Windows-created .venv (Scripts/, not
+# bin/) can't run from WSL2/Linux bash at all.
+if [[ -d .venv ]] && [[ ! -e .venv/bin/python ]] && [[ -e .venv/Scripts/python.exe ]]; then
+  echo "$(basename "$0"): .venv was created by native Windows Python (.venv/Scripts/python.exe exists, .venv/bin/python doesn't) -- that can't run from WSL2/Linux." >&2
+  echo "Rename or delete .venv, then run scripts/install.sh from this WSL2 shell to create a proper Linux one." >&2
+  exit 1
+fi
+
 KIND="${1:-}"
 if [[ "$KIND" != "fz94" && "$KIND" != "ms6514" ]]; then
   echo "Usage: $0 fz94|ms6514 [--tcp [port]]" >&2

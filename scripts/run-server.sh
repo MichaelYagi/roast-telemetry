@@ -22,6 +22,19 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# A .venv created by native Windows Python (install.ps1, or a manual
+# `python -m venv` from PowerShell) has .venv/Scripts/python.exe, not
+# .venv/bin/python -- WSL2/Linux bash can't execute those .exe binaries
+# at all, so every .venv/bin/... call below would otherwise fail with a
+# bare "No such file or directory" and no explanation (confirmed live:
+# exactly this, on a repo folder shared between native Windows and
+# WSL2). Catch it here with a clear message instead.
+if [[ -d .venv ]] && [[ ! -e .venv/bin/python ]] && [[ -e .venv/Scripts/python.exe ]]; then
+  echo "$(basename "$0"): .venv was created by native Windows Python (.venv/Scripts/python.exe exists, .venv/bin/python doesn't) -- that can't run from WSL2/Linux." >&2
+  echo "Rename or delete .venv, then run scripts/install.sh from this WSL2 shell to create a proper Linux one." >&2
+  exit 1
+fi
+
 RELOAD=()
 SKIP_BUILD=0
 PORT=8000

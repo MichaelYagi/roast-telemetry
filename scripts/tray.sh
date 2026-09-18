@@ -11,6 +11,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Same check as run-server.sh -- a Windows-created .venv (Scripts/, not
+# bin/) can't run from WSL2/Linux bash at all; without this, the checks
+# below just silently read as "pystray isn't installed" and send you
+# down the wrong fix.
+if [[ -d .venv ]] && [[ ! -e .venv/bin/python ]] && [[ -e .venv/Scripts/python.exe ]]; then
+  echo "$(basename "$0"): .venv was created by native Windows Python (.venv/Scripts/python.exe exists, .venv/bin/python doesn't) -- that can't run from WSL2/Linux." >&2
+  echo "Rename or delete .venv, then run scripts/install.sh from this WSL2 shell to create a proper Linux one." >&2
+  exit 1
+fi
+
 if ! .venv/bin/python -c "import pystray" 2>/dev/null; then
   echo "Tray dependencies aren't installed yet. Run this once:" >&2
   echo "    .venv/bin/pip install -r scripts/tray_requirements.txt" >&2
