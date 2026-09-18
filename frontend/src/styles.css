@@ -1605,9 +1605,14 @@ button:disabled {
 
 /* Drum/Air's label doubles as an on/off toggle -- a real run/stop
    gesture for the drive itself, separate from the slider's own value
-   (see VerticalControlPanel.jsx's toggleDrumOn/toggleAirOn). Button-reset
-   so it still just reads as a label at rest, not an obviously chrome-y
-   button, with a hover/pressed affordance so it doesn't look inert. */
+   (see VerticalControlPanel.jsx's toggleDrumOn/toggleAirOn). Needs to
+   actually *look* like a small button (visible border/fill), not just
+   read as plain colored text -- confirmed live that a bare reset with
+   no chrome at all was indistinguishable from a text link, not
+   something a user would recognize as clickable. Same small-button
+   language .vertical-slider-arrow already uses elsewhere in this exact
+   panel (border + border-radius, accent border on hover), just sized
+   for text instead of a single glyph. */
 .vertical-slider-toggle {
   /* A <button> carries a bunch of browser UA-stylesheet defaults a
      <div> (what this replaced) never had -- font isn't inherited by
@@ -1618,29 +1623,46 @@ button:disabled {
      of thing that ripples into "the general layout" (lane height via
      align-items:stretch, spacing via the mobile space-evenly fix) --
      explicitly not supposed to change just from turning 2 of the 4
-     labels into buttons. */
+     labels into buttons. The visible padding/border below is a small,
+     deliberate exception -- "small buttons" was the actual ask, this
+     is what makes that legible as a button at all. */
   font: inherit;
-  line-height: inherit;
+  line-height: 1.1;
   display: block;
   box-sizing: border-box;
   min-width: 0;
   min-height: 0;
   margin: 0;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
+  padding: 0.15rem 0.55rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 4px;
+  cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
 }
 
 .vertical-slider-toggle:hover:not(:disabled) {
   color: var(--accent);
+  border-color: var(--accent);
 }
 
 .vertical-slider-toggle:disabled {
   cursor: not-allowed;
+}
+
+/* On -- a filled chip in the slider's own color (--item-color, already
+   set per-column) so the button visibly reads as "this one's live"
+   rather than needing the slider's own color/position to tell you. */
+.vertical-slider-col:not(.vertical-slider-col-off) .vertical-slider-toggle {
+  background: var(--item-color);
+  border-color: var(--item-color);
+  color: white;
+}
+
+.vertical-slider-col:not(.vertical-slider-col-off) .vertical-slider-toggle:hover:not(:disabled) {
+  color: white;
+  filter: brightness(1.1);
 }
 
 /* Toggled off -- the track/arrows grey out and lock (see isDisabled in
@@ -1654,7 +1676,12 @@ button:disabled {
   opacity: 0.4;
 }
 
+/* Outline instead of the "on" state's filled chip -- an empty/muted
+   button reads as "off, click to start" the same way a real power
+   toggle would, rather than just dimmer text. */
 .vertical-slider-col-off .vertical-slider-toggle {
+  background: var(--panel);
+  border-color: var(--border);
   color: var(--text-muted);
 }
 
