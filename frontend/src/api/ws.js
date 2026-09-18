@@ -80,6 +80,12 @@ export function useRoastStream(roastId) {
         setRoast((prev) => (prev ? { ...prev, notes: [...prev.notes, message.note] } : prev));
       } else if (message.type === "event") {
         setRoast((prev) => (prev ? { ...prev, events: [...prev.events, message.event] } : prev));
+      } else if (message.type === "event_deleted") {
+        setRoast((prev) => (prev ? { ...prev, events: prev.events.filter((e) => e.id !== message.event_id) } : prev));
+      } else if (message.type === "event_updated") {
+        setRoast((prev) =>
+          prev ? { ...prev, events: prev.events.map((e) => (e.id === message.event.id ? message.event : e)) } : prev
+        );
       } else if (message.type === "error") {
         setLastError(message.message || "unknown error");
       } else if (message.type === "alarm_scheduled") {

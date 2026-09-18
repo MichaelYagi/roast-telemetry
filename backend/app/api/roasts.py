@@ -19,6 +19,7 @@ from .. import auth, ollama_client, storage
 from ..models import (
     ControlCommand,
     EventCreateRequest,
+    EventUpdateRequest,
     NoteCreateRequest,
     Roast,
     RoastCreateRequest,
@@ -214,6 +215,41 @@ async def add_event(roast_id: str, event: EventCreateRequest) -> dict:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     await pubsub.publish(roast_id, {"type": "event", "roast_id": roast_id, "event": created})
     return created
+
+
+def _require_roast_exists(roast_id: str) -> None:
+    # Unlike add_event/add_note above, delete_event/retime_event work on
+    # a roast whose in-memory session no longer exists too (a genuinely
+    # historical roast from before the last backend restart), reading/
+    # writing its .alog file directly -- so there's no single
+    # session_manager.get() call to 404 on. Check both places explicitly
+    # instead of string-matching exception messages for status codes.
+    if session_manager.get(roast_id) is not None:
+        return
+    if storage.get_roast_row(roast_id) is not None:
+        return
+    raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
+
+
+@router.delete("/{roast_id}/events/{event_id}", status_code=204)
+async def delete_event(roast_id: str, event_id: str) -> None:
+    _require_roast_exists(roast_id)
+    try:
+        session_manager.delete_event(roast_id, event_id)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await pubsub.publish(roast_id, {"type": "event_deleted", "roast_id": roast_id, "event_id": event_id})
+
+
+@router.patch("/{roast_id}/events/{event_id}")
+async def retime_event(roast_id: str, event_id: str, update: EventUpdateRequest) -> dict:
+    _require_roast_exists(roast_id)
+    try:
+        updated = session_manager.retime_event(roast_id, event_id, update.time_s)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await pubsub.publish(roast_id, {"type": "event_updated", "roast_id": roast_id, "event": updated})
+    return updated
 
 
 @router.post("/{roast_id}/weight")

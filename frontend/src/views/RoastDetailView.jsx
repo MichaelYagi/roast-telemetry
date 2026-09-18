@@ -51,6 +51,11 @@ export default function RoastDetailView() {
   const [roastedWeightInput, setRoastedWeightInput] = useState("");
   const [weightSaving, setWeightSaving] = useState(false);
   const [weightError, setWeightError] = useState(null);
+  // Deliberately separate from `error` above -- that one *replaces the
+  // whole page* (see the early-return a few lines down), which is right
+  // for "the roast itself failed to load" but way too disruptive for a
+  // failed milestone delete/retime on an otherwise-fine page.
+  const [milestoneError, setMilestoneError] = useState(null);
 
   useEffect(() => {
     api
@@ -72,6 +77,31 @@ export default function RoastDetailView() {
       setWeightError(err.message);
     } finally {
       setWeightSaving(false);
+    }
+  }
+
+  // No websocket on this page (one-time REST fetch, see the effect
+  // above) -- unlike LiveRoastView.jsx, there's no server-pushed
+  // "event_deleted"/"event_updated" message to pick up, so these mutate
+  // `roast.events` directly on success, same direct-mutation pattern
+  // handleSaveRoastedWeight above already uses.
+  async function handleDeleteMilestone(eventId) {
+    setMilestoneError(null);
+    try {
+      await api.deleteEvent(id, eventId);
+      setRoast((r) => (r ? { ...r, events: r.events.filter((e) => e.id !== eventId) } : r));
+    } catch (err) {
+      setMilestoneError(err.message);
+    }
+  }
+
+  async function handleRetimeMilestone(eventId, timeS) {
+    setMilestoneError(null);
+    try {
+      const updated = await api.retimeEvent(id, eventId, timeS);
+      setRoast((r) => (r ? { ...r, events: r.events.map((e) => (e.id === eventId ? updated : e)) } : r));
+    } catch (err) {
+      setMilestoneError(err.message);
     }
   }
 
@@ -144,7 +174,14 @@ export default function RoastDetailView() {
       </div>
 
       <div className="panel">
-        <RoastChart profile={roast.profile} events={roast.events} tempUnit={tempUnit} />
+        <RoastChart
+          profile={roast.profile}
+          events={roast.events}
+          tempUnit={tempUnit}
+          onDeleteEvent={handleDeleteMilestone}
+          onRetimeEvent={handleRetimeMilestone}
+        />
+        {milestoneError && <p className="error no-print">{milestoneError}</p>}
       </div>
 
       <div className="detail-grid">

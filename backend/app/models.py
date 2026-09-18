@@ -640,3 +640,13 @@ class EventCreateRequest(BaseModel):
     type: RoastEventType
     label: str
     value: Optional[float] = None
+
+
+class EventUpdateRequest(BaseModel):
+    """Retime an already-marked milestone -- see RoastSession.retime_event.
+    Only time_s is client-supplied; `value` (the temperature at that
+    instant) is always recomputed server-side from the profile, never
+    trusted from the client, since a stale/wrong value would silently
+    mismatch the marker's new position on the chart."""
+
+    time_s: float

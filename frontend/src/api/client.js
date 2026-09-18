@@ -56,6 +56,9 @@ export const api = {
   setWeightRoasted: (id, grams) => request(`/roasts/${id}/weight?${new URLSearchParams({ grams })}`, { method: "POST" }),
   addNote: (id, note) => request(`/roasts/${id}/notes`, { method: "POST", body: JSON.stringify(note) }),
   addEvent: (id, event) => request(`/roasts/${id}/events`, { method: "POST", body: JSON.stringify(event) }),
+  deleteEvent: (id, eventId) => request(`/roasts/${id}/events/${eventId}`, { method: "DELETE" }),
+  retimeEvent: (id, eventId, timeS) =>
+    request(`/roasts/${id}/events/${eventId}`, { method: "PATCH", body: JSON.stringify({ time_s: timeS }) }),
   alogDownloadUrl: (id) => `${BASE}/roasts/${id}/alog`,
   csvDownloadUrl: (id) => `${BASE}/roasts/${id}/csv`,
   importAlog: (path, title) =>

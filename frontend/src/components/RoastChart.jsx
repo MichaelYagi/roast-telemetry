@@ -8,7 +8,7 @@ import {
   Tooltip,
 } from "chart.js";
 import zoomPlugin from "chartjs-plugin-zoom";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 import { TERM_TOOLTIPS } from "../termTooltips.js";
@@ -228,6 +228,41 @@ const axisUnitLabelsPlugin = {
   },
 };
 
+// A milestone is editable (right-click to delete, drag to retime) if
+// it's something a human could have marked by hand in the first place --
+// CUSTOM isn't a milestone at all (no marker is even drawn for it, see
+// below), and TURNING_POINT is a pure auto-detected observation with no
+// manual-mark path anywhere in the app (see backend's
+// ALWAYS_AUTO_EVENT_TYPES) -- matches the backend's own edit guards
+// exactly (RoastSession._find_editable_milestone et al), so a click here
+// can never attempt something the API would just reject anyway.
+export function isEditableMilestone(ev) {
+  return ev.type !== "CUSTOM" && ev.type !== "TURNING_POINT";
+}
+
+// Shared by eventMarkersPlugin's draw path and hitTestMarker below, so
+// the two can never quietly disagree about where a marker actually is.
+// `dragPreviewTimeS` overrides ev.time_s for the one marker currently
+// being dragged (see the mousedown/mousemove handlers further down) --
+// read from `chart.$dragPreview`, a plain property stashed directly on
+// the live Chart.js instance rather than threaded through React props,
+// so a drag can redraw at 60fps via chart.update('none') without
+// triggering a React re-render on every pixel of mouse movement.
+function markerPosition(chart, ev, tempUnit, dragPreviewTimeS) {
+  const { scales } = chart;
+  const xScale = scales.x;
+  const yScale = scales.yTemp;
+  const timeS = dragPreviewTimeS != null ? dragPreviewTimeS : ev.time_s;
+  const x = xScale.getPixelForValue(timeS);
+  // ev.value is always raw Celsius (events aren't part of the
+  // already-converted chart datasets below) -- must convert before using
+  // it against a scale whose own values are now in tempUnit, or the dot
+  // lands at a wildly wrong pixel position.
+  const displayValue = ev.value != null ? celsiusToUnit(ev.value, tempUnit) : null;
+  const dotY = displayValue != null && yScale ? yScale.getPixelForValue(displayValue) : chart.chartArea.bottom;
+  return { x, dotY, timeS, displayValue };
+}
+
 // Dark rounded-rectangle callouts (label / time / value) anchored to each
 // named milestone's point on the BT curve, with a stem + dot down to the
 // actual point. Manual control-channel (CUSTOM) events are excluded here
@@ -240,22 +275,16 @@ const eventMarkersPlugin = {
     const events = (opts?.events || []).filter((e) => e.type !== "CUSTOM");
     if (!events.length) return;
     const tempUnit = opts?.tempUnit || "c";
-    const { ctx, chartArea, scales } = chart;
-    const xScale = scales.x;
-    const yScale = scales.yTemp;
+    const dragPreview = chart.$dragPreview;
+    const { ctx, chartArea } = chart;
     ctx.save();
     events.forEach((ev) => {
-      const x = xScale.getPixelForValue(ev.time_s);
+      const dragging = dragPreview && dragPreview.eventId === ev.id;
+      const { x, dotY, timeS, displayValue } = markerPosition(chart, ev, tempUnit, dragging ? dragPreview.timeS : null);
       if (x < chartArea.left || x > chartArea.right) return;
       const color = EVENT_COLORS[ev.type] || EVENT_COLORS.CUSTOM;
-      // ev.value is always raw Celsius (events aren't part of the
-      // already-converted chart datasets below) -- must convert before
-      // using it against a scale whose own values are now in tempUnit,
-      // or the dot lands at a wildly wrong pixel position.
-      const displayValue = ev.value != null ? celsiusToUnit(ev.value, tempUnit) : null;
-      const dotY = displayValue != null && yScale ? yScale.getPixelForValue(displayValue) : chartArea.bottom;
 
-      const lines = [ev.label, formatTime(ev.time_s), displayValue != null ? `${displayValue.toFixed(1)}${unitSuffix(tempUnit)}` : null].filter(Boolean);
+      const lines = [ev.label, formatTime(timeS), displayValue != null ? `${displayValue.toFixed(1)}${unitSuffix(tempUnit)}` : null].filter(Boolean);
       ctx.font = "9px system-ui, sans-serif";
       const boxWidth = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 14;
       const boxHeight = lines.length * 11 + 6;
@@ -264,14 +293,16 @@ const eventMarkersPlugin = {
 
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
+      ctx.setLineDash(dragging ? [3, 3] : []);
       ctx.beginPath();
       ctx.moveTo(x, dotY);
       ctx.lineTo(x, boxY + boxHeight);
       ctx.stroke();
+      ctx.setLineDash([]);
 
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(x, dotY, 3.5, 0, Math.PI * 2);
+      ctx.arc(x, dotY, dragging ? 5 : 3.5, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = "rgba(28, 25, 23, 0.92)";
@@ -292,6 +323,28 @@ const eventMarkersPlugin = {
 
 ChartJS.register(eventMarkersPlugin, scopeBandsPlugin, axisUnitLabelsPlugin, phaseBandsPlugin);
 
+const MARKER_HIT_RADIUS_PX = 12;
+
+// Finds the editable milestone (if any) whose dot sits within
+// MARKER_HIT_RADIUS_PX of the given canvas-relative point -- shared by
+// the context-menu (right-click) and drag-to-retime (onPanStart) entry
+// points below, closest-first so two nearby markers never fight over an
+// ambiguous click.
+function hitTestMarker(chart, events, x, y, tempUnit) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const ev of events) {
+    if (!isEditableMilestone(ev)) continue;
+    const { x: mx, dotY } = markerPosition(chart, ev, tempUnit, null);
+    const dist = Math.hypot(mx - x, dotY - y);
+    if (dist <= MARKER_HIT_RADIUS_PX && dist < bestDist) {
+      best = ev;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
 export default function RoastChart({
   profile = [],
   events = [],
@@ -306,6 +359,15 @@ export default function RoastChart({
   // every second. Every other caller (history detail, or Live before
   // START / after STOP) leaves this at the default, fully interactive.
   interactive = true,
+  // Right-click-to-delete / drag-to-retime an already-marked milestone
+  // (item #7 from the real-hardware feedback round -- matching Artisan).
+  // Both optional and independent of `interactive` above: that flag only
+  // gates zoom/pan, but editing a milestone has to keep working during
+  // an active roast too, per the user's own scoping answer ("both live
+  // and afterward"). Omit either to render read-only (no callers do
+  // today, but keeps this component honest about being usable that way).
+  onDeleteEvent,
+  onRetimeEvent,
 }) {
   // Cheap to recompute every tick (profile grows every second during a
   // live roast anyway, same cost the data/availability useMemos below
@@ -336,8 +398,28 @@ export default function RoastChart({
   );
   const [hideEventLabels, setHideEventLabels] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Right-click context menu: {eventId, x, y} in viewport coordinates
+  // (for CSS positioning), or null when closed.
+  const [contextMenu, setContextMenu] = useState(null);
   const chartRef = useRef(null);
   const menuRef = useRef(null);
+  const contextMenuRef = useRef(null);
+  // Drag-to-retime state lives in a ref, not React state -- the
+  // mousemove handler mutates chart.$dragPreview directly and calls
+  // chart.update('none') itself (see startDrag below) specifically to
+  // avoid a React re-render on every pixel of mouse movement.
+  const dragRef = useRef(null);
+
+  // Closes the right-click context menu on any click outside it, same
+  // pattern as the chart-options popover below.
+  useEffect(() => {
+    if (!contextMenu) return undefined;
+    function onPointerDown(e) {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) setContextMenu(null);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [contextMenu]);
 
   // Closes the chart-options menu on any click outside it -- a plain
   // popover, no library, since it's just these two controls.
@@ -446,6 +528,81 @@ export default function RoastChart({
   const showRor = visible.ROR_BT || visible.ROR_ET;
   const showControl = visible.Burner || visible.Air || visible.Drum || visible.Damper;
 
+  // Drag-to-retime a milestone marker -- started from onPanStart below
+  // (chartjs-plugin-zoom's own pan-gesture hook, the one sanctioned way
+  // to veto/hijack a pan gesture conditionally: returning false from
+  // onPanStart cancels the library's own pan for that gesture, see
+  // node_modules/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.esm.js's
+  // startPan). From there, tracked with plain window listeners (not
+  // Chart.js/Hammer's own pan machinery -- that gesture was cancelled)
+  // so the drag keeps working even if the cursor leaves the canvas.
+  // $dragPreview is stashed directly on the live Chart.js instance
+  // (bypassing React state/props) so every pixel of movement is just
+  // chart.update('none'), not a React re-render.
+  const handleDragMove = useCallback(
+    (e) => {
+      const chart = chartRef.current;
+      const drag = dragRef.current;
+      if (!chart || !drag) return;
+      const rect = chart.canvas.getBoundingClientRect();
+      const canvasX = e.clientX - rect.left;
+      let timeS = chart.scales.x.getValueForPixel(canvasX);
+      // Clamped client-side only to the roast's overall recorded range,
+      // for obvious live feedback -- neighbor-milestone ordering is
+      // validated authoritatively by the backend on drop
+      // (RoastSession._retime_milestone), not duplicated here.
+      const profileEnd = profile.length ? profile[profile.length - 1].time_s : null;
+      timeS = profileEnd != null ? Math.max(0, Math.min(profileEnd, timeS)) : Math.max(0, timeS);
+      chart.$dragPreview = { eventId: drag.eventId, timeS };
+      chart.update("none");
+    },
+    [profile]
+  );
+
+  const handleDragEnd = useCallback(() => {
+    window.removeEventListener("mousemove", handleDragMove);
+    window.removeEventListener("mouseup", handleDragEnd);
+    const drag = dragRef.current;
+    dragRef.current = null;
+    const chart = chartRef.current;
+    if (!drag || !chart) return;
+    const preview = chart.$dragPreview;
+    // Clear the preview immediately, before the retime API call even
+    // resolves -- the marker visually reverts to its stored position
+    // right away, then jumps to the new one once onRetimeEvent's own
+    // state update lands. If the backend rejects the move (crosses a
+    // neighboring milestone, say), that's the whole error UI: it just
+    // never moves from the reverted position, same as a native
+    // drag-and-drop rejection.
+    chart.$dragPreview = null;
+    chart.update("none");
+    if (preview && onRetimeEvent) {
+      Promise.resolve(onRetimeEvent(drag.eventId, preview.timeS)).catch((err) => {
+        console.error("Failed to retime milestone:", err);
+      });
+    }
+  }, [onRetimeEvent, handleDragMove]);
+
+  // Catches a drag left in progress if this component unmounts mid-drag
+  // (e.g. navigating away) -- addEventListener'd window listeners
+  // otherwise leak past the component's own lifetime.
+  useEffect(() => {
+    return () => {
+      window.removeEventListener("mousemove", handleDragMove);
+      window.removeEventListener("mouseup", handleDragEnd);
+    };
+  }, [handleDragMove, handleDragEnd]);
+
+  function handleContextMenu(e) {
+    const chart = chartRef.current;
+    if (!chart || !onDeleteEvent) return;
+    const rect = chart.canvas.getBoundingClientRect();
+    const hit = hitTestMarker(chart, events, e.clientX - rect.left, e.clientY - rect.top, tempUnit);
+    if (!hit) return; // not on an editable marker -- let the browser's own context menu through
+    e.preventDefault();
+    setContextMenu({ eventId: hit.id, x: e.clientX, y: e.clientY });
+  }
+
   const options = useMemo(
     () => ({
       responsive: true,
@@ -487,7 +644,31 @@ export default function RoastChart({
         // under you doesn't work well, so this is a reviewing-a-curve
         // feature, not a live one).
         zoom: {
-          pan: { enabled: interactive, mode: "x" },
+          // pan.enabled stays true always -- unlike wheel/pinch zoom
+          // below, pan-gesture recognition has to keep running even
+          // while !interactive (an active roast) specifically so
+          // onPanStart still fires and can hijack a drag that starts on
+          // a milestone marker (drag-to-retime has to work live, not
+          // just on a finished roast, per the user's own scoping
+          // answer). Genuine chart-panning during a live roast is still
+          // rejected -- just from inside onPanStart now, not by
+          // disabling the gesture recognizer entirely.
+          pan: {
+            enabled: true,
+            mode: "x",
+            onPanStart: ({ chart, point }) => {
+              const hit = onRetimeEvent ? hitTestMarker(chart, events, point.x, point.y, tempUnit) : null;
+              if (hit) {
+                dragRef.current = { eventId: hit.id };
+                chart.$dragPreview = { eventId: hit.id, timeS: hit.time_s };
+                window.addEventListener("mousemove", handleDragMove);
+                window.addEventListener("mouseup", handleDragEnd);
+                return false;
+              }
+              if (!interactive) return false; // not a marker, and panning itself is off right now (live roast)
+              return undefined; // let normal panning proceed
+            },
+          },
           zoom: { wheel: { enabled: interactive }, pinch: { enabled: interactive }, mode: "x" },
         },
       },
@@ -548,7 +729,7 @@ export default function RoastChart({
         },
       },
     }),
-    [events, phases, showTemp, showRor, showControl, tempUnit, hideEventLabels, interactive]
+    [events, phases, showTemp, showRor, showControl, tempUnit, hideEventLabels, interactive, onRetimeEvent, handleDragMove, handleDragEnd]
   );
 
   return (
@@ -604,7 +785,21 @@ export default function RoastChart({
             )}
           </div>
         )}
-        <Line ref={chartRef} data={data} options={options} />
+        <Line ref={chartRef} data={data} options={options} onContextMenu={handleContextMenu} />
+        {contextMenu && (
+          <div className="milestone-context-menu" ref={contextMenuRef} style={{ left: contextMenu.x, top: contextMenu.y }}>
+            <button
+              type="button"
+              className="link-like"
+              onClick={() => {
+                onDeleteEvent(contextMenu.eventId);
+                setContextMenu(null);
+              }}
+            >
+              Delete milestone
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

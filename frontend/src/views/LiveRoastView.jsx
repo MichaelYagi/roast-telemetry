@@ -717,6 +717,30 @@ export default function LiveRoastView() {
     }
   }
 
+  // Both are effectively fire-and-forget here -- the actual UI update
+  // comes back through useRoastStream's websocket ("event_deleted"/
+  // "event_updated", see ws.js), not a local state mutation, since the
+  // backend publishes those the same way it already does for "event"/
+  // "note" on every other roast mutation. Errors still surface via the
+  // same error banner every other action on this page uses.
+  async function handleDeleteMilestone(eventId) {
+    if (!roastId) return;
+    try {
+      await api.deleteEvent(roastId, eventId);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleRetimeMilestone(eventId, timeS) {
+    if (!roastId) return;
+    try {
+      await api.retimeEvent(roastId, eventId, timeS);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   async function handleSavePreset() {
     if (!presetName.trim()) return;
     setError(null);
@@ -1606,6 +1630,8 @@ export default function LiveRoastView() {
                   height={chartHeight}
                   tempUnit={tempUnit}
                   interactive={!isRecording}
+                  onDeleteEvent={handleDeleteMilestone}
+                  onRetimeEvent={handleRetimeMilestone}
                 />
               </div>
               {/* Independent from the split breakout panel now (see

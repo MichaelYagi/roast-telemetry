@@ -82,6 +82,58 @@ def _modbus_register_overrides(request: RoastCreateRequest) -> dict:
     return overrides
 
 
+def _find_editable_milestone(events: list, event_id: str) -> tuple[dict, "RoastEventType"]:
+    """Shared by RoastSession.delete_event/retime_event (a live session's
+    own self.events) and RoastSessionManager's cold-roast path (a plain
+    list freshly parsed from a .alog file, no RoastSession involved at
+    all) -- both need the exact same find-by-id and Turning-Point/CUSTOM
+    guards, and duplicating them would just be an easy place for the two
+    paths to quietly drift apart."""
+    event = next((e for e in events if e["id"] == event_id), None)
+    if event is None:
+        raise RoastSessionError(f"event {event_id!r} not found")
+    event_type = RoastEventType(event["type"])
+    if event_type in ALWAYS_AUTO_EVENT_TYPES:
+        raise RoastSessionError(f"{event_type.value} is always auto-detected -- it can't be edited")
+    if event_type == RoastEventType.CUSTOM:
+        raise RoastSessionError("CUSTOM events aren't milestones -- nothing to edit")
+    return event, event_type
+
+
+def _retime_milestone(events: list, profile: list, event_id: str, new_time_s: float) -> dict:
+    """Validates and applies a milestone retime in place (bounds-checks
+    against the roast's own recorded range and against whichever
+    chronologically-adjacent milestones are already marked, then
+    recomputes `value` from the profile at the new time) -- shared for
+    the same reason as _find_editable_milestone above."""
+    event, event_type = _find_editable_milestone(events, event_id)
+
+    if profile and not (0.0 <= new_time_s <= profile[-1]["time_s"]):
+        raise RoastSessionError(f"time_s {new_time_s} is outside this roast's recorded range (0-{profile[-1]['time_s']})")
+
+    idx = MILESTONE_SEQUENCE.index(event_type)
+    by_type = {RoastEventType(e["type"]): e for e in events if e["type"] != RoastEventType.CUSTOM.value}
+    for earlier_type in reversed(MILESTONE_SEQUENCE[:idx]):
+        if earlier_type in by_type:
+            if new_time_s <= by_type[earlier_type]["time_s"]:
+                raise RoastSessionError(f"can't move {event_type.value} before {earlier_type.value}")
+            break
+    for later_type in MILESTONE_SEQUENCE[idx + 1:]:
+        if later_type in by_type:
+            if new_time_s >= by_type[later_type]["time_s"]:
+                raise RoastSessionError(f"can't move {event_type.value} past {later_type.value}")
+            break
+
+    nearest_bt = None
+    if profile:
+        nearest = min(profile, key=lambda p: abs(p["time_s"] - new_time_s))
+        nearest_bt = nearest.get("bt")
+
+    event["time_s"] = new_time_s
+    event["value"] = nearest_bt
+    return event
+
+
 class RoastSession:
     def __init__(self, roast_id: str, request: RoastCreateRequest, created_by_username: Optional[str] = None):
         self.id = roast_id
@@ -649,16 +701,12 @@ class RoastSession:
             if current in self._pending_alarm_tasks:
                 self._pending_alarm_tasks.remove(current)
 
-    def set_weight_roasted(self, grams: float) -> None:
-        # The natural workflow is: roast finishes, beans cool, *then* get
-        # weighed -- by that point _finish() has already run and this
-        # session's own in-memory state is the only thing DB reads/exports
-        # would otherwise reflect. Without persisting here too, the weight
-        # would silently vanish on a backend restart (still-running-process
-        # reads/the AI review pick it up fine either way, since both go
-        # through this same in-memory session first).
-        self.weight_roasted_g = grams
-        storage.update_roast(self.id, weight_roasted_g=grams)
+    def _rewrite_alog(self) -> None:
+        """Re-serializes this session's current profile/events/notes/
+        weights into its .alog file, if one already exists -- shared by
+        every edit that can happen after _finish() already wrote it once
+        (set_weight_roasted, delete_event, retime_event), so the exported
+        file never silently drifts from what the app itself shows."""
         if self.alog_path and os.path.exists(self.alog_path):
             alog_dict = roast_to_artisan_native_dict(
                 title=self.title,
@@ -671,6 +719,40 @@ class RoastSession:
                 roastdate=self.created_at,
             )
             save_artisan_native_alog(self.alog_path, alog_dict)
+
+    def set_weight_roasted(self, grams: float) -> None:
+        # The natural workflow is: roast finishes, beans cool, *then* get
+        # weighed -- by that point _finish() has already run and this
+        # session's own in-memory state is the only thing DB reads/exports
+        # would otherwise reflect. Without persisting here too, the weight
+        # would silently vanish on a backend restart (still-running-process
+        # reads/the AI review pick it up fine either way, since both go
+        # through this same in-memory session first).
+        self.weight_roasted_g = grams
+        storage.update_roast(self.id, weight_roasted_g=grams)
+        self._rewrite_alog()
+
+    def delete_event(self, event_id: str) -> None:
+        """Removes an already-marked milestone entirely, so it can be
+        re-marked fresh via the normal add_event() flow (its own
+        already-marked check only looks at what's currently in
+        self.events, so a deleted one is simply absent again). Doesn't
+        rewind anything else -- deleting CHARGE, for instance, doesn't
+        reset the elapsed-time clock or Turning Point detection state,
+        it only removes this one event marker."""
+        event, _ = _find_editable_milestone(self.events, event_id)
+        self.events.remove(event)
+        self._rewrite_alog()
+
+    def retime_event(self, event_id: str, new_time_s: float) -> dict:
+        """Moves an already-marked milestone to a different point on the
+        elapsed-time axis -- for correcting a click that landed too early
+        or too late. See _retime_milestone for the actual validation/
+        recompute logic, shared with RoastSessionManager's cold-roast
+        path."""
+        event = _retime_milestone(self.events, self.profile, event_id, new_time_s)
+        self._rewrite_alog()
+        return event
 
     # -- serialization ----------------------------------------------------
     def summary(self) -> RoastSummary:
@@ -826,6 +908,50 @@ class RoastSessionManager:
             events=parsed["events"],
             notes=parsed["notes"],
         )
+
+    def _cold_roast_row_and_parsed(self, roast_id: str) -> tuple[dict, dict]:
+        """Loads a roast with no live session purely from storage+.alog --
+        same read path get_roast_detail's own cold branch above uses.
+        Raises RoastSessionError (not returning None) since callers here
+        are about to *write*, where "doesn't exist" should surface as a
+        real error, not a silent no-op."""
+        row = storage.get_roast_row(roast_id)
+        if row is None or not row.get("alog_path"):
+            raise RoastSessionError(f"unknown roast {roast_id}")
+        parsed = alog_dict_to_points(load_alog(row["alog_path"]))
+        return row, parsed
+
+    def _rewrite_cold_alog(self, row: dict, parsed: dict) -> None:
+        alog_dict = roast_to_artisan_native_dict(
+            title=row["title"],
+            profile=parsed["profile"],
+            events=parsed["events"],
+            notes=parsed["notes"],
+            beans=row["beans"],
+            weight_green_g=row["weight_green_g"],
+            weight_roasted_g=row["weight_roasted_g"],
+            roastdate=row["created_at"],
+        )
+        save_artisan_native_alog(row["alog_path"], alog_dict)
+
+    def delete_event(self, roast_id: str, event_id: str) -> None:
+        session = self.get(roast_id)
+        if session is not None:
+            session.delete_event(event_id)
+            return
+        row, parsed = self._cold_roast_row_and_parsed(roast_id)
+        event, _ = _find_editable_milestone(parsed["events"], event_id)
+        parsed["events"].remove(event)
+        self._rewrite_cold_alog(row, parsed)
+
+    def retime_event(self, roast_id: str, event_id: str, new_time_s: float) -> dict:
+        session = self.get(roast_id)
+        if session is not None:
+            return session.retime_event(event_id, new_time_s)
+        row, parsed = self._cold_roast_row_and_parsed(roast_id)
+        event = _retime_milestone(parsed["events"], parsed["profile"], event_id, new_time_s)
+        self._rewrite_cold_alog(row, parsed)
+        return event
 
     def delete(self, roast_id: str) -> None:
         session = self.get(roast_id)

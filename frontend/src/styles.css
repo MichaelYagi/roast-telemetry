@@ -1996,6 +1996,23 @@ button:disabled {
   font-size: 0.8rem;
 }
 
+/* Right-click a milestone marker on the chart -- positioned at the raw
+   click coordinates (viewport-relative, see RoastChart.jsx's
+   handleContextMenu), not anchored to a fixed corner like
+   .scope-chart-menu-panel above, so it needs its own position: fixed
+   rather than reusing that class's position: absolute/top/right rules. */
+.milestone-context-menu {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  padding: 0.5rem 0.7rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-size: 0.8rem;
+}
+
 .scope-toggles {
   display: flex;
   flex-wrap: wrap;
