@@ -11,12 +11,40 @@ import { celsiusToUnit, unitToCelsius, unitSuffix } from "../tempUnits.js";
 // .scope-chart), one vertical slider per configured channel, arranged into
 // lanes per the settings' ordered-groups layout -- a lane with more than
 // one channel splits its height between them, stacked top to bottom,
-// rather than each getting its own lane.
+// rather than each getting its own lane. That stacking is desktop-only
+// (see MOBILE_BREAKPOINT_PX below) -- confirmed live on a real phone
+// that splitting a lane's already-limited height between 2 stacked
+// channels left both cramped and, with certain layouts, one member's
+// own value/label rendering invisibly thin. Below the breakpoint every
+// enabled channel gets its own full-height lane instead, side by side,
+// scrolling horizontally if there isn't room for all of them --
+// simpler and legible over matching the desktop pairing exactly. See
+// VerticalControlSettingsEditor.jsx's own note about this.
 const LOCAL_ECHO_GUARD_MS = 1500;
 const STEP = 1;
+const MOBILE_BREAKPOINT_PX = 700; // matches styles.css's own @media (max-width: 700px) for this panel
+
+function useIsMobileViewport() {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth <= MOBILE_BREAKPOINT_PX
+  );
+  useEffect(() => {
+    function onResize() {
+      setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT_PX);
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return isMobile;
+}
 
 export default function VerticalControlPanel({ disabled, onSend, initial, layout, arrows, svRangeC, tempUnit = "c" }) {
-  const groups = normalizeLayout(layout, { svAvailable: svRangeC != null });
+  const isMobile = useIsMobileViewport();
+  const normalizedGroups = normalizeLayout(layout, { svAvailable: svRangeC != null });
+  // Flatten every group down to single-channel lanes on mobile -- see
+  // the module comment above for why. Order is preserved (just the
+  // pairing dropped), so this still respects the Settings ordering.
+  const groups = isMobile ? normalizedGroups.flat().map((key) => [key]) : normalizedGroups;
 
   // Two independent numeric-state pairs: Drum/Air are simple, one write
   // path each, same as the old ControlPanel. Burner is a pair (heater_pct

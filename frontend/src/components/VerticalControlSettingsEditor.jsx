@@ -77,6 +77,11 @@ export default function VerticalControlSettingsEditor({ layout, setLayout, arrow
         lane's height between them (top half / bottom half, and so on) instead of giving it a separate lane
         of its own -- each still stays its own independent slider either way.
       </p>
+      <p className="hint">
+        Stacking only applies on wider screens. On a phone-width screen, every enabled slider always gets
+        its own full-height lane instead, side by side (scrolling sideways if they don't all fit) -- a
+        stacked lane's already-limited height splitting further between 2 phone-sized sliders wasn't legible.
+      </p>
       <ul className="breakout-order-list">
         {flat.map((item, i) => {
           const meta = verticalControlItem(item.key);
