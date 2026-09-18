@@ -1644,6 +1644,14 @@ button:disabled {
     overflow-x: auto;
     overflow-y: visible;
     width: 100%;
+    /* Lanes bunched to the left with empty space on the right otherwise
+       -- there are only ever 4 possible channels total
+       (VERTICAL_CONTROL_ITEMS), so all of them at once still comfortably
+       fits a phone's width; space-evenly spreads them out to use the
+       full container width without changing any single slider's own
+       size (each stays sized by .vertical-slider-col/.vertical-slider-
+       track as before -- this only adds space between/around them). */
+    justify-content: space-evenly;
   }
 }
 
