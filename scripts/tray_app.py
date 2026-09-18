@@ -300,10 +300,10 @@ def _set_launch_at_login_windows(enabled: bool) -> None:
     path = _windows_startup_bat_path()
     if enabled:
         path.parent.mkdir(parents=True, exist_ok=True)
-        # -WindowStyle Hidden here specifically (unlike the repo-root
-        # Roast Telemetry.bat, which stays visible on purpose) -- a
-        # login autostart is expected to start quietly in the
-        # background, not pop a console on every boot.
+        # -WindowStyle Hidden here specifically -- a login autostart is
+        # expected to start quietly in the background, not pop a
+        # console on every boot (unlike scripts\tray.ps1 run by hand,
+        # which stays visible on purpose).
         content = (
             "@echo off\r\n"
             f'powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{REPO_ROOT}\\scripts\\tray.ps1"\r\n'

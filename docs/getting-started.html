@@ -31,30 +31,21 @@
 
   <h2 id="setup-and-run">Setup &amp; run</h2>
   <div class="callout">
-    <strong>Prefer not to type commands at all?</strong> Double-click
-    <strong>Roast Telemetry.bat</strong> (Windows) /
-    <strong>Roast Telemetry.command</strong> (macOS) /
-    <strong>Roast Telemetry.desktop</strong> (a real Linux desktop — not
-    WSL2) in the repo's root folder — one launcher for everything:
+    <strong>Prefer not to deal with a source checkout at all?</strong>
+    See <a href="#standalone-builds">Standalone builds</a> further down
+    — a real double-clickable <code>.exe</code>/<code>.app</code>/Linux
+    binary, no Python/Node/terminal involved at all. Building one still
+    needs the dev setup below done once, on whichever machine builds it
+    — but *running* it afterward, including for someone else you hand
+    it to, needs nothing from this page.
+  </div>
+  <p>
+    Otherwise, from a terminal: <code>scripts/install.sh</code> once
+    (or <code>scripts\install.ps1</code> on Windows), then
+    <code>scripts/start.sh</code> / <code>scripts\start.ps1</code> —
     installs if this is a fresh clone, otherwise goes straight to the
-    <a href="#tray-icon">tray icon</a> below. Same thing from a
-    terminal: <code>scripts/start.sh</code> / <code>scripts\start.ps1</code>.
-    A first double-click may show a one-time trust warning — macOS
-    Gatekeeper ("cannot be opened because the developer cannot be
-    verified": right-click → Open bypasses it) or, on Linux, your file
-    manager asking to confirm launching it ("Allow Launching" in
-    GNOME) — normal for any unsigned script, only needed once.
-  </div>
-  <div class="callout">
-    <strong>Linux specifically:</strong> unlike the Windows/macOS
-    launchers, <code>Roast Telemetry.desktop</code> can't fully
-    bootstrap itself from a completely fresh clone — it needs this
-    repo's real folder path written into it first, which only happens
-    once <code>scripts/install.sh</code> has actually run. So the very
-    first time, run <code>./scripts/install.sh</code> from a terminal
-    yourself; the double-click launcher works from then on (it doesn't
-    need to be re-run unless the repo folder moves).
-  </div>
+    <a href="#tray-icon">tray icon</a> below.
+  </p>
 
   <h3 id="windows-powershell">Windows — PowerShell (native)</h3>
   <p>
@@ -178,9 +169,7 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
   </p>
   <pre><code>scripts/tray.sh      # Windows: scripts\tray.ps1</code></pre>
   <p>
-    Or use the single combined launcher from the callout above
-    (<strong>Roast Telemetry.bat</strong> /
-    <strong>Roast Telemetry.command</strong> / <code>scripts/start.sh</code> /
+    Or use the combined launcher (<code>scripts/start.sh</code> /
     <code>scripts\start.ps1</code>) — it installs first only if needed,
     then comes straight here.
   </p>

@@ -256,40 +256,6 @@ echo
 echo "Installing frontend dependencies (npm install)..."
 (cd frontend && npm install)
 
-# --- Linux desktop launcher paths ---
-# "Roast Telemetry.desktop" needs the repo's real absolute path baked
-# into both Exec= and Icon=. %k (the Desktop Entry spec's field code
-# for "location of this .desktop file") was tried twice -- embedded in
-# a quoted argument first, then correctly as a spec-compliant trailing
-# unquoted word (`bash -c '...' bash %k`, read back as $1) -- and both
-# failed on a real Raspberry Pi OS desktop (confirmed live, twice). The
-# second attempt was genuinely spec-compliant, so the conclusion isn't
-# "used it wrong" anymore, it's that this file manager's execution path
-# for this file (its Execute/Execute in Terminal/Open chooser
-# specifically) doesn't perform field-code substitution here at all,
-# regardless of how it's written. Not chasing %k further -- baking in
-# the real path directly has no such dependency on file-manager-
-# specific behavior.
-#
-# Both keys get the same treatment: Exec='s cd target and Icon= are
-# each matched by their current content (whatever that is -- the
-# committed placeholder on a first run, or a stale absolute path left
-# over from a previous run at a different location) and replaced with
-# the real path, so a moved/re-cloned repo gets fixed on the next run
-# too, not just handled once. Rewriting this every run is harmless
-# (idempotent). Skipped on WSL2/headless -- harmless there too (nothing
-# reads this file without a real desktop), just pointless.
-if [[ "$IS_MAC" -eq 0 ]] && [[ -f "Roast Telemetry.desktop" ]]; then
-  REPO_ROOT_ABS="$(pwd)"
-  ICON_ABS="$REPO_ROOT_ABS/frontend/public/icon-256x256.png"
-  sed -i "s|cd \"[^\"]*\" && ./scripts/start.sh|cd \"$REPO_ROOT_ABS\" \&\& ./scripts/start.sh|" "Roast Telemetry.desktop"
-  if grep -q "^Icon=" "Roast Telemetry.desktop"; then
-    sed -i "s|^Icon=.*|Icon=$ICON_ABS|" "Roast Telemetry.desktop"
-  else
-    sed -i "/^Exec=/a Icon=$ICON_ABS" "Roast Telemetry.desktop"
-  fi
-fi
-
 echo
 echo "Done. Next:"
 echo "  scripts/run-server.sh          # build + start the app at http://localhost:8000"
