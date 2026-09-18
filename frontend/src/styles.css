@@ -1619,8 +1619,20 @@ button:disabled {
     align-self: stretch;
   }
   .vertical-control-stack {
-    height: 140px;
+    /* Was a fixed 140px with only overflow-x -- too short for a lane
+       stacking 2 channels (e.g. Drum+Air sharing one lane, see
+       .vertical-control-group's own comment), and with no vertical
+       scroll enabled, the extra content just clipped invisibly instead
+       of being reachable any way. .scope-body already goes to
+       flex-direction:column on mobile (this same media query block,
+       above), so unlike desktop this panel no longer has a chart height
+       to match -- let it size to its own content instead, and the page
+       itself scrolls to reveal it, the normal mobile pattern, rather
+       than a cramped scroll region inside a fixed box. overflow-x stays
+       for however many lanes don't fit the phone's width side by side. */
+    height: auto;
     overflow-x: auto;
+    overflow-y: visible;
     width: 100%;
   }
 }
@@ -2343,12 +2355,35 @@ button:disabled {
     flex-direction: row;
     width: 100%;
     height: 70px;
+    /* Desktop's vertical stacking has a min-height floor per box plus
+       overflow-y as the safety net once too many are enabled (see
+       .small-readout-col .breakout-box's own comment) -- this row
+       layout had no equivalent: with min-width:0 still in effect
+       (needed for the desktop case) and no horizontal scroll, enabling
+       many channels at once just squeezed every box thinner and
+       thinner instead of ever reaching a floor. Mirrors the same fix:
+       a real min-width floor below, and overflow-x to scroll past it. */
+    overflow-x: auto;
+    overflow-y: hidden;
   }
   .small-readout-col .breakout-panel {
     flex-direction: row;
   }
+  .small-readout-col .breakout-box {
+    min-width: 70px;
+    flex-shrink: 0;
+  }
   .artisan-toolbar-controls {
     margin-left: 0;
+    /* RESET+START+clock together are wider than a narrow phone screen
+       -- .artisan-toolbar-wrap's overflow:hidden (for its rounded
+       corners) was clipping the clock's right edge instead of it
+       wrapping. Letting the clock drop to its own line under the
+       buttons keeps everything fully visible instead. */
+    flex-wrap: wrap;
+  }
+  .digital-clock {
+    font-size: 1.4rem;
   }
 }
 
