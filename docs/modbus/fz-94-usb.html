@@ -314,6 +314,58 @@ PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code></pre>
     — especially relevant if it's not your own machine.
   </p>
 
+  <h2 id="remote-roaster">Running the roaster and the app on different machines</h2>
+  <p>
+    Normally the machine running the backend needs the roaster's USB
+    cable plugged directly into it — <code>pyserial</code> (what
+    <code>ModbusSerialClient</code> uses under the hood) needs a real
+    local serial device, a COM port on Windows or a
+    <code>/dev/ttyUSB*</code> on Linux/Mac. If you want the roaster
+    plugged into one machine (e.g. a Raspberry Pi sitting next to it) and
+    the backend running somewhere else on your network, bridge the real
+    serial port to a plain TCP socket — <code>pyserial</code> accepts a
+    <code>socket://host:port</code> URL in the exact same Serial port
+    field and treats it as a live connection, no different from a real
+    local port. This is the same underlying mechanism the
+    <a href="#testing-without-real-hardware">fake hardware's
+    <code>--tcp</code> flag</a> above already uses and this app has
+    verified working end to end (reads and writes both) — just pointed
+    at a real device instead of a fake process, which hasn't specifically
+    been tested against real FZ-94 hardware in this repo yet. Confirm it
+    with Test Connection before trusting it for an actual roast.
+  </p>
+  <p>
+    On the machine with the roaster physically plugged in:
+  </p>
+  <pre><code>sudo apt install socat   # if not already there
+socat -d -d TCP-LISTEN:5020,reuseaddr,fork /dev/ttyUSB0,raw,echo=0,b19200,cs8,cstopb=1,parenb=0</code></pre>
+  <p>
+    <code>/dev/ttyUSB0</code> is whatever the roaster's actual device path
+    is (<code>ls /dev/ttyUSB*</code>, or
+    <code>/dev/serial/by-id/...</code> for a name that survives a
+    reboot/replug) — the baud/framing options
+    (<code>b19200,cs8,cstopb=1,parenb=0</code>) are the FZ-94's own
+    19200/8N2 settings from the register map above.
+    <code>reuseaddr,fork</code> keeps the bridge listening for new
+    connections instead of dying after the first one disconnects.
+  </p>
+  <p>
+    Then on the machine running the backend, in the Serial port field:
+  </p>
+  <pre><code>socket://&lt;bridge-machine-IP&gt;:5020</code></pre>
+  <p>
+    A plain <code>socat</code> command in a terminal dies with the
+    terminal, or on a reboot — fine for trying this out, not for
+    something you leave running unattended. For a permanent setup,
+    <a href="https://github.com/cminyard/ser2net"><code>ser2net</code></a>
+    is the purpose-built tool for exposing a serial port over the
+    network as a proper daemon (systemd service, auto-restart on
+    failure) instead of a one-off process. Also worth knowing: a network
+    bridge introduces a way for the connection to drop mid-roast that a
+    direct USB cable doesn't have — wired Ethernet on the bridge machine,
+    not WiFi, if you can.
+  </p>
+
   <div class="page-nav"><a href="../index.html">&larr; Back to docs home</a></div>
 </main>
 <script src="../assets/toc.js" defer></script>
