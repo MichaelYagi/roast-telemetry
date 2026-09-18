@@ -325,6 +325,19 @@ ChartJS.register(eventMarkersPlugin, scopeBandsPlugin, axisUnitLabelsPlugin, pha
 
 const MARKER_HIT_RADIUS_PX = 12;
 
+// Plain scroll over the chart used to zoom it directly -- confirmed
+// live as a real problem: scrolling the page with the cursor resting
+// over the chart accidentally zoomed instead. Wheel-zoom now requires
+// holding Ctrl (or Cmd on Mac, the platform's own zoom-modifier
+// convention) -- chartjs-plugin-zoom's wheel.modifierKey checks
+// event[modifierKey + "Key"] directly (confirmed against the installed
+// plugin's own source), so this has to match the browser's actual
+// event property name ("ctrlKey" vs "metaKey"), not just a label.
+const WHEEL_ZOOM_MODIFIER_KEY =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || "")
+    ? "meta"
+    : "ctrl";
+
 // Finds the editable milestone (if any) whose dot sits within
 // MARKER_HIT_RADIUS_PX of the given canvas-relative point -- shared by
 // the context-menu (right-click) and drag-to-retime (onPanStart) entry
@@ -669,7 +682,11 @@ export default function RoastChart({
               return undefined; // let normal panning proceed
             },
           },
-          zoom: { wheel: { enabled: interactive }, pinch: { enabled: interactive }, mode: "x" },
+          zoom: {
+            wheel: { enabled: interactive, modifierKey: WHEEL_ZOOM_MODIFIER_KEY },
+            pinch: { enabled: interactive },
+            mode: "x",
+          },
         },
       },
       scales: {
@@ -777,7 +794,7 @@ export default function RoastChart({
                     chartRef.current?.resetZoom();
                     setMenuOpen(false);
                   }}
-                  title="Scroll/pinch the chart to zoom, drag to pan"
+                  title={`${WHEEL_ZOOM_MODIFIER_KEY === "meta" ? "Cmd" : "Ctrl"}+scroll or pinch to zoom, drag to pan`}
                 >
                   Reset zoom
                 </button>
