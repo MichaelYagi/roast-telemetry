@@ -650,7 +650,27 @@ class RoastSession:
                 self._pending_alarm_tasks.remove(current)
 
     def set_weight_roasted(self, grams: float) -> None:
+        # The natural workflow is: roast finishes, beans cool, *then* get
+        # weighed -- by that point _finish() has already run and this
+        # session's own in-memory state is the only thing DB reads/exports
+        # would otherwise reflect. Without persisting here too, the weight
+        # would silently vanish on a backend restart (still-running-process
+        # reads/the AI review pick it up fine either way, since both go
+        # through this same in-memory session first).
         self.weight_roasted_g = grams
+        storage.update_roast(self.id, weight_roasted_g=grams)
+        if self.alog_path and os.path.exists(self.alog_path):
+            alog_dict = roast_to_artisan_native_dict(
+                title=self.title,
+                profile=self.profile,
+                events=self.events,
+                notes=self.notes,
+                beans=self.beans,
+                weight_green_g=self.weight_green_g,
+                weight_roasted_g=self.weight_roasted_g,
+                roastdate=self.created_at,
+            )
+            save_artisan_native_alog(self.alog_path, alog_dict)
 
     # -- serialization ----------------------------------------------------
     def summary(self) -> RoastSummary:

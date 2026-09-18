@@ -532,11 +532,12 @@ export default function RoastChart({
           ticks: { color: "#78716c" },
           title: { display: true, text: "ctrl", color: "#78716c" },
           display: showControl,
-          // Heater/Fan/Drum/Damper are always 0-100% -- without a fixed
-          // range here too, Chart.js auto-fit whatever narrow slice of
-          // values was actually visible, so a ~constant 50% Drum line
-          // (say) landed at an arbitrary height instead of a real
-          // percentage scale. Artisan itself plots these against its own
+          // Heater/Damper are 0-100%; Fan/Drum are RPM but share the same
+          // 0-100 numeric range on this machine -- without a fixed range
+          // here too, Chart.js auto-fit whatever narrow slice of values
+          // was actually visible, so a ~constant 50 Drum line (say)
+          // landed at an arbitrary height instead of a real 0-100 scale.
+          // Artisan itself plots these against its own
           // temperature axis rather than a dedicated one -- this app
           // deliberately doesn't match that (a real 0-100 scale is more
           // readable than a control value squashed near zero on a 350-

@@ -51,6 +51,9 @@ export const api = {
   deleteRoast: (id) => request(`/roasts/${id}`, { method: "DELETE" }),
   stopRoast: (id) => request(`/roasts/${id}/stop`, { method: "POST" }),
   sendCommand: (id, command) => request(`/roasts/${id}/commands`, { method: "POST", body: JSON.stringify(command) }),
+  // grams as a query param, matching the backend route's plain-float
+  // parameter (backend/app/api/roasts.py's set_weight) -- no request body.
+  setWeightRoasted: (id, grams) => request(`/roasts/${id}/weight?${new URLSearchParams({ grams })}`, { method: "POST" }),
   addNote: (id, note) => request(`/roasts/${id}/notes`, { method: "POST", body: JSON.stringify(note) }),
   addEvent: (id, event) => request(`/roasts/${id}/events`, { method: "POST", body: JSON.stringify(event) }),
   alogDownloadUrl: (id) => `${BASE}/roasts/${id}/alog`,

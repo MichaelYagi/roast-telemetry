@@ -4,9 +4,12 @@
 // sides. drum_speed_pct/fan_pct are always shown regardless of settings
 // (see VerticalControlPanel's own comment); heater_pct/burner_sv_c are the
 // two configurable ones.
+// drum_speed_pct/fan_pct are real RPM values on the FZ-94 (confirmed
+// against a live unit), not percentages, despite the "_pct" field names
+// -- their 0-100/0-70 range is just this machine's actual RPM range.
 export const VERTICAL_CONTROL_ITEMS = [
-  { key: "drum_speed_pct", label: "Drum", unit: "%", color: "#16a34a", mandatory: true },
-  { key: "fan_pct", label: "Air", unit: "%", color: "#0891b2", mandatory: true },
+  { key: "drum_speed_pct", label: "Drum", unit: " RPM", color: "#16a34a", mandatory: true },
+  { key: "fan_pct", label: "Air", unit: " RPM", color: "#0891b2", mandatory: true },
   { key: "heater_pct", label: "Burner", unit: "%", color: "#f59e0b", mandatory: false },
   { key: "burner_sv_c", label: "SV", unit: "°C", color: "#92400e", mandatory: false },
 ];

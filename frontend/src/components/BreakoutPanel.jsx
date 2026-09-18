@@ -25,8 +25,8 @@ function computeValues(latest, milestones, elapsedLabel, roast, tempUnit) {
     to_dev: milestones?.devTime ?? "—",
     heater: fmt(latest?.heater_pct, 0, "%"),
     burner_sv: temp(latest?.burner_sv_c),
-    fan: fmt(latest?.fan_pct, 0, "%"),
-    drum: fmt(latest?.drum_speed_pct, 0, "%"),
+    fan: fmt(latest?.fan_pct, 0, " RPM"),
+    drum: fmt(latest?.drum_speed_pct, 0, " RPM"),
     playback_speed: roast?.playback_speed != null ? `${roast.playback_speed}x` : "—",
   };
 }

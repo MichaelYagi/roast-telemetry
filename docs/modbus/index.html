@@ -59,7 +59,7 @@
     <tbody>
       <tr><td>BT / ET / DT</td><td>Slave ID, register, divisor (each independent)</td></tr>
       <tr><td>Burner</td><td>Slave ID, register, divisor, plus the SV range (°C) the 0–100% UI slider maps onto</td></tr>
-      <tr><td>Air / Drum</td><td>Slave ID, control register, frequency register, feedback register, plus the 0–100% operating range</td></tr>
+      <tr><td>Air / Drum</td><td>Slave ID, control register, frequency register, feedback register, plus the operating range in RPM (0–100/0–70 on the FZ-94, not a percentage)</td></tr>
     </tbody>
   </table>
   <p>
@@ -191,7 +191,7 @@
     write check passes, an optional, separately-confirmed
     <strong>"nudge"</strong> is offered for anyone who wants a
     <em>visible</em> confirmation instead of just a silent round-trip —
-    it bumps Air by 5% for about 2 seconds, then sets it back, with its
+    it bumps Air by 5 RPM for about 2 seconds, then sets it back, with its
     own explicit confirm step and up-front description of exactly what
     will happen before it runs. After the nudge, you're asked directly
     whether it actually moved (a register-level "done" only proves the

@@ -78,6 +78,28 @@ def test_begin_recording_persists_the_roast_row_and_sets_roasting(isolated_db):
     asyncio.run(body())
 
 
+def test_set_weight_roasted_persists_to_the_db_row(isolated_db):
+    # Real workflow: roast finishes, beans cool, *then* get weighed -- by
+    # which point this session may be the only thing standing between the
+    # entered weight and a backend restart losing it, since set_weight_roasted
+    # used to only update the in-memory session, never storage (see its own
+    # docstring in session.py).
+    async def body():
+        manager, request = make_manager_and_request()
+        session = manager.create(request)
+        await session.connect()
+        try:
+            await session.begin_recording()
+            session.set_weight_roasted(1388.0)
+            assert session.weight_roasted_g == 1388.0
+            row = isolated_db.get_roast_row(session.id)
+            assert row["weight_roasted_g"] == 1388.0
+        finally:
+            await _stop_background_task(session)
+
+    asyncio.run(body())
+
+
 def test_apply_command_allowed_while_connected_but_not_recording(isolated_db):
     """Air/Drum/Burner sliders (or Testing Mode's write check) need to work
     during the armed-not-recording window too, matching Artisan's own

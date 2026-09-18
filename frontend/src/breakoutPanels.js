@@ -16,8 +16,8 @@ export const BREAKOUT_PANEL_ITEMS = [
   { key: "to_dev", label: "DEV TIME", color: "#dc2626" },
   { key: "heater", label: "Burner %", color: "#f59e0b" },
   { key: "burner_sv", label: "SV", color: "#92400e" },
-  { key: "fan", label: "Air %", color: "#0891b2" },
-  { key: "drum", label: "Drum %", color: "#16a34a" },
+  { key: "fan", label: "Air RPM", color: "#0891b2" },
+  { key: "drum", label: "Drum RPM", color: "#16a34a" },
   { key: "playback_speed", label: "Playback speed", color: "#334155" },
 ];
 

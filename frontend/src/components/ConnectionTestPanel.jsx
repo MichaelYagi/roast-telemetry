@@ -9,14 +9,17 @@ import { TERM_TOOLTIPS } from "../termTooltips.js";
 // sanity check against "reading garbage/nothing," not a real calibration
 // check) -- a real BT/ET/DT for a coffee roaster, hot or cold, comfortably
 // fits 0-300C; Burner SV is a configurable setpoint range but 0-400C
-// safely bounds any sane configuration; Air/Drum are plain percentages.
+// safely bounds any sane configuration; Air/Drum are real RPM readings
+// (confirmed against a live FZ-94), not percentages, despite the
+// fan_pct/drum_speed_pct field names -- 0-100/0-70 there is this
+// specific machine's actual RPM range, not a 0-100% scale.
 const READ_CHANNELS = [
   { key: "bt", label: "BT", unit: "°", min: -10, max: 300 },
   { key: "et", label: "ET", unit: "°", min: -10, max: 300 },
   { key: "dt", label: "DT", unit: "°", min: -10, max: 300 },
   { key: "burner_sv_c", label: "Burner SV", unit: "°", min: 0, max: 400 },
-  { key: "fan_pct", label: "Air %", unit: "%", min: 0, max: 100 },
-  { key: "drum_speed_pct", label: "Drum %", unit: "%", min: 0, max: 100 },
+  { key: "fan_pct", label: "Air RPM", unit: " RPM", min: 0, max: 100 },
+  { key: "drum_speed_pct", label: "Drum RPM", unit: " RPM", min: 0, max: 100 },
 ];
 
 const SAMPLE_WINDOW_MS = 4000;
@@ -27,8 +30,8 @@ const NUDGE_PCT = 5;
 // 8451, same blog-sourced-only origin, just different slave IDs) --
 // Drum is a genuine differential test if Air's nudge doesn't visibly
 // move anything, not a "more trustworthy" alternative. Max mirrors the
-// FZ-94 built-in profile's own default operating ranges (Air 0-100%,
-// Drum 0-70%) purely so the nudge target shown here doesn't overstate
+// FZ-94 built-in profile's own default operating ranges (Air 0-100 RPM,
+// Drum 0-70 RPM) purely so the nudge target shown here doesn't overstate
 // what the drive will actually accept -- the backend clamps to
 // whatever's really configured regardless.
 const CHANNEL_LABEL = { fan_pct: "Air", drum_speed_pct: "Drum" };
@@ -161,11 +164,11 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
       const after = latestRef.current?.fan_pct;
       if (after != null && Math.abs(after - before) > 1) {
         setWriteStep("failed");
-        setWriteDetail(`wrote ${before.toFixed(0)}% but feedback now reads ${after.toFixed(0)}% -- write may not be reaching the drive`);
+        setWriteDetail(`wrote ${before.toFixed(0)} RPM but feedback now reads ${after.toFixed(0)} RPM -- write may not be reaching the drive`);
         return;
       }
       setWriteStep("done");
-      setWriteDetail(`wrote Air back at its current ${before.toFixed(0)}% (no-op) -- feedback confirms it took effect`);
+      setWriteDetail(`wrote Air back at its current ${before.toFixed(0)} RPM (no-op) -- feedback confirms it took effect`);
     } catch (err) {
       setWriteStep("failed");
       setWriteDetail(err.message);
@@ -188,7 +191,7 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     setNudgeResult({
       channel,
       status: "pending",
-      detail: `nudging ${label} ${direction > 0 ? "up" : "down"} to ${nudged.toFixed(0)}% -- watch/listen for it…`,
+      detail: `nudging ${label} ${direction > 0 ? "up" : "down"} to ${nudged.toFixed(0)} RPM -- watch/listen for it…`,
     });
     // The nudge-up and restore writes are deliberately two separate
     // try/catches, not one -- if the FIRST fails, nothing changed at all
@@ -211,12 +214,12 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     const label = CHANNEL_LABEL[channel];
     try {
       await api.sendCommand(roastId, { [channel]: before });
-      setNudgeResult({ channel, status: "done", detail: `set back to ${before.toFixed(0)}%` });
+      setNudgeResult({ channel, status: "done", detail: `set back to ${before.toFixed(0)} RPM` });
     } catch (err) {
       setNudgeResult({
         channel,
         status: "failed",
-        detail: `${label} is still nudged up -- restoring it to ${before.toFixed(0)}% failed: ${err.message}. Set it back yourself with the ${label} slider below, or retry.`,
+        detail: `${label} is still nudged up -- restoring it to ${before.toFixed(0)} RPM failed: ${err.message}. Set it back yourself with the ${label} slider below, or retry.`,
         retryTo: before,
       });
     }
@@ -284,14 +287,14 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
               <p className="hint">
                 This will briefly bump {CHANNEL_LABEL[nudgeConfirming]}{" "}
                 {(latestRef.current?.[nudgeConfirming] ?? 0) + NUDGE_PCT > CHANNEL_NUDGE_MAX[nudgeConfirming] ? "down" : "up"}{" "}
-                by {NUDGE_PCT}% for about 2 seconds (you should hear/see it respond), then set it back to exactly
+                by {NUDGE_PCT} RPM for about 2 seconds (you should hear/see it respond), then set it back to exactly
                 what it was. Only do this if that's fine right now.
               </p>
               <div className="event-button-row">
                 <button type="button" onClick={() => runNudge(nudgeConfirming)}>
                   Confirm: nudge {CHANNEL_LABEL[nudgeConfirming]}{" "}
                   {(latestRef.current?.[nudgeConfirming] ?? 0) + NUDGE_PCT > CHANNEL_NUDGE_MAX[nudgeConfirming] ? "-" : "+"}
-                  {NUDGE_PCT}% and back
+                  {NUDGE_PCT} RPM and back
                 </button>
                 <button type="button" className="danger" onClick={() => setNudgeConfirming(null)}>
                   Cancel
@@ -308,7 +311,7 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
           </p>
           {nudgeResult.retryTo != null && (
             <button type="button" onClick={() => restoreChannelTo(nudgeResult.channel, nudgeResult.retryTo)}>
-              Retry restoring {CHANNEL_LABEL[nudgeResult.channel]} to {nudgeResult.retryTo.toFixed(0)}%
+              Retry restoring {CHANNEL_LABEL[nudgeResult.channel]} to {nudgeResult.retryTo.toFixed(0)} RPM
             </button>
           )}
 

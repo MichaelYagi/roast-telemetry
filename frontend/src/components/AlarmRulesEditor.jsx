@@ -15,8 +15,8 @@ const TRIGGER_KINDS = [
 function summarizeCommand(rule) {
   const parts = [];
   if (rule.heater_pct != null) parts.push(`Burner→${rule.heater_pct}%`);
-  if (rule.fan_pct != null) parts.push(`Air→${rule.fan_pct}%`);
-  if (rule.drum_speed_pct != null) parts.push(`Drum→${rule.drum_speed_pct}%`);
+  if (rule.fan_pct != null) parts.push(`Air→${rule.fan_pct} RPM`);
+  if (rule.drum_speed_pct != null) parts.push(`Drum→${rule.drum_speed_pct} RPM`);
   if (rule.message) parts.push(`banner: "${rule.message}"`);
   if (rule.mark_milestone) parts.push(`mark ${rule.mark_milestone.replace("_", " ")}`);
   return parts.join(", ") || "(nothing set)";
@@ -258,7 +258,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
               />
             </label>
             <label>
-              Air %
+              Air RPM
               <input
                 type="number"
                 min="0"
@@ -269,7 +269,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
               />
             </label>
             <label>
-              Drum %
+              Drum RPM
               <input
                 type="number"
                 min="0"

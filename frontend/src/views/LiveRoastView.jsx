@@ -1264,7 +1264,7 @@ export default function LiveRoastView() {
                       Air slave ID
                       <input
                         type="number"
-                        placeholder="1"
+                        placeholder="2"
                         value={form.modbus_air_slave_id}
                         onChange={(e) => setForm({ ...form, modbus_air_slave_id: e.target.value })}
                       />
@@ -1297,7 +1297,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Air min %
+                      Air min RPM
                       <input
                         type="number"
                         placeholder="0"
@@ -1306,7 +1306,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Air max %
+                      Air max RPM
                       <input
                         type="number"
                         placeholder="100"
@@ -1320,7 +1320,7 @@ export default function LiveRoastView() {
                       Drum slave ID
                       <input
                         type="number"
-                        placeholder="2"
+                        placeholder="1"
                         value={form.modbus_drum_slave_id}
                         onChange={(e) => setForm({ ...form, modbus_drum_slave_id: e.target.value })}
                       />
@@ -1353,7 +1353,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Drum min %
+                      Drum min RPM
                       <input
                         type="number"
                         placeholder="0"
@@ -1362,7 +1362,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Drum max %
+                      Drum max RPM
                       <input
                         type="number"
                         placeholder="70"
@@ -1385,7 +1385,7 @@ export default function LiveRoastView() {
                       Burner SV max °C (100% heater)
                       <input
                         type="number"
-                        placeholder="250"
+                        placeholder="260"
                         value={form.modbus_burner_sv_max_c}
                         onChange={(e) => setForm({ ...form, modbus_burner_sv_max_c: e.target.value })}
                       />
@@ -1461,25 +1461,25 @@ export default function LiveRoastView() {
                 </span>
               </label>
               <label>
-                Air % at start
+                Air RPM at start
                 <span className="input-suffix-group">
                   <input
                     type="number" min="0" max="100"
                     value={form.fan_pct}
                     onChange={(e) => setForm({ ...form, fan_pct: e.target.value })}
                   />
-                  <span className="input-suffix">%</span>
+                  <span className="input-suffix">RPM</span>
                 </span>
               </label>
               <label>
-                Drum % at start
+                Drum RPM at start
                 <span className="input-suffix-group">
                   <input
                     type="number" min="0" max="100"
                     value={form.drum_speed_pct}
                     onChange={(e) => setForm({ ...form, drum_speed_pct: e.target.value })}
                   />
-                  <span className="input-suffix">%</span>
+                  <span className="input-suffix">RPM</span>
                 </span>
               </label>
               <p className="hint" style={{ flexBasis: "100%" }}>
