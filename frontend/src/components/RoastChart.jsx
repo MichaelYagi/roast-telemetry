@@ -325,18 +325,27 @@ ChartJS.register(eventMarkersPlugin, scopeBandsPlugin, axisUnitLabelsPlugin, pha
 
 const MARKER_HIT_RADIUS_PX = 12;
 
-// Plain scroll over the chart used to zoom it directly -- confirmed
-// live as a real problem: scrolling the page with the cursor resting
-// over the chart accidentally zoomed instead. Wheel-zoom now requires
-// holding Ctrl (or Cmd on Mac, the platform's own zoom-modifier
-// convention) -- chartjs-plugin-zoom's wheel.modifierKey checks
-// event[modifierKey + "Key"] directly (confirmed against the installed
-// plugin's own source), so this has to match the browser's actual
-// event property name ("ctrlKey" vs "metaKey"), not just a label.
-const WHEEL_ZOOM_MODIFIER_KEY =
+// Plain scroll over the chart used to zoom it directly -- confirmed live
+// as a real problem: scrolling the page with the cursor resting over the
+// chart accidentally zoomed instead. First fix tried Ctrl (Cmd on Mac)
+// as the required modifier, since chartjs-plugin-zoom's wheel.modifierKey
+// checks event[modifierKey + "Key"] directly (confirmed against the
+// installed plugin's own source) -- but Ctrl/Cmd+scroll is *also* the
+// browser's own native "zoom the whole page" gesture, and a trackpad
+// pinch gets synthesized as a wheel event with ctrlKey already set, so
+// the two collided: confirmed live, pinching over the chart zoomed the
+// whole page instead (browser-level, not something this plugin's own
+// preventDefault() reliably wins against across browsers). Alt isn't
+// reserved by any browser for page-zoom or horizontal scroll (unlike
+// Ctrl or Shift), so there's nothing left for it to collide with.
+const WHEEL_ZOOM_MODIFIER_KEY = "alt";
+// Display label only -- Mac calls this key "Option", everywhere else
+// calls it "Alt"; the actual modifierKey value above is the same either
+// way (event.altKey doesn't differ by OS).
+const WHEEL_ZOOM_MODIFIER_LABEL =
   typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || "")
-    ? "meta"
-    : "ctrl";
+    ? "Option"
+    : "Alt";
 
 // Finds the editable milestone (if any) whose dot sits within
 // MARKER_HIT_RADIUS_PX of the given canvas-relative point -- shared by
@@ -794,7 +803,7 @@ export default function RoastChart({
                     chartRef.current?.resetZoom();
                     setMenuOpen(false);
                   }}
-                  title={`${WHEEL_ZOOM_MODIFIER_KEY === "meta" ? "Cmd" : "Ctrl"}+scroll or pinch to zoom, drag to pan`}
+                  title={`${WHEEL_ZOOM_MODIFIER_LABEL}+scroll to zoom, drag to pan`}
                 >
                   Reset zoom
                 </button>
