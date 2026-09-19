@@ -107,15 +107,26 @@ fake — everything else here is well-tested in every *other* sense
 protocol-decoding pytest coverage for Aillio), just not yet against
 its real hardware.
 
-| Preset | Data source | Tested on real hardware |
-| --- | --- | --- |
-| Bullet R1, USB | Aillio Bullet (USB) | ❌ |
-| FZ-94 Evo, Ethernet | Direct Modbus | ❌ |
-| FZ-94, USB | Direct Modbus | ✅ |
-| Mastech MS6514, USB | Direct USB (thermocouple meter) | ❌ |
+| Preset | Company | Model | Data source | Tested on real hardware |
+| --- | --- | --- | --- | --- |
+| Bullet R1, USB | Aillio | Bullet R1 | Aillio Bullet (USB) | ❌ |
+| FZ-94 Evo, Ethernet | Coffee-Tech | FZ-94 Evo | Direct Modbus | ❌ |
+| FZ-94, USB | Coffee-Tech | FZ-94 | Direct Modbus | ✅ |
+| Mastech MS6514, USB | Mastech | MS6514 | Direct USB (thermocouple meter) | ❌ |
 
 TC4+ has no built-in preset — it's DIY hardware with no single default
 wiring/config to ship, unlike the rest of these.
+
+**More machine support is planned over time**, the way Artisan covers a
+wide range of roasters/meters. In practice that mostly isn't new
+engine code: a new *Modbus* roaster model is usually just a new
+[Device Profile](docs/modbus/index.html#device-profiles) (register
+numbers as data, not code); a genuinely different protocol (raw USB
+like Aillio, plain serial commands like TC4+) gets its own thin engine
+sharing the same core contract (`tick`/`apply_command`/`status`/
+`close`/`is_finished`) every other data source already implements. If
+your roaster or meter isn't listed above, it's very likely addable
+without a rewrite.
 
 ## Getting started
 

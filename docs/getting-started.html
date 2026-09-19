@@ -374,17 +374,31 @@ npm run dev</code></pre>
     coverage for Aillio), just not yet against its real hardware.
   </p>
   <table>
-    <thead><tr><th>Preset</th><th>Data source</th><th>Tested on real hardware</th></tr></thead>
+    <thead><tr><th>Preset</th><th>Company</th><th>Model</th><th>Data source</th><th>Tested on real hardware</th></tr></thead>
     <tbody>
-      <tr><td>Bullet R1, USB</td><td>Aillio Bullet (USB)</td><td>&#10060;</td></tr>
-      <tr><td>FZ-94 Evo, Ethernet</td><td>Direct Modbus</td><td>&#10060;</td></tr>
-      <tr><td>FZ-94, USB</td><td>Direct Modbus</td><td>&#9989;</td></tr>
-      <tr><td>Mastech MS6514, USB</td><td>Direct USB (thermocouple meter)</td><td>&#10060;</td></tr>
+      <tr><td>Bullet R1, USB</td><td>Aillio</td><td>Bullet R1</td><td>Aillio Bullet (USB)</td><td>&#10060;</td></tr>
+      <tr><td>FZ-94 Evo, Ethernet</td><td>Coffee-Tech</td><td>FZ-94 Evo</td><td>Direct Modbus</td><td>&#10060;</td></tr>
+      <tr><td>FZ-94, USB</td><td>Coffee-Tech</td><td>FZ-94</td><td>Direct Modbus</td><td>&#9989;</td></tr>
+      <tr><td>Mastech MS6514, USB</td><td>Mastech</td><td>MS6514</td><td>Direct USB (thermocouple meter)</td><td>&#10060;</td></tr>
     </tbody>
   </table>
   <p>
     TC4+ has no built-in preset — it's DIY hardware with no single
     default wiring/config to ship, unlike the rest of these.
+  </p>
+  <p>
+    <strong>More machine support is planned over time</strong>, the way
+    Artisan covers a wide range of roasters/meters. In practice that
+    mostly isn't new engine code: a new <em>Modbus</em> roaster model is
+    usually just a new
+    <a href="modbus/index.html#device-profiles">Device Profile</a>
+    (register numbers as data, not code); a genuinely different
+    protocol (raw USB like Aillio, plain serial commands like TC4+)
+    gets its own thin engine sharing the same core contract
+    (<code>tick</code>/<code>apply_command</code>/<code>status</code>/<code>close</code>/<code>is_finished</code>)
+    every other data source already implements. If your roaster or
+    meter isn't listed above, it's very likely addable without a
+    rewrite.
   </p>
 
   <h2>Saving a roast</h2>
