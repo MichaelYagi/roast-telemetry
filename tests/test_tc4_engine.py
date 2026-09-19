@@ -74,8 +74,9 @@ def test_parse_read_response_non_numeric_is_none():
 
 def test_engine_sends_units_c_once_at_connect():
     engine, fake = _make_engine()
-    assert fake.written == [b"UNITS,C\n"]
+    assert fake.written == [b"UNITS,C\n", b"PID,CHAN,1\n", b"PID,OFF\n"]
     assert engine.status()["connected"] is True
+    assert engine.status()["pid_enabled"] is False
 
 
 def test_engine_requires_a_port():
@@ -155,6 +156,52 @@ def test_apply_command_ignores_drum_speed_pct():
     engine.apply_command({"drum_speed_pct": 50})
 
     assert fake.written == []
+
+
+# -- onboard PID (PID,SV / PID,ON / PID,OFF) -------------------------------
+
+
+def test_apply_command_enables_pid_with_a_target():
+    engine, fake = _make_engine()
+    fake.written.clear()
+
+    engine.apply_command({"tc4_pid_target_c": 200, "tc4_pid_enabled": True})
+
+    # SV written before ON, so the board never briefly chases a stale target.
+    assert fake.written == [b"PID,SV,200.0\n", b"PID,ON\n"]
+    assert engine.status()["pid_enabled"] is True
+
+
+def test_apply_command_disables_pid():
+    engine, fake = _make_engine()
+    engine.apply_command({"tc4_pid_enabled": True})
+    fake.written.clear()
+
+    engine.apply_command({"tc4_pid_enabled": False})
+
+    assert fake.written == [b"PID,OFF\n"]
+    assert engine.status()["pid_enabled"] is False
+
+
+def test_heater_pct_ignored_while_pid_enabled():
+    engine, fake = _make_engine()
+    engine.apply_command({"tc4_pid_enabled": True})
+    fake.written.clear()
+
+    engine.apply_command({"heater_pct": 80})
+
+    assert fake.written == []
+
+
+def test_heater_pct_resumes_after_pid_disabled():
+    engine, fake = _make_engine()
+    engine.apply_command({"tc4_pid_enabled": True})
+    engine.apply_command({"tc4_pid_enabled": False})
+    fake.written.clear()
+
+    engine.apply_command({"heater_pct": 80})
+
+    assert fake.written == [b"OT1,80\n"]
 
 
 # -- API-level: POST /roasts is the ON action, not ON+start ---------------

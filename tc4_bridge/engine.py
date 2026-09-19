@@ -28,6 +28,24 @@ Commands used:
               needed, unlike Modbus's burner_sv_range_c.
   DCFAN,duty -- fan output, 0-100. The firmware enforces its own ramp
               limit on this; nothing for this engine to replicate.
+  PID,CHAN,1 -- sent once at connect: BT (channel 1) is the onboard
+              PID's process variable, matching this app's existing
+              "channel 1 = BT" convention.
+  PID,OFF   -- sent once at connect too, defensively: guarantees manual
+              heater control works by default even if the board was
+              left in PID-on mode from an earlier session.
+  PID,SV,target / PID,ON / PID,OFF -- the board's own onboard PID loop.
+              Genuinely different shape from Modbus's burner_sv_c: that's
+              a stateless alternate *unit* for the same immediate write
+              (every tick writes the SV register directly). This is a
+              stateful *mode* -- once PID,ON is sent, the board's own
+              loop keeps adjusting OT1 continuously with no further
+              writes needed, so this engine stops sending OT1 itself
+              (see apply_command) while it's on, rather than fighting
+              the board's own loop. No Kp/Ki/Kd tuning (PID,T) or cycle
+              time (PID,CT) exposed -- both stay at the firmware's own
+              defaults, same restraint as not exposing a channel remap
+              for temperature reading.
 
 No OT2 (secondary output) or drum support -- TC4 has no drum channel at
 all, so apply_command silently ignores drum_speed_pct, same as every
@@ -86,12 +104,15 @@ class TC4Engine:
         self._last_dt: Optional[float] = None
         self._connected = False
         self._last_error: Optional[str] = None
+        self._pid_enabled = False
 
         try:
             self._serial = serial_cls(port=port, baudrate=baudrate, bytesize=8, parity="N", stopbits=1, timeout=timeout)
             self._connected = bool(self._serial.is_open)
             if self._connected:
                 self._write_line("UNITS,C")
+                self._write_line("PID,CHAN,1")
+                self._write_line("PID,OFF")
         except Exception as exc:  # pragma: no cover - depends on local hardware/OS
             self._serial = None
             self._connected = False
@@ -153,7 +174,23 @@ class TC4Engine:
         return self._detector.get_new_events()
 
     def apply_command(self, cmd: dict) -> None:
-        if "heater_pct" in cmd and cmd["heater_pct"] is not None:
+        # SV written before ON, so the board never briefly chases a
+        # stale/default target when both arrive in the same command.
+        if cmd.get("tc4_pid_target_c") is not None:
+            self._write_line(f"PID,SV,{cmd['tc4_pid_target_c']:.1f}")
+        if cmd.get("tc4_pid_enabled") is not None:
+            if cmd["tc4_pid_enabled"]:
+                self._write_line("PID,ON")
+                self._pid_enabled = True
+            else:
+                self._write_line("PID,OFF")
+                self._pid_enabled = False
+
+        # While the onboard PID owns OT1, a manual heater_pct write
+        # would just fight it -- same "no-op for a channel the app
+        # doesn't currently own" precedent drum_speed_pct always has,
+        # just conditional on state here instead of unconditional.
+        if "heater_pct" in cmd and cmd["heater_pct"] is not None and not self._pid_enabled:
             duty = max(0, min(100, int(round(cmd["heater_pct"]))))
             self._write_line(f"OT1,{duty}")
         if "fan_pct" in cmd and cmd["fan_pct"] is not None:
@@ -170,6 +207,10 @@ class TC4Engine:
             "port": self.port,
             "connected": self._connected,
             "last_error": self._last_error,
+            # Last-commanded state only -- the protocol has no PID-state
+            # read-back command, same honest limitation heater_pct/
+            # fan_pct's own always-None readouts already have.
+            "pid_enabled": self._pid_enabled,
         }
 
     def reset_detection(self) -> None:

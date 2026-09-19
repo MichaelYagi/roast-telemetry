@@ -282,6 +282,12 @@ export default function LiveRoastView() {
   // value back to empty instead of falling straight through to it again.
   const [greenWeightOverride, setGreenWeightOverride] = useState(undefined);
   const [roastedWeightOverride, setRoastedWeightOverride] = useState(undefined);
+  // tc4_live only -- the board's own onboard PID loop (see
+  // tc4_bridge/engine.py's own docstring for why this is a stateful
+  // mode, not just another slider). Local-only, no server round trip
+  // to read it back (the protocol has no PID-state query).
+  const [tc4PidEnabled, setTc4PidEnabled] = useState(false);
+  const [tc4PidTargetInput, setTc4PidTargetInput] = useState("");
   // Same local-override reasoning as greenWeightOverride above -- `roast`
   // itself is never mutated, tagsSaved (once set) is what actually
   // renders, falling back to roast.tags until the first edit. allTags
@@ -2106,14 +2112,52 @@ export default function LiveRoastView() {
               </div>
             )}
             {activeMode === "tc4_live" && (
-              <p className="hint" style={{ gridColumn: "1 / -1" }}>
-                Reading/writing {form.tc4_port || "the serial port"} directly (115200 baud, aArtisanQ/PID
-                firmware) — no other software needed. The Heater/Fan sliders beside the chart send real OT1/
-                DCFAN commands; there's no Drum output on TC4, so that slider doesn't do anything here.
-                Heater/Fan readouts stay blank — TC4's own READ command only reports temperature channels, not
-                its current output duty. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual
-                click — mark them yourself as the roast happens.
-              </p>
+              <div className="panel control-panel">
+                <h3>TC4+</h3>
+                <p className="hint">
+                  Reading/writing {form.tc4_port || "the serial port"} directly (115200 baud, aArtisanQ/PID
+                  firmware) — no other software needed. The Heater/Fan sliders beside the chart send real OT1/
+                  DCFAN commands; there's no Drum output on TC4, so that slider doesn't do anything here.
+                  Heater/Fan readouts stay blank — TC4's own READ command only reports temperature channels, not
+                  its current output duty. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual
+                  click — mark them yourself as the roast happens.
+                </p>
+                <div className="form-row">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={tc4PidEnabled}
+                      disabled={!isActive}
+                      onChange={(e) => {
+                        const enabled = e.target.checked;
+                        setTc4PidEnabled(enabled);
+                        handleCommand({ tc4_pid_enabled: enabled });
+                      }}
+                    />
+                    Enable onboard PID
+                  </label>
+                  <label>
+                    Target BT (°C)
+                    <span className="input-suffix-group">
+                      <input
+                        type="number"
+                        value={tc4PidTargetInput}
+                        onChange={(e) => setTc4PidTargetInput(e.target.value)}
+                        placeholder="e.g. 200"
+                        disabled={!isActive}
+                      />
+                      <button
+                        type="button"
+                        disabled={!isActive || !tc4PidTargetInput.trim()}
+                        onClick={() => handleCommand({ tc4_pid_target_c: Number(tc4PidTargetInput) })}
+                      >
+                        Set
+                      </button>
+                    </span>
+                  </label>
+                </div>
+                <p className="hint">The Heater slider has no effect while onboard PID is enabled.</p>
+              </div>
             )}
             <div className="panel">
               <h3>Events</h3>

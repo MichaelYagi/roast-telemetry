@@ -12,6 +12,9 @@ for the full protocol citation):
     UNITS,x     -> no response (real firmware doesn't ack this either)
     OT1,duty    -> sets the shared ThermalDriver's heater_pct
     DCFAN,duty  -> sets the shared ThermalDriver's fan_pct
+    PID,*       -> logged only (see _handle_command's own comment --
+                   this fake doesn't simulate the onboard PID loop
+                   itself, only that the app's writes arrive correctly)
     anything else -> ignored
 
 BT/ET/heater/fan all come from the same shared thermal model as the
@@ -56,13 +59,26 @@ def _handle_command(line: str, driver: ThermalDriver, ser, quiet: bool) -> None:
     elif cmd == "OT1" and len(parts) > 1:
         try:
             driver.apply_command({"heater_pct": float(parts[1])})
+            if not quiet:
+                print(f"OT1,{parts[1]} (heater)", file=sys.stderr)
         except ValueError:
             pass
     elif cmd == "DCFAN" and len(parts) > 1:
         try:
             driver.apply_command({"fan_pct": float(parts[1])})
+            if not quiet:
+                print(f"DCFAN,{parts[1]} (fan)", file=sys.stderr)
         except ValueError:
             pass
+    elif cmd == "PID":
+        # Not a real PID simulation -- the fake's thermal model doesn't
+        # need one, it already reacts to whatever OT1 value arrives
+        # regardless of who's driving it (the app or, on real hardware,
+        # the board's own onboard loop). Logged only, so the app's own
+        # PID,SV/PID,ON/PID,OFF writes are actually visible here for
+        # verification -- see tc4_bridge/engine.py's own docstring.
+        if not quiet:
+            print(f"PID command: {line.strip()}", file=sys.stderr)
     # UNITS/OT2/everything else -- no response needed, silently ignored
 
 
