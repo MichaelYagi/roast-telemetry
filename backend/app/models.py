@@ -289,15 +289,6 @@ class ControlCommand(BaseModel):
     # that moves the same underlying value (see ModbusEngine.apply_command).
     # No ge/le: valid range is per-DeviceProfile (sv_range_c), not fixed.
     burner_sv_c: Optional[float] = Field(default=None, description="modbus_live only: burner setpoint in native °C, an alternate unit to heater_pct for the same underlying value.")
-    # Not the same shape as burner_sv_c above -- that's a stateless
-    # alternate *unit* for the same immediate write. This is a stateful
-    # *mode*: once enabled, the TC4 board's own onboard PID loop drives
-    # OT1 itself continuously, no further writes needed, and heater_pct
-    # writes are ignored while it's on (see tc4_bridge/engine.py's own
-    # apply_command). No ge/le on the target -- valid range isn't fixed,
-    # same reasoning burner_sv_c already has.
-    tc4_pid_enabled: Optional[bool] = Field(default=None, description="tc4_live only: True enables the TC4 board's own onboard PID loop (drives OT1 itself -- heater_pct writes are ignored while it's on); False returns heater control to manual OT1 writes.")
-    tc4_pid_target_c: Optional[float] = Field(default=None, description="tc4_live only: target BT in °C for the onboard PID loop (PID,SV). Only takes effect together with tc4_pid_enabled=True, or while it's already on.")
     speed: Optional[float] = Field(default=None, ge=0, description="Playback speed multiplier (alog_playback mode only)")
 
 
