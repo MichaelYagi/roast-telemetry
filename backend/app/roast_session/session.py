@@ -146,6 +146,7 @@ class RoastSession:
         self.title = request.title
         self.mode = request.mode
         self.beans = request.beans
+        self.tags = list(request.tags or [])
         self.weight_green_g = request.weight_green_g
         # Exposed via summary()/to_roast() so a client that only has the
         # roast id (e.g. LiveRoastView's reconnectActiveRoast, reattaching
@@ -390,6 +391,8 @@ class RoastSession:
             "ms6514_port": self.ms6514_port,
             "aillio_model": self.aillio_model,
         })
+        if self.tags:
+            storage.set_roast_tags(self.id, self.tags)
         self._recorded = True
 
     async def start(self) -> None:
@@ -840,6 +843,13 @@ class RoastSession:
         storage.update_roast(self.id, weight_green_g=grams)
         self._rewrite_alog()
 
+    def set_tags(self, tags: list[str]) -> None:
+        # No _rewrite_alog() call here, unlike the weight setters -- tags
+        # aren't an Artisan .alog concept, so there's nothing to round-trip
+        # into that file. storage.set_roast_tags is the only durable copy.
+        self.tags = tags
+        storage.set_roast_tags(self.id, tags)
+
     def delete_event(self, event_id: str) -> None:
         """Removes an already-marked milestone entirely, so it can be
         re-marked fresh via the normal add_event() flow (its own
@@ -871,6 +881,7 @@ class RoastSession:
             status=self.status,
             created_at=self.created_at,
             beans=self.beans,
+            tags=self.tags,
             weight_green_g=self.weight_green_g,
             weight_roasted_g=self.weight_roasted_g,
             duration_s=self.duration_s,
@@ -1020,6 +1031,7 @@ class RoastSessionManager:
             status=RoastStatus(row["status"]),
             created_at=row["created_at"],
             beans=row["beans"],
+            tags=storage.get_tags_for_roasts([roast_id]).get(roast_id, []),
             weight_green_g=row["weight_green_g"],
             weight_roasted_g=row["weight_roasted_g"],
             duration_s=row["duration_s"],
@@ -1103,6 +1115,19 @@ class RoastSessionManager:
         storage.update_roast(roast_id, weight_green_g=grams)
         self._rewrite_cold_alog(row, parsed)
 
+    def set_tags(self, roast_id: str, tags: list[str]) -> None:
+        session = self.get(roast_id)
+        if session is not None:
+            session.set_tags(tags)
+            return
+        # No _cold_roast_row_and_parsed/_rewrite_cold_alog here -- unlike
+        # weight, tags never touch the .alog file, so this doesn't need
+        # an alog_path (a roast the alog cold-read helpers would reject).
+        # Just confirms the roast row itself exists.
+        if storage.get_roast_row(roast_id) is None:
+            raise RoastSessionError(f"unknown roast {roast_id}")
+        storage.set_roast_tags(roast_id, tags)
+
     def delete(self, roast_id: str) -> None:
         session = self.get(roast_id)
         if session is not None and session.status in (RoastStatus.ROASTING, RoastStatus.COOLING):
@@ -1121,10 +1146,12 @@ class RoastSessionManager:
 
     def list_summaries(self, **filters) -> list[RoastSummary]:
         rows = storage.list_roast_rows(**filters)
+        tag_map = storage.get_tags_for_roasts([r["id"] for r in rows])
         return [
             RoastSummary(
                 id=r["id"], title=r["title"], mode=RoastMode(r["mode"]),
                 status=RoastStatus(r["status"]), created_at=r["created_at"], beans=r["beans"],
+                tags=tag_map.get(r["id"], []),
                 weight_green_g=r["weight_green_g"], weight_roasted_g=r["weight_roasted_g"],
                 duration_s=r["duration_s"], alog_path=r["alog_path"],
                 created_by_username=r.get("created_by_username"),

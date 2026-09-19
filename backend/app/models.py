@@ -350,6 +350,7 @@ class RoastCreateRequest(BaseModel):
     title: str
     mode: RoastMode
     beans: Optional[str] = None
+    tags: list[str] = Field(default=[], description="Optional tags, freely editable later via PUT /roasts/{id}/tags -- see RoastDetailView.jsx.")
     weight_green_g: Optional[float] = None
     alog_path: Optional[str] = Field(default=None, description="Required when mode=alog_playback")
     playback_speed: float = 1.0
@@ -414,6 +415,7 @@ class RoastSummary(BaseModel):
     status: RoastStatus
     created_at: str
     beans: Optional[str] = None
+    tags: list[str] = []
     weight_green_g: Optional[float] = None
     weight_roasted_g: Optional[float] = None
     duration_s: Optional[float] = None
@@ -704,3 +706,11 @@ class EventUpdateRequest(BaseModel):
     mismatch the marker's new position on the chart."""
 
     time_s: float
+
+
+class TagsUpdateRequest(BaseModel):
+    """PUT /roasts/{id}/tags body -- replace-the-whole-set semantics, see
+    storage.set_roast_tags. A list doesn't fit the plain-query-param
+    convention the weight endpoints use, hence a real body model here."""
+
+    tags: list[str]

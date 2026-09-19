@@ -55,6 +55,8 @@ export const api = {
   // parameter (backend/app/api/roasts.py's set_weight) -- no request body.
   setWeightRoasted: (id, grams) => request(`/roasts/${id}/weight?${new URLSearchParams({ grams })}`, { method: "POST" }),
   setWeightGreen: (id, grams) => request(`/roasts/${id}/weight-green?${new URLSearchParams({ grams })}`, { method: "POST" }),
+  setTags: (id, tags) => request(`/roasts/${id}/tags`, { method: "PUT", body: JSON.stringify({ tags }) }),
+  listTags: () => request("/roasts/tags"),
   addNote: (id, note) => request(`/roasts/${id}/notes`, { method: "POST", body: JSON.stringify(note) }),
   addEvent: (id, event) => request(`/roasts/${id}/events`, { method: "POST", body: JSON.stringify(event) }),
   deleteEvent: (id, eventId) => request(`/roasts/${id}/events/${eventId}`, { method: "DELETE" }),

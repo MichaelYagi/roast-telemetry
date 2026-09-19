@@ -69,6 +69,8 @@ export default function RoastDetailView() {
   // for "the roast itself failed to load" but way too disruptive for a
   // failed milestone delete/retime on an otherwise-fine page.
   const [milestoneError, setMilestoneError] = useState(null);
+  const [newTagInput, setNewTagInput] = useState("");
+  const [tagsError, setTagsError] = useState(null);
 
   useEffect(() => {
     api
@@ -102,6 +104,34 @@ export default function RoastDetailView() {
     setWeightInput(currentValue != null ? String(currentValue) : "");
     setWeightError(null);
     setEditingWeightField(field);
+  }
+
+  // Both add and remove go through this one function -- always PUTting
+  // the roast's *entire* tag list (set_roast_tags' replace-the-whole-set
+  // semantics), not a single add/remove call, so there's only one code
+  // path to get right rather than two nearly-identical ones.
+  async function handleTagsChange(nextTags) {
+    setTagsError(null);
+    try {
+      await api.setTags(id, nextTags);
+      setRoast((r) => (r ? { ...r, tags: nextTags } : r));
+    } catch (err) {
+      setTagsError(err.message);
+    }
+  }
+
+  function handleAddTag() {
+    const tag = newTagInput.trim();
+    if (!tag || roast.tags.includes(tag)) {
+      setNewTagInput("");
+      return;
+    }
+    setNewTagInput("");
+    handleTagsChange([...roast.tags, tag]);
+  }
+
+  function handleRemoveTag(tag) {
+    handleTagsChange(roast.tags.filter((t) => t !== tag));
   }
 
   // No websocket on this page (one-time REST fetch, see the effect
@@ -268,6 +298,42 @@ export default function RoastDetailView() {
               <span>Beans</span>
               <span>{roast.beans || "—"}</span>
             </li>
+            <li>
+              <span>Tags</span>
+              <span className="tag-edit-group">
+                {roast.tags.map((t) => (
+                  <span key={t} className="tag-chip">
+                    {t}
+                    <button type="button" className="tag-chip-remove no-print" onClick={() => handleRemoveTag(t)} aria-label={`Remove tag ${t}`}>
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <span className="input-suffix-group no-print">
+                  <input
+                    type="text"
+                    value={newTagInput}
+                    onChange={(e) => setNewTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddTag();
+                      }
+                    }}
+                    placeholder="Add tag…"
+                  />
+                  <button type="button" onClick={handleAddTag} disabled={!newTagInput.trim()}>
+                    Add
+                  </button>
+                </span>
+              </span>
+            </li>
+            {tagsError && (
+              <li>
+                <span></span>
+                <span className="error">{tagsError}</span>
+              </li>
+            )}
             <li>
               <span>Green weight</span>
               <span>

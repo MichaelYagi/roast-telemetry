@@ -27,6 +27,7 @@ from ..models import (
     RoastReview,
     RoastStatus,
     RoastSummary,
+    TagsUpdateRequest,
     UserStatus,
 )
 from ..roast_review import build_prompt, build_summary
@@ -115,15 +116,24 @@ def roast_to_csv(roast: Roast) -> str:
 def list_roasts(
     mode: Optional[RoastMode] = None,
     status: Optional[RoastStatus] = None,
+    tag: Optional[str] = None,
+    q: Optional[str] = Query(default=None, description="Substring match against title/beans/tags"),
     limit: int = Query(default=100, le=500),
     offset: int = 0,
 ) -> list[RoastSummary]:
     return session_manager.list_summaries(
         mode=mode.value if mode else None,
         status=status.value if status else None,
+        tag=tag,
+        q=q,
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/tags")
+def list_tags() -> list[dict]:
+    return storage.list_distinct_tags()
 
 
 @router.post("", response_model=RoastSummary, status_code=201)
@@ -273,6 +283,15 @@ def set_weight_green(roast_id: str, grams: float) -> dict:
     except RoastSessionError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"ok": True, "weight_green_g": grams}
+
+
+@router.put("/{roast_id}/tags")
+def set_tags(roast_id: str, update: TagsUpdateRequest) -> dict:
+    try:
+        session_manager.set_tags(roast_id, update.tags)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True, "tags": update.tags}
 
 
 @router.get("/{roast_id}/alog")

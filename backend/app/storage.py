@@ -125,6 +125,19 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+
+-- A normalized join table, not a comma-separated column on roasts --
+-- needed for real WHERE tag = ? filtering and a distinct-tags listing
+-- (see list_distinct_tags below), neither of which works cleanly
+-- against a packed string column. No ALTER TABLE migration needed for
+-- this one, unlike a new column on an existing table -- CREATE TABLE IF
+-- NOT EXISTS is already idempotent on its own.
+CREATE TABLE IF NOT EXISTS roast_tags (
+    roast_id TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    PRIMARY KEY (roast_id, tag)
+);
+CREATE INDEX IF NOT EXISTS idx_roast_tags_tag ON roast_tags(tag);
 """
 
 
@@ -244,22 +257,39 @@ def list_roast_rows(
     *,
     mode: Optional[str] = None,
     status: Optional[str] = None,
+    tag: Optional[str] = None,
+    q: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict]:
     clauses, params = [], {}
     if mode:
-        clauses.append("mode = :mode")
+        clauses.append("r.mode = :mode")
         params["mode"] = mode
     if status:
-        clauses.append("status = :status")
+        clauses.append("r.status = :status")
         params["status"] = status
+    if tag:
+        clauses.append("t.tag = :tag")
+        params["tag"] = tag
+    if q:
+        # title/beans/tags only -- per-timestamp roast notes live inside
+        # each roast's own .alog file, not a DB column, so searching
+        # those would mean loading every .alog on every search. Not
+        # worth it for this table's realistic scale (hundreds to
+        # low-thousands of rows) -- plain LIKE, not FTS5, for the same
+        # reason: no virtual-table/tokenizer setup earned at this size.
+        clauses.append("(r.title LIKE :q OR r.beans LIKE :q OR t.tag LIKE :q)")
+        params["q"] = f"%{q}%"
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     params["limit"] = limit
     params["offset"] = offset
     with _conn() as c:
         rows = c.execute(
-            f"SELECT * FROM roasts {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
+            f"""SELECT DISTINCT r.* FROM roasts r
+                LEFT JOIN roast_tags t ON t.roast_id = r.id
+                {where}
+                ORDER BY r.created_at DESC LIMIT :limit OFFSET :offset""",
             params,
         ).fetchall()
         return [dict(r) for r in rows]
@@ -268,6 +298,46 @@ def list_roast_rows(
 def delete_roast_row(roast_id: str) -> None:
     with _conn() as c:
         c.execute("DELETE FROM roasts WHERE id = ?", (roast_id,))
+        c.execute("DELETE FROM roast_tags WHERE roast_id = ?", (roast_id,))
+
+
+def set_roast_tags(roast_id: str, tags: list[str]) -> None:
+    """Replace-the-whole-set semantics, same 'load full, save full'
+    precedent as AppSettings fields -- but scoped to one roast, so
+    there's no cross-field clobbering risk the settings PUT landmine
+    had (see chart_series_visible's own history)."""
+    with _conn() as c:
+        c.execute("DELETE FROM roast_tags WHERE roast_id = ?", (roast_id,))
+        c.executemany(
+            "INSERT INTO roast_tags (roast_id, tag) VALUES (?, ?)",
+            [(roast_id, tag) for tag in dict.fromkeys(tags)],  # de-dupe, preserve order
+        )
+
+
+def get_tags_for_roasts(roast_ids: list[str]) -> dict[str, list[str]]:
+    """One batched query (WHERE roast_id IN (...)), not N+1 -- used both
+    for listing many roasts at once and for a single cold roast read
+    (pass a one-element list)."""
+    if not roast_ids:
+        return {}
+    with _conn() as c:
+        placeholders = ",".join("?" * len(roast_ids))
+        rows = c.execute(
+            f"SELECT roast_id, tag FROM roast_tags WHERE roast_id IN ({placeholders}) ORDER BY tag",
+            roast_ids,
+        ).fetchall()
+    result: dict[str, list[str]] = {}
+    for row in rows:
+        result.setdefault(row["roast_id"], []).append(row["tag"])
+    return result
+
+
+def list_distinct_tags() -> list[dict]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT tag, COUNT(*) as count FROM roast_tags GROUP BY tag ORDER BY count DESC, tag ASC"
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def abort_stale_roasts() -> list[str]:

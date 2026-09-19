@@ -14,7 +14,13 @@ export default function HistoryDashboard() {
   const confirm = useConfirm();
   const notify = useNotify();
   const [roasts, setRoasts] = useState([]);
-  const [filters, setFilters] = useState({ mode: "", status: "" });
+  const [filters, setFilters] = useState({ mode: "", status: "", tag: "", q: "" });
+  // Debounced separately from `filters.q` itself -- typing shouldn't fire
+  // a request per keystroke, but the input needs to stay responsive/
+  // uncontrolled-feeling, so this local value updates immediately while
+  // filters.q (the thing refresh()'s effect actually watches) lags behind it.
+  const [searchInput, setSearchInput] = useState("");
+  const [allTags, setAllTags] = useState([]);
   const [loading, setLoading] = useState(true);
   const [importPath, setImportPath] = useState("");
   const [importTitle, setImportTitle] = useState("");
@@ -61,6 +67,18 @@ export default function HistoryDashboard() {
   useEffect(() => {
     refresh();
   }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const id = setTimeout(() => setFilters((f) => ({ ...f, q: searchInput.trim() })), 300);
+    return () => clearTimeout(id);
+  }, [searchInput]);
+
+  // Fetched once on mount -- a tag added mid-session won't show up in the
+  // filter dropdown until next reload, same tradeoff RoastDetailView.jsx's
+  // one-time getSettings() fetch already accepts for temperature unit.
+  useEffect(() => {
+    api.listTags().then(setAllTags);
+  }, []);
 
   async function handleImport(e) {
     e.preventDefault();
@@ -176,11 +194,23 @@ export default function HistoryDashboard() {
 
       <div className="panel filters-row">
         <label>
+          Search
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Title, beans, or tag…"
+          />
+        </label>
+        <label>
           Mode
           <select value={filters.mode} onChange={(e) => setFilters({ ...filters, mode: e.target.value })}>
             <option value="">All</option>
             <option value="simulator">Simulator</option>
             <option value="alog_playback">Playback</option>
+            <option value="modbus_live">Modbus (live)</option>
+            <option value="ms6514_live">MS6514 (live)</option>
+            <option value="aillio_live">Aillio Bullet (live)</option>
           </select>
         </label>
         <label>
@@ -192,6 +222,17 @@ export default function HistoryDashboard() {
             <option value="complete">Complete</option>
             <option value="stopped">Stopped</option>
             <option value="aborted">Aborted</option>
+          </select>
+        </label>
+        <label>
+          Tag
+          <select value={filters.tag} onChange={(e) => setFilters({ ...filters, tag: e.target.value })}>
+            <option value="">All</option>
+            {allTags.map((t) => (
+              <option key={t.tag} value={t.tag}>
+                {t.tag} ({t.count})
+              </option>
+            ))}
           </select>
         </label>
       </div>
@@ -226,6 +267,7 @@ export default function HistoryDashboard() {
               <th>Status</th>
               <th>Duration</th>
               <th>Beans</th>
+              <th>Tags</th>
               <th>Created</th>
               <th>Roasted by</th>
               <th></th>
@@ -234,12 +276,12 @@ export default function HistoryDashboard() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={9}>Loading…</td>
+                <td colSpan={10}>Loading…</td>
               </tr>
             )}
             {!loading && roasts.length === 0 && (
               <tr>
-                <td colSpan={9}>No roasts yet.</td>
+                <td colSpan={10}>No roasts yet.</td>
               </tr>
             )}
             {roasts.map((r) => (
@@ -254,6 +296,15 @@ export default function HistoryDashboard() {
                 </td>
                 <td>{formatDuration(r.duration_s)}</td>
                 <td>{r.beans || "—"}</td>
+                <td>
+                  {r.tags && r.tags.length > 0
+                    ? r.tags.map((t) => (
+                        <span key={t} className="tag-chip">
+                          {t}
+                        </span>
+                      ))
+                    : "—"}
+                </td>
                 <td>{new Date(r.created_at).toLocaleString()}</td>
                 <td>{r.created_by_username || "—"}</td>
                 <td>
