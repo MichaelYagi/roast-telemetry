@@ -99,7 +99,7 @@ app = FastAPI(
         "a mock USB/serial device layer, and an .alog playback engine, "
         "all running without physical hardware."
     ),
-    version="1.2.4",
+    version="1.2.5",
     lifespan=lifespan,
 )
 
