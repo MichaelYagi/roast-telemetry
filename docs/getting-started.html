@@ -33,8 +33,8 @@
   <div class="callout">
     <strong>Prefer not to deal with a source checkout at all?</strong>
     See <a href="#standalone-builds">Standalone builds</a> further down
-    — a real double-clickable <code>.exe</code>/<code>.app</code>/Linux
-    binary, no Python/Node/terminal involved at all. Building one still
+    — a real double-clickable <code>.exe</code>/<code>.app</code>,
+    no Python/Node/terminal involved at all. Building one still
     needs the dev setup below done once, on whichever machine builds it
     — but *running* it afterward, including for someone else you hand
     it to, needs nothing from this page.
@@ -160,10 +160,13 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
   <h2 id="tray-icon">Tray icon (optional)</h2>
   <p>
     A system tray / menu-bar icon that starts and stops the server with a
-    click, instead of a terminal command — works on Windows, macOS, and a
-    real Linux desktop (not WSL2, which has no tray without WSLg; WSL2's
-    own role stays the terminal-based install/fake-hardware workflow
-    above, unchanged). <code>scripts/install.sh</code>/<code>install.ps1</code>
+    click, instead of a terminal command — works on Windows and macOS.
+    Deliberately not native Linux desktop: real testing surfaced
+    tray-icon fragmentation across Linux desktop environments (no
+    single standard protocol the way Windows/macOS each have exactly
+    one) that isn't fixable from this app's own code. WSL2's own role
+    stays the terminal-based install/fake-hardware workflow above,
+    unaffected. <code>scripts/install.sh</code>/<code>install.ps1</code>
     already install its dependencies (<code>pystray</code>, Pillow) by
     default, so there's no separate setup step — just run it:
   </p>
@@ -202,7 +205,7 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
       once you know your build is current for faster restarts.</li>
     <li><strong>Launch at login</strong> (checkbox) — starts the tray
       automatically next time you log in (Windows Startup folder / macOS
-      LaunchAgent / Linux autostart, whichever applies).</li>
+      LaunchAgent, whichever applies).</li>
   </ul>
 
   <h2 id="standalone-builds">Standalone builds (no Python/Node install needed to run)</h2>
@@ -210,20 +213,20 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
     Everything above assumes running from a cloned repo with Python and
     Node installed. <code>packaging/</code> builds a standalone,
     unsigned distributable instead — by default a single file
-    (Windows/Linux) or a real <code>.app</code> (macOS, wrapping a
+    (Windows) or a real <code>.app</code> (macOS, wrapping a
     single file inside) with the same tray icon experience as above,
     that someone else can just download and run with nothing else
     installed (a folder-based build is available too, see
     <code>packaging/README.md</code>, if you'd rather trade the
-    single-file convenience for faster startup). Must be built natively
-    on each target platform (there's no cross-compile path) — one
-    command per platform, from a machine with this repo's own dev setup
+    single-file convenience for faster startup). Windows and macOS
+    only — see the Tray icon section above for why native Linux
+    desktop isn't a supported target. Must be built natively on each
+    target platform (there's no cross-compile path) — one command per
+    platform, from a machine with this repo's own dev setup
     (<code>install.sh</code>/<code>install.ps1</code>) already done:
   </p>
   <pre><code>packaging\build-windows.ps1   # Windows, in PowerShell
-packaging/build-macos.sh      # macOS
-packaging/build-linux.sh      # Linux (needs a real desktop -- GTK/AppIndicator --
-                               # to *run* the tray icon; the build itself works from WSL2)</code></pre>
+packaging/build-macos.sh      # macOS</code></pre>
   <p>
     Unsigned means a one-time OS warning on whoever's machine first runs
     it (Windows SmartScreen / macOS Gatekeeper) — expected, not a build

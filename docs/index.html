@@ -53,14 +53,14 @@
     <li><strong>CSV export and a printable roast report</strong> — every roast (finished or still recording) has a spreadsheet-friendly CSV download alongside the Artisan-native <code>.alog</code> one, plus a "Print report" button using the browser's own print-to-PDF (no extra dependency) for a clean, chart-included summary sheet.</li>
     <li><strong>Login, with the first registrant becoming admin.</strong> No built-in default account — the first person to register gets immediate admin access; everyone after that is pending until the admin allows them from the Manage Access page (Allow/Deny/Delete, and a denied account can be sent back to pending). Every allowed account, admin or not, has full access to everything else — no per-feature permissions, just the one gate. See <a href="getting-started.html#accounts-and-access">Getting started &rarr; Accounts and access</a>.</li>
     <li><strong>Per-user API keys</strong> for calling the API directly (a script, a Home Assistant integration, <code>curl</code>) without the browser's cookie-based login — generate/regenerate/revoke from Account (click your username in the header). Cryptographically random, hashed at rest, shown in full exactly once at generation time. An alternative credential alongside session cookies, not a replacement for them.</li>
-    <li><strong>Standalone desktop builds</strong> for Windows, macOS, and Linux — package the same tray-icon app into a distributable that needs no Python/Node install to run, for sharing with someone who doesn't want to set up a dev environment. Unsigned (a one-time OS warning on first run, not a functional limitation). See <a href="getting-started.html#standalone-builds">Getting started &rarr; Standalone builds</a>.</li>
+    <li><strong>Standalone desktop builds</strong> for Windows and macOS — package the same tray-icon app into a distributable that needs no Python/Node install to run, for sharing with someone who doesn't want to set up a dev environment. Unsigned (a one-time OS warning on first run, not a functional limitation). See <a href="getting-started.html#standalone-builds">Getting started &rarr; Standalone builds</a>.</li>
   </ul>
 
   <h2>Where to start</h2>
   <ul>
     <li><a href="getting-started.html">Getting started</a> — install, run, the data sources, saving a roast, testing without real hardware.
       <ul>
-        <li><a href="getting-started.html#standalone-builds">Standalone builds</a> — package a standalone, unsigned Windows/macOS/Linux distributable that needs no Python/Node install to run.</li>
+        <li><a href="getting-started.html#standalone-builds">Standalone builds</a> — package a standalone, unsigned Windows/macOS distributable that needs no Python/Node install to run.</li>
       </ul>
     </li>
     <li><a href="modbus/index.html">Direct Modbus Bridge</a> — connection basics and the register-override mechanism, for any Modbus-connected roaster.

@@ -1,20 +1,23 @@
 """A system tray / menu-bar icon that starts and stops Roast Telemetry --
 the GUI equivalent of run-server.sh/run-server.ps1, for someone who'd
-rather click an icon than remember a terminal command. Works on Windows,
-macOS, and a real Linux desktop (pystray needs an actual tray
-implementation -- GTK/AppIndicator/Ayatana on Linux -- which a plain
-WSL2 shell doesn't have without WSLg; WSL2's own role in this project
-stays the terminal-based install.sh/fake-hardware.sh workflow, unchanged
-by this file). See scripts/tray.sh / scripts/tray.ps1 for how this gets
-launched with the right interpreter either way.
+rather click an icon than remember a terminal command. Windows and
+macOS only -- deliberately not Linux desktop (see
+[[feedback_no_linux_desktop_tray]] for why: pystray has no single
+standard tray protocol to target there the way Windows/macOS each have
+exactly one, and real testing across Raspberry Pi OS's default desktop
+and GNOME both surfaced genuine, unresolvable-from-this-app's-own-code
+friction -- an invisible/non-interactive icon depending on which
+backend pystray happened to pick, with no reliable way to know which
+one will actually render on a given machine ahead of time). WSL2's own
+role in this project stays the terminal-based
+install.sh/fake-hardware.sh workflow, unaffected by any of this. See
+scripts/tray.sh / scripts/tray.ps1 for how this gets launched with the
+right interpreter either way.
 
 Requires the extra deps in scripts/tray_requirements.txt (pystray,
 Pillow) installed into the same .venv scripts/install.sh already set up
 -- not part of the app's own backend/requirements.txt, see that file's
-own comment for why. Port/Host dialogs and the save-logs dialog use
-tkinter (stdlib) -- on Linux specifically this sometimes needs a
-separate `python3-tk` package (Debian/Ubuntu split it out); see
-install.sh.
+own comment for why.
 """
 from __future__ import annotations
 
@@ -175,7 +178,7 @@ def _badge(base: Image.Image, color: str) -> Image.Image:
 
 
 # -- Dialogs -----------------------------------------------------------
-# Windows/Linux: tkinter, marshaled onto one consistent thread -- see
+# Windows: tkinter, marshaled onto one consistent thread -- see
 # TrayApp.run()/_run_on_main_thread. Confirmed live, not just a
 # theoretical risk: creating a throwaway tk.Tk() root inside a pystray
 # menu callback (pystray runs each callback on its own fresh worker
@@ -250,15 +253,10 @@ def _copy_to_clipboard(text: str, root) -> bool:
     """True on success. Prefers each OS's own dedicated clipboard tool
     (clip/pbcopy -- always present, zero new dependency, a single
     stdin-piping subprocess call, nothing to get wrong) over tkinter's
-    own clipboard, which is only the last-resort fallback for Linux
-    without xclip/xsel/wl-copy installed. Takes the shared persistent
-    root (see the dialogs comment above) rather than creating its own --
-    besides the same cross-thread issue every other dialog here had,
-    reusing the persistent root actually makes the X11 fallback *more*
-    reliable than a throwaway one would be: X11's clipboard only stays
-    available while the owning window is alive unless a clipboard
-    manager is running, and this root lives for the tray's whole
-    session, not just for one call."""
+    own clipboard, kept only as a last-resort fallback should clip/pbcopy
+    themselves ever fail. Takes the shared persistent root (see the
+    dialogs comment above) rather than creating its own -- same
+    cross-thread issue every other dialog here had."""
     system = platform.system()
     try:
         if system == "Windows":
@@ -267,11 +265,6 @@ def _copy_to_clipboard(text: str, root) -> bool:
         if system == "Darwin":
             subprocess.run(["pbcopy"], input=text.encode(), check=True)
             return True
-        for tool, args in (("wl-copy", []), ("xclip", ["-selection", "clipboard"]), ("xsel", ["--clipboard", "--input"])):
-            path = shutil.which(tool)
-            if path:
-                subprocess.run([path, *args], input=text.encode(), check=True)
-                return True
     except (OSError, subprocess.CalledProcessError):
         pass
 
@@ -285,12 +278,11 @@ def _copy_to_clipboard(text: str, root) -> bool:
 
 
 # -- Launch at login -----------------------------------------------------
-# Three different OS mechanisms under one dispatch -- none of these are
-# testable in this environment (no real Windows/macOS/Linux-desktop
-# session here), reviewed carefully instead. Windows/Linux use plain
-# text files (a .bat, a .desktop) with no external tool needed; macOS
-# needs `launchctl` to actually register the LaunchAgent, not just
-# writing its plist.
+# Two different OS mechanisms under one dispatch -- neither is testable
+# in this environment (no real Windows/macOS session here), reviewed
+# carefully instead. Windows uses a plain .bat text file in the Startup
+# folder, no external tool needed; macOS needs `launchctl` to actually
+# register the LaunchAgent, not just writing its plist.
 def _windows_startup_bat_path() -> Path:
     appdata = os.environ.get("APPDATA", "")
     return Path(appdata) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup" / "Roast Telemetry.bat"
@@ -343,35 +335,12 @@ def _set_launch_at_login_mac(enabled: bool) -> None:
         path.unlink(missing_ok=True)
 
 
-def _linux_autostart_path() -> Path:
-    return Path.home() / ".config" / "autostart" / "roast-telemetry-tray.desktop"
-
-
-def _set_launch_at_login_linux(enabled: bool) -> None:
-    path = _linux_autostart_path()
-    if enabled:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        content = (
-            "[Desktop Entry]\n"
-            "Type=Application\n"
-            "Name=Roast Telemetry\n"
-            f"Exec={REPO_ROOT}/scripts/tray.sh\n"
-            f"Icon={ICON_PATH}\n"
-            "Terminal=false\n"
-        )
-        path.write_text(content)
-    else:
-        path.unlink(missing_ok=True)
-
-
 def _set_launch_at_login(enabled: bool) -> None:
     system = platform.system()
     if system == "Windows":
         _set_launch_at_login_windows(enabled)
     elif system == "Darwin":
         _set_launch_at_login_mac(enabled)
-    else:
-        _set_launch_at_login_linux(enabled)
 
 
 class TrayApp:

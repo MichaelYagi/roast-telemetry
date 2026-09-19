@@ -7,7 +7,10 @@
 #
 # Must be run *on* the target platform -- Windows produces a Windows
 # build, macOS produces a macOS build; there is no supported
-# cross-compile path. See packaging/build-windows.ps1 /
+# cross-compile path. Windows and macOS are the only supported desktop
+# targets -- see scripts/tray_app.py's own module docstring for why
+# native Linux desktop isn't (WSL2 stays a dev/build environment, not a
+# distribution target). See packaging/build-windows.ps1 /
 # packaging/build-macos.sh, which both just wrap:
 #
 #     pyinstaller packaging/roast-telemetry.spec --distpath dist --workpath build
@@ -23,13 +26,15 @@
 # relative Analysis/datas paths against the spec file's own directory,
 # not the invoking shell's cwd.
 #
-# Verified with a real build in this sandbox (Linux/WSL2) after fixing
-# that -- see packaging/build-linux.sh. Windows/macOS still need their
-# own first real build to confirm (no such environment available here),
-# but this exact path-resolution issue is now already caught and fixed
-# rather than something each platform would've hit independently.
+# Verified with a real headless build in this sandbox (WSL2, used here
+# only to run PyInstaller and exercise --run-server -- not a tray/GUI
+# test, and not itself a supported distribution target) after fixing
+# that. Windows/macOS still need their own first real build to confirm
+# (no such environment available here), but this exact path-resolution
+# issue is now already caught and fixed rather than something each
+# platform would've hit independently.
 #
-# PACKAGE_MODE env var picks the output shape (all three build scripts
+# PACKAGE_MODE env var picks the output shape (both build scripts
 # set it -- override by hand if you ever want the other one):
 #   onefile (default) -- a genuinely single executable, nothing else to
 #     keep alongside it. Costs something real: every launch re-extracts
@@ -225,7 +230,7 @@ if not ONEFILE:
 # macOS only -- wraps the EXE/COLLECT output into a real double-
 # clickable .app bundle (works the same way whether exe above is a
 # onefile single binary or the onedir COLLECT folder -- BUNDLE accepts
-# either). Windows/Linux just use the exe/folder directly, no BUNDLE
+# either). Windows just uses the exe/folder directly, no BUNDLE
 # equivalent there.
 if sys.platform == "darwin":
     app = BUNDLE(
@@ -238,7 +243,7 @@ if sys.platform == "darwin":
             "NSHighResolutionCapable": True,
             # A tray/menu-bar-only app -- no Dock icon or app-switcher
             # entry, matching how the tray icon already behaves on
-            # Windows/Linux (background utility, not a normal windowed app).
+            # Windows (background utility, not a normal windowed app).
             "LSUIElement": True,
         },
     )

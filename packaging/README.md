@@ -2,38 +2,42 @@
 
 Produces an unsigned, standalone single executable per platform --
 `Roast Telemetry.exe` (Windows), `Roast Telemetry.app` (macOS, a real
-double-clickable app bundle wrapping a single-file executable inside),
-`Roast Telemetry` (Linux) -- no Python/Node install required to *run*
-the result, just to *build* it, and (the default mode) nothing else to
-keep alongside the file itself. Must be built natively on each target
-platform (PyInstaller has no supported cross-compile path) -- see
+double-clickable app bundle wrapping a single-file executable inside)
+-- no Python/Node install required to *run* the result, just to
+*build* it, and (the default mode) nothing else to keep alongside the
+file itself. Windows and macOS are the only supported desktop targets
+-- see `scripts/tray_app.py`'s own module docstring for why native
+Linux desktop isn't (real testing surfaced genuine, unresolvable-from-
+this-app's-own-code tray-icon fragmentation across Linux desktop
+environments). Must be built natively on each target platform
+(PyInstaller has no supported cross-compile path) -- see
 `roast-telemetry.spec`'s own header comment for the full design notes,
 including the `PACKAGE_MODE`/`-Mode`/positional-arg switch to build a
 folder instead (faster startup, no single-exe antivirus-heuristic risk,
 just not a single file -- see that comment for the full tradeoff).
 
-**Verified end-to-end on Linux** (the sandbox this was built in), both
-modes -- a real `pyinstaller` build was run for each, and the resulting
-binary was actually exercised: `--run-server` starts a genuine server,
-`/api/health` responds, a user can register, a `simulator` roast can be
-created, an `alog_playback` roast against the bundled sample file works
-(the one relative-path assumption riskiest to get wrong -- see "What
-actually changed" below), and `ROAST_TELEMETRY_DATA_DIR` correctly
-redirects where `roasts.db` gets created. Two real bugs were caught and
-fixed in the process, both in the spec/tray_app.py, not the app itself:
-the spec initially resolved paths relative to the caller's cwd instead
-of the spec file's own location, and the single-file (onefile) mode's
-server subprocess initially inherited a stale working directory from
-whichever process launched it instead of establishing its own correct
-one on every fresh launch (onefile re-extracts to a brand new temp
-directory each time, not a stable folder) -- see the spec's own comment
-and `_run_server_entrypoint()`'s. **Windows and macOS still need their
-own first real build** to confirm (no such environment available here)
--- the design is the same across all three platforms and the trickiest
-part (path resolution inside the frozen bundle, in both onefile and
-onedir shapes) is now confirmed correct on one of them, but treat the
-Windows/macOS builds as a first real test on those specific platforms,
-not a formality.
+**Verified end-to-end via a real headless build in this sandbox**
+(WSL2, used only to run PyInstaller and exercise `--run-server` --
+never a tray/GUI test, and not itself a supported distribution
+target), both modes -- a real `pyinstaller` build was run for each, and
+the resulting binary was actually exercised: `--run-server` starts a
+genuine server, `/api/health` responds, a user can register, a
+`simulator` roast can be created, an `alog_playback` roast against the
+bundled sample file works (the one relative-path assumption riskiest to
+get wrong -- see "What actually changed" below), and
+`ROAST_TELEMETRY_DATA_DIR` correctly redirects where `roasts.db` gets
+created. Two real bugs were caught and fixed in the process, both in
+the spec/tray_app.py, not the app itself: the spec initially resolved
+paths relative to the caller's cwd instead of the spec file's own
+location, and the single-file (onefile) mode's server subprocess
+initially inherited a stale working directory from whichever process
+launched it instead of establishing its own correct one on every fresh
+launch (onefile re-extracts to a brand new temp directory each time,
+not a stable folder) -- see the spec's own comment and
+`_run_server_entrypoint()`'s. Windows and macOS have both since had
+real builds on their own hardware too, catching two further real bugs
+along the way -- see "What actually changed" below and the git history
+for the `pystray`/`pyserial` hidden-import fixes.
 
 ## Windows
 
@@ -73,30 +77,8 @@ not a formality.
    does have an Open-anyway button) -- only needed once per machine.
    After that it runs like any other app: a menu-bar icon appears
    (no Dock icon -- this is a background utility, same as the
-   Windows/Linux tray, not a normal windowed app), click for the same
+   Windows tray, not a normal windowed app), click for the same
    Start/Stop/Open in browser/Save logs menu.
-
-## Linux
-
-1. Clone/pull the repo.
-2. If you haven't already: `scripts/install.sh`.
-3. `packaging/build-linux.sh` (or `packaging/build-linux.sh onedir` for a
-   folder instead of a single file). The build itself works fine from
-   WSL2/any Linux with no display -- PyInstaller doesn't need one --
-   but see step 5.
-4. Output: `dist/Roast Telemetry` -- a genuinely single file, copy or
-   send just that (`chmod +x` it again if the executable bit didn't
-   survive however you transferred it). (`onedir` instead produces
-   `dist/Roast Telemetry/`, a folder whose `Roast Telemetry` binary
-   needs the rest of the folder alongside it -- tar/zip the whole
-   folder in that case, not just the binary.)
-5. Needs a **real Linux desktop** to actually show the tray icon
-   (pystray needs GTK/AppIndicator/Ayatana) -- a bare WSL2 shell without
-   WSLg won't display one even though the binary itself runs fine (this
-   is exactly why `scripts/tray_app.py`'s own module docstring already
-   scopes WSL2 to the terminal-based `install.sh`/`fake-hardware.sh`
-   workflow, not the tray). No SmartScreen/Gatekeeper-style warning on
-   Linux -- it just runs.
 
 ## Why unsigned, and what that costs
 
