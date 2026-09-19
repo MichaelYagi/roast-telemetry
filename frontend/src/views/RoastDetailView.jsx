@@ -71,6 +71,7 @@ export default function RoastDetailView() {
   const [milestoneError, setMilestoneError] = useState(null);
   const [newTagInput, setNewTagInput] = useState("");
   const [tagsError, setTagsError] = useState(null);
+  const [allTags, setAllTags] = useState([]); // feeds the <datalist> below -- existing tags to autocomplete against
 
   useEffect(() => {
     api
@@ -78,6 +79,13 @@ export default function RoastDetailView() {
       .then(setRoast)
       .catch((err) => setError(err.message));
   }, [id]);
+
+  // Fetched once on mount, same tradeoff as tempUnit's getSettings() call
+  // below -- a tag added elsewhere mid-session won't appear in the
+  // suggestions until next reload.
+  useEffect(() => {
+    api.listTags().then(setAllTags);
+  }, []);
 
   async function handleSaveWeight(field) {
     const grams = Number(weightInput);
@@ -321,10 +329,22 @@ export default function RoastDetailView() {
                       }
                     }}
                     placeholder="Add tag…"
+                    list="existing-tags"
                   />
                   <button type="button" onClick={handleAddTag} disabled={!newTagInput.trim()}>
                     Add
                   </button>
+                  {/* Native browser autocomplete against every tag used
+                      anywhere -- no library needed, and it degrades to a
+                      plain text input on anything that doesn't support
+                      <datalist> (rare, but free either way). */}
+                  <datalist id="existing-tags">
+                    {allTags
+                      .filter((t) => !roast.tags.includes(t.tag))
+                      .map((t) => (
+                        <option key={t.tag} value={t.tag} />
+                      ))}
+                  </datalist>
                 </span>
               </span>
             </li>
