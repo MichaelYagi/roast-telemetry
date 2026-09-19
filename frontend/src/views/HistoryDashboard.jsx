@@ -37,6 +37,13 @@ export default function HistoryDashboard() {
   const [importing, setImporting] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [deletingSelected, setDeletingSelected] = useState(false);
+  // Off by default -- each entry here is a real .alog read+parse
+  // server-side (see GET /roasts/stats-batch), so this is opt-in rather
+  // than fetched on every History page load. Scoped to the exact same
+  // filtered/paged set already showing in the table below.
+  const [showTrends, setShowTrends] = useState(false);
+  const [trendStats, setTrendStats] = useState([]);
+  const [trendsLoading, setTrendsLoading] = useState(false);
   const navigate = useNavigate();
 
   function refresh() {
@@ -79,6 +86,34 @@ export default function HistoryDashboard() {
   useEffect(() => {
     refresh();
   }, [filters, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Same filters/page/pageSize as the table above, so "trends" always
+  // means "trends for exactly what I'm looking at right now" -- picking
+  // a tag/mode filter while trends are showing re-fetches automatically,
+  // same as the table itself does.
+  useEffect(() => {
+    if (!showTrends) return;
+    setTrendsLoading(true);
+    const filterParams = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+    const pageParams = { ...filterParams, limit: pageSize, offset: (page - 1) * pageSize };
+    api
+      .getRoastStatsBatch(pageParams)
+      .then(setTrendStats)
+      .finally(() => setTrendsLoading(false));
+  }, [showTrends, filters, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const trendAverages = useMemo(() => {
+    const withDry = trendStats.filter((r) => r.dry_pct != null);
+    const withDtr = trendStats.filter((r) => r.dtr_pct != null);
+    const flaggedCount = trendStats.filter(
+      (r) => r.ror_flags.crashes.length || r.ror_flags.flatlines.length || r.ror_flags.flicks.length
+    ).length;
+    return {
+      avgDryPct: withDry.length ? withDry.reduce((sum, r) => sum + r.dry_pct, 0) / withDry.length : null,
+      avgDtrPct: withDtr.length ? withDtr.reduce((sum, r) => sum + r.dtr_pct, 0) / withDtr.length : null,
+      flaggedCount,
+    };
+  }, [trendStats]);
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -192,6 +227,29 @@ export default function HistoryDashboard() {
           <span className="stat-value">{stats.avgLoss != null ? `${(stats.avgLoss * 100).toFixed(1)}%` : "—"}</span>
           <span className="stat-label">Avg roast loss</span>
         </div>
+        {showTrends && (
+          <>
+            <div>
+              <span className="stat-value">
+                {trendsLoading ? "…" : trendAverages.avgDryPct != null ? `${trendAverages.avgDryPct.toFixed(1)}%` : "—"}
+              </span>
+              <span className="stat-label">Avg Dry %</span>
+            </div>
+            <div>
+              <span className="stat-value">
+                {trendsLoading ? "…" : trendAverages.avgDtrPct != null ? `${trendAverages.avgDtrPct.toFixed(1)}%` : "—"}
+              </span>
+              <span className="stat-label">Avg DTR %</span>
+            </div>
+            <div>
+              <span className="stat-value">{trendsLoading ? "…" : trendAverages.flaggedCount}</span>
+              <span className="stat-label">With RoR flags</span>
+            </div>
+          </>
+        )}
+        <button type="button" className="link-like" onClick={() => setShowTrends((s) => !s)}>
+          {showTrends ? "Hide trends" : "Show trends"}
+        </button>
       </div>
 
       <form className="panel import-form" onSubmit={handleImport}>

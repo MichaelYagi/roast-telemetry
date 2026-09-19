@@ -1844,7 +1844,12 @@ button:disabled {
 
 .stats-row {
   display: flex;
+  align-items: center;
   gap: 2.5rem;
+}
+
+.stats-row button.link-like {
+  margin-left: auto;
 }
 
 .stats-row > div {
@@ -1889,6 +1894,14 @@ button:disabled {
 .roast-table {
   width: 100%;
   border-collapse: collapse;
+}
+
+/* Many selected roasts on the Compare page means many columns -- this
+   wrapper scrolls horizontally instead of letting the table force the
+   whole page wider (same overflow-x:auto containment already used for
+   the vertical-control lanes/other wide content in this file). */
+.table-scroll {
+  overflow-x: auto;
 }
 
 .roast-table th,
@@ -2018,6 +2031,31 @@ button:disabled {
 
 .roast-picker li {
   padding: 0.25rem 0;
+}
+
+.roast-picker-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.roast-picker-title {
+  display: block;
+}
+
+/* Date + beans under the title -- title alone doesn't distinguish
+   roasts with generic/repeated names, the actual complaint this was
+   added for ("I don't know what roasts I'm comparing against"). */
+.roast-picker-meta {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.compare-th-meta {
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 /* --- Artisan-style toolbar -------------------------------------------- */
