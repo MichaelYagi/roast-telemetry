@@ -21,6 +21,16 @@ export default defineConfig({
     __APP_BUILD__: JSON.stringify(gitShortHash()),
   },
   plugins: [react()],
+  build: {
+    // Default is 500kB; the real bundle sits a bit over that (Chart.js
+    // pulled in for RoastChart/RoastComparisonView) but gzips down to
+    // ~160kB, fine for a self-hosted app with no first-time-visitor/
+    // slow-connection concern -- not worth real code-splitting effort
+    // for. Raised just to silence the advisory, not chosen to exactly
+    // fit today's size (that'd just make this go stale the next time
+    // the bundle grows a little).
+    chunkSizeWarningLimit: 600,
+  },
   server: {
     port: 5173,
     // WSL + a Windows-mounted path (/mnt/c/...) doesn't deliver inotify
