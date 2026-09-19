@@ -63,7 +63,11 @@ export default function WeightField({ value, onSave, onDelete, noPrint = false }
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="grams"
-            autoFocus
+            // Only when the user explicitly clicked "edit" -- not just
+            // because the field happens to start empty (value == null),
+            // which used to steal focus and scroll the whole page down
+            // to this field on every page load.
+            autoFocus={userWantsToEdit}
           />
           <span className="input-suffix">g</span>
           <button type="button" onClick={handleSave} disabled={saving || !input.trim()}>
