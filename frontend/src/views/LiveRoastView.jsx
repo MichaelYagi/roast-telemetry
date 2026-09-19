@@ -1931,139 +1931,151 @@ export default function LiveRoastView() {
                       <span className="meta-value">Aillio Bullet {roast.aillio_model.toUpperCase()}</span>
                     </li>
                   )}
-                  {roast.beans && (
-                    <li>
-                      <span className="meta-label">Beans</span>
-                      <span className="meta-value">{roast.beans}</span>
-                    </li>
-                  )}
-                  <li>
-                    <span className="meta-label">Tags</span>
-                    <span className="meta-value">
-                      <span className="tag-edit-group">
-                        {(tagsSaved ?? roast.tags ?? []).map((t) => (
-                          <span key={t} className="tag-chip">
-                            {t}
-                            <button type="button" className="tag-chip-remove" onClick={() => handleRemoveTag(t)} aria-label={`Remove tag ${t}`}>
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                        <span className="input-suffix-group">
-                          <input
-                            type="text"
-                            value={newTagInput}
-                            onChange={(e) => setNewTagInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleAddTag();
-                              }
-                            }}
-                            placeholder="Add tag…"
-                            list="existing-tags-live"
-                          />
-                          <button type="button" onClick={handleAddTag} disabled={!newTagInput.trim()}>
-                            Add
-                          </button>
-                          <datalist id="existing-tags-live">
-                            {allTags
-                              .filter((t) => !(tagsSaved ?? roast.tags ?? []).includes(t.tag))
-                              .map((t) => (
-                                <option key={t.tag} value={t.tag} />
-                              ))}
-                          </datalist>
-                        </span>
-                      </span>
-                    </span>
-                  </li>
-                  {tagsError && (
-                    <li>
-                      <span className="meta-label"></span>
-                      <span className="meta-value error">{tagsError}</span>
-                    </li>
-                  )}
-                  <li>
-                    <span className="meta-label">Green weight</span>
-                    <span className="meta-value">
-                      {editingGreenWeight ? (
-                        <span className="input-suffix-group">
-                          <input
-                            type="number" min="0" step="0.1"
-                            value={greenWeightInput}
-                            onChange={(e) => setGreenWeightInput(e.target.value)}
-                            placeholder="grams"
-                            autoFocus
-                          />
-                          <span className="input-suffix">g</span>
-                          <button type="button" onClick={handleSaveGreenWeight} disabled={weightSaving || !greenWeightInput.trim()}>
-                            {weightSaving ? "Saving…" : "Save"}
-                          </button>
-                          <button type="button" className="link-like" onClick={() => setEditingGreenWeight(false)}>
-                            Cancel
-                          </button>
-                        </span>
-                      ) : (
-                        <>
-                          {(greenWeightSaved ?? roast.weight_green_g) != null ? `${greenWeightSaved ?? roast.weight_green_g} g` : "—"}{" "}
-                          <button
-                            type="button"
-                            className="link-like"
-                            onClick={() => {
-                              setGreenWeightInput(String(greenWeightSaved ?? roast.weight_green_g ?? ""));
-                              setWeightError(null);
-                              setEditingGreenWeight(true);
-                            }}
-                          >
-                            {(greenWeightSaved ?? roast.weight_green_g) != null ? "edit" : "add"}
-                          </button>
-                        </>
-                      )}
-                    </span>
-                  </li>
-                  {phase === "finished" && (roastedWeightSaved != null || roast.weight_roasted_g == null) && (
-                    <li>
-                      <span className="meta-label">Roasted weight</span>
-                      <span className="meta-value">
-                        {roastedWeightSaved != null ? (
-                          `${roastedWeightSaved} g`
-                        ) : (
-                          <span className="input-suffix-group">
-                            <input
-                              type="number" min="0" step="0.1"
-                              value={roastedWeightInput}
-                              onChange={(e) => setRoastedWeightInput(e.target.value)}
-                              placeholder="grams"
-                            />
-                            <span className="input-suffix">g</span>
-                            <button type="button" onClick={handleSaveRoastedWeight} disabled={weightSaving || !roastedWeightInput.trim()}>
-                              {weightSaving ? "Saving…" : "Save"}
-                            </button>
-                          </span>
-                        )}
-                      </span>
-                    </li>
-                  )}
-                  {phase === "finished" && (greenWeightSaved ?? roast.weight_green_g) && (roastedWeightSaved ?? roast.weight_roasted_g) != null && (
-                    <li>
-                      <span className="meta-label">Weight loss</span>
-                      <span className="meta-value">
-                        {((((roastedWeightSaved ?? roast.weight_roasted_g) / (greenWeightSaved ?? roast.weight_green_g)) - 1) * 100).toFixed(1)}%
-                      </span>
-                    </li>
-                  )}
-                  {weightError && (
-                    <li>
-                      <span className="meta-label"></span>
-                      <span className="meta-value error">{weightError}</span>
-                    </li>
-                  )}
                 </ul>
               </div>
               <div className="live-header-actions">
                 <ConnectionBadge status={connectionStatus} />
                 {phase === "finished" && <Link to={`/roasts/${roastId}`}>View detail</Link>}
               </div>
+            </div>
+          )}
+
+          {/* Batch info (beans/tags/weights) split out of the connection-facts
+              header above into its own panel -- mixing short read-only mode
+              details with increasingly wide interactive editors (tags,
+              weight) in one inline-wrapping row got genuinely hard to read
+              as those editors were added one at a time. Same kv-list
+              label-left/value-right pattern RoastDetailView.jsx's own
+              "Batch" section already uses, for the same fields. */}
+          {roast && (
+            <div className="panel live-batch">
+              <ul className="kv-list">
+                {roast.beans && (
+                  <li>
+                    <span>Beans</span>
+                    <span>{roast.beans}</span>
+                  </li>
+                )}
+                <li>
+                  <span>Tags</span>
+                  <span className="tag-edit-group">
+                    {(tagsSaved ?? roast.tags ?? []).map((t) => (
+                      <span key={t} className="tag-chip">
+                        {t}
+                        <button type="button" className="tag-chip-remove" onClick={() => handleRemoveTag(t)} aria-label={`Remove tag ${t}`}>
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    <span className="input-suffix-group">
+                      <input
+                        type="text"
+                        value={newTagInput}
+                        onChange={(e) => setNewTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddTag();
+                          }
+                        }}
+                        placeholder="Add tag…"
+                        list="existing-tags-live"
+                      />
+                      <button type="button" onClick={handleAddTag} disabled={!newTagInput.trim()}>
+                        Add
+                      </button>
+                      <datalist id="existing-tags-live">
+                        {allTags
+                          .filter((t) => !(tagsSaved ?? roast.tags ?? []).includes(t.tag))
+                          .map((t) => (
+                            <option key={t.tag} value={t.tag} />
+                          ))}
+                      </datalist>
+                    </span>
+                  </span>
+                </li>
+                {tagsError && (
+                  <li>
+                    <span></span>
+                    <span className="error">{tagsError}</span>
+                  </li>
+                )}
+                <li>
+                  <span>Green weight</span>
+                  <span>
+                    {editingGreenWeight ? (
+                      <span className="input-suffix-group">
+                        <input
+                          type="number" min="0" step="0.1"
+                          value={greenWeightInput}
+                          onChange={(e) => setGreenWeightInput(e.target.value)}
+                          placeholder="grams"
+                          autoFocus
+                        />
+                        <span className="input-suffix">g</span>
+                        <button type="button" onClick={handleSaveGreenWeight} disabled={weightSaving || !greenWeightInput.trim()}>
+                          {weightSaving ? "Saving…" : "Save"}
+                        </button>
+                        <button type="button" className="link-like" onClick={() => setEditingGreenWeight(false)}>
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <>
+                        {(greenWeightSaved ?? roast.weight_green_g) != null ? `${greenWeightSaved ?? roast.weight_green_g} g` : "—"}{" "}
+                        <button
+                          type="button"
+                          className="link-like"
+                          onClick={() => {
+                            setGreenWeightInput(String(greenWeightSaved ?? roast.weight_green_g ?? ""));
+                            setWeightError(null);
+                            setEditingGreenWeight(true);
+                          }}
+                        >
+                          {(greenWeightSaved ?? roast.weight_green_g) != null ? "edit" : "add"}
+                        </button>
+                      </>
+                    )}
+                  </span>
+                </li>
+                {phase === "finished" && (roastedWeightSaved != null || roast.weight_roasted_g == null) && (
+                  <li>
+                    <span>Roasted weight</span>
+                    <span>
+                      {roastedWeightSaved != null ? (
+                        `${roastedWeightSaved} g`
+                      ) : (
+                        <span className="input-suffix-group">
+                          <input
+                            type="number" min="0" step="0.1"
+                            value={roastedWeightInput}
+                            onChange={(e) => setRoastedWeightInput(e.target.value)}
+                            placeholder="grams"
+                          />
+                          <span className="input-suffix">g</span>
+                          <button type="button" onClick={handleSaveRoastedWeight} disabled={weightSaving || !roastedWeightInput.trim()}>
+                            {weightSaving ? "Saving…" : "Save"}
+                          </button>
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                )}
+                {phase === "finished" && (greenWeightSaved ?? roast.weight_green_g) && (roastedWeightSaved ?? roast.weight_roasted_g) != null && (
+                  <li>
+                    <span>Weight loss</span>
+                    <span>
+                      {((((roastedWeightSaved ?? roast.weight_roasted_g) / (greenWeightSaved ?? roast.weight_green_g)) - 1) * 100).toFixed(1)}%
+                    </span>
+                  </li>
+                )}
+                {weightError && (
+                  <li>
+                    <span></span>
+                    <span className="error">{weightError}</span>
+                  </li>
+                )}
+              </ul>
             </div>
           )}
 
