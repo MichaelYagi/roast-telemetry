@@ -46,6 +46,8 @@ jobs:
         working-directory: frontend
       - name: Build Roast Telemetry.app
         run: packaging/build-macos.sh
+      - name: Add a README explaining the Gatekeeper warning
+        run: cp packaging/README-macos-artifact.txt "dist/README.txt"
       # Not pre-zipped -- v4 already preserves directory structure/
       # permissions/symlinks on its own, and GitHub's artifact download
       # always wraps whatever's uploaded in its own container zip
@@ -88,7 +90,15 @@ jobs:
         working-directory: frontend
       - name: Build Roast Telemetry.exe
         run: packaging\build-windows.ps1
+      - name: Add a README explaining the SmartScreen warning
+        run: Copy-Item packaging\README-windows-artifact.txt "dist\README.txt"
+      # path is the whole dist folder, not just the .exe, so README.txt
+      # rides along in the same artifact -- see the macOS job's own
+      # comment on why upload-artifact's path must be the *parent* of
+      # what you want preserved as a named entry, not a single loose
+      # file (that part doesn't apply here, .exe is already a single
+      # file either way, but dist as a whole is what carries both).
       - uses: actions/upload-artifact@v4
         with:
           name: RoastTelemetry-Windows-${{ github.ref_name }}
-          path: dist/Roast Telemetry.exe
+          path: dist
