@@ -1738,12 +1738,18 @@ button:disabled {
    fallback for older WebKit that doesn't honor the writing-mode approach
    on a range input. `direction: rtl` is what makes the value increase
    upward (min at the bottom, matching every physical fader/the Artisan
-   screenshot this was modeled on) instead of the default top-to-bottom. */
+   screenshot this was modeled on) instead of the default top-to-bottom.
+   No unprefixed `appearance: slider-vertical` -- that keyword was never
+   part of the standardized `appearance` property's value set (only ever
+   a -webkit-appearance-specific extension some engines also aliased
+   unprefixed), and current Chrome deprecates/warns on it for exactly
+   that reason. The vendor-prefixed line below isn't affected -- vendor
+   prefixes aren't held to the standardized value list -- and stays as
+   the real older-WebKit fallback the comment above describes. */
 .vertical-slider-track {
   writing-mode: vertical-lr;
   direction: rtl;
   -webkit-appearance: slider-vertical;
-  appearance: slider-vertical;
   width: 16px;
   flex: 1;
   /* Lower than it might look -- deliberately small so two members
