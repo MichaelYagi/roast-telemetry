@@ -265,12 +265,13 @@ export default function LiveRoastView() {
   // doesn't push a message for this REST-only write), so this tracks the
   // saved value locally instead of trying to mutate `roast` itself.
   // Roasted weight only makes sense once finished (nothing to weigh
-  // before then) -- shown as a plain inline capture, no edit toggle
-  // needed since it starts blank. Green weight usually already has a
-  // value from the New Roast form though, and should stay correctable
-  // the whole time the roast is open (a typo, a re-weigh, forgetting to
-  // fill it in at all) -- so it gets the same edit/add toggle
-  // RoastDetailView.jsx uses, not a fill-once box.
+  // before then) -- a plain always-visible input + Save, pre-filled with
+  // the current value once known (see the seeding effect below) so
+  // reopening a finished roast doesn't show a misleadingly blank box.
+  // Green weight usually already has a value from the New Roast form
+  // though, and should stay correctable the whole time the roast is
+  // open (a typo, a re-weigh, forgetting to fill it in at all) -- so it
+  // gets its own edit/add toggle instead, same as RoastDetailView.jsx.
   const [roastedWeightInput, setRoastedWeightInput] = useState("");
   const [roastedWeightSaved, setRoastedWeightSaved] = useState(null);
   const [editingGreenWeight, setEditingGreenWeight] = useState(false);
@@ -339,6 +340,18 @@ export default function LiveRoastView() {
   useEffect(() => {
     if (lastError) setError(lastError);
   }, [lastError]);
+
+  // Pre-fills the Roasted weight input once a value is already known
+  // (saved earlier this session, or from a previous visit/page reload)
+  // -- otherwise reopening a finished roast's live view showed a blank
+  // box with no indication anything had been saved. Guarded on the
+  // input still being empty so it never clobbers active typing.
+  useEffect(() => {
+    const known = roastedWeightSaved ?? roast?.weight_roasted_g;
+    if (known != null && !roastedWeightInput) {
+      setRoastedWeightInput(String(known));
+    }
+  }, [roast?.weight_roasted_g, roastedWeightSaved]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     function onResize() {
@@ -2038,26 +2051,22 @@ export default function LiveRoastView() {
                     )}
                   </span>
                 </li>
-                {phase === "finished" && (roastedWeightSaved != null || roast.weight_roasted_g == null) && (
+                {phase === "finished" && (
                   <li>
                     <span>Roasted weight</span>
                     <span>
-                      {roastedWeightSaved != null ? (
-                        `${roastedWeightSaved} g`
-                      ) : (
-                        <span className="input-suffix-group">
-                          <input
-                            type="number" min="0" step="0.1"
-                            value={roastedWeightInput}
-                            onChange={(e) => setRoastedWeightInput(e.target.value)}
-                            placeholder="grams"
-                          />
-                          <span className="input-suffix">g</span>
-                          <button type="button" onClick={handleSaveRoastedWeight} disabled={weightSaving || !roastedWeightInput.trim()}>
-                            {weightSaving ? "Saving…" : "Save"}
-                          </button>
-                        </span>
-                      )}
+                      <span className="input-suffix-group">
+                        <input
+                          type="number" min="0" step="0.1"
+                          value={roastedWeightInput}
+                          onChange={(e) => setRoastedWeightInput(e.target.value)}
+                          placeholder="grams"
+                        />
+                        <span className="input-suffix">g</span>
+                        <button type="button" onClick={handleSaveRoastedWeight} disabled={weightSaving || !roastedWeightInput.trim()}>
+                          {weightSaving ? "Saving…" : "Save"}
+                        </button>
+                      </span>
                     </span>
                   </li>
                 )}
