@@ -51,6 +51,38 @@ def test_roundtrip_through_save_and_load(tmp_path):
     assert points["notes"][0]["text"] == "hello"
 
 
+def test_charge_survives_when_it_predates_the_first_profile_sample(tmp_path):
+    # Real bug: live-bridge/simulator sessions fire Charge synchronously
+    # (resetting the clock) but only append the first profile sample once
+    # a full tick interval has elapsed -- so Charge's own recorded time
+    # can be *earlier* than profile[0], not coincide with it like the
+    # roundtrip test above assumes. When that gap exactly equals the
+    # synthetic lead-in's own 1-tick offset, a plain nearest-time search
+    # used to tie between the lead-in slot and profile[0], and the
+    # tie-break silently picked the lead-in (index 0, Artisan's "not
+    # recorded" sentinel) -- losing the Charge marker entirely on every
+    # read-back. Confirmed live with the simulator's default 1s interval,
+    # this profile/events shape is exactly that scenario.
+    profile = [
+        {"time_s": 1.0, "bt": 95.98, "et": 202.8},
+        {"time_s": 2.0, "bt": 95.92, "et": 205.46},
+        {"time_s": 4.0, "bt": 90.0, "et": 210.0},
+    ]
+    events = [
+        {"id": "e1", "time_s": 0.0, "type": "CHARGE", "label": "Charge", "value": 96.0},
+        {"id": "e2", "time_s": 4.0, "type": "DRY_END", "label": "Dry End", "value": None},
+    ]
+
+    alog_dict = roast_to_artisan_native_dict(title="Gap Test", profile=profile, events=events, notes=[])
+    path = str(tmp_path / "gap.alog")
+    save_artisan_native_alog(path, alog_dict)
+
+    points = alog_dict_to_points(load_alog(path))
+    event_types = [e["type"] for e in points["events"]]
+    assert "CHARGE" in event_types
+    assert "DRY_END" in event_types
+
+
 def test_extra_channels_roundtrip_through_the_extraname2_bank(tmp_path):
     # role=EXTRA DeviceProfile channels (see RoastProfilePoint.extra) --
     # up to 2 round-trip through the real .alog format's extraname2 bank

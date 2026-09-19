@@ -18,6 +18,8 @@ Two layers, matching test_roast_session.py's own split:
 """
 from __future__ import annotations
 
+import time
+
 from backend.app.models import EventCreateRequest, RoastCreateRequest, RoastEventType, RoastMode, RoastStatus
 from backend.app.roast_session.session import RoastSession, RoastSessionError, session_manager
 
@@ -168,6 +170,17 @@ def test_retime_event_allowed_between_neighbors():
 def _create_and_mark(client, event_type: str = "DRY_END") -> tuple[str, str]:
     resp = client.post("/api/roasts", json={"title": "Editable Roast", "mode": "simulator"})
     roast_id = resp.json()["id"]
+    # Real wait, not mocked -- marking immediately on connect (no tick
+    # elapsed yet) lands this milestone at the exact same profile sample
+    # as the simulator's own auto-fired Charge (sample_interval_s=1.0
+    # default), which after an .alog round-trip collapses both to the
+    # identical cold time_s -- a genuine ambiguity a real roast almost
+    # never hits, but this test's synchronous POST right after create
+    # did every time. Confirmed live: this used to be masked by a
+    # separate bug where Charge silently failed to round-trip at all
+    # (see alog_io.py's own milestone_idx comment) -- once that was
+    # fixed, Charge legitimately competed for the same timestamp here.
+    time.sleep(2.2)
     resp = client.post(f"/api/roasts/{roast_id}/events", json={"type": event_type, "label": event_type})
     event_id = resp.json()["id"]
     return roast_id, event_id

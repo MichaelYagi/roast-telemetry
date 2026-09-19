@@ -189,6 +189,23 @@ def roast_to_artisan_native_dict(
         e = milestone_events.get(event_type)
         if e is None or not timex:
             return 0  # Artisan's own "not recorded" sentinel
+        if event_type == "CHARGE":
+            # Charge is always "the start of recording" in this app's
+            # data model once it's actually been marked -- export_profile[1]
+            # (the first real sample, right after the single synthetic
+            # lead-in point), not something to nearest-match by timestamp
+            # like every other milestone. Live-bridge/simulator sessions
+            # fire Charge synchronously (resetting the clock) but only
+            # append the first profile sample once a full tick interval
+            # has elapsed, so Charge's own recorded time can legitimately
+            # predate profile[0] -- a plain nearest-time search then hits
+            # an exact tie between the lead-in and profile[0] whenever
+            # that gap equals the lead-in's own 1-tick offset, and
+            # _nearest_index's tie-break silently picked the lead-in slot
+            # (index 0, Artisan's "not recorded" sentinel), losing the
+            # Charge marker entirely on every affected roast. Confirmed
+            # live with the simulator's default 1-second sample interval.
+            return 1 if len(timex) > 1 else 0
         return _nearest_index(timex, e["time_s"])
 
     timeindex = [milestone_idx(t) for t in _ARTISAN_TIMEINDEX_TYPES]
