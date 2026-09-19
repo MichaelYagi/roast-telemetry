@@ -47,6 +47,50 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+usage() {
+  cat <<'EOF'
+Usage: scripts/fake-hardware.sh <kind> [options]
+
+Starts a fake roaster/meter for testing modbus_live/ms6514_live/tc4_live
+without real hardware.
+
+Kinds:
+  fz94      FZ-94 (Modbus RTU over USB serial)
+  ms6514    Mastech MS6514 (USB serial meter, read-only)
+  tc4       TC4+ (aArtisanQ/PID firmware, USB serial)
+  evo       FZ-94 Evo (Modbus TCP over Ethernet -- no serial/socat at all)
+
+Options (fz94/ms6514/tc4 only -- evo never uses these, see below):
+  --tcp [port]   RTU-over-TCP bridge instead of a WSL-internal serial
+                 link -- needed when the app runs *natively on Windows*
+                 (e.g. via scripts/run-server.ps1) rather than inside
+                 this WSL2 shell. Default port 5020 if not given.
+
+evo speaks genuine Modbus TCP natively, so there's no virtual serial
+port to bridge and no --tcp flag -- point the app's "Direct Modbus
+(Ethernet)" data source straight at its host/port. Takes a plain
+optional port argument instead (default 5020), not --tcp.
+
+Examples:
+  scripts/fake-hardware.sh fz94                # app also running in WSL
+  scripts/fake-hardware.sh fz94 --tcp          # app running natively on Windows
+  scripts/fake-hardware.sh fz94 --tcp 5030     # on a specific port
+  scripts/fake-hardware.sh ms6514
+  scripts/fake-hardware.sh tc4
+  scripts/fake-hardware.sh evo                 # default port 5020
+  scripts/fake-hardware.sh evo 5030            # on a specific port
+
+Prints the value to paste into the app's Configure Roast form once
+it's up. Press Ctrl+C to stop -- cleans up socat and the fake process
+together. See hardware_fakes/README.md for more detail per device.
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
 # Same check as run-server.sh -- a Windows-created .venv (Scripts/, not
 # bin/) can't run from WSL2/Linux bash at all.
 if [[ -d .venv ]] && [[ ! -e .venv/bin/python ]] && [[ -e .venv/Scripts/python.exe ]]; then
@@ -57,7 +101,7 @@ fi
 
 KIND="${1:-}"
 if [[ "$KIND" != "fz94" && "$KIND" != "ms6514" && "$KIND" != "tc4" && "$KIND" != "evo" ]]; then
-  echo "Usage: $0 fz94|ms6514|tc4|evo [--tcp [port]] | $0 evo [port]" >&2
+  usage >&2
   exit 1
 fi
 shift || true
