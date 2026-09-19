@@ -10,6 +10,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { api } from "../api/client.js";
+import { STAT_ROW_DEFS, formatRoastStatRow } from "../roastStats.js";
 import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
@@ -20,6 +21,7 @@ export default function RoastComparisonView() {
   const [roasts, setRoasts] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [details, setDetails] = useState({});
+  const [stats, setStats] = useState({});
   const [curve, setCurve] = useState("bt");
   const [tempUnit, setTempUnit] = useState("c"); // display only, see Settings > Temperature Unit
 
@@ -42,18 +44,27 @@ export default function RoastComparisonView() {
       if (!details[id]) {
         api.getRoast(id).then((roast) => setDetails((prev) => ({ ...prev, [id]: roast })));
       }
+      if (!stats[id]) {
+        api.getRoastStats(id).then((s) => setStats((prev) => ({ ...prev, [id]: s })));
+      }
     });
   }, [selectedIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isRate = curve.startsWith("ror_");
+
+  // Filtered-then-indexed once here, reused for both the chart's own
+  // per-dataset color below AND the stats table's column headers, so a
+  // roast's color stays consistent between the two -- same list, same
+  // index, not two independently-filtered copies that could drift if a
+  // detail fetch resolves out of order.
+  const readyIds = selectedIds.filter((id) => details[id]);
 
   const data = useMemo(() => {
     // Rate curves (°C/min) convert by scale only, no +32 offset -- see
     // RoastChart.jsx's identical convertRor for the same reasoning.
     const convert = (v) => (v == null ? null : isRate ? (tempUnit === "f" ? v * 1.8 : v) : celsiusToUnit(v, tempUnit));
     return {
-      datasets: selectedIds
-        .filter((id) => details[id])
+      datasets: readyIds
         .map((id, i) => ({
           label: details[id].title,
           data: details[id].profile.map((p) => ({ x: p.time_s, y: convert(p[curve]) })),
@@ -105,13 +116,22 @@ export default function RoastComparisonView() {
           <ul>
             {roasts.map((r) => (
               <li key={r.id}>
-                <label>
+                <label className="roast-picker-item">
                   <input
                     type="checkbox"
                     checked={selectedIds.includes(r.id)}
                     onChange={() => toggle(r.id)}
                   />
-                  {r.title}
+                  <span>
+                    <span className="roast-picker-title">{r.title}</span>
+                    {/* Title alone isn't enough to tell roasts apart, especially
+                        with generic/repeated titles -- date + beans give the
+                        context needed to know what's actually being compared. */}
+                    <span className="roast-picker-meta">
+                      {new Date(r.created_at).toLocaleDateString()}
+                      {r.beans ? ` · ${r.beans}` : ""}
+                    </span>
+                  </span>
                 </label>
               </li>
             ))}
@@ -121,6 +141,49 @@ export default function RoastComparisonView() {
           {selectedIds.length === 0 ? <p>Select roasts to overlay their curves.</p> : <Line data={data} options={options} />}
         </div>
       </div>
+
+      {readyIds.length > 0 && (
+        <div className="panel compare-stats-table">
+          <h3>Roast Stats</h3>
+          <div className="table-scroll">
+            <table className="roast-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  {readyIds.map((id, i) => (
+                    <th key={id} style={{ color: PALETTE[i % PALETTE.length] }}>
+                      <div>{details[id].title}</div>
+                      <div className="compare-th-meta">
+                        {new Date(details[id].created_at).toLocaleDateString()}
+                        {details[id].beans ? ` · ${details[id].beans}` : ""}
+                      </div>
+                      {details[id].tags && details[id].tags.length > 0 && (
+                        <div className="compare-th-meta">
+                          {details[id].tags.map((t) => (
+                            <span key={t} className="tag-chip">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {STAT_ROW_DEFS.map(({ key, label }) => (
+                  <tr key={key}>
+                    <td>{label}</td>
+                    {readyIds.map((id) => (
+                      <td key={id}>{formatRoastStatRow(key, stats[id])}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
