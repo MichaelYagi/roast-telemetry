@@ -130,6 +130,18 @@ without a rewrite.
 
 ## Getting started
 
+**Run it on whichever computer is physically connected to the
+roaster.** For every USB/serial data source (Direct Modbus RTU,
+MS6514, TC4+, Aillio Bullet) the server process needs the OS to see
+that serial/USB port directly — it can't reach across a network to a
+port plugged into a different machine. LAN access (`Host: 0.0.0.0`)
+only controls who can reach an *already-running* server remotely, not
+where the server itself has to run. The one exception: Direct Modbus
+*over Ethernet* (e.g. FZ-94 Evo) is genuinely network-connected, so the
+server can run anywhere that can reach its IP. See
+[docs/getting-started.html#lan-exposure](docs/getting-started.html#lan-exposure)
+for the full explanation, including the safety side of LAN access.
+
 See [docs/getting-started.html](docs/getting-started.html) for
 installation and running it. Full docs:
 

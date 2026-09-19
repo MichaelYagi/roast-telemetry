@@ -30,6 +30,28 @@
   </p>
 
   <h2 id="setup-and-run">Setup &amp; run</h2>
+  <div class="callout" id="lan-exposure">
+    <strong>Run it on whichever computer is physically connected to the
+    roaster.</strong> For every USB/serial data source (Direct Modbus
+    RTU, MS6514, TC4+, Aillio Bullet) the server process itself needs
+    the OS to see that serial/USB port directly — it can't reach across
+    a network to a port plugged into a different machine. Other devices
+    on your network (a phone, another computer) can still view/control
+    an already-running roast remotely — that's what the tray's
+    <a href="#tray-icon">Host: 0.0.0.0</a> option is for — but that's
+    about who can reach the server once it's running, not about which
+    machine the server itself has to run on. The one exception: Direct
+    Modbus <em>over Ethernet</em> (e.g. FZ-94 Evo) is genuinely
+    network-connected, so the server can run on any machine that can
+    reach its IP address.
+    <br><br>
+    Also worth weighing before turning on LAN access at all: this app
+    can send real Burner/Air/Drum/Heater commands to a real,
+    heat-producing machine — anyone who can reach <code>0.0.0.0</code>
+    on your network can too, with nothing beyond the login screen
+    standing between them and a roaster mid-roast. Fine on a trusted
+    home network; worth real thought anywhere less trusted.
+  </div>
   <div class="callout">
     <strong>Prefer not to deal with a source checkout at all?</strong>
     See <a href="#standalone-builds">Standalone builds</a> further down
@@ -196,8 +218,9 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
       already running, it restarts automatically so the change takes
       effect right away. <code>127.0.0.1</code> means this computer
       only; type <code>0.0.0.0</code> (or a specific address) for LAN
-      access — see the LAN-exposure notes on this page before doing
-      that for anything that actually controls a real roaster.</li>
+      access — see the <a href="#lan-exposure">LAN-exposure notes</a>
+      above before doing that for anything that actually controls a
+      real roaster.</li>
     <li><strong>Copy URL to clipboard</strong> — the address to paste
       into another device's browser.</li>
     <li><strong>Launch at startup</strong> (checkbox) — starts the tray
