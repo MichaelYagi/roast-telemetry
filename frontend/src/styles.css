@@ -1733,23 +1733,25 @@ button:disabled {
 
 /* The vertical-orientation trick: same underlying <input type="range">
    the old horizontal Controls panel used (touch-drag behavior included),
-   just rotated -- writing-mode/direction for Firefox and current Chrome/
-   Edge/Safari, -webkit-appearance:slider-vertical as a belt-and-suspenders
-   fallback for older WebKit that doesn't honor the writing-mode approach
-   on a range input. `direction: rtl` is what makes the value increase
-   upward (min at the bottom, matching every physical fader/the Artisan
-   screenshot this was modeled on) instead of the default top-to-bottom.
-   No unprefixed `appearance: slider-vertical` -- that keyword was never
-   part of the standardized `appearance` property's value set (only ever
-   a -webkit-appearance-specific extension some engines also aliased
-   unprefixed), and current Chrome deprecates/warns on it for exactly
-   that reason. The vendor-prefixed line below isn't affected -- vendor
-   prefixes aren't held to the standardized value list -- and stays as
-   the real older-WebKit fallback the comment above describes. */
+   just rotated -- writing-mode/direction alone is enough for every
+   currently-relevant engine (Firefox, current Chrome/Edge/Safari all
+   honor writing-mode on a range input). `direction: rtl` is what makes
+   the value increase upward (min at the bottom, matching every physical
+   fader/the Artisan screenshot this was modeled on) instead of the
+   default top-to-bottom.
+   No `appearance`/`-webkit-appearance: slider-vertical` -- 'slider-
+   vertical' was never part of the standardized `appearance` property's
+   value set, only ever a WebKit-specific extension; a previous version
+   of this rule kept -webkit-appearance around on the theory it was a
+   separate, still-useful older-WebKit fallback, but in Chrome/Blink
+   -webkit-appearance IS the appearance property (a full alias, same
+   underlying computed value) -- so that line triggered the exact same
+   deprecation warning as the unprefixed one, confirmed live: removing
+   only the unprefixed line didn't make the warning go away, removing
+   both did. */
 .vertical-slider-track {
   writing-mode: vertical-lr;
   direction: rtl;
-  -webkit-appearance: slider-vertical;
   width: 16px;
   flex: 1;
   /* Lower than it might look -- deliberately small so two members
