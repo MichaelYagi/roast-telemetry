@@ -587,6 +587,11 @@ class AppSettings(BaseModel):
     # breakout_panel_colors above, resolved client-side in RoastChart.jsx
     # (this dict only ever needs to hold actual overrides).
     chart_series_visible: dict[str, bool] = {}
+    # How many roasts HistoryDashboard.jsx fetches per page (GET
+    # /roasts' own limit/offset). Clamped server-side to 10-500 in
+    # api/settings.py's update_settings -- 500 matches GET /roasts'
+    # own existing `limit` query param cap.
+    history_page_size: int = 100
 
 
 class OllamaStatus(BaseModel):

@@ -253,15 +253,13 @@ def get_roast_row(roast_id: str) -> Optional[dict]:
         return dict(row) if row else None
 
 
-def list_roast_rows(
-    *,
-    mode: Optional[str] = None,
-    status: Optional[str] = None,
-    tag: Optional[str] = None,
-    q: Optional[str] = None,
-    limit: int = 100,
-    offset: int = 0,
-) -> list[dict]:
+def _roast_filter_clauses(
+    *, mode: Optional[str], status: Optional[str], tag: Optional[str], q: Optional[str]
+) -> tuple[list[str], dict]:
+    """Shared between list_roast_rows and count_roast_rows -- the page
+    of results and the total count behind it must always agree on
+    exactly which rows match, so this is one place to keep in sync
+    rather than two copies of the same WHERE logic drifting apart."""
     clauses, params = [], {}
     if mode:
         clauses.append("r.mode = :mode")
@@ -281,6 +279,19 @@ def list_roast_rows(
         # reason: no virtual-table/tokenizer setup earned at this size.
         clauses.append("(r.title LIKE :q OR r.beans LIKE :q OR t.tag LIKE :q)")
         params["q"] = f"%{q}%"
+    return clauses, params
+
+
+def list_roast_rows(
+    *,
+    mode: Optional[str] = None,
+    status: Optional[str] = None,
+    tag: Optional[str] = None,
+    q: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict]:
+    clauses, params = _roast_filter_clauses(mode=mode, status=status, tag=tag, q=q)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     params["limit"] = limit
     params["offset"] = offset
@@ -293,6 +304,31 @@ def list_roast_rows(
             params,
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def count_roast_rows(
+    *,
+    mode: Optional[str] = None,
+    status: Optional[str] = None,
+    tag: Optional[str] = None,
+    q: Optional[str] = None,
+) -> int:
+    """Total matching rows regardless of limit/offset -- backs
+    HistoryDashboard.jsx's page count, since GET /roasts itself stays a
+    plain array (several other callers -- BackgroundProfilePicker.jsx,
+    RoastComparisonView.jsx, LiveRoastView.jsx's active-roast check --
+    already depend on that exact shape and would break if it became
+    {items, total})."""
+    clauses, params = _roast_filter_clauses(mode=mode, status=status, tag=tag, q=q)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    with _conn() as c:
+        row = c.execute(
+            f"""SELECT COUNT(DISTINCT r.id) FROM roasts r
+                LEFT JOIN roast_tags t ON t.roast_id = r.id
+                {where}""",
+            params,
+        ).fetchone()
+        return row[0]
 
 
 def delete_roast_row(roast_id: str) -> None:
@@ -572,6 +608,10 @@ def get_settings() -> dict:
         )
     except (json.JSONDecodeError, TypeError):
         chart_series_visible = {}
+    try:
+        history_page_size = int(values["history_page_size"]) if values.get("history_page_size") else 100
+    except (TypeError, ValueError):
+        history_page_size = 100
     return {
         "ollama_url": values.get("ollama_url"),
         "ollama_model": values.get("ollama_model"),
@@ -582,6 +622,7 @@ def get_settings() -> dict:
         "vertical_control_layout": vertical_control_layout,
         "vertical_control_arrows": vertical_control_arrows,
         "chart_series_visible": chart_series_visible,
+        "history_page_size": history_page_size,
     }
 
 

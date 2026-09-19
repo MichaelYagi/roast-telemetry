@@ -25,6 +25,7 @@ export default function SettingsView() {
   const [temperatureUnit, setTemperatureUnit] = useState("c");
   const [verticalControlLayout, setVerticalControlLayout] = useState([]);
   const [verticalControlArrows, setVerticalControlArrows] = useState({});
+  const [historyPageSize, setHistoryPageSize] = useState(100);
   const [loaded, setLoaded] = useState(false);
   const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState(null); // { connected, models, error } | null
@@ -41,6 +42,7 @@ export default function SettingsView() {
       setTemperatureUnit(s.temperature_unit || "c");
       setVerticalControlLayout(s.vertical_control_layout || []);
       setVerticalControlArrows(s.vertical_control_arrows || {});
+      setHistoryPageSize(s.history_page_size || 100);
       setLoaded(true);
     });
   }, []);
@@ -77,6 +79,7 @@ export default function SettingsView() {
         temperature_unit: temperatureUnit,
         vertical_control_layout: verticalControlLayout,
         vertical_control_arrows: verticalControlArrows,
+        history_page_size: historyPageSize,
       });
       setSaveFeedback("Saved.");
     } catch (err) {
@@ -167,6 +170,23 @@ export default function SettingsView() {
           arrows={verticalControlArrows}
           setArrows={setVerticalControlArrows}
         />
+      </div>
+
+      <div className="panel">
+        <h2>History</h2>
+        <p className="hint">
+          How many roasts the History page loads per page (Prev/Next paging through the rest).
+        </p>
+        <label>
+          Results per page
+          <input
+            type="number"
+            min="10"
+            max="500"
+            value={historyPageSize}
+            onChange={(e) => setHistoryPageSize(Number(e.target.value) || 100)}
+          />
+        </label>
       </div>
 
       <div className="panel">

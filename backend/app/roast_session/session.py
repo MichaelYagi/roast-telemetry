@@ -1159,6 +1159,9 @@ class RoastSessionManager:
             for r in rows
         ]
 
+    def count_summaries(self, **filters) -> int:
+        return storage.count_roast_rows(**filters)
+
     def import_alog(self, source_path: str, title: Optional[str] = None, created_by_username: Optional[str] = None) -> RoastSummary:
         roast_id = str(uuid.uuid4())
         dest_path = storage.alog_path_for(roast_id)

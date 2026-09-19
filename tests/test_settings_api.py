@@ -20,6 +20,7 @@ def test_get_settings_defaults(client):
         "vertical_control_layout": [["drum_speed_pct"], ["fan_pct"], ["heater_pct"]],
         "vertical_control_arrows": {},
         "chart_series_visible": {},
+        "history_page_size": 100,
     }
 
 
@@ -116,6 +117,20 @@ def test_put_settings_bogus_temperature_unit_falls_back_to_celsius(client):
     # rather than failing the whole save.
     resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "temperature_unit": "kelvin"})
     assert resp.json()["temperature_unit"] == "c"
+
+
+def test_put_settings_saves_history_page_size(client):
+    resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "history_page_size": 250})
+    assert resp.json()["history_page_size"] == 250
+    assert client.get("/api/settings").json()["history_page_size"] == 250
+
+
+def test_put_settings_clamps_history_page_size(client):
+    resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "history_page_size": 5})
+    assert resp.json()["history_page_size"] == 10
+
+    resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "history_page_size": 9999})
+    assert resp.json()["history_page_size"] == 500
 
 
 def test_put_settings_drops_unknown_vertical_control_keys(client):

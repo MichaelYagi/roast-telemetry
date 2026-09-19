@@ -136,6 +136,28 @@ def list_tags() -> list[dict]:
     return storage.list_distinct_tags()
 
 
+@router.get("/count")
+def count_roasts(
+    mode: Optional[RoastMode] = None,
+    status: Optional[RoastStatus] = None,
+    tag: Optional[str] = None,
+    q: Optional[str] = None,
+) -> dict:
+    # Separate from list_roasts above (rather than {items, total}) so
+    # GET /roasts itself stays a plain array -- BackgroundProfilePicker.jsx/
+    # RoastComparisonView.jsx/LiveRoastView.jsx's active-roast check all
+    # already depend on that exact shape. Backs HistoryDashboard.jsx's
+    # page count, same filters as list_roasts so the two always agree on
+    # which rows match.
+    total = session_manager.count_summaries(
+        mode=mode.value if mode else None,
+        status=status.value if status else None,
+        tag=tag,
+        q=q,
+    )
+    return {"total": total}
+
+
 @router.post("", response_model=RoastSummary, status_code=201)
 async def create_roast(request: RoastCreateRequest, http_request: Request) -> RoastSummary:
     """modbus_live/ms6514_live/aillio_live: this is the ON action --

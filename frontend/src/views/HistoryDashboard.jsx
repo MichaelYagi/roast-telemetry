@@ -21,6 +21,14 @@ export default function HistoryDashboard() {
   // filters.q (the thing refresh()'s effect actually watches) lags behind it.
   const [searchInput, setSearchInput] = useState("");
   const [allTags, setAllTags] = useState([]);
+  // 1-indexed. pageSize comes from Settings > History (default 100 until
+  // that loads) -- GET /roasts itself has no hard cap on how many total
+  // roasts are reachable, just how many come back per request; paging
+  // through offset is what gets to the rest, same as the "don't limit
+  // it" ask this was built for.
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [importPath, setImportPath] = useState("");
   const [importTitle, setImportTitle] = useState("");
@@ -32,10 +40,13 @@ export default function HistoryDashboard() {
 
   function refresh() {
     setLoading(true);
-    const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
-    return api
-      .listRoasts(params)
-      .then(setRoasts)
+    const filterParams = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+    const pageParams = { ...filterParams, limit: pageSize, offset: (page - 1) * pageSize };
+    return Promise.all([api.listRoasts(pageParams), api.countRoasts(filterParams)])
+      .then(([roastsPage, count]) => {
+        setRoasts(roastsPage);
+        setTotalCount(count.total);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -66,10 +77,13 @@ export default function HistoryDashboard() {
 
   useEffect(() => {
     refresh();
-  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const id = setTimeout(() => setFilters((f) => ({ ...f, q: searchInput.trim() })), 300);
+    const id = setTimeout(() => {
+      setFilters((f) => ({ ...f, q: searchInput.trim() }));
+      setPage(1); // a new search restarts paging from the top
+    }, 300);
     return () => clearTimeout(id);
   }, [searchInput]);
 
@@ -78,7 +92,15 @@ export default function HistoryDashboard() {
   // one-time getSettings() fetch already accepts for temperature unit.
   useEffect(() => {
     api.listTags().then(setAllTags);
+    api.getSettings().then((s) => setPageSize(s.history_page_size || 100));
   }, []);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  function updateFilter(key, value) {
+    setFilters({ ...filters, [key]: value });
+    setPage(1); // a changed filter restarts paging from the top
+  }
 
   async function handleImport(e) {
     e.preventDefault();
@@ -204,7 +226,7 @@ export default function HistoryDashboard() {
         </label>
         <label>
           Mode
-          <select value={filters.mode} onChange={(e) => setFilters({ ...filters, mode: e.target.value })}>
+          <select value={filters.mode} onChange={(e) => updateFilter("mode", e.target.value)}>
             <option value="">All</option>
             <option value="simulator">Simulator</option>
             <option value="alog_playback">Playback</option>
@@ -215,7 +237,7 @@ export default function HistoryDashboard() {
         </label>
         <label>
           Status
-          <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+          <select value={filters.status} onChange={(e) => updateFilter("status", e.target.value)}>
             <option value="">All</option>
             <option value="roasting">Roasting</option>
             <option value="cooling">Cooling</option>
@@ -226,7 +248,7 @@ export default function HistoryDashboard() {
         </label>
         <label>
           Tag
-          <select value={filters.tag} onChange={(e) => setFilters({ ...filters, tag: e.target.value })}>
+          <select value={filters.tag} onChange={(e) => updateFilter("tag", e.target.value)}>
             <option value="">All</option>
             {allTags.map((t) => (
               <option key={t.tag} value={t.tag}>
@@ -318,6 +340,19 @@ export default function HistoryDashboard() {
             ))}
           </tbody>
         </table>
+        {totalCount > 0 && (
+          <div className="pagination-row">
+            <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
+              ← Prev
+            </button>
+            <span>
+              Page {page} of {totalPages} ({totalCount} roast{totalCount === 1 ? "" : "s"})
+            </span>
+            <button type="button" disabled={page >= totalPages || loading} onClick={() => setPage((p) => p + 1)}>
+              Next →
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

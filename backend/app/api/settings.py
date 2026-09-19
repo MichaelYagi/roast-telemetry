@@ -64,6 +64,10 @@ def _filter_series_visible(visible: dict[str, bool]) -> dict[str, bool]:
     return {k: bool(v) for k, v in visible.items() if k in CHART_SERIES_KEYS}
 
 
+def _clamp_history_page_size(size: int) -> int:
+    return max(10, min(500, size))
+
+
 @router.get("/stream")
 async def stream_settings() -> EventSourceResponse:
     """Pushes the current settings immediately, then again on every save
@@ -106,6 +110,7 @@ async def update_settings(settings: AppSettings) -> AppSettings:
     vertical_layout = _filter_vertical_layout(settings.vertical_control_layout)
     vertical_arrows = _filter_arrows(settings.vertical_control_arrows)
     series_visible = _filter_series_visible(settings.chart_series_visible)
+    history_page_size = _clamp_history_page_size(settings.history_page_size)
     storage.set_settings(
         ollama_url=settings.ollama_url,
         ollama_model=settings.ollama_model,
@@ -116,6 +121,7 @@ async def update_settings(settings: AppSettings) -> AppSettings:
         vertical_control_layout=vertical_layout,
         vertical_control_arrows=vertical_arrows,
         chart_series_visible=series_visible,
+        history_page_size=history_page_size,
     )
     result = AppSettings(
         ollama_url=settings.ollama_url,
@@ -127,6 +133,7 @@ async def update_settings(settings: AppSettings) -> AppSettings:
         vertical_control_layout=vertical_layout,
         vertical_control_arrows=vertical_arrows,
         chart_series_visible=series_visible,
+        history_page_size=history_page_size,
     )
     await settings_pubsub.publish(result.model_dump_json())
     return result

@@ -170,3 +170,41 @@ def test_list_roasts_search_does_not_duplicate_multi_tag_roasts(client):
     resp = client.get("/api/roasts", params={"q": "Multi Tag"})
     ids = [r["id"] for r in resp.json()]
     assert ids.count(a) == 1
+
+
+# -- GET /roasts/count -- backs HistoryDashboard.jsx's pagination -------
+
+
+def test_count_roasts_matches_list_length_unfiltered(client):
+    _create_roast(client, title="Count A")
+    _create_roast(client, title="Count B")
+
+    total = client.get("/api/roasts/count").json()["total"]
+    listed = len(client.get("/api/roasts").json())
+    assert total == listed
+
+
+def test_count_roasts_respects_filters(client):
+    a = _create_roast(client, title="Filtered Count A")
+    b = _create_roast(client, title="Filtered Count B")
+    client.put(f"/api/roasts/{a}/tags", json={"tags": ["decaf"]})
+    client.post(f"/api/roasts/{a}/stop")
+    client.post(f"/api/roasts/{b}/stop")
+
+    resp = client.get("/api/roasts/count", params={"tag": "decaf"})
+    assert resp.json()["total"] == 1
+
+
+def test_count_roasts_not_capped_by_list_limit(client):
+    # The regression this guards: list_roasts caps `limit` at 500, but
+    # count_roasts must report the TRUE total regardless -- pagination
+    # needs the real count to compute how many pages exist, not one
+    # clamped to a single page's own max size.
+    for i in range(3):
+        _create_roast(client, title=f"Uncapped {i}")
+
+    total = client.get("/api/roasts/count").json()["total"]
+    assert total == 3
+    capped_list = client.get("/api/roasts", params={"limit": 1}).json()
+    assert len(capped_list) == 1
+    assert total > len(capped_list)
