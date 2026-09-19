@@ -47,13 +47,22 @@ function formatElapsed(seconds) {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-const LIVE_MODES = ["modbus_live", "ms6514_live", "aillio_live"];
+const LIVE_MODES = ["modbus_live", "ms6514_live", "aillio_live", "tc4_live"];
 // modbus_live and aillio_live both read Heater/Fan/Drum back from the
 // device itself (genuine PLC/VFD registers or, for Aillio, the device's
 // own last-reported state -- not an echo of this app's own commands, see
-// modbus_bridge/engine.py's and aillio_bridge/engine.py's own tick()) --
-// ms6514_live is excluded, it's a read-only meter with no control at all.
-const CONTROLLABLE_LIVE_MODES = ["modbus_live", "aillio_live"];
+// modbus_bridge/engine.py's and aillio_bridge/engine.py's own tick()).
+// tc4_live is controllable too (OT1/DCFAN) but *doesn't* read either
+// back -- TC4's own READ command only returns temperature channels, so
+// its heater_pct/fan_pct readouts just stay blank, same as ms6514_live's
+// (which has no control at all) -- still belongs in this list rather
+// than AUTO_APPLY_STARTING_CONTROLS_MODES below, though: it's real
+// hardware with real control capability, so auto-sending a starting
+// value on mere connect risks clobbering physical state an operator
+// already set by hand, the same reason modbus_live/aillio_live don't
+// auto-apply either -- that concern doesn't depend on whether the app
+// can read the result back afterward.
+const CONTROLLABLE_LIVE_MODES = ["modbus_live", "aillio_live", "tc4_live"];
 const CONTROLLABLE_MODES = ["simulator", ...CONTROLLABLE_LIVE_MODES];
 // Reading Heater/Fan/Drum back from the device means auto-sending a
 // "starting value" on connect would overwrite whatever the roaster's
@@ -158,6 +167,7 @@ export default function LiveRoastView() {
     // RoastCreateRequest.aillio_model docstring). "r1" is the only
     // known value today.
     aillio_model: "r1",
+    tc4_port: "",
     // Off by default -- real hardware means a real operator marking
     // milestones by hand, not an algorithm guessing, unless explicitly
     // opted in. Manual clicks still work as an override even when on
@@ -697,6 +707,9 @@ export default function LiveRoastView() {
     if (form.mode === "aillio_live") {
       payload.aillio_model = form.aillio_model;
     }
+    if (form.mode === "tc4_live") {
+      payload.tc4_port = form.tc4_port;
+    }
     if (LIVE_MODES.includes(form.mode)) {
       payload.auto_detect_milestones = form.auto_detect_milestones;
       payload.dry_end_c = form.dry_end_c === "" ? null : Number(form.dry_end_c);
@@ -892,6 +905,7 @@ export default function LiveRoastView() {
       modbus_device_profile_id: c.modbus_device_profile_id || "",
       ms6514_port: c.ms6514_port || "",
       aillio_model: c.aillio_model || "r1",
+      tc4_port: c.tc4_port || "",
       auto_detect_milestones: c.auto_detect_milestones ?? false,
       dry_end_c: c.dry_end_c ?? "",
       fc_start_c: c.fc_start_c ?? "",
@@ -1198,6 +1212,7 @@ export default function LiveRoastView() {
                     <option value="modbus_live_tcp">Direct Modbus (Ethernet)</option>
                     <option value="ms6514_live">Direct USB (thermocouple meter)</option>
                     <option value="aillio_live">Aillio Bullet (USB)</option>
+                    <option value="tc4_live">TC4+ (USB, PID firmware)</option>
                   </select>
                 </label>
               </div>
@@ -1647,6 +1662,24 @@ export default function LiveRoastView() {
               </p>
             </div>
           )}
+          {activeTab === "device" && form.mode === "tc4_live" && (
+            <div className="form-row">
+              <label>
+                Serial port
+                <input
+                  placeholder="COM5"
+                  value={form.tc4_port}
+                  onChange={(e) => setForm({ ...form, tc4_port: e.target.value })}
+                />
+              </label>
+              <p className="hint">
+                Direct USB read/write of a TC4+ shield running the aArtisanQ (PID) firmware, 115200 baud —
+                talks straight over USB, no other software needed. Channel 1 → BT, channel 2 → ET, channel 3
+                (if wired) → DT. Heater and Fan sliders send real OT1/DCFAN commands; there's no Drum output
+                on TC4, so that slider doesn't do anything here.
+              </p>
+            </div>
+          )}
           {activeTab === "milestones" && LIVE_MODES.includes(form.mode) && (
             <div className="form-row">
               <label className="checkbox-label">
@@ -1928,6 +1961,12 @@ export default function LiveRoastView() {
                       <span className="meta-value">Aillio Bullet {roast.aillio_model.toUpperCase()}</span>
                     </li>
                   )}
+                  {roast.mode === "tc4_live" && roast.tc4_port && (
+                    <li>
+                      <span className="meta-label">Serial port</span>
+                      <span className="meta-value">{roast.tc4_port}</span>
+                    </li>
+                  )}
                 </ul>
               </div>
               <div className="live-header-actions">
@@ -2065,6 +2104,16 @@ export default function LiveRoastView() {
                   End, FC Start, Drop, etc.) is a manual click — mark them yourself below.
                 </p>
               </div>
+            )}
+            {activeMode === "tc4_live" && (
+              <p className="hint" style={{ gridColumn: "1 / -1" }}>
+                Reading/writing {form.tc4_port || "the serial port"} directly (115200 baud, aArtisanQ/PID
+                firmware) — no other software needed. The Heater/Fan sliders beside the chart send real OT1/
+                DCFAN commands; there's no Drum output on TC4, so that slider doesn't do anything here.
+                Heater/Fan readouts stay blank — TC4's own READ command only reports temperature channels, not
+                its current output duty. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual
+                click — mark them yourself as the roast happens.
+              </p>
             )}
             <div className="panel">
               <h3>Events</h3>

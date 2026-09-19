@@ -22,6 +22,7 @@ function modeLabel(roast) {
     alog_playback: ".alog Playback",
     ms6514_live: "Direct USB (thermocouple meter)",
     aillio_live: "Aillio Bullet (USB)",
+    tc4_live: "TC4+ (USB, PID firmware)",
   };
   return MODE_LABELS[roast.mode] || roast.mode;
 }
@@ -280,6 +281,12 @@ export default function RoastDetailView() {
               <li>
                 <span>Model</span>
                 <span>{roast.aillio_model ? `Aillio Bullet ${roast.aillio_model.toUpperCase()}` : "—"}</span>
+              </li>
+            )}
+            {roast.mode === "tc4_live" && (
+              <li>
+                <span>Serial port</span>
+                <span>{roast.tc4_port || "—"}</span>
               </li>
             )}
           </ul>

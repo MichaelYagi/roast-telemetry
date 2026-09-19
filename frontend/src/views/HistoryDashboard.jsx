@@ -293,6 +293,7 @@ export default function HistoryDashboard() {
             <option value="modbus_live">Modbus (live)</option>
             <option value="ms6514_live">MS6514 (live)</option>
             <option value="aillio_live">Aillio Bullet (live)</option>
+            <option value="tc4_live">TC4+ (live)</option>
           </select>
         </label>
         <label>
