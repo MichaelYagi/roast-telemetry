@@ -53,12 +53,15 @@ export default function RoastDetailView() {
   const [roast, setRoast] = useState(null);
   const [error, setError] = useState(null);
   const [tempUnit, setTempUnit] = useState("c"); // display only, see Settings > Temperature Unit
-  // Roasted weight is entered here, after the fact (beans weighed once
-  // cooled) -- see backend/app/api/roasts.py's set_weight route. Separate
-  // edit-mode state rather than always showing the input, so a roast that
-  // already has a value reads as a plain fact until "edit" is clicked.
-  const [editingWeight, setEditingWeight] = useState(false);
-  const [roastedWeightInput, setRoastedWeightInput] = useState("");
+  // Both green and roasted weight are editable here at any time -- green
+  // usually comes in via the New Roast form but a typo/forgotten scale/
+  // re-weigh should be fixable same as roasted (which is only ever known
+  // after the fact). One shared set of edit state, keyed by which field
+  // is currently being edited (null when neither is), rather than
+  // duplicating it per field -- a roast that already has a value reads as
+  // a plain fact until "edit" is clicked, same as before.
+  const [editingWeightField, setEditingWeightField] = useState(null); // "green" | "roasted" | null
+  const [weightInput, setWeightInput] = useState("");
   const [weightSaving, setWeightSaving] = useState(false);
   const [weightError, setWeightError] = useState(null);
   // Deliberately separate from `error` above -- that one *replaces the
@@ -74,15 +77,20 @@ export default function RoastDetailView() {
       .catch((err) => setError(err.message));
   }, [id]);
 
-  async function handleSaveRoastedWeight() {
-    const grams = Number(roastedWeightInput);
-    if (!roastedWeightInput.trim() || Number.isNaN(grams)) return;
+  async function handleSaveWeight(field) {
+    const grams = Number(weightInput);
+    if (!weightInput.trim() || Number.isNaN(grams)) return;
     setWeightSaving(true);
     setWeightError(null);
     try {
-      await api.setWeightRoasted(id, grams);
-      setRoast((r) => (r ? { ...r, weight_roasted_g: grams } : r));
-      setEditingWeight(false);
+      if (field === "green") {
+        await api.setWeightGreen(id, grams);
+        setRoast((r) => (r ? { ...r, weight_green_g: grams } : r));
+      } else {
+        await api.setWeightRoasted(id, grams);
+        setRoast((r) => (r ? { ...r, weight_roasted_g: grams } : r));
+      }
+      setEditingWeightField(null);
     } catch (err) {
       setWeightError(err.message);
     } finally {
@@ -90,11 +98,17 @@ export default function RoastDetailView() {
     }
   }
 
+  function startEditingWeight(field, currentValue) {
+    setWeightInput(currentValue != null ? String(currentValue) : "");
+    setWeightError(null);
+    setEditingWeightField(field);
+  }
+
   // No websocket on this page (one-time REST fetch, see the effect
   // above) -- unlike LiveRoastView.jsx, there's no server-pushed
   // "event_deleted"/"event_updated" message to pick up, so these mutate
   // `roast.events` directly on success, same direct-mutation pattern
-  // handleSaveRoastedWeight above already uses.
+  // handleSaveWeight above already uses.
   async function handleDeleteMilestone(eventId) {
     setMilestoneError(null);
     try {
@@ -256,25 +270,55 @@ export default function RoastDetailView() {
             </li>
             <li>
               <span>Green weight</span>
-              <span>{roast.weight_green_g ? `${roast.weight_green_g} g` : "—"}</span>
-            </li>
-            <li>
-              <span>Roasted weight</span>
               <span>
-                {editingWeight ? (
+                {editingWeightField === "green" ? (
                   <span className="input-suffix-group">
                     <input
                       type="number" min="0" step="0.1"
-                      value={roastedWeightInput}
-                      onChange={(e) => setRoastedWeightInput(e.target.value)}
+                      value={weightInput}
+                      onChange={(e) => setWeightInput(e.target.value)}
                       placeholder="grams"
                       autoFocus
                     />
                     <span className="input-suffix">g</span>
-                    <button type="button" onClick={handleSaveRoastedWeight} disabled={weightSaving || !roastedWeightInput.trim()}>
+                    <button type="button" onClick={() => handleSaveWeight("green")} disabled={weightSaving || !weightInput.trim()}>
                       {weightSaving ? "Saving…" : "Save"}
                     </button>
-                    <button type="button" className="link-like" onClick={() => setEditingWeight(false)}>
+                    <button type="button" className="link-like" onClick={() => setEditingWeightField(null)}>
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <>
+                    {roast.weight_green_g ? `${roast.weight_green_g} g` : "—"}{" "}
+                    <button
+                      type="button"
+                      className="link-like no-print"
+                      onClick={() => startEditingWeight("green", roast.weight_green_g)}
+                    >
+                      {roast.weight_green_g ? "edit" : "add"}
+                    </button>
+                  </>
+                )}
+              </span>
+            </li>
+            <li>
+              <span>Roasted weight</span>
+              <span>
+                {editingWeightField === "roasted" ? (
+                  <span className="input-suffix-group">
+                    <input
+                      type="number" min="0" step="0.1"
+                      value={weightInput}
+                      onChange={(e) => setWeightInput(e.target.value)}
+                      placeholder="grams"
+                      autoFocus
+                    />
+                    <span className="input-suffix">g</span>
+                    <button type="button" onClick={() => handleSaveWeight("roasted")} disabled={weightSaving || !weightInput.trim()}>
+                      {weightSaving ? "Saving…" : "Save"}
+                    </button>
+                    <button type="button" className="link-like" onClick={() => setEditingWeightField(null)}>
                       Cancel
                     </button>
                   </span>
@@ -284,11 +328,7 @@ export default function RoastDetailView() {
                     <button
                       type="button"
                       className="link-like no-print"
-                      onClick={() => {
-                        setRoastedWeightInput(roast.weight_roasted_g != null ? String(roast.weight_roasted_g) : "");
-                        setWeightError(null);
-                        setEditingWeight(true);
-                      }}
+                      onClick={() => startEditingWeight("roasted", roast.weight_roasted_g)}
                     >
                       {roast.weight_roasted_g ? "edit" : "add"}
                     </button>

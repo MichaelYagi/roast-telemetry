@@ -255,11 +255,24 @@ async def retime_event(roast_id: str, event_id: str, update: EventUpdateRequest)
 
 @router.post("/{roast_id}/weight")
 def set_weight(roast_id: str, grams: float) -> dict:
-    session = session_manager.get(roast_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found or not active")
-    session.set_weight_roasted(grams)
+    # Works for any roast with a saved .alog, not just a still-live
+    # in-memory session -- same warm/cold split as delete_event/retime_event
+    # below, so this keeps working after a server restart, not just during
+    # the same process the roast was recorded in.
+    try:
+        session_manager.set_weight_roasted(roast_id, grams)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"ok": True, "weight_roasted_g": grams}
+
+
+@router.post("/{roast_id}/weight-green")
+def set_weight_green(roast_id: str, grams: float) -> dict:
+    try:
+        session_manager.set_weight_green(roast_id, grams)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True, "weight_green_g": grams}
 
 
 @router.get("/{roast_id}/alog")

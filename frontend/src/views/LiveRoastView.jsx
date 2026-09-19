@@ -258,14 +258,24 @@ export default function LiveRoastView() {
   const [selectedPresetId, setSelectedPresetId] = useState("");
   const [presetName, setPresetName] = useState("");
   const [presetFeedback, setPresetFeedback] = useState(null);
-  // Quick post-roast weight capture, right here rather than forcing a
+  // Quick weight capture/edit, right here rather than forcing a
   // navigation to the detail page first -- see RoastDetailView.jsx for
-  // the durable/editable version of the same field. `roast` comes from
+  // the other place both fields are editable. `roast` comes from
   // useRoastStream's websocket state (no setter exposed, and the backend
   // doesn't push a message for this REST-only write), so this tracks the
   // saved value locally instead of trying to mutate `roast` itself.
+  // Roasted weight only makes sense once finished (nothing to weigh
+  // before then) -- shown as a plain inline capture, no edit toggle
+  // needed since it starts blank. Green weight usually already has a
+  // value from the New Roast form though, and should stay correctable
+  // the whole time the roast is open (a typo, a re-weigh, forgetting to
+  // fill it in at all) -- so it gets the same edit/add toggle
+  // RoastDetailView.jsx uses, not a fill-once box.
   const [roastedWeightInput, setRoastedWeightInput] = useState("");
   const [roastedWeightSaved, setRoastedWeightSaved] = useState(null);
+  const [editingGreenWeight, setEditingGreenWeight] = useState(false);
+  const [greenWeightInput, setGreenWeightInput] = useState("");
+  const [greenWeightSaved, setGreenWeightSaved] = useState(null);
   const [weightSaving, setWeightSaving] = useState(false);
   const [weightError, setWeightError] = useState(null);
   const [brokenOutPanels, setBrokenOutPanels] = useState([]); // ordered array, matches Settings' display order
@@ -740,6 +750,22 @@ export default function LiveRoastView() {
     try {
       await api.setWeightRoasted(roastId, grams);
       setRoastedWeightSaved(grams);
+    } catch (err) {
+      setWeightError(err.message);
+    } finally {
+      setWeightSaving(false);
+    }
+  }
+
+  async function handleSaveGreenWeight() {
+    const grams = Number(greenWeightInput);
+    if (!roastId || !greenWeightInput.trim() || Number.isNaN(grams)) return;
+    setWeightSaving(true);
+    setWeightError(null);
+    try {
+      await api.setWeightGreen(roastId, grams);
+      setGreenWeightSaved(grams);
+      setEditingGreenWeight(false);
     } catch (err) {
       setWeightError(err.message);
     } finally {
@@ -1871,12 +1897,44 @@ export default function LiveRoastView() {
                       <span className="meta-value">{roast.beans}</span>
                     </li>
                   )}
-                  {roast.weight_green_g != null && (
-                    <li>
-                      <span className="meta-label">Green weight</span>
-                      <span className="meta-value">{roast.weight_green_g} g</span>
-                    </li>
-                  )}
+                  <li>
+                    <span className="meta-label">Green weight</span>
+                    <span className="meta-value">
+                      {editingGreenWeight ? (
+                        <span className="input-suffix-group">
+                          <input
+                            type="number" min="0" step="0.1"
+                            value={greenWeightInput}
+                            onChange={(e) => setGreenWeightInput(e.target.value)}
+                            placeholder="grams"
+                            autoFocus
+                          />
+                          <span className="input-suffix">g</span>
+                          <button type="button" onClick={handleSaveGreenWeight} disabled={weightSaving || !greenWeightInput.trim()}>
+                            {weightSaving ? "Saving…" : "Save"}
+                          </button>
+                          <button type="button" className="link-like" onClick={() => setEditingGreenWeight(false)}>
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
+                        <>
+                          {(greenWeightSaved ?? roast.weight_green_g) != null ? `${greenWeightSaved ?? roast.weight_green_g} g` : "—"}{" "}
+                          <button
+                            type="button"
+                            className="link-like"
+                            onClick={() => {
+                              setGreenWeightInput(String(greenWeightSaved ?? roast.weight_green_g ?? ""));
+                              setWeightError(null);
+                              setEditingGreenWeight(true);
+                            }}
+                          >
+                            {(greenWeightSaved ?? roast.weight_green_g) != null ? "edit" : "add"}
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  </li>
                   {phase === "finished" && (roastedWeightSaved != null || roast.weight_roasted_g == null) && (
                     <li>
                       <span className="meta-label">Roasted weight</span>
@@ -1900,11 +1958,11 @@ export default function LiveRoastView() {
                       </span>
                     </li>
                   )}
-                  {phase === "finished" && roast.weight_green_g && (roastedWeightSaved ?? roast.weight_roasted_g) != null && (
+                  {phase === "finished" && (greenWeightSaved ?? roast.weight_green_g) && (roastedWeightSaved ?? roast.weight_roasted_g) != null && (
                     <li>
                       <span className="meta-label">Weight loss</span>
                       <span className="meta-value">
-                        {((((roastedWeightSaved ?? roast.weight_roasted_g) / roast.weight_green_g) - 1) * 100).toFixed(1)}%
+                        {((((roastedWeightSaved ?? roast.weight_roasted_g) / (greenWeightSaved ?? roast.weight_green_g)) - 1) * 100).toFixed(1)}%
                       </span>
                     </li>
                   )}

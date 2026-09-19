@@ -831,6 +831,15 @@ class RoastSession:
         storage.update_roast(self.id, weight_roasted_g=grams)
         self._rewrite_alog()
 
+    def set_weight_green(self, grams: float) -> None:
+        # Green weight is usually entered up front (New Roast form), but a
+        # typo, a forgotten scale, or a re-weigh after the fact should all
+        # be fixable the same way weight_roasted_g already is -- see that
+        # method's own comment, same reasoning applies here unchanged.
+        self.weight_green_g = grams
+        storage.update_roast(self.id, weight_green_g=grams)
+        self._rewrite_alog()
+
     def delete_event(self, event_id: str) -> None:
         """Removes an already-marked milestone entirely, so it can be
         re-marked fresh via the normal add_event() flow (its own
@@ -1073,6 +1082,26 @@ class RoastSessionManager:
         event = _retime_milestone(parsed["events"], parsed["profile"], event_id, new_time_s)
         self._rewrite_cold_alog(row, parsed)
         return event
+
+    def set_weight_roasted(self, roast_id: str, grams: float) -> None:
+        session = self.get(roast_id)
+        if session is not None:
+            session.set_weight_roasted(grams)
+            return
+        row, parsed = self._cold_roast_row_and_parsed(roast_id)
+        row["weight_roasted_g"] = grams
+        storage.update_roast(roast_id, weight_roasted_g=grams)
+        self._rewrite_cold_alog(row, parsed)
+
+    def set_weight_green(self, roast_id: str, grams: float) -> None:
+        session = self.get(roast_id)
+        if session is not None:
+            session.set_weight_green(grams)
+            return
+        row, parsed = self._cold_roast_row_and_parsed(roast_id)
+        row["weight_green_g"] = grams
+        storage.update_roast(roast_id, weight_green_g=grams)
+        self._rewrite_cold_alog(row, parsed)
 
     def delete(self, roast_id: str) -> None:
         session = self.get(roast_id)

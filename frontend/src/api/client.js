@@ -54,6 +54,7 @@ export const api = {
   // grams as a query param, matching the backend route's plain-float
   // parameter (backend/app/api/roasts.py's set_weight) -- no request body.
   setWeightRoasted: (id, grams) => request(`/roasts/${id}/weight?${new URLSearchParams({ grams })}`, { method: "POST" }),
+  setWeightGreen: (id, grams) => request(`/roasts/${id}/weight-green?${new URLSearchParams({ grams })}`, { method: "POST" }),
   addNote: (id, note) => request(`/roasts/${id}/notes`, { method: "POST", body: JSON.stringify(note) }),
   addEvent: (id, event) => request(`/roasts/${id}/events`, { method: "POST", body: JSON.stringify(event) }),
   deleteEvent: (id, eventId) => request(`/roasts/${id}/events/${eventId}`, { method: "DELETE" }),

@@ -150,6 +150,26 @@ def test_set_weight_roasted_persists_to_the_db_row(isolated_db):
     asyncio.run(body())
 
 
+def test_set_weight_green_persists_to_the_db_row(isolated_db):
+    # Same reasoning as set_weight_roasted above -- green weight is usually
+    # entered up front, but a typo/re-weigh should be correctable the same
+    # way, and correcting it must survive a backend restart too.
+    async def body():
+        manager, request = make_manager_and_request()
+        session = manager.create(request)
+        await session.connect()
+        try:
+            await session.begin_recording()
+            session.set_weight_green(1600.0)
+            assert session.weight_green_g == 1600.0
+            row = isolated_db.get_roast_row(session.id)
+            assert row["weight_green_g"] == 1600.0
+        finally:
+            await _stop_background_task(session)
+
+    asyncio.run(body())
+
+
 def test_apply_command_allowed_while_connected_but_not_recording(isolated_db):
     """Air/Drum/Burner sliders (or Testing Mode's write check) need to work
     during the armed-not-recording window too, matching Artisan's own
