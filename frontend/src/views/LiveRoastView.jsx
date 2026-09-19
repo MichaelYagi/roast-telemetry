@@ -278,6 +278,14 @@ export default function LiveRoastView() {
   const [greenWeightSaved, setGreenWeightSaved] = useState(null);
   const [weightSaving, setWeightSaving] = useState(false);
   const [weightError, setWeightError] = useState(null);
+  // Same local-override reasoning as greenWeightSaved above -- `roast`
+  // itself is never mutated, tagsSaved (once set) is what actually
+  // renders, falling back to roast.tags until the first edit. allTags
+  // feeds the "add tag" input's <datalist>, same as RoastDetailView.jsx.
+  const [tagsSaved, setTagsSaved] = useState(null);
+  const [newTagInput, setNewTagInput] = useState("");
+  const [tagsError, setTagsError] = useState(null);
+  const [allTags, setAllTags] = useState([]);
   const [brokenOutPanels, setBrokenOutPanels] = useState([]); // ordered array, matches Settings' display order
   const [panelColors, setPanelColors] = useState({}); // key -> hex override, shared by both readout panels
   const [smallReadoutPanels, setSmallReadoutPanels] = useState([]); // ordered array, independent from brokenOutPanels
@@ -488,6 +496,7 @@ export default function LiveRoastView() {
     refreshPresets();
     reconnectActiveRoast();
     refreshSerialPorts();
+    api.listTags().then(setAllTags);
   }, []);
 
   // Hot-applies Settings > Big Readout Panel / Small Readout changes to an
@@ -771,6 +780,37 @@ export default function LiveRoastView() {
     } finally {
       setWeightSaving(false);
     }
+  }
+
+  // Same local-override pattern as the weight setters above -- `roast`
+  // is never mutated directly. Both add and remove go through this one
+  // function, always PUTting the full tag list (replace-the-whole-set
+  // semantics, see storage.set_roast_tags), not a single add/remove call.
+  async function handleTagsChange(nextTags) {
+    if (!roastId) return;
+    setTagsError(null);
+    try {
+      await api.setTags(roastId, nextTags);
+      setTagsSaved(nextTags);
+    } catch (err) {
+      setTagsError(err.message);
+    }
+  }
+
+  function handleAddTag() {
+    const tag = newTagInput.trim();
+    const currentTags = tagsSaved ?? roast?.tags ?? [];
+    if (!tag || currentTags.includes(tag)) {
+      setNewTagInput("");
+      return;
+    }
+    setNewTagInput("");
+    handleTagsChange([...currentTags, tag]);
+  }
+
+  function handleRemoveTag(tag) {
+    const currentTags = tagsSaved ?? roast?.tags ?? [];
+    handleTagsChange(currentTags.filter((t) => t !== tag));
   }
 
   // Both are effectively fire-and-forget here -- the actual UI update
@@ -1895,6 +1935,52 @@ export default function LiveRoastView() {
                     <li>
                       <span className="meta-label">Beans</span>
                       <span className="meta-value">{roast.beans}</span>
+                    </li>
+                  )}
+                  <li>
+                    <span className="meta-label">Tags</span>
+                    <span className="meta-value">
+                      <span className="tag-edit-group">
+                        {(tagsSaved ?? roast.tags ?? []).map((t) => (
+                          <span key={t} className="tag-chip">
+                            {t}
+                            <button type="button" className="tag-chip-remove" onClick={() => handleRemoveTag(t)} aria-label={`Remove tag ${t}`}>
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                        <span className="input-suffix-group">
+                          <input
+                            type="text"
+                            value={newTagInput}
+                            onChange={(e) => setNewTagInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleAddTag();
+                              }
+                            }}
+                            placeholder="Add tag…"
+                            list="existing-tags-live"
+                          />
+                          <button type="button" onClick={handleAddTag} disabled={!newTagInput.trim()}>
+                            Add
+                          </button>
+                          <datalist id="existing-tags-live">
+                            {allTags
+                              .filter((t) => !(tagsSaved ?? roast.tags ?? []).includes(t.tag))
+                              .map((t) => (
+                                <option key={t.tag} value={t.tag} />
+                              ))}
+                          </datalist>
+                        </span>
+                      </span>
+                    </span>
+                  </li>
+                  {tagsError && (
+                    <li>
+                      <span className="meta-label"></span>
+                      <span className="meta-value error">{tagsError}</span>
                     </li>
                   )}
                   <li>
