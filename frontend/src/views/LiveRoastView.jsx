@@ -13,6 +13,7 @@ import VerticalControlPanel from "../components/VerticalControlPanel.jsx";
 import DeviceProfileEditor from "../components/DeviceProfileEditor.jsx";
 import EventButtonRow from "../components/EventButtonRow.jsx";
 import RoastChart from "../components/RoastChart.jsx";
+import RoastStatsPanel from "../components/RoastStatsPanel.jsx";
 import WeightField from "../components/WeightField.jsx";
 import { formatTemp } from "../tempUnits.js";
 
@@ -2017,6 +2018,13 @@ export default function LiveRoastView() {
                   </li>
                 )}
               </ul>
+            </div>
+          )}
+
+          {phase === "finished" && roast && (
+            <div className="panel">
+              <h3>Roast Stats</h3>
+              <RoastStatsPanel roastId={roast.id} />
             </div>
           )}
 

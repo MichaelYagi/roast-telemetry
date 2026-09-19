@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import RoastChart from "../components/RoastChart.jsx";
 import RoastReviewCard from "../components/RoastReviewCard.jsx";
+import RoastStatsPanel from "../components/RoastStatsPanel.jsx";
 import WeightField from "../components/WeightField.jsx";
 import { formatTemp } from "../tempUnits.js";
 
@@ -356,6 +357,11 @@ export default function RoastDetailView() {
               </li>
             )}
           </ul>
+        </div>
+
+        <div className="panel">
+          <h3>Roast Stats</h3>
+          <RoastStatsPanel roastId={roast.id} />
         </div>
 
         <div className="panel">

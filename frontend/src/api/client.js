@@ -61,6 +61,8 @@ export const api = {
   listTags: () => request("/roasts/tags"),
   listRoasters: () => request("/roasts/roasters"),
   countRoasts: (params = {}) => request(`/roasts/count?${new URLSearchParams(params)}`),
+  getRoastStats: (id) => request(`/roasts/${id}/stats`),
+  getRoastStatsBatch: (params = {}) => request(`/roasts/stats-batch?${new URLSearchParams(params)}`),
   addNote: (id, note) => request(`/roasts/${id}/notes`, { method: "POST", body: JSON.stringify(note) }),
   addEvent: (id, event) => request(`/roasts/${id}/events`, { method: "POST", body: JSON.stringify(event) }),
   deleteEvent: (id, eventId) => request(`/roasts/${id}/events/${eventId}`, { method: "DELETE" }),
