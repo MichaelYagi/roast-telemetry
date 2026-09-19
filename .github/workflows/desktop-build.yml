@@ -46,17 +46,25 @@ jobs:
         working-directory: frontend
       - name: Build Roast Telemetry.app
         run: packaging/build-macos.sh
-      # Uploading the .app directory as-is, not pre-zipped -- v4 already
-      # preserves the bundle's directory structure/permissions/symlinks
-      # correctly on its own, and GitHub's artifact download always wraps
-      # whatever's uploaded in its own container zip regardless. Pre-
-      # zipping on top of that produced a zip-inside-a-zip that macOS's
-      # own Archive Utility (Finder double-click) failed to open at all
-      # ("unsupported format") -- confirmed live on a real v1.2.1 build.
+      # Not pre-zipped -- v4 already preserves directory structure/
+      # permissions/symlinks on its own, and GitHub's artifact download
+      # always wraps whatever's uploaded in its own container zip
+      # regardless. Pre-zipping on top of that produced a zip-inside-a-
+      # zip that macOS's own Archive Utility (Finder double-click)
+      # refused to open at all ("unsupported format") -- confirmed live
+      # on the v1.2.1 build.
+      #
+      # path points at "dist", the .app's *parent*, not the .app itself
+      # -- upload-artifact treats whatever directory you give it as the
+      # artifact's own root, so pointing straight at the .app uploaded
+      # its insides (Contents/, Info.plist, ...) flattened at the top
+      # level, losing "Roast Telemetry.app" as a folder name entirely.
+      # Confirmed live on v1.2.2. build-macos.sh already removes
+      # everything from dist/ except the finished .app, so this is safe.
       - uses: actions/upload-artifact@v4
         with:
           name: RoastTelemetry-macOS-${{ github.ref_name }}
-          path: "dist/Roast Telemetry.app"
+          path: dist
 
   build-windows:
     runs-on: windows-latest
