@@ -25,6 +25,7 @@ from ..models import (
     RoastCreateRequest,
     RoastMode,
     RoastReview,
+    RoastStats,
     RoastStatus,
     RoastSummary,
     TagsUpdateRequest,
@@ -32,6 +33,7 @@ from ..models import (
 )
 from ..roast_review import build_prompt, build_summary
 from ..roast_session import RoastSessionError, session_manager
+from ..roast_stats import compute_roast_stats
 from ..ws_manager import pubsub
 
 router = APIRouter(prefix="/roasts", tags=["roasts"])
@@ -167,6 +169,42 @@ def count_roasts(
     return {"total": total}
 
 
+@router.get("/stats-batch")
+def stats_batch(
+    mode: Optional[RoastMode] = None,
+    status: Optional[RoastStatus] = None,
+    tag: Optional[str] = None,
+    q: Optional[str] = None,
+    created_by: Optional[str] = None,
+    limit: int = Query(default=100, le=500),
+    offset: int = 0,
+) -> list[dict]:
+    # Derived stats for History's "Show trends" toggle -- same filters as
+    # list_roasts, same page (limit/offset) as whatever's currently shown
+    # in the table, deliberately NOT the whole filtered set: each entry
+    # here means a real .alog read + parse (get_roast_detail's cold path),
+    # so this stays bounded to one page's worth of I/O, and is only ever
+    # called when the user explicitly asks to see trends, never on a
+    # plain History page load.
+    summaries = session_manager.list_summaries(
+        mode=mode.value if mode else None,
+        status=status.value if status else None,
+        tag=tag,
+        q=q,
+        created_by=created_by,
+        limit=limit,
+        offset=offset,
+    )
+    results = []
+    for s in summaries:
+        roast = session_manager.get_roast_detail(s.id)
+        if roast is None:
+            continue
+        stats = compute_roast_stats(roast)
+        results.append({"id": s.id, "title": s.title, **stats.model_dump()})
+    return results
+
+
 @router.post("", response_model=RoastSummary, status_code=201)
 async def create_roast(request: RoastCreateRequest, http_request: Request) -> RoastSummary:
     """modbus_live/ms6514_live/aillio_live: this is the ON action --
@@ -205,6 +243,17 @@ def get_roast(roast_id: str) -> Roast:
     if roast is None:
         raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
     return roast
+
+
+@router.get("/{roast_id}/stats", response_model=RoastStats)
+def get_roast_stats(roast_id: str) -> RoastStats:
+    # get_roast_detail already handles both a live session and a cold/
+    # historical roast (same method the plain GET above uses) -- no
+    # separate warm/cold plumbing needed here.
+    roast = session_manager.get_roast_detail(roast_id)
+    if roast is None:
+        raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
+    return compute_roast_stats(roast)
 
 
 @router.delete("/{roast_id}", status_code=204)

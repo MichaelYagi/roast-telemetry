@@ -616,6 +616,44 @@ class RoastReview(BaseModel):
     completed_at: Optional[str] = None
 
 
+class RoastPhaseStat(BaseModel):
+    """One PHASE_DEFS entry from roast_stats.py -- Dry (CHARGE->DRY_END),
+    Maillard (DRY_END->FC_START), or Development (FC_START->DROP).
+    pct_of_roast is DRY%/DTR respectively, the same numbers Artisan's own
+    phase breakdown shows -- absent entirely (not just null fields) when
+    the roast is missing the milestones a phase needs."""
+
+    phase: str
+    duration_s: float
+    pct_of_roast: Optional[float] = None
+
+
+class RoastRorFlags(BaseModel):
+    """Crash/flatline/flick windows detected on the RoR(BT) curve after
+    Turning Point -- see roast_stats.py's own threshold constants for
+    what counts as each. Each list entry is a small dict (time_s +
+    supporting values), capped at 5 per category."""
+
+    crashes: list[dict] = []
+    flatlines: list[dict] = []
+    flicks: list[dict] = []
+
+
+class RoastStats(BaseModel):
+    """GET /roasts/{id}/stats -- derived metrics computed purely from a
+    roast's own profile/events/weights, no new data collected. dry_pct/
+    dtr_pct are convenience pulls from `phases` (the Dry/Development
+    entries' own pct_of_roast) so a caller that only wants the headline
+    numbers doesn't have to search the phases list itself."""
+
+    weight_loss_pct: Optional[float] = None
+    duration_s: Optional[float] = None
+    phases: list[RoastPhaseStat] = []
+    dry_pct: Optional[float] = None
+    dtr_pct: Optional[float] = None
+    ror_flags: RoastRorFlags = RoastRorFlags()
+
+
 class UserRole(str, Enum):
     ADMIN = "admin"
     USER = "user"
