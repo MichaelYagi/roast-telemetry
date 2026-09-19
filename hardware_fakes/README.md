@@ -1,20 +1,23 @@
 # Hardware fakes
 
 Standalone scripts that stand in for real roasting hardware, so
-`modbus_live` and `ms6514_live` can each be tested end-to-end through the
-app's actual connection code without owning a roaster. Both are driven by
-the same roast physics as the app's own "Artisan Simulator" mode
-(`_thermal.py`, wrapping `simulator.SimulatorEngine`) so BT/ET behave like
-a real roast no matter which one you're using.
+`modbus_live`, `ms6514_live`, and `tc4_live` can each be tested
+end-to-end through the app's actual connection code without owning a
+roaster. All are driven by the same roast physics as the app's own
+"Artisan Simulator" mode (`_thermal.py`, wrapping
+`simulator.SimulatorEngine`) so BT/ET behave like a real roast no
+matter which one you're using.
 
 | Fake | Stands in for | Protocol | Needs a virtual serial port? |
 |---|---|---|---|
 | `modbus_fz94.py` | Coffee-Tech FZ-94 (plain, not Evo) | Modbus RTU (hand-rolled framing) | Yes — one (two only for unusual wiring) |
 | `modbus_fz94_evo.py` | Coffee-Tech FZ-94 Evo | Modbus TCP (hand-rolled MBAP framing) | No — a real TCP listener, point the app straight at it |
 | `ms6514_device.py` | Mastech MS6514 meter | Raw 18-byte serial frames | Yes |
+| `tc4.py` | TC4+ (aArtisanQ/PID firmware) | Plain ASCII commands (`READ`/`OT1`/`DCFAN`) | Yes |
 
-**Quick start:** `../scripts/fake-hardware.sh fz94` or
-`../scripts/fake-hardware.sh ms6514` wraps the whole socat-pair +
+**Quick start:** `../scripts/fake-hardware.sh fz94`,
+`../scripts/fake-hardware.sh ms6514`, or
+`../scripts/fake-hardware.sh tc4` wraps the whole socat-pair +
 fake-process dance below into one command, using the same fixed port
 name every run (so a serial port you've already saved in a Configure
 Roast preset keeps working across restarts), and prints the port to
@@ -75,6 +78,25 @@ python -m hardware_fakes.ms6514_device --port /tmp/ttyFAKE_METER
 In the app, choose **Direct USB (thermocouple meter)**, serial port
 `/tmp/ttyFAKE_METER_APP`. This one's read-only in real life too, so
 there's nothing to control -- just BT/ET streaming in.
+
+### TC4+
+
+Same socat-pair pattern, but this fake actually responds to commands
+(request/response, not continuous streaming) and reacts to Heater/Fan
+control writes, same as the Modbus fake does:
+
+```
+# terminal 1
+socat -d -d pty,raw,echo=0,link=/tmp/ttyFAKE_TC4 pty,raw,echo=0,link=/tmp/ttyFAKE_TC4_APP
+
+# terminal 2
+python -m hardware_fakes.tc4 --port /tmp/ttyFAKE_TC4
+```
+
+In the app, choose **TC4+ (USB, PID firmware)**, serial port
+`/tmp/ttyFAKE_TC4_APP`. Unlike MS6514, this one has real Heater/Fan
+control (OT1/DCFAN) -- dragging those vertical-control sliders actually
+bends the fake's simulated BT/ET curve.
 
 ## Modbus TCP (FZ-94 Evo)
 

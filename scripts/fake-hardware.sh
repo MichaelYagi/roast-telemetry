@@ -6,6 +6,7 @@
 # Usage:
 #   scripts/fake-hardware.sh fz94              # WSL-internal link, for an app also running in WSL
 #   scripts/fake-hardware.sh ms6514
+#   scripts/fake-hardware.sh tc4               # TC4+ (aArtisanQ/PID firmware) fake
 #   scripts/fake-hardware.sh fz94 --tcp        # RTU-over-TCP bridge on port 5020, for an app running natively on Windows
 #   scripts/fake-hardware.sh fz94 --tcp 5030   # RTU-over-TCP bridge on a specific port
 #   scripts/fake-hardware.sh evo               # FZ-94 Evo fake -- genuine Modbus TCP, no socat needed at all
@@ -55,15 +56,15 @@ if [[ -d .venv ]] && [[ ! -e .venv/bin/python ]] && [[ -e .venv/Scripts/python.e
 fi
 
 KIND="${1:-}"
-if [[ "$KIND" != "fz94" && "$KIND" != "ms6514" && "$KIND" != "evo" ]]; then
-  echo "Usage: $0 fz94|ms6514|evo [--tcp [port]] | $0 evo [port]" >&2
+if [[ "$KIND" != "fz94" && "$KIND" != "ms6514" && "$KIND" != "tc4" && "$KIND" != "evo" ]]; then
+  echo "Usage: $0 fz94|ms6514|tc4|evo [--tcp [port]] | $0 evo [port]" >&2
   exit 1
 fi
 shift || true
 
 # evo speaks genuine Modbus TCP natively -- no socat/virtual serial port
 # involved at all (see the header comment above), so it's handled
-# entirely separately from the fz94/ms6514 socat dance below.
+# entirely separately from the fz94/ms6514/tc4 socat dance below.
 if [[ "$KIND" == "evo" ]]; then
   EVO_PORT="${1:-5020}"
   FAKE_PID=""
@@ -154,6 +155,8 @@ fi
 
 if [[ "$KIND" == "fz94" ]]; then
   PYTHONPATH=. .venv/bin/python -m hardware_fakes.modbus_fz94 --port "$LINK" --quiet &
+elif [[ "$KIND" == "tc4" ]]; then
+  PYTHONPATH=. .venv/bin/python -m hardware_fakes.tc4 --port "$LINK" --quiet &
 else
   PYTHONPATH=. .venv/bin/python -m hardware_fakes.ms6514_device --port "$LINK" --quiet &
 fi
