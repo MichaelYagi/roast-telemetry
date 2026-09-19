@@ -822,23 +822,26 @@ class RoastSession:
             )
             save_artisan_native_alog(self.alog_path, alog_dict)
 
-    def set_weight_roasted(self, grams: float) -> None:
+    def set_weight_roasted(self, grams: Optional[float]) -> None:
         # The natural workflow is: roast finishes, beans cool, *then* get
         # weighed -- by that point _finish() has already run and this
         # session's own in-memory state is the only thing DB reads/exports
         # would otherwise reflect. Without persisting here too, the weight
         # would silently vanish on a backend restart (still-running-process
         # reads/the AI review pick it up fine either way, since both go
-        # through this same in-memory session first).
+        # through this same in-memory session first). grams=None clears
+        # it (DELETE /roasts/{id}/weight) -- same method either way, no
+        # separate delete path needed here.
         self.weight_roasted_g = grams
         storage.update_roast(self.id, weight_roasted_g=grams)
         self._rewrite_alog()
 
-    def set_weight_green(self, grams: float) -> None:
+    def set_weight_green(self, grams: Optional[float]) -> None:
         # Green weight is usually entered up front (New Roast form), but a
         # typo, a forgotten scale, or a re-weigh after the fact should all
         # be fixable the same way weight_roasted_g already is -- see that
-        # method's own comment, same reasoning applies here unchanged.
+        # method's own comment, same reasoning applies here unchanged,
+        # including grams=None clearing it.
         self.weight_green_g = grams
         storage.update_roast(self.id, weight_green_g=grams)
         self._rewrite_alog()
@@ -1095,7 +1098,7 @@ class RoastSessionManager:
         self._rewrite_cold_alog(row, parsed)
         return event
 
-    def set_weight_roasted(self, roast_id: str, grams: float) -> None:
+    def set_weight_roasted(self, roast_id: str, grams: Optional[float]) -> None:
         session = self.get(roast_id)
         if session is not None:
             session.set_weight_roasted(grams)
@@ -1105,7 +1108,7 @@ class RoastSessionManager:
         storage.update_roast(roast_id, weight_roasted_g=grams)
         self._rewrite_cold_alog(row, parsed)
 
-    def set_weight_green(self, roast_id: str, grams: float) -> None:
+    def set_weight_green(self, roast_id: str, grams: Optional[float]) -> None:
         session = self.get(roast_id)
         if session is not None:
             session.set_weight_green(grams)

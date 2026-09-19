@@ -316,6 +316,27 @@ def set_weight_green(roast_id: str, grams: float) -> dict:
     return {"ok": True, "weight_green_g": grams}
 
 
+@router.delete("/{roast_id}/weight")
+def delete_weight(roast_id: str) -> dict:
+    # Same set_weight_roasted method as the POST above, just with
+    # grams=None -- see that method's own comment for why one method
+    # handles both instead of a separate clearing code path.
+    try:
+        session_manager.set_weight_roasted(roast_id, None)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True, "weight_roasted_g": None}
+
+
+@router.delete("/{roast_id}/weight-green")
+def delete_weight_green(roast_id: str) -> dict:
+    try:
+        session_manager.set_weight_green(roast_id, None)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"ok": True, "weight_green_g": None}
+
+
 @router.put("/{roast_id}/tags")
 def set_tags(roast_id: str, update: TagsUpdateRequest) -> dict:
     try:

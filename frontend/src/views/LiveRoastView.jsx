@@ -13,6 +13,7 @@ import VerticalControlPanel from "../components/VerticalControlPanel.jsx";
 import DeviceProfileEditor from "../components/DeviceProfileEditor.jsx";
 import EventButtonRow from "../components/EventButtonRow.jsx";
 import RoastChart from "../components/RoastChart.jsx";
+import WeightField from "../components/WeightField.jsx";
 import { formatTemp } from "../tempUnits.js";
 
 const SAMPLE_ALOG_PATH = "backend/data/sample_roasts/demo_roast.alog";
@@ -258,28 +259,19 @@ export default function LiveRoastView() {
   const [selectedPresetId, setSelectedPresetId] = useState("");
   const [presetName, setPresetName] = useState("");
   const [presetFeedback, setPresetFeedback] = useState(null);
-  // Quick weight capture/edit, right here rather than forcing a
-  // navigation to the detail page first -- see RoastDetailView.jsx for
-  // the other place both fields are editable. `roast` comes from
-  // useRoastStream's websocket state (no setter exposed, and the backend
-  // doesn't push a message for this REST-only write), so this tracks the
-  // saved value locally instead of trying to mutate `roast` itself.
-  // Roasted weight only makes sense once finished (nothing to weigh
-  // before then) -- a plain always-visible input + Save, pre-filled with
-  // the current value once known (see the seeding effect below) so
-  // reopening a finished roast doesn't show a misleadingly blank box.
-  // Green weight usually already has a value from the New Roast form
-  // though, and should stay correctable the whole time the roast is
-  // open (a typo, a re-weigh, forgetting to fill it in at all) -- so it
-  // gets its own edit/add toggle instead, same as RoastDetailView.jsx.
-  const [roastedWeightInput, setRoastedWeightInput] = useState("");
-  const [roastedWeightSaved, setRoastedWeightSaved] = useState(null);
-  const [editingGreenWeight, setEditingGreenWeight] = useState(false);
-  const [greenWeightInput, setGreenWeightInput] = useState("");
-  const [greenWeightSaved, setGreenWeightSaved] = useState(null);
-  const [weightSaving, setWeightSaving] = useState(false);
-  const [weightError, setWeightError] = useState(null);
-  // Same local-override reasoning as greenWeightSaved above -- `roast`
+  // Both weight fields use the shared WeightField component (see that
+  // file) -- same edit/add/delete UI RoastDetailView.jsx uses. `roast`
+  // comes from useRoastStream's websocket state (no setter exposed, and
+  // the backend never pushes a message for this REST-only write), so
+  // these track a local override instead of trying to mutate `roast`
+  // itself. `undefined` means "no override yet, defer to roast.weight_*_g"
+  // -- deliberately NOT `null` for that (nullish coalescing can't tell
+  // "never touched" apart from "explicitly deleted to empty" if both use
+  // null), so a delete can actually override an already-loaded roast
+  // value back to empty instead of falling straight through to it again.
+  const [greenWeightOverride, setGreenWeightOverride] = useState(undefined);
+  const [roastedWeightOverride, setRoastedWeightOverride] = useState(undefined);
+  // Same local-override reasoning as greenWeightOverride above -- `roast`
   // itself is never mutated, tagsSaved (once set) is what actually
   // renders, falling back to roast.tags until the first edit. allTags
   // feeds the "add tag" input's <datalist>, same as RoastDetailView.jsx.
@@ -341,17 +333,13 @@ export default function LiveRoastView() {
     if (lastError) setError(lastError);
   }, [lastError]);
 
-  // Pre-fills the Roasted weight input once a value is already known
-  // (saved earlier this session, or from a previous visit/page reload)
-  // -- otherwise reopening a finished roast's live view showed a blank
-  // box with no indication anything had been saved. Guarded on the
-  // input still being empty so it never clobbers active typing.
-  useEffect(() => {
-    const known = roastedWeightSaved ?? roast?.weight_roasted_g;
-    if (known != null && !roastedWeightInput) {
-      setRoastedWeightInput(String(known));
-    }
-  }, [roast?.weight_roasted_g, roastedWeightSaved]); // eslint-disable-line react-hooks/exhaustive-deps
+  // undefined override means "defer to roast's own field" -- WeightField
+  // itself derives its editing/display state fresh from whatever value
+  // it's handed, so this needs no separate seeding effect the way the
+  // old hand-rolled version did (that's exactly the class of bug this
+  // shared component was built to stop happening again).
+  const greenWeightValue = greenWeightOverride !== undefined ? greenWeightOverride : roast?.weight_green_g;
+  const roastedWeightValue = roastedWeightOverride !== undefined ? roastedWeightOverride : roast?.weight_roasted_g;
 
   useEffect(() => {
     function onResize() {
@@ -764,35 +752,30 @@ export default function LiveRoastView() {
     }
   }
 
-  async function handleSaveRoastedWeight() {
-    const grams = Number(roastedWeightInput);
-    if (!roastId || !roastedWeightInput.trim() || Number.isNaN(grams)) return;
-    setWeightSaving(true);
-    setWeightError(null);
-    try {
-      await api.setWeightRoasted(roastId, grams);
-      setRoastedWeightSaved(grams);
-    } catch (err) {
-      setWeightError(err.message);
-    } finally {
-      setWeightSaving(false);
-    }
+  // No !roastId guard here (unlike other handlers in this file that
+  // silently no-op without one) -- WeightField's onSave/onDelete are
+  // expected to reject on failure so it can show the error instead of
+  // wrongly flipping to "saved" display state, and this UI only ever
+  // renders once `roast` (and so roastId) already exists anyway (see
+  // the `{roast && (...)}` gate around the panel that contains it).
+  async function handleSaveGreenWeight(grams) {
+    await api.setWeightGreen(roastId, grams);
+    setGreenWeightOverride(grams);
   }
 
-  async function handleSaveGreenWeight() {
-    const grams = Number(greenWeightInput);
-    if (!roastId || !greenWeightInput.trim() || Number.isNaN(grams)) return;
-    setWeightSaving(true);
-    setWeightError(null);
-    try {
-      await api.setWeightGreen(roastId, grams);
-      setGreenWeightSaved(grams);
-      setEditingGreenWeight(false);
-    } catch (err) {
-      setWeightError(err.message);
-    } finally {
-      setWeightSaving(false);
-    }
+  async function handleDeleteGreenWeight() {
+    await api.deleteWeightGreen(roastId);
+    setGreenWeightOverride(null);
+  }
+
+  async function handleSaveRoastedWeight(grams) {
+    await api.setWeightRoasted(roastId, grams);
+    setRoastedWeightOverride(grams);
+  }
+
+  async function handleDeleteRoastedWeight() {
+    await api.deleteWeightRoasted(roastId);
+    setRoastedWeightOverride(null);
   }
 
   // Same local-override pattern as the weight setters above -- `roast`
@@ -2016,72 +1999,21 @@ export default function LiveRoastView() {
                 <li>
                   <span>Green weight</span>
                   <span>
-                    {editingGreenWeight ? (
-                      <span className="input-suffix-group">
-                        <input
-                          type="number" min="0" step="0.1"
-                          value={greenWeightInput}
-                          onChange={(e) => setGreenWeightInput(e.target.value)}
-                          placeholder="grams"
-                          autoFocus
-                        />
-                        <span className="input-suffix">g</span>
-                        <button type="button" onClick={handleSaveGreenWeight} disabled={weightSaving || !greenWeightInput.trim()}>
-                          {weightSaving ? "Saving…" : "Save"}
-                        </button>
-                        <button type="button" className="link-like" onClick={() => setEditingGreenWeight(false)}>
-                          Cancel
-                        </button>
-                      </span>
-                    ) : (
-                      <>
-                        {(greenWeightSaved ?? roast.weight_green_g) != null ? `${greenWeightSaved ?? roast.weight_green_g} g` : "—"}{" "}
-                        <button
-                          type="button"
-                          className="link-like"
-                          onClick={() => {
-                            setGreenWeightInput(String(greenWeightSaved ?? roast.weight_green_g ?? ""));
-                            setWeightError(null);
-                            setEditingGreenWeight(true);
-                          }}
-                        >
-                          {(greenWeightSaved ?? roast.weight_green_g) != null ? "edit" : "add"}
-                        </button>
-                      </>
-                    )}
+                    <WeightField value={greenWeightValue} onSave={handleSaveGreenWeight} onDelete={handleDeleteGreenWeight} />
                   </span>
                 </li>
                 {phase === "finished" && (
                   <li>
                     <span>Roasted weight</span>
                     <span>
-                      <span className="input-suffix-group">
-                        <input
-                          type="number" min="0" step="0.1"
-                          value={roastedWeightInput}
-                          onChange={(e) => setRoastedWeightInput(e.target.value)}
-                          placeholder="grams"
-                        />
-                        <span className="input-suffix">g</span>
-                        <button type="button" onClick={handleSaveRoastedWeight} disabled={weightSaving || !roastedWeightInput.trim()}>
-                          {weightSaving ? "Saving…" : "Save"}
-                        </button>
-                      </span>
+                      <WeightField value={roastedWeightValue} onSave={handleSaveRoastedWeight} onDelete={handleDeleteRoastedWeight} />
                     </span>
                   </li>
                 )}
-                {phase === "finished" && (greenWeightSaved ?? roast.weight_green_g) && (roastedWeightSaved ?? roast.weight_roasted_g) != null && (
+                {phase === "finished" && greenWeightValue && roastedWeightValue != null && (
                   <li>
                     <span>Weight loss</span>
-                    <span>
-                      {((((roastedWeightSaved ?? roast.weight_roasted_g) / (greenWeightSaved ?? roast.weight_green_g)) - 1) * 100).toFixed(1)}%
-                    </span>
-                  </li>
-                )}
-                {weightError && (
-                  <li>
-                    <span></span>
-                    <span className="error">{weightError}</span>
+                    <span>{(((roastedWeightValue / greenWeightValue) - 1) * 100).toFixed(1)}%</span>
                   </li>
                 )}
               </ul>

@@ -84,3 +84,68 @@ def test_set_weight_endpoints_404_for_unknown_roast(client):
 
     resp = client.post("/api/roasts/does-not-exist/weight-green", params={"grams": 1000.0})
     assert resp.status_code == 404
+
+
+# -- DELETE clears a weight back to null -----------------------------------
+
+
+def test_delete_weight_roasted_via_api_warm(client):
+    roast_id = _create_roast(client)
+    client.post(f"/api/roasts/{roast_id}/weight", params={"grams": 1200.0})
+
+    resp = client.delete(f"/api/roasts/{roast_id}/weight")
+    assert resp.status_code == 200
+    assert resp.json()["weight_roasted_g"] is None
+
+    resp = client.get(f"/api/roasts/{roast_id}")
+    assert resp.json()["weight_roasted_g"] is None
+
+    client.post(f"/api/roasts/{roast_id}/stop")
+
+
+def test_delete_weight_green_via_api_warm(client):
+    roast_id = _create_roast(client)
+    client.post(f"/api/roasts/{roast_id}/weight-green", params={"grams": 1500.0})
+
+    resp = client.delete(f"/api/roasts/{roast_id}/weight-green")
+    assert resp.status_code == 200
+    assert resp.json()["weight_green_g"] is None
+
+    resp = client.get(f"/api/roasts/{roast_id}")
+    assert resp.json()["weight_green_g"] is None
+
+    client.post(f"/api/roasts/{roast_id}/stop")
+
+
+def test_delete_weight_roasted_via_api_cold(client):
+    roast_id = _create_roast(client)
+    client.post(f"/api/roasts/{roast_id}/weight", params={"grams": 1180.0})
+    client.post(f"/api/roasts/{roast_id}/stop")
+    session_manager.sessions.pop(roast_id, None)
+
+    resp = client.delete(f"/api/roasts/{roast_id}/weight")
+    assert resp.status_code == 200
+
+    resp = client.get(f"/api/roasts/{roast_id}")
+    assert resp.json()["weight_roasted_g"] is None
+
+
+def test_delete_weight_green_via_api_cold(client):
+    roast_id = _create_roast(client)
+    client.post(f"/api/roasts/{roast_id}/weight-green", params={"grams": 1520.0})
+    client.post(f"/api/roasts/{roast_id}/stop")
+    session_manager.sessions.pop(roast_id, None)
+
+    resp = client.delete(f"/api/roasts/{roast_id}/weight-green")
+    assert resp.status_code == 200
+
+    resp = client.get(f"/api/roasts/{roast_id}")
+    assert resp.json()["weight_green_g"] is None
+
+
+def test_delete_weight_endpoints_404_for_unknown_roast(client):
+    resp = client.delete("/api/roasts/does-not-exist/weight")
+    assert resp.status_code == 404
+
+    resp = client.delete("/api/roasts/does-not-exist/weight-green")
+    assert resp.status_code == 404
