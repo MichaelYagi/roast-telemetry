@@ -21,6 +21,13 @@ class RoastMode(str, Enum):
     # same reasoning as modbus_transport -- same engine contract, only
     # the byte protocol underneath differs.
     AILLIO_LIVE = "aillio_live"
+    # TC4+ shield running the aArtisanQ (PID) firmware -- plain ASCII
+    # serial commands (READ/OT1/DCFAN), not Modbus/raw-USB -- see
+    # tc4_bridge/engine.py's own docstring for the full protocol
+    # citation. Its own mode (not folded into modbus_live/ms6514_live)
+    # for the same reason aillio_live is separate: a genuinely different
+    # protocol family, not just a different transport of an existing one.
+    TC4_LIVE = "tc4_live"
 
 
 class RoastStatus(str, Enum):
@@ -401,6 +408,7 @@ class RoastCreateRequest(BaseModel):
     modbus_burner_sv_max_c: Optional[float] = Field(default=None, description="modbus_live, advanced: high end of the heater_pct(100%)->SV-temperature mapping, paired with modbus_burner_sv_min_c (both required together). Default 250.")
     ms6514_port: Optional[str] = Field(default=None, description="Required when mode=ms6514_live: serial port the Mastech MS6514 is on, e.g. 'COM5'")
     aillio_model: Optional[str] = Field(default=None, description="Required when mode=aillio_live: which Aillio Bullet model, e.g. 'r1' (see aillio_bridge.engine.PROTOCOLS for the known set). A raw USB device, not a port/host -- there's nothing else to configure per-install.")
+    tc4_port: Optional[str] = Field(default=None, description="Required when mode=tc4_live: serial port the TC4+ shield is on, e.g. 'COM5'")
     auto_detect_milestones: bool = Field(default=False, description="live-bridge modes only, opt-in: auto-fire Charge/Dry End/FC Start from the BT curve instead of manual clicks only (Turning Point stays automatic either way -- see roast_heuristics.LiveRoastDetector). Off by default -- real hardware means a real operator, not an algorithm guessing, unless explicitly turned on. Manual clicks still work as an override even when on.")
     dry_end_c: Optional[float] = Field(default=160.0, description="BT threshold for auto-detecting Dry End when auto_detect_milestones is on; live-bridge modes only. Null disables it.")
     fc_start_c: Optional[float] = Field(default=196.0, description="BT threshold for auto-detecting FC Start when auto_detect_milestones is on; live-bridge modes only. Null disables it.")
@@ -460,6 +468,8 @@ class RoastSummary(BaseModel):
     ms6514_port: Optional[str] = None
     # aillio_live only, same reasoning again.
     aillio_model: Optional[str] = None
+    # tc4_live only, same reasoning again.
+    tc4_port: Optional[str] = None
 
 
 class Roast(RoastSummary):

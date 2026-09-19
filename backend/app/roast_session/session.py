@@ -24,6 +24,7 @@ from modbus_bridge import ModbusEngine
 from ms6514_bridge import MS6514Engine
 from pymodbus.client import ModbusSerialClient, ModbusTcpClient
 from simulator import SimulatorEngine
+from tc4_bridge import TC4Engine
 
 from .. import storage
 from ..models import (
@@ -205,6 +206,11 @@ class RoastSession:
         if request.mode == RoastMode.AILLIO_LIVE:
             self.aillio_model = request.aillio_model
 
+        # tc4_live only -- same reasoning again.
+        self.tc4_port: Optional[str] = None
+        if request.mode == RoastMode.TC4_LIVE:
+            self.tc4_port = request.tc4_port
+
         if request.mode == RoastMode.SIMULATOR:
             engine = SimulatorEngine()
         elif request.mode == RoastMode.ALOG_PLAYBACK:
@@ -299,6 +305,18 @@ class RoastSession:
                 )
             except ValueError as exc:
                 raise RoastSessionError(str(exc)) from exc
+        elif request.mode == RoastMode.TC4_LIVE:
+            if not request.tc4_port:
+                raise RoastSessionError("tc4_port is required for tc4_live mode")
+            try:
+                engine = TC4Engine(
+                    request.tc4_port,
+                    dry_end_c=request.dry_end_c,
+                    fc_start_c=request.fc_start_c,
+                    detect_milestones=request.auto_detect_milestones,
+                )
+            except ValueError as exc:
+                raise RoastSessionError(str(exc)) from exc
         else:  # pragma: no cover - guarded by enum
             raise RoastSessionError(f"unsupported mode {request.mode}")
 
@@ -329,6 +347,13 @@ class RoastSession:
             logger.info(
                 "roast %s connecting: aillio_live model=%s connected=%s%s",
                 self.id, self.aillio_model, status.get("connected"),
+                f" error={status.get('last_error')}" if not status.get("connected") else "",
+            )
+        elif request.mode == RoastMode.TC4_LIVE:
+            status = engine.status()
+            logger.info(
+                "roast %s connecting: tc4_live port=%s connected=%s%s",
+                self.id, self.tc4_port, status.get("connected"),
                 f" error={status.get('last_error')}" if not status.get("connected") else "",
             )
         # Exposed via summary() so the frontend's vertical control panel
@@ -390,6 +415,7 @@ class RoastSession:
             "modbus_device_profile_name": self.modbus_device_profile_name,
             "ms6514_port": self.ms6514_port,
             "aillio_model": self.aillio_model,
+            "tc4_port": self.tc4_port,
         })
         if self.tags:
             storage.set_roast_tags(self.id, self.tags)
@@ -553,7 +579,7 @@ class RoastSession:
         self._stop_requested.set()
         self.status = RoastStatus.IDLE  # back to idle, not "stopped" -- nothing was ever actually recording
         await asyncio.to_thread(self.device.disconnect)
-        if isinstance(self._engine, (ModbusEngine, MS6514Engine)):
+        if isinstance(self._engine, (ModbusEngine, MS6514Engine, TC4Engine)):
             self._engine.close()  # release the serial port
         await pubsub.publish(self.id, {"type": "finished", "roast_id": self.id, "status": self.status.value})
 
@@ -562,7 +588,7 @@ class RoastSession:
         self.status = status
         self.duration_s = self.profile[-1]["time_s"] if self.profile else 0.0
         await asyncio.to_thread(self.device.disconnect)
-        if isinstance(self._engine, (ModbusEngine, MS6514Engine)):
+        if isinstance(self._engine, (ModbusEngine, MS6514Engine, TC4Engine)):
             self._engine.close()  # release the serial port
 
         # Written in real Artisan's own native shape (Python-literal syntax
@@ -903,6 +929,7 @@ class RoastSession:
             modbus_device_profile_name=self.modbus_device_profile_name,
             ms6514_port=self.ms6514_port,
             aillio_model=self.aillio_model,
+            tc4_port=self.tc4_port,
         )
 
     def to_roast(self) -> Roast:
@@ -941,6 +968,8 @@ class RoastSessionManager:
         elif request.mode == RoastMode.AILLIO_LIVE:
             port = request.aillio_model
             engine_attr = "model"
+        elif request.mode == RoastMode.TC4_LIVE:
+            port = request.tc4_port
         else:
             return
         if not port:
@@ -960,12 +989,12 @@ class RoastSessionManager:
         RoastSession.start()/begin_recording()'s _persist_new_roast_row()
         calls), since a modbus_live/ms6514_live session can now sit
         connected-but-not-recording for a while first (see connect())."""
-        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE):
+        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE):
             self._release_stale_same_port_session(request)
         roast_id = str(uuid.uuid4())
         session = RoastSession(roast_id, request, created_by_username=created_by_username)
-        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE):
-            # ModbusEngine/MS6514Engine/AillioEngine's __init__ already made the real
+        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE):
+            # ModbusEngine/MS6514Engine/AillioEngine/TC4Engine's __init__ already made the real
             # connect attempt above and caught/swallowed any failure into
             # last_error rather than raising -- without this check, a bad
             # port (wrong COM number, or one Artisan is still holding open)
@@ -1049,6 +1078,7 @@ class RoastSessionManager:
             modbus_device_profile_name=row.get("modbus_device_profile_name"),
             ms6514_port=row.get("ms6514_port"),
             aillio_model=row.get("aillio_model"),
+            tc4_port=row.get("tc4_port"),
             profile=parsed["profile"],
             events=parsed["events"],
             notes=parsed["notes"],
