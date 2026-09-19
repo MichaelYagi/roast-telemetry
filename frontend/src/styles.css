@@ -498,6 +498,18 @@ body.breakout-split-active .app-header-inner {
   min-width: 160px;
 }
 
+/* A single field on its own, outside a .form-row/.filters-row (so
+   there's no sibling to share a row with, and no need for those rules'
+   own flex:1/min-width:160px, which would stretch the input to the
+   whole panel's width) -- same label-above-input gap, no width push. */
+.standalone-field-label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 /* A number input's own value has no unit next to it -- the label text
    above ("Burner % at start") isn't enough on its own while eyes are on
    the typed number itself, so this pairs a "%" directly against the box. */

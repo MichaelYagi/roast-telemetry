@@ -100,7 +100,7 @@ export default function RoastComparisonView() {
     <div className="compare-view">
       <div className="panel">
         <h2>Roast Comparison</h2>
-        <label>
+        <label className="standalone-field-label">
           Curve
           <select value={curve} onChange={(e) => setCurve(e.target.value)}>
             <option value="bt">Bean Temp (BT)</option>
