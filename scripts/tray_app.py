@@ -85,12 +85,6 @@ DEFAULT_CONFIG = {
     # control of a real heat-producing machine). Type a real IP or
     # 0.0.0.0 via "Host: ..." to opt in.
     "host": "127.0.0.1",
-    # No npm/frontend source exists inside a frozen build (frontend/dist
-    # is already baked into the bundle) -- default off there so a
-    # first-ever launch doesn't immediately hit "npm not found" and
-    # refuse to start (see start()'s own frozen check below, which also
-    # skips this regardless of what's saved, belt-and-suspenders).
-    "rebuild_on_start": not FROZEN,
     "launch_at_login": False,
 }
 
@@ -109,6 +103,40 @@ def load_config() -> dict:
 def save_config(config: dict) -> None:
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     CONFIG_PATH.write_text(json.dumps(config, indent=2))
+
+
+# -- Frontend staleness check ---------------------------------------------
+# Used to be a manual "Rebuild frontend on start" checkbox (on by default,
+# turned off once you knew your build was current) -- replaced with this:
+# compare frontend source mtimes against the existing dist/index.html's
+# own mtime, so start() only rebuilds when something under frontend/ has
+# actually changed since the last build. Same guarantee the checkbox
+# existed for (never serve a stale build -- the bug run-server.sh/ps1
+# already guard against, an old build can silently keep serving outdated
+# behavior with no error at all) without needing anyone to remember a
+# setting exists, let alone what it does.
+def _frontend_needs_rebuild() -> bool:
+    dist_index = REPO_ROOT / "frontend" / "dist" / "index.html"
+    if not dist_index.exists():
+        return True  # first run, or a fresh clone -- nothing built yet
+    dist_mtime = dist_index.stat().st_mtime
+
+    watched_files = [
+        REPO_ROOT / "frontend" / "index.html",
+        REPO_ROOT / "frontend" / "vite.config.js",
+        REPO_ROOT / "frontend" / "package.json",
+    ]
+    if any(f.exists() and f.stat().st_mtime > dist_mtime for f in watched_files):
+        return True
+
+    for root_name in ("src", "public"):
+        root = REPO_ROOT / "frontend" / root_name
+        if not root.is_dir():
+            continue
+        for path in root.rglob("*"):
+            if path.is_file() and path.stat().st_mtime > dist_mtime:
+                return True
+    return False
 
 
 # -- Single-instance lock ------------------------------------------------
@@ -376,12 +404,7 @@ class TrayApp:
                 pystray.MenuItem(lambda _: f"Port: {self.config['port']}", self.change_port),
                 pystray.MenuItem(lambda _: f"Host: {self.config['host']}", self.change_host),
                 pystray.MenuItem(
-                    "Rebuild frontend on start",
-                    self.toggle_rebuild,
-                    checked=lambda _: self.config["rebuild_on_start"],
-                ),
-                pystray.MenuItem(
-                    "Launch at login",
+                    "Launch at startup",
                     self.toggle_launch_at_login,
                     checked=lambda _: self.config["launch_at_login"],
                 ),
@@ -450,7 +473,7 @@ class TrayApp:
         port = self.config["port"]
         host = self.config["host"]
 
-        if self.config["rebuild_on_start"] and not FROZEN:
+        if not FROZEN and _frontend_needs_rebuild():
             self._set_status(self.icon_building, "Roast Telemetry (building frontend...)")
             npm = shutil.which("npm")
             if npm is None:
@@ -461,9 +484,10 @@ class TrayApp:
             # frontend/dist/ is exactly the bug run-server.sh/ps1 already
             # guard against (see their own header comments: an old build
             # can silently keep serving old auth/login behavior with no
-            # error at all), so this rebuilds first by default. Turn off
-            # via the "Rebuild frontend on start" checkbox once you know
-            # your build is current, for faster restarts.
+            # error at all). Only runs when _frontend_needs_rebuild()
+            # above actually found something newer than the existing
+            # build -- no setting to remember, correct and fast by
+            # default instead of a manual on/off toggle.
             build = subprocess.run([npm, "run", "build"], cwd=REPO_ROOT / "frontend")
             if build.returncode != 0:
                 self._set_status(self.icon_error, "Roast Telemetry (frontend build failed)")
@@ -594,11 +618,6 @@ class TrayApp:
             return  # cancelled or cleared
         self.config["host"] = value.strip()
         self._apply_setting_change()
-
-    def toggle_rebuild(self, _icon=None, _item=None) -> None:
-        self.config["rebuild_on_start"] = not self.config["rebuild_on_start"]
-        save_config(self.config)
-        self.icon.update_menu()
 
     def toggle_launch_at_login(self, _icon=None, _item=None) -> None:
         new_value = not self.config["launch_at_login"]
