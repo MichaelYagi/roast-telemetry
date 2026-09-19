@@ -208,3 +208,47 @@ def test_count_roasts_not_capped_by_list_limit(client):
     capped_list = client.get("/api/roasts", params={"limit": 1}).json()
     assert len(capped_list) == 1
     assert total > len(capped_list)
+
+
+# -- "Roasted by" filter (GET /roasts?created_by=...) and GET /roasts/roasters --
+
+
+def test_list_roasts_filters_by_created_by(client):
+    a = _create_roast(client, title="Roaster A's Roast")
+    b = _create_roast(client, title="Roaster B's Roast")
+    client.post(f"/api/roasts/{a}/stop")
+    client.post(f"/api/roasts/{b}/stop")
+    # Simulates a roast created by a different account -- simplest way to
+    # get a second distinct created_by_username without a full second
+    # register/login flow, same direct-storage-manipulation precedent
+    # test_roasts_lifecycle_api.py's own attribution tests already use.
+    storage.update_roast(b, created_by_username="someone-else")
+
+    resp = client.get("/api/roasts", params={"created_by": "someone-else"})
+    ids = [r["id"] for r in resp.json()]
+    assert b in ids
+    assert a not in ids
+
+
+def test_count_roasts_filters_by_created_by(client):
+    a = _create_roast(client, title="Count Roaster A")
+    b = _create_roast(client, title="Count Roaster B")
+    client.post(f"/api/roasts/{a}/stop")
+    client.post(f"/api/roasts/{b}/stop")
+    storage.update_roast(b, created_by_username="someone-else")
+
+    resp = client.get("/api/roasts/count", params={"created_by": "someone-else"})
+    assert resp.json()["total"] == 1
+
+
+def test_list_roasters_endpoint(client):
+    a = _create_roast(client, title="Roaster List A")
+    b = _create_roast(client, title="Roaster List B")
+    client.post(f"/api/roasts/{a}/stop")
+    client.post(f"/api/roasts/{b}/stop")
+    storage.update_roast(b, created_by_username="someone-else")
+
+    resp = client.get("/api/roasts/roasters")
+    assert resp.status_code == 200
+    roasters = {r["created_by_username"]: r["count"] for r in resp.json()}
+    assert roasters == {"test-admin": 1, "someone-else": 1}

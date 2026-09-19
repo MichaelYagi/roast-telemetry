@@ -118,6 +118,7 @@ def list_roasts(
     status: Optional[RoastStatus] = None,
     tag: Optional[str] = None,
     q: Optional[str] = Query(default=None, description="Substring match against title/beans/tags"),
+    created_by: Optional[str] = None,
     limit: int = Query(default=100, le=500),
     offset: int = 0,
 ) -> list[RoastSummary]:
@@ -126,6 +127,7 @@ def list_roasts(
         status=status.value if status else None,
         tag=tag,
         q=q,
+        created_by=created_by,
         limit=limit,
         offset=offset,
     )
@@ -136,12 +138,18 @@ def list_tags() -> list[dict]:
     return storage.list_distinct_tags()
 
 
+@router.get("/roasters")
+def list_roasters() -> list[dict]:
+    return storage.list_distinct_roasters()
+
+
 @router.get("/count")
 def count_roasts(
     mode: Optional[RoastMode] = None,
     status: Optional[RoastStatus] = None,
     tag: Optional[str] = None,
     q: Optional[str] = None,
+    created_by: Optional[str] = None,
 ) -> dict:
     # Separate from list_roasts above (rather than {items, total}) so
     # GET /roasts itself stays a plain array -- BackgroundProfilePicker.jsx/
@@ -154,6 +162,7 @@ def count_roasts(
         status=status.value if status else None,
         tag=tag,
         q=q,
+        created_by=created_by,
     )
     return {"total": total}
 

@@ -254,7 +254,12 @@ def get_roast_row(roast_id: str) -> Optional[dict]:
 
 
 def _roast_filter_clauses(
-    *, mode: Optional[str], status: Optional[str], tag: Optional[str], q: Optional[str]
+    *,
+    mode: Optional[str],
+    status: Optional[str],
+    tag: Optional[str],
+    q: Optional[str],
+    created_by: Optional[str] = None,
 ) -> tuple[list[str], dict]:
     """Shared between list_roast_rows and count_roast_rows -- the page
     of results and the total count behind it must always agree on
@@ -270,6 +275,9 @@ def _roast_filter_clauses(
     if tag:
         clauses.append("t.tag = :tag")
         params["tag"] = tag
+    if created_by:
+        clauses.append("r.created_by_username = :created_by")
+        params["created_by"] = created_by
     if q:
         # title/beans/tags only -- per-timestamp roast notes live inside
         # each roast's own .alog file, not a DB column, so searching
@@ -288,10 +296,11 @@ def list_roast_rows(
     status: Optional[str] = None,
     tag: Optional[str] = None,
     q: Optional[str] = None,
+    created_by: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict]:
-    clauses, params = _roast_filter_clauses(mode=mode, status=status, tag=tag, q=q)
+    clauses, params = _roast_filter_clauses(mode=mode, status=status, tag=tag, q=q, created_by=created_by)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     params["limit"] = limit
     params["offset"] = offset
@@ -312,6 +321,7 @@ def count_roast_rows(
     status: Optional[str] = None,
     tag: Optional[str] = None,
     q: Optional[str] = None,
+    created_by: Optional[str] = None,
 ) -> int:
     """Total matching rows regardless of limit/offset -- backs
     HistoryDashboard.jsx's page count, since GET /roasts itself stays a
@@ -319,7 +329,7 @@ def count_roast_rows(
     RoastComparisonView.jsx, LiveRoastView.jsx's active-roast check --
     already depend on that exact shape and would break if it became
     {items, total})."""
-    clauses, params = _roast_filter_clauses(mode=mode, status=status, tag=tag, q=q)
+    clauses, params = _roast_filter_clauses(mode=mode, status=status, tag=tag, q=q, created_by=created_by)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     with _conn() as c:
         row = c.execute(
@@ -329,6 +339,16 @@ def count_roast_rows(
             params,
         ).fetchone()
         return row[0]
+
+
+def list_distinct_roasters() -> list[dict]:
+    with _conn() as c:
+        rows = c.execute(
+            """SELECT created_by_username, COUNT(*) as count FROM roasts
+               WHERE created_by_username IS NOT NULL
+               GROUP BY created_by_username ORDER BY count DESC, created_by_username ASC"""
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def delete_roast_row(roast_id: str) -> None:

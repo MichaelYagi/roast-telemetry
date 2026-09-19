@@ -14,13 +14,14 @@ export default function HistoryDashboard() {
   const confirm = useConfirm();
   const notify = useNotify();
   const [roasts, setRoasts] = useState([]);
-  const [filters, setFilters] = useState({ mode: "", status: "", tag: "", q: "" });
+  const [filters, setFilters] = useState({ mode: "", status: "", tag: "", created_by: "", q: "" });
   // Debounced separately from `filters.q` itself -- typing shouldn't fire
   // a request per keystroke, but the input needs to stay responsive/
   // uncontrolled-feeling, so this local value updates immediately while
   // filters.q (the thing refresh()'s effect actually watches) lags behind it.
   const [searchInput, setSearchInput] = useState("");
   const [allTags, setAllTags] = useState([]);
+  const [allRoasters, setAllRoasters] = useState([]);
   // 1-indexed. pageSize comes from Settings > History (default 100 until
   // that loads) -- GET /roasts itself has no hard cap on how many total
   // roasts are reachable, just how many come back per request; paging
@@ -92,6 +93,7 @@ export default function HistoryDashboard() {
   // one-time getSettings() fetch already accepts for temperature unit.
   useEffect(() => {
     api.listTags().then(setAllTags);
+    api.listRoasters().then(setAllRoasters);
     api.getSettings().then((s) => setPageSize(s.history_page_size || 100));
   }, []);
 
@@ -253,6 +255,17 @@ export default function HistoryDashboard() {
             {allTags.map((t) => (
               <option key={t.tag} value={t.tag}>
                 {t.tag} ({t.count})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Roasted by
+          <select value={filters.created_by} onChange={(e) => updateFilter("created_by", e.target.value)}>
+            <option value="">All</option>
+            {allRoasters.map((r) => (
+              <option key={r.created_by_username} value={r.created_by_username}>
+                {r.created_by_username} ({r.count})
               </option>
             ))}
           </select>
