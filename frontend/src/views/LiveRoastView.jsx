@@ -260,17 +260,16 @@ export default function LiveRoastView() {
   const [presetFeedback, setPresetFeedback] = useState(null);
   // Quick weight capture/edit, right here rather than forcing a
   // navigation to the detail page first -- see RoastDetailView.jsx for
-  // the other place both fields are editable. `roast` comes from
-  // useRoastStream's websocket state (no setter exposed, and the backend
-  // doesn't push a message for this REST-only write), so this tracks the
-  // saved value locally instead of trying to mutate `roast` itself.
-  // Roasted weight only makes sense once finished (nothing to weigh
-  // before then) -- shown as a plain inline capture, no edit toggle
-  // needed since it starts blank. Green weight usually already has a
-  // value from the New Roast form though, and should stay correctable
-  // the whole time the roast is open (a typo, a re-weigh, forgetting to
-  // fill it in at all) -- so it gets the same edit/add toggle
-  // RoastDetailView.jsx uses, not a fill-once box.
+  // the other place both fields are editable, same edit/add toggle
+  // pattern as there for both fields (originally Roasted weight had its
+  // own plain always-visible-input pattern instead, since it starts
+  // blank -- but that read as visually inconsistent sitting right next
+  // to Green weight's toggle in the same list, so both match now).
+  // `roast` comes from useRoastStream's websocket state (no setter
+  // exposed, and the backend doesn't push a message for this REST-only
+  // write), so this tracks the saved value locally instead of trying to
+  // mutate `roast` itself.
+  const [editingRoastedWeight, setEditingRoastedWeight] = useState(false);
   const [roastedWeightInput, setRoastedWeightInput] = useState("");
   const [roastedWeightSaved, setRoastedWeightSaved] = useState(null);
   const [editingGreenWeight, setEditingGreenWeight] = useState(false);
@@ -759,6 +758,7 @@ export default function LiveRoastView() {
     try {
       await api.setWeightRoasted(roastId, grams);
       setRoastedWeightSaved(grams);
+      setEditingRoastedWeight(false);
     } catch (err) {
       setWeightError(err.message);
     } finally {
@@ -2038,25 +2038,42 @@ export default function LiveRoastView() {
                     )}
                   </span>
                 </li>
-                {phase === "finished" && (roastedWeightSaved != null || roast.weight_roasted_g == null) && (
+                {phase === "finished" && (
                   <li>
                     <span>Roasted weight</span>
                     <span>
-                      {roastedWeightSaved != null ? (
-                        `${roastedWeightSaved} g`
-                      ) : (
+                      {editingRoastedWeight ? (
                         <span className="input-suffix-group">
                           <input
                             type="number" min="0" step="0.1"
                             value={roastedWeightInput}
                             onChange={(e) => setRoastedWeightInput(e.target.value)}
                             placeholder="grams"
+                            autoFocus
                           />
                           <span className="input-suffix">g</span>
                           <button type="button" onClick={handleSaveRoastedWeight} disabled={weightSaving || !roastedWeightInput.trim()}>
                             {weightSaving ? "Saving…" : "Save"}
                           </button>
+                          <button type="button" className="link-like" onClick={() => setEditingRoastedWeight(false)}>
+                            Cancel
+                          </button>
                         </span>
+                      ) : (
+                        <>
+                          {(roastedWeightSaved ?? roast.weight_roasted_g) != null ? `${roastedWeightSaved ?? roast.weight_roasted_g} g` : "—"}{" "}
+                          <button
+                            type="button"
+                            className="link-like"
+                            onClick={() => {
+                              setRoastedWeightInput(String(roastedWeightSaved ?? roast.weight_roasted_g ?? ""));
+                              setWeightError(null);
+                              setEditingRoastedWeight(true);
+                            }}
+                          >
+                            {(roastedWeightSaved ?? roast.weight_roasted_g) != null ? "edit" : "add"}
+                          </button>
+                        </>
                       )}
                     </span>
                   </li>
