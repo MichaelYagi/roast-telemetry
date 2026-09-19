@@ -21,6 +21,7 @@ from ..models import (
     EventCreateRequest,
     EventUpdateRequest,
     NoteCreateRequest,
+    ReviewStatus,
     Roast,
     RoastCreateRequest,
     RoastMode,
@@ -484,9 +485,18 @@ async def request_review(roast_id: str, background_tasks: BackgroundTasks) -> Ro
 @router.get("/{roast_id}/review", response_model=RoastReview)
 def get_review(roast_id: str) -> RoastReview:
     row = storage.get_review_row(roast_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail=f"no review for roast {roast_id!r} yet")
-    return _row_to_review(row)
+    if row is not None:
+        return _row_to_review(row)
+    # No review row yet -- the default, common state (nobody's clicked
+    # "Generate review"), not an error. 404 is reserved for the roast
+    # itself not existing at all -- see ReviewStatus.NONE's own comment
+    # for why this distinction matters: a 404 here used to fire on every
+    # single unreviewed roast's detail page load, showing up as a failed
+    # network request in the browser console during completely normal
+    # browsing, not just when something was actually wrong.
+    if session_manager.get_roast_detail(roast_id) is None:
+        raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
+    return RoastReview(roast_id=roast_id, status=ReviewStatus.NONE)
 
 
 @router.post("/import", response_model=RoastSummary, status_code=201)

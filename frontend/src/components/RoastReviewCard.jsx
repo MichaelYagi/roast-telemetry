@@ -21,16 +21,18 @@ export default function RoastReviewCard({ roastId, roastActive }) {
   function fetchReview() {
     api
       .getReview(roastId)
+      // status "none" (no review row yet -- the common, default state)
+      // comes back as a normal 200, not a 404 -- see backend's
+      // ReviewStatus.NONE comment for why a 404 here used to fire on
+      // every unreviewed roast's detail page during ordinary browsing.
+      // Any error caught below is now a genuine one (network failure,
+      // or the roast itself not existing).
       .then((r) => {
-        setReview(r);
+        setReview(r.status === "none" ? null : r);
         if (r.status === "pending") scheduleNextPoll();
       })
       .catch((err) => {
-        if (err.status === 404) {
-          setReview(null);
-        } else {
-          setError(err.message);
-        }
+        setError(err.message);
       });
   }
 

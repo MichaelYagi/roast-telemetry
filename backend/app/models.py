@@ -611,6 +611,15 @@ class OllamaStatus(BaseModel):
 
 
 class ReviewStatus(str, Enum):
+    # No review row exists yet -- the default, common state for most
+    # roasts (nobody's clicked "Generate review"). GET /review returns
+    # this with a 200, not a 404 -- see that endpoint's own comment for
+    # why: 404 collapsed "no review yet" (routine, happens on every
+    # unreviewed roast's detail page) into the same status as a genuinely
+    # broken request, showing up as a failed network request in the
+    # browser console on ordinary navigation, not just when something's
+    # actually wrong.
+    NONE = "none"
     PENDING = "pending"
     READY = "ready"
     FAILED = "failed"
@@ -622,7 +631,9 @@ class RoastReview(BaseModel):
     review_text: Optional[str] = None
     error: Optional[str] = None
     model: Optional[str] = None
-    created_at: str
+    # Optional -- genuinely absent for status=none (no row exists to have
+    # a created_at at all), present for every other status.
+    created_at: Optional[str] = None
     completed_at: Optional[str] = None
 
 
