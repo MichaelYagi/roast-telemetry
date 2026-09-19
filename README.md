@@ -14,16 +14,17 @@ prefer the link above or open the files locally.)*
 
 ## Major features
 
-- **Four interchangeable data sources**, picked per roast:
+- **Six interchangeable data sources**, picked per roast:
   - **Artisan Simulator** — a thermal model producing realistic BT/ET/RoR
     curves and auto-detected roast events. No hardware needed.
   - **`.alog` Playback** — replays a real roast log, including events and
     notes, at real or accelerated speed. Reads genuine Artisan-exported
     `.alog` files too, not just this project's own.
-  - **Direct Modbus** — talks straight to a real roaster's PLC over
-    Modbus RTU, bypassing Artisan entirely, with full read *and* write
-    control (Burner/Air/Drum). Ships configured for Coffee-Tech's
-    FZ-94, expressed as a built-in **Device Profile** — a named,
+  - **Direct Modbus (USB or Ethernet)** — talks straight to a real
+    roaster's PLC over Modbus RTU or TCP, bypassing Artisan entirely,
+    with full read *and* write control (Burner/Air/Drum). Ships
+    configured for Coffee-Tech's FZ-94 (USB) and FZ-94 Evo (Ethernet),
+    each expressed as a built-in **Device Profile** — a named,
     reusable register map covering any number of temperature channels
     and three control mechanisms (setpoint-temperature, VFD drive,
     plain direct-register), so supporting a different roaster brand is
@@ -35,6 +36,14 @@ prefer the link above or open the files locally.)*
     capacity in Artisan's own file format).
   - **Direct USB (thermocouple meter)** — reads a Mastech MS6514 dual
     K-type thermocouple meter straight over USB-serial.
+  - **Aillio Bullet (USB)** — talks straight to a real Aillio Bullet over
+    its own vendor-specific USB protocol (not Modbus/serial), with full
+    Heater/Fan/Drum control. Ships with the R1 model.
+  - **TC4+ (USB, aArtisanQ/PID firmware)** — plain ASCII serial commands
+    over USB to a TC4+ shield, bypassing Artisan entirely, with real
+    Heater/Fan control (no Drum channel on this hardware). DIY hardware
+    with no single default wiring, so it has no built-in preset — see
+    the table below.
 - **Artisan-style connect-then-record flow** for the two live-hardware
   modes — ON connects and streams live readings so you can verify a
   connection before committing to a roast; START begins actually
@@ -64,8 +73,11 @@ prefer the link above or open the files locally.)*
   auto-fires either way, since it's a pure observation, not a judgment
   call. (The Artisan Simulator source is the exception — its own thermal
   model auto-fires every milestone, useful as a hands-off demo.)
-- **Real hardware fakes** for both live-hardware modes, so the full
-  connection code path is testable without owning a roaster.
+- **Real hardware fakes** for Direct Modbus, Direct USB (thermocouple
+  meter), and TC4+, so the full connection code path is testable without
+  owning a roaster — Aillio Bullet is the one exception (a raw USB
+  device, not a serial port or TCP socket; covered instead by thorough
+  protocol-level pytest coverage).
 - **Background Profile overlay** — load any previously recorded, finished
   roast onto the live chart as a dashed BT/ET reference to pace against,
   same idea as Artisan's own Background Profile. Both curves are already
@@ -84,6 +96,27 @@ prefer the link above or open the files locally.)*
   full access to everything else — no per-feature permissions, just the
   one gate.
 
+## Built-in presets
+
+"Load saved config" entries the app ships with, so most people never
+type in a register map or port by hand. Alphabetical by preset name;
+"Tested on real hardware" means actually connected to and verified
+against the physical device, not just protocol-level unit tests or a
+fake — everything else here is well-tested in every *other* sense
+(real end-to-end tests against `hardware_fakes/`, or thorough
+protocol-decoding pytest coverage for Aillio), just not yet against
+its real hardware.
+
+| Preset | Data source | Tested on real hardware |
+| --- | --- | --- |
+| Bullet R1, USB | Aillio Bullet (USB) | ❌ |
+| FZ-94 Evo, Ethernet | Direct Modbus | ❌ |
+| FZ-94, USB | Direct Modbus | ✅ |
+| Mastech MS6514, USB | Direct USB (thermocouple meter) | ❌ |
+
+TC4+ has no built-in preset — it's DIY hardware with no single default
+wiring/config to ship, unlike the rest of these.
+
 ## Getting started
 
 See [docs/getting-started.html](docs/getting-started.html) for
@@ -94,6 +127,8 @@ installation and running it. Full docs:
   [FZ-94 (USB)](docs/modbus/fz-94-usb.html) specifically
 - [Real-hardware checklist](docs/modbus/real-hardware-checklist.html) —
   connecting to an actual machine safely
+- [Aillio Bullet R1](docs/aillio/bullet-r1.html) — USB protocol, install
+  requirements, known limitations
 - [Architecture reference](docs/architecture.html) — layout, storage, API
   summary, assumptions
 - [Contributing](CONTRIBUTING.md) — running tests, code style, releasing
