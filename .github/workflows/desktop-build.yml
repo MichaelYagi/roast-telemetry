@@ -1,0 +1,81 @@
+name: Build desktop app
+
+# Builds the unsigned Windows .exe and macOS .app via
+# packaging/build-windows.ps1 / packaging/build-macos.sh -- both must run
+# *natively* on their target OS (PyInstaller has no cross-compile path),
+# which is exactly what macos-latest/windows-latest runners give.
+#
+# Same trigger as release.yml -- every vX.Y.Z tag, no filtering by
+# version component. (While this pipeline is still being proven out on
+# real GitHub-hosted runners -- it's only ever been verified headless on
+# WSL2 before, and has already broken twice on a first *real* native
+# build, see git history: "could not open serial port 'socket://...'",
+# "No module named 'pystray'" -- testing tags are just plain patch bumps
+# by convention, not because this workflow itself treats patch tags
+# specially.)
+#
+# Deliberately doesn't call scripts/install.sh / install.ps1 -- those are
+# interactive (prompt before touching system state via brew/apt/winget),
+# meant for a first-time human on their own machine, not CI. This runs
+# the handful of non-interactive equivalent steps directly instead.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Set up .venv (mirrors scripts/install.sh, non-interactively)
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r backend/requirements.txt
+          .venv/bin/pip install -r scripts/tray_requirements.txt
+      - run: npm ci
+        working-directory: frontend
+      - name: Build Roast Telemetry.app
+        run: packaging/build-macos.sh
+      - name: Zip the .app (upload-artifact would otherwise flatten it)
+        run: cd dist && zip -r "RoastTelemetry-macOS-${GITHUB_REF_NAME}.zip" "Roast Telemetry.app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RoastTelemetry-macOS-${{ github.ref_name }}
+          path: dist/RoastTelemetry-macOS-*.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Set up .venv (mirrors scripts/install.ps1, non-interactively)
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install --upgrade pip
+          .\.venv\Scripts\pip.exe install -r backend\requirements.txt
+          .\.venv\Scripts\pip.exe install -r scripts\tray_requirements.txt
+      - run: npm ci
+        working-directory: frontend
+      - name: Build Roast Telemetry.exe
+        run: packaging\build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RoastTelemetry-Windows-${{ github.ref_name }}
+          path: dist/Roast Telemetry.exe
