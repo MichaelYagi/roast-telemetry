@@ -2,9 +2,9 @@ name: Notify desktop build
 
 # When a version tag is pushed here, tells the private
 # MichaelYagi/roast-telemetry-artifacts repo to build the desktop
-# .exe/.app for it -- those builds are the paid convenience offering, so
-# they're built and kept in a private repo (workflow artifacts on a
-# *public* repo are downloadable by any signed-in GitHub user). The build
+# .exe/.app for it -- those builds are built and kept in a private repo
+# (workflow artifacts on a *public* repo are downloadable by any
+# signed-in GitHub user). The build
 # itself lives in that repo's own desktop-build.yml.
 #
 # Needs a repo secret DESKTOP_DISPATCH_TOKEN: a fine-grained personal

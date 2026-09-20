@@ -1,0 +1,66 @@
+name: Hardware report
+description: Tell us whether Roast Telemetry works with your roaster or meter
+title: "[Hardware] <model> - works / partly / doesn't"
+labels: ["hardware-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing! Please read the
+        [real-hardware checklist](https://michaelyagi.github.io/roast-telemetry/modbus/real-hardware-checklist.html)
+        first. Do the read-only checks before you try any writes (burner, fan, drum) -- a wrong setting can act on a hot machine.
+  - type: input
+    id: machine
+    attributes:
+      label: Roaster or meter (make, model, firmware)
+      placeholder: "e.g. Aillio Bullet R1, firmware 3.x"
+    validations:
+      required: true
+  - type: dropdown
+    id: preset
+    attributes:
+      label: Built-in preset you used
+      options:
+        - Bullet R1, USB
+        - FZ-94 Evo, Ethernet
+        - FZ-94, USB
+        - Mastech MS6514, USB
+        - TC4+ (no preset)
+        - Custom / other
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Roast Telemetry version, OS, and connection (USB / serial adapter / Ethernet)
+      placeholder: "e.g. v1.2.10, Windows 11, USB-serial adapter on COM4"
+    validations:
+      required: true
+  - type: dropdown
+    id: reads
+    attributes:
+      label: Test Connection -- read checks
+      options:
+        - All channels read correctly
+        - Some channels wrong or missing
+        - Could not connect
+    validations:
+      required: true
+  - type: dropdown
+    id: writes
+    attributes:
+      label: Write checks (only if you tried them)
+      options:
+        - Not tried
+        - Worked and the machine responded
+        - Did not work
+        - Worked but behaved unexpectedly
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: What happened
+      description: Attach a screenshot of the Test Connection results, and an exported `.alog` from a short recording if you can. Mention any channels that were wrong (for example fan and drum swapped).
+    validations:
+      required: true

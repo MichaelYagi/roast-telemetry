@@ -92,15 +92,13 @@ serves directly — see `backend/app/main.py`).
 
 ## Publishing docs
 
-`docs/` here isn't what's actually live at
-https://michaelyagi.github.io/roast-telemetry — that's a separate,
-public repo (`michaelyagi.github.io`), since this repo is private and
-GitHub Pages can't serve a private repo directly. A `docs/` change
-doesn't reach the public site on its own; run `scripts/sync-docs.sh`
-(clones/updates a local copy of that repo next to this one by default,
-override with `MIRROR_DIR`) to copy everything over, strip the couple
-of links that point back to this private repo, and push, but only when
-you actually want the public site updated.
+`docs/` here isn't served directly -- what's live at
+https://michaelyagi.github.io/roast-telemetry is a copy published to a
+separate repo (`michaelyagi.github.io`) by `scripts/sync-docs.sh`. CI runs
+it automatically whenever `docs/` changes on `main`; you can also run it by
+hand (it clones/updates a local copy of that repo next to this one by
+default, override with `MIRROR_DIR`), which copies everything over, strips
+the couple of links that point back to this repo, and pushes.
 
 ## Reporting bugs / proposing features
 
