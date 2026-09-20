@@ -37,8 +37,9 @@
     the OS to see that serial/USB port directly — it can't reach across
     a network to a port plugged into a different machine. Other devices
     on your network (a phone, another computer) can still view/control
-    an already-running roast remotely — that's what the tray's
-    <a href="#tray-icon">Host: 0.0.0.0</a> option is for — but that's
+    an already-running roast remotely — that's what
+    <code>--lan</code> / <code>-Lan</code> (listening on
+    <code>0.0.0.0</code>) is for — but that's
     about who can reach the server once it's running, not about which
     machine the server itself has to run on. The one exception: Direct
     Modbus <em>over Ethernet</em> (e.g. FZ-94 Evo) is genuinely
@@ -52,23 +53,13 @@
     standing between them and a roaster mid-roast. Fine on a trusted
     home network; worth real thought anywhere less trusted.
   </div>
-  <div class="callout">
-    <strong>Prefer not to deal with a source checkout at all?</strong>
-    See <a href="#standalone-builds">Standalone builds</a> further down
-    — a real double-clickable <code>.exe</code>/<code>.app</code>,
-    no Python/Node/terminal involved at all. Building one still
-    needs the dev setup below done once, on whichever machine builds it
-    — but *running* it afterward, including for someone else you hand
-    it to, needs nothing from this page.
-  </div>
   <p>
-    Otherwise, from a terminal: <code>scripts/install.sh</code> once
-    (or <code>scripts\install.ps1</code> on Windows), then
-    <code>scripts/start.sh</code> / <code>scripts\start.ps1</code> —
-    installs if this is a fresh clone, otherwise starts the app: the
-    <a href="#tray-icon">tray icon</a> below on macOS/Windows, or the
-    server right in your terminal on Linux/WSL2 (there's deliberately no
-    Linux tray icon). What every script does, and its options, is in the
+    From a terminal: <code>scripts/install.sh</code> once (or
+    <code>scripts\install.ps1</code> on Windows), then
+    <code>scripts/run-server.sh</code> (or
+    <code>scripts\run-server.ps1</code>) whenever you want to run it —
+    the app is then at <code>http://localhost:8000</code>. What every
+    script does, and its options, is in the
     <a href="#scripts-reference">Scripts reference</a> below.
   </p>
 
@@ -157,9 +148,8 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
   <h3 id="linux-headless">Linux / Raspberry Pi (server only)</h3>
   <p>
     On Linux — a Raspberry Pi running Raspberry Pi OS included — the app
-    runs as a plain server you open in a browser: the same two scripts as
-    above (<code>scripts/start.sh</code> does both). There's deliberately
-    no tray icon on Linux, and no <code>.deb</code>/<code>.rpm</code>/AppImage
+    runs as a plain server you open in a browser, using the same two
+    scripts as above. There's no <code>.deb</code>/<code>.rpm</code>/AppImage
     package: for a server-only app those would save little over
     <code>install.sh</code> + <code>run-server.sh</code>, and the scripts
     already cover the real setup work. Over SSH, unattended:
@@ -213,7 +203,7 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
     etc.) works on a hard refresh too.
   </p>
   <div class="callout">
-    <strong>Note:</strong> the run scripts (and the tray icon) rebuild
+    <strong>Note:</strong> the run scripts rebuild
     the frontend before starting <em>when it's out of date</em>, since
     the backend serves whatever's already sitting in
     <code>frontend/dist/</code> and never rebuilds it for you — a stale
@@ -235,88 +225,6 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
     <code>cd frontend &amp;&amp; npm run build &amp;&amp; cd .. &amp;&amp; PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code>
     by hand.
   </div>
-
-  <h2 id="tray-icon">Tray icon (optional)</h2>
-  <p>
-    A system tray / menu-bar icon that starts and stops the server with a
-    click, instead of a terminal command — works on Windows and macOS.
-    Deliberately not native Linux desktop: real testing surfaced
-    tray-icon fragmentation across Linux desktop environments (no
-    single standard protocol the way Windows/macOS each have exactly
-    one) that isn't fixable from this app's own code. WSL2's own role
-    stays the terminal-based install/fake-hardware workflow above,
-    unaffected. <code>scripts/install.sh</code>/<code>install.ps1</code>
-    already install its dependencies (<code>pystray</code>, Pillow) by
-    default, so there's no separate setup step — just run it:
-  </p>
-  <pre><code>scripts/tray.sh      # macOS.  Windows: scripts\tray.ps1</code></pre>
-  <p>
-    Or use the combined launcher (<code>scripts/start.sh</code> on macOS,
-    <code>scripts\start.ps1</code> on Windows) — it installs first only if
-    needed, then comes straight here. (<code>tray.sh</code> refuses to run
-    on Linux/WSL2 and points you at <code>run-server.sh</code>; on Linux,
-    <code>start.sh</code> starts the server in your terminal instead.)
-  </p>
-  <p>
-    Right-click the icon for Start/Stop/Restart/Open in browser. A color
-    badge on the icon shows building (amber) / running (green) /
-    stopped or crashed (gray/red) at a glance. The server's own output
-    (started this way) goes to <code>backend/data/server.log</code>,
-    appended across restarts, rather than to the console window, which
-    would otherwise lose it once closed — <strong>Save logs...</strong>
-    copies it wherever you choose (e.g. to send someone for
-    troubleshooting).
-  </p>
-  <p>
-    The menu also has:
-  </p>
-  <ul>
-    <li><strong>Port</strong> / <strong>Host</strong> — click either to
-      change it (a text prompt, defaulting to <code>7890</code> /
-      <code>127.0.0.1</code>). Saved permanently, and if the server's
-      already running, it restarts automatically so the change takes
-      effect right away. <code>127.0.0.1</code> means this computer
-      only; type <code>0.0.0.0</code> (or a specific address) for LAN
-      access — see the <a href="#lan-exposure">LAN-exposure notes</a>
-      above before doing that for anything that actually controls a
-      real roaster.</li>
-    <li><strong>Copy URL to clipboard</strong> — the address to paste
-      into another device's browser.</li>
-    <li><strong>Launch at startup</strong> (checkbox) — starts the tray
-      automatically next time you log in (Windows Startup folder / macOS
-      LaunchAgent, whichever applies).</li>
-  </ul>
-
-  <h2 id="standalone-builds">Standalone builds (no Python/Node install needed to run)</h2>
-  <p>
-    Everything above assumes running from a cloned repo with Python and
-    Node installed. <code>packaging/</code> builds a standalone,
-    unsigned distributable instead — by default a single file
-    (Windows) or a real <code>.app</code> (macOS, wrapping a
-    single file inside) with the same tray icon experience as above,
-    that someone else can just download and run with nothing else
-    installed (a folder-based build is available too, see
-    <code>packaging/README.md</code>, if you'd rather trade the
-    single-file convenience for faster startup). Windows and macOS
-    only — see the Tray icon section above for why native Linux
-    desktop isn't a supported target. Must be built natively on each
-    target platform (there's no cross-compile path) — one command per
-    platform, from a machine with this repo's own dev setup
-    (<code>install.sh</code>/<code>install.ps1</code>) already done:
-  </p>
-  <pre><code>packaging\build-windows.ps1   # Windows, in PowerShell
-packaging/build-macos.sh      # macOS</code></pre>
-  <p>
-    Unsigned means a one-time OS warning on whoever's machine first runs
-    it (Windows SmartScreen / macOS Gatekeeper) — expected, not a build
-    error; see
-    <a href="https://github.com/MichaelYagi/roast-telemetry/blob/main/packaging/README.md">packaging/README.md</a>
-    for the exact click-through steps, what actually changes to make a
-    frozen build behave correctly (per-user data directory, the
-    server's own re-exec instead of shelling out to <code>-m
-    uvicorn</code>), and what this does <em>not</em> do yet (code
-    signing, a real installer, auto-update).
-  </p>
 
   <h2>Two ports (for frontend development)</h2>
   <p>
@@ -552,24 +460,19 @@ scripts/fake-hardware.sh fz94 --tcp 5030 # or a specific port</code></pre>
 
   <h2 id="scripts-reference">Scripts reference</h2>
   <p>
-    Everything in <code>scripts/</code>, plus the two build scripts in
-    <code>packaging/</code>, and what each is for. Not sure where to
-    start? <code>scripts/start.sh</code> (<code>scripts\start.ps1</code>
-    on Windows) does the right thing for your platform.
+    Everything in <code>scripts/</code> and what each is for. Not sure
+    where to start? <code>install.sh</code> (<code>install.ps1</code> on
+    Windows) once, then <code>run-server.sh</code>
+    (<code>run-server.ps1</code>).
   </p>
   <table>
     <thead><tr><th>Script</th><th>Platform</th><th>What it does</th></tr></thead>
     <tbody>
-      <tr><td><code>install.sh</code></td><td>macOS, Linux/WSL2</td><td>First-time setup, safe to re-run. Checks for Python 3.10+ and Node.js (offers to install them via <code>brew</code>/<code>apt-get</code> — asks first), creates <code>.venv</code>, installs the backend and tray dependencies and the frontend's npm packages, and offers <code>socat</code> (only <code>fake-hardware.sh</code> needs it). <code>--yes</code> runs it unattended. Refuses to reuse a <code>.venv</code> created by native Windows Python, and says why.</td></tr>
+      <tr><td><code>install.sh</code></td><td>macOS, Linux/WSL2</td><td>First-time setup, safe to re-run. Checks for Python 3.10+ and Node.js (offers to install them via <code>brew</code>/<code>apt-get</code> — asks first), creates <code>.venv</code>, installs the backend dependencies and the frontend's npm packages, and offers <code>socat</code> (only <code>fake-hardware.sh</code> needs it). <code>--yes</code> runs it unattended. Refuses to reuse a <code>.venv</code> created by native Windows Python, and says why.</td></tr>
       <tr><td><code>install.ps1</code></td><td>Windows</td><td>The same, via <code>winget</code>; also offers to set up WSL2 for <code>fake-hardware.sh</code> if WSL2 is present. <code>-Yes</code> runs it unattended.</td></tr>
       <tr><td><code>run-server.sh</code> / <code>run-server.ps1</code></td><td>macOS, Linux/WSL2 / Windows</td><td>Starts the server (uvicorn) at <code>http://localhost:8000</code>, rebuilding the frontend first if it's out of date. Options: a port number (<code>-Port</code>), <code>--reload</code> (<code>-Reload</code>), <code>--lan</code> / <code>--host</code> (<code>-Lan</code> / <code>-BindHost</code>), <code>--skip-build</code> (<code>-SkipBuild</code>), <code>--force-build</code> (<code>-ForceBuild</code>).</td></tr>
-      <tr><td><code>start.sh</code> / <code>start.ps1</code></td><td>macOS, Linux/WSL2 / Windows</td><td>One entry point: runs the installer if this is a fresh clone, then starts the app — the tray icon on macOS/Windows, the server in your terminal on Linux/WSL2 (any arguments are passed through to <code>run-server.sh</code> there).</td></tr>
-      <tr><td><code>tray.sh</code> / <code>tray.ps1</code></td><td>macOS / Windows</td><td>Launches the tray icon (<code>tray_app.py</code>) with the project's <code>.venv</code>, after checking its dependencies are installed. The "Launch at startup" login items run these. <code>tray.sh</code> refuses to run on Linux and points at <code>run-server.sh</code>.</td></tr>
-      <tr><td><code>tray_app.py</code></td><td>macOS, Windows</td><td>The tray / menu-bar app itself — normally launched through the scripts above, not by hand. Starts, stops and restarts the server as a subprocess; from source it also rebuilds the frontend when it's out of date. Provides Open in browser, Copy URL, Save logs, Port/Host and Launch at startup. It's also the entry point of the packaged <code>.exe</code>/<code>.app</code>.</td></tr>
-      <tr><td><code>tray_requirements.txt</code></td><td>—</td><td>The tray's own Python dependencies (<code>pystray</code>, Pillow), kept separate from the backend's so a server-only deployment never needs GUI packages it can't use.</td></tr>
       <tr><td><code>fake-hardware.sh</code></td><td>WSL2, Linux, macOS</td><td>Starts a fake roaster/meter (<code>fz94</code>, <code>ms6514</code>, <code>tc4</code> or <code>evo</code>) so you can try the full connection path without real hardware, and prints the value to paste into the app. <code>--help</code> lists the options; <code>--tcp</code> bridges to an app running natively on Windows. Needs <code>socat</code> (except <code>evo</code>). See <a href="#testing-without-real-hardware">Testing without real hardware</a>.</td></tr>
       <tr><td><code>sync-docs.sh</code></td><td>maintainers</td><td>Publishes <code>docs/</code> to the public docs site (a separate GitHub repo), rewriting links that would point at this private repo. Runs automatically in CI whenever <code>docs/</code> changes on <code>main</code>; can also be run by hand.</td></tr>
-      <tr><td><code>packaging/build-windows.ps1</code> / <code>packaging/build-macos.sh</code></td><td>Windows / macOS</td><td>Build the standalone, unsigned <code>.exe</code> / <code>.app</code> with PyInstaller. Need the installer run first (they reuse its <code>.venv</code>). CI runs them on every version tag. See <a href="#standalone-builds">Standalone builds</a>.</td></tr>
     </tbody>
   </table>
 

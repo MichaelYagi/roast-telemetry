@@ -143,12 +143,12 @@ server can run anywhere that can reach its IP. See
 for the full explanation, including the safety side of LAN access.
 
 See [docs/getting-started.html](docs/getting-started.html) for
-installation and running it. In short: `scripts/start.sh` (or
-`scripts\start.ps1` on Windows) installs if needed and starts the app —
-a tray icon on macOS/Windows; on Linux (Raspberry Pi included) the
-server runs in your terminal and you open it in a browser, with no tray
-icon and no `.deb`/`.rpm`/AppImage packages (the scripts cover it).
-What every script does is in the docs' [Scripts
+installation and running it. In short: `scripts/install.sh` once, then
+`scripts/run-server.sh` (on Windows: `scripts\install.ps1`, then
+`scripts\run-server.ps1`) and open http://localhost:8000. That's the
+same on macOS, Linux (Raspberry Pi included) and Windows; there are no
+`.deb`/`.rpm`/AppImage packages, the scripts cover it. What every
+script does is in the docs' [Scripts
 reference](docs/getting-started.html#scripts-reference). Full docs:
 
 - [Getting started](docs/getting-started.html)
