@@ -40,7 +40,7 @@ def test_create_roast_with_tcp_transport_and_no_profile_returns_an_error_not_201
     })
 
     assert resp.status_code == 400
-    assert "modbus_device_profile_id" in resp.json()["detail"]
+    assert "Device Profile" in resp.json()["detail"]
 
 
 def test_create_roast_with_tcp_transport_and_no_host_returns_an_error_not_201(client):
@@ -50,7 +50,7 @@ def test_create_roast_with_tcp_transport_and_no_host_returns_an_error_not_201(cl
     })
 
     assert resp.status_code == 400
-    assert "modbus_host" in resp.json()["detail"]
+    assert "Host / IP address" in resp.json()["detail"]
 
 
 def test_create_roast_with_unreachable_tcp_host_returns_an_error_not_201(client):
@@ -87,7 +87,7 @@ def test_create_aillio_roast_without_a_model_returns_an_error_not_201(client):
     resp = client.post("/api/roasts", json={"title": "Test Roast", "mode": "aillio_live"})
 
     assert resp.status_code == 400
-    assert "aillio_model" in resp.json()["detail"]
+    assert "Aillio model" in resp.json()["detail"]
 
 
 def test_begin_recording_on_unknown_roast_returns_404(client):

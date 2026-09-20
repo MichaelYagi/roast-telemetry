@@ -215,15 +215,15 @@ class RoastSession:
             engine = SimulatorEngine()
         elif request.mode == RoastMode.ALOG_PLAYBACK:
             if not request.alog_path:
-                raise RoastSessionError("alog_path is required for alog_playback mode")
+                raise RoastSessionError("Missing .alog file path -- enter the path to an .alog file on the server (Device tab, \".alog file path\") before connecting.")
             engine = AlogPlayer(request.alog_path, speed=request.playback_speed)
         elif request.mode == RoastMode.MODBUS_LIVE:
             is_tcp = request.modbus_transport == "tcp"
             if is_tcp:
                 if not request.modbus_host:
-                    raise RoastSessionError("modbus_host is required for modbus_live mode with modbus_transport='tcp'")
+                    raise RoastSessionError("Missing host/IP address -- enter the roaster's IP address (Device tab, \"Host / IP address\") before connecting.")
             elif not request.modbus_port:
-                raise RoastSessionError("modbus_port is required for modbus_live mode")
+                raise RoastSessionError("Missing serial port -- enter the COM port (Windows, e.g. COM5) or /dev/tty... path (Linux/macOS) your roaster is connected on (Device tab, \"Serial port\") before connecting.")
             try:
                 if request.modbus_device_profile_id:
                     # Profile-driven path -- see ModbusEngine.from_profile
@@ -267,7 +267,7 @@ class RoastSession:
                     # device profile). Guarded explicitly rather than
                     # silently falling through to the RTU-shaped flat
                     # constructor below.
-                    raise RoastSessionError("modbus_transport='tcp' requires modbus_device_profile_id")
+                    raise RoastSessionError("Ethernet Modbus needs a Device Profile -- pick one from the \"Device profile\" dropdown (Device tab); there's no flat register-override fallback for Ethernet the way USB has.")
                 else:
                     engine = ModbusEngine(
                         request.modbus_port,
@@ -283,7 +283,7 @@ class RoastSession:
                 raise RoastSessionError(str(exc)) from exc
         elif request.mode == RoastMode.MS6514_LIVE:
             if not request.ms6514_port:
-                raise RoastSessionError("ms6514_port is required for ms6514_live mode")
+                raise RoastSessionError("Missing serial port -- enter the COM port (Windows, e.g. COM5) or /dev/tty... path (Linux/macOS) the MS6514 meter is connected on (Device tab, \"Serial port\") before connecting.")
             try:
                 engine = MS6514Engine(
                     request.ms6514_port,
@@ -295,7 +295,7 @@ class RoastSession:
                 raise RoastSessionError(str(exc)) from exc
         elif request.mode == RoastMode.AILLIO_LIVE:
             if not request.aillio_model:
-                raise RoastSessionError("aillio_model is required for aillio_live mode")
+                raise RoastSessionError("Missing Aillio model -- select which Bullet model (Device tab, \"Model\") before connecting.")
             try:
                 engine = AillioEngine(
                     request.aillio_model,
@@ -307,7 +307,7 @@ class RoastSession:
                 raise RoastSessionError(str(exc)) from exc
         elif request.mode == RoastMode.TC4_LIVE:
             if not request.tc4_port:
-                raise RoastSessionError("tc4_port is required for tc4_live mode")
+                raise RoastSessionError("Missing serial port -- enter the COM port (Windows, e.g. COM5) or /dev/tty... path (Linux/macOS) the TC4+ shield is connected on (Device tab, \"Serial port\") before connecting.")
             try:
                 engine = TC4Engine(
                     request.tc4_port,
