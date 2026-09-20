@@ -12,7 +12,7 @@ Set-Location (Split-Path $PSScriptRoot -Parent)
 
 if (-not (Test-Path "$VenvDir\Scripts\python.exe")) {
     Write-Host "No Windows virtual environment found ($VenvDir\Scripts\python.exe)." -ForegroundColor Red
-    Write-Host "Run scripts\start.ps1 (or scripts\install.ps1 first) -- it creates it."
+    Write-Host "Run scripts\install.ps1 first -- it creates it."
     exit 1
 }
 

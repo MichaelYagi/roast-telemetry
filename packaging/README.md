@@ -95,7 +95,7 @@ working, shareable build today.
 
 Small, additive backend/tray changes, all fully guarded so the existing
 from-source dev workflow (`scripts/install.sh`/`.ps1` +
-`start`/`tray.sh`/`.ps1`) is completely unaffected:
+`tray.sh`/`.ps1`) is completely unaffected:
 
 - `backend/app/storage.py`: `DATA_DIR` now reads a
   `ROAST_TELEMETRY_DATA_DIR` env var if set, falling back to today's
