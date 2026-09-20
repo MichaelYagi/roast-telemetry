@@ -7,7 +7,34 @@ import { api } from "../api/client.js";
 
 const POLL_INTERVAL_MS = 3000;
 
-export default function RoastReviewCard({ roastId, roastActive }) {
+// The AI Review box only shows when Ollama is set up: both a URL and a
+// model chosen under Settings. Otherwise it renders nothing at all (and
+// doesn't request a review), since there is nothing it could do. Settings are
+// read when the roast page opens, so setting Ollama up and coming back to a
+// roast shows the box. A saved review for a roast is hidden along with it
+// while the connection is unset.
+export default function RoastReviewCard(props) {
+  const [configured, setConfigured] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getSettings()
+      .then((s) => {
+        if (!cancelled) setConfigured(Boolean(s.ollama_url?.trim() && s.ollama_model?.trim()));
+      })
+      .catch(() => {
+        if (!cancelled) setConfigured(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return configured ? <RoastReviewPanel {...props} /> : null;
+}
+
+function RoastReviewPanel({ roastId, roastActive }) {
   const [review, setReview] = useState(undefined); // undefined = loading, null = none yet, object = loaded
   const [error, setError] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -95,9 +122,6 @@ export default function RoastReviewCard({ roastId, roastActive }) {
               </button>
             )}
             {roastActive && <p className="hint no-print">Finish the roast before generating a review.</p>}
-            {!roastActive && !review && (
-              <p className="hint no-print">Uses a local Ollama server -- configure it under Settings.</p>
-            )}
           </>
         )}
       </div>
