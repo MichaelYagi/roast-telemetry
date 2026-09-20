@@ -34,7 +34,7 @@ export default function RoastReviewCard(props) {
   return configured ? <RoastReviewPanel {...props} /> : null;
 }
 
-function RoastReviewPanel({ roastId, roastActive }) {
+function RoastReviewPanel({ roastId, roastActive, roastStatus }) {
   const [review, setReview] = useState(undefined); // undefined = loading, null = none yet, object = loaded
   const [error, setError] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -121,7 +121,12 @@ function RoastReviewPanel({ roastId, roastActive }) {
                 {review ? "Regenerate review" : "Generate review"}
               </button>
             )}
-            {roastActive && <p className="hint no-print">Finish the roast before generating a review.</p>}
+            {roastActive && (
+              <p className="hint no-print">
+                This roast is still {roastStatus} -- it hasn't been ended yet. Go to Live Roast and press OFF to end it
+                (dropping the beans doesn't end it), then come back to generate a review.
+              </p>
+            )}
           </>
         )}
       </div>
