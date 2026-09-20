@@ -5,7 +5,7 @@ import { useEffect } from "react";
 // confirm/alert specifically (see DialogProvider.jsx, which builds those
 // on top of this) -- any custom modal content in the app can use this
 // directly.
-export default function Modal({ open, onClose, title, children }) {
+export default function Modal({ open, onClose, title, wide = false, children }) {
   useEffect(() => {
     if (!open) return undefined;
     function onKeyDown(e) {
@@ -19,7 +19,7 @@ export default function Modal({ open, onClose, title, children }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+      <div className={`modal${wide ? " modal-wide" : ""}`} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           {title && <h3>{title}</h3>}
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close">

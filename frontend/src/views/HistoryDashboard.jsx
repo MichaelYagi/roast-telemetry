@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import { useConfirm, useNotify } from "../components/DialogProvider.jsx";
+import ServerFileChooser from "../components/ServerFileChooser.jsx";
 
 function formatDuration(seconds) {
   if (seconds == null) return "—";
@@ -35,6 +36,7 @@ export default function HistoryDashboard() {
   const [importTitle, setImportTitle] = useState("");
   const [importError, setImportError] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [chooserOpen, setChooserOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [deletingSelected, setDeletingSelected] = useState(false);
   // Off by default -- each entry here is a real .alog read+parse
@@ -262,7 +264,12 @@ export default function HistoryDashboard() {
         <div className="form-row">
           <label>
             .alog file path (server-side)
-            <input value={importPath} onChange={(e) => setImportPath(e.target.value)} placeholder="/path/to/roast.alog" />
+            <span className="path-with-browse">
+              <input value={importPath} onChange={(e) => setImportPath(e.target.value)} placeholder="/path/to/roast.alog" />
+              <button type="button" onClick={() => setChooserOpen(true)}>
+                Browse…
+              </button>
+            </span>
           </label>
           <label>
             Title (optional)
@@ -273,6 +280,12 @@ export default function HistoryDashboard() {
           {importing ? "Importing…" : "Import"}
         </button>
       </form>
+      <ServerFileChooser
+        open={chooserOpen}
+        onClose={() => setChooserOpen(false)}
+        onSelect={(path) => setImportPath(path)}
+        startPath={importPath}
+      />
 
       <div className="panel filters-row">
         <label>

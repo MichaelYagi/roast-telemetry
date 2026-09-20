@@ -751,6 +751,26 @@ class SerialPortInfo(BaseModel):
     description: Optional[str] = None  # driver-reported label, e.g. "USB-SERIAL CH340 (COM3)" -- None if the OS has nothing better than the bare device name
 
 
+class FileEntry(BaseModel):
+    name: str
+    path: str  # full server-side path -- what goes in the import/playback path field
+    kind: Literal["dir", "file"]
+    size: Optional[int] = None  # bytes; files only
+
+
+class FileShortcut(BaseModel):
+    label: str
+    path: str
+
+
+class FileListing(BaseModel):
+    path: str  # the folder that was listed (normalized)
+    parent: Optional[str] = None  # None at a filesystem root
+    entries: list[FileEntry]
+    shortcuts: list[FileShortcut]
+    truncated: bool = False  # True if the folder had more entries than were returned
+
+
 class NoteCreateRequest(BaseModel):
     text: str
     author: Optional[str] = None

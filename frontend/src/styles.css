@@ -2969,3 +2969,108 @@ button:disabled {
     break-inside: avoid;
   }
 }
+
+.modal.modal-wide {
+  max-width: 640px;
+}
+
+/* Server-side .alog chooser (see ServerFileChooser.jsx) */
+.file-chooser-pathbar {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.file-chooser-pathbar input {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.file-chooser-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.file-chooser-shortcut {
+  padding: 0.15rem 0.6rem;
+  font-size: 0.8rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.file-chooser-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 45vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.file-chooser-list[aria-busy="true"] {
+  opacity: 0.55;
+}
+
+.file-chooser-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  background: none;
+  color: var(--text);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  font-weight: 400;
+}
+
+.file-chooser-list li:last-child .file-chooser-entry {
+  border-bottom: none;
+}
+
+.file-chooser-entry:hover {
+  background: var(--accent-soft);
+}
+
+.file-chooser-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-chooser-file .file-chooser-name {
+  font-weight: 600;
+}
+
+.file-chooser-size {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.file-chooser-empty {
+  padding: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.path-with-browse {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.path-with-browse input {
+  flex: 1;
+  min-width: 0;
+}

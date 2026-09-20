@@ -40,6 +40,9 @@ export const api = {
   // serial ports (Configure Roast form's port-picker convenience list)
   listSerialPorts: () => request("/serial-ports"),
 
+  // server-side file chooser (History import) -- folders and .alog files on the server
+  listServerFiles: (path) => request(`/files${path ? `?${new URLSearchParams({ path })}` : ""}`),
+
   // roasts
   listRoasts: (params = {}) => request(`/roasts?${new URLSearchParams(params)}`),
   createRoast: (payload) => request("/roasts", { method: "POST", body: JSON.stringify(payload) }),

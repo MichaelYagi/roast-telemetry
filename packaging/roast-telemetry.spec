@@ -136,6 +136,7 @@ hidden_imports = [
     "backend.app.api.auth",
     "backend.app.api.device_profiles",
     "backend.app.api.devices",
+    "backend.app.api.files",
     "backend.app.api.presets",
     "backend.app.api.roasts",
     "backend.app.api.serial_ports",

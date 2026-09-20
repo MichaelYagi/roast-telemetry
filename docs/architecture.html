@@ -119,6 +119,7 @@
       <tr><td>GET</td><td><code>/devices</code></td><td>Mock devices currently bound to active roasts</td></tr>
       <tr><td>POST</td><td><code>/devices/{id}/fault</code></td><td>Testing hook: force a device into an error state</td></tr>
       <tr><td>GET</td><td><code>/serial-ports</code></td><td>Serial ports currently visible to the OS, for the Configure Roast form's port picker</td></tr>
+      <tr><td>GET</td><td><code>/files</code></td><td>Folders and <code>.alog</code> files on the server (<code>path</code>, defaults to the home folder), for the History page's <strong>Browse&hellip;</strong> button next to the import path. Names only, never contents.</td></tr>
       <tr><td>GET</td><td><code>/roasts</code></td><td>Roast history (filter: <code>mode</code>, <code>status</code>)</td></tr>
       <tr><td>POST</td><td><code>/roasts</code></td><td><code>simulator</code>/<code>alog_playback</code>: create <strong>and start</strong> a roast. <code>modbus_live</code>/<code>ms6514_live</code>: <strong>connect only</strong> (ON) — see <code>/roasts/{id}/start</code></td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/start</code></td><td><code>modbus_live</code>/<code>ms6514_live</code> only: begin recording a connection already made via <code>POST /roasts</code> (START)</td></tr>
@@ -133,7 +134,7 @@
       <tr><td>GET</td><td><code>/roasts/{id}/csv</code></td><td>Download a CSV export — works on an in-progress roast too, unlike <code>.alog</code></td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/review</code></td><td>Kick off an AI review (Ollama) — <code>202</code>, async</td></tr>
       <tr><td>GET</td><td><code>/roasts/{id}/review</code></td><td>Poll for the review's status/result</td></tr>
-      <tr><td>POST</td><td><code>/roasts/import</code></td><td>Import an existing <code>.alog</code> file as history (<code>path</code>, optional <code>title</code>)</td></tr>
+      <tr><td>POST</td><td><code>/roasts/import</code></td><td>Import an existing <code>.alog</code> file as history (<code>path</code> on the server &mdash; pick it with <strong>Browse&hellip;</strong> on the History page &mdash; and optional <code>title</code>)</td></tr>
       <tr><td>WS</td><td><code>/roasts/{id}/stream</code></td><td>Live sample/event stream (sends a <code>snapshot</code> first)</td></tr>
       <tr><td>GET</td><td><code>/roasts/{id}/stream/sse</code></td><td>Same stream over Server-Sent Events</td></tr>
       <tr><td>GET</td><td><code>/presets</code></td><td>List saved roast configurations</td></tr>

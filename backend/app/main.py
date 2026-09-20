@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import auth, storage
 from .api import auth as auth_api
-from .api import device_profiles, devices, presets, roasts, serial_ports, settings
+from .api import device_profiles, devices, files, presets, roasts, serial_ports, settings
 from .models import DeviceProfileCreateRequest, RoastCreateRequest, UserStatus
 from .version import VERSION
 from modbus_bridge.device_profiles import BUILT_IN_PROFILES
@@ -155,6 +155,7 @@ app.include_router(presets.router, prefix="/api")
 app.include_router(device_profiles.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 app.include_router(serial_ports.router, prefix="/api")
+app.include_router(files.router, prefix="/api")
 
 
 @app.get("/api/health")
