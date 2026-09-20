@@ -723,6 +723,14 @@ def _run_server_entrypoint() -> None:
         host = args[args.index("--host") + 1]
     if "--port" in args:
         port = int(args[args.index("--port") + 1])
+    # A windowed (console=False) build started with no redirected output
+    # has sys.stdout/stderr = None, and uvicorn's log formatter calls
+    # .isatty() on them and dies before serving. The tray always redirects
+    # both to server.log, so this only matters for a bare `--run-server`.
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")
     import uvicorn
 
     from backend.app.main import app
