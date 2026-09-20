@@ -38,6 +38,7 @@ import re
 import uuid
 from datetime import datetime
 from typing import Any, Optional
+from .artisan_profile_base import new_profile_base
 
 
 def load_alog(path: str) -> dict:
@@ -75,18 +76,6 @@ _ARTISAN_CHANNEL_INDEX = {"Air": 0, "Drum": 1, "Damper": 2, "Burner": 3}
 _ARTISAN_TIMEINDEX_TYPES = [
     "CHARGE", "DRY_END", "FC_START", "FC_END", "SC_START", "SC_END", "DROP", "COOL_END",
 ]
-
-_ARTISAN_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "artisan_native_template.json")
-_artisan_template_cache: Optional[dict] = None
-
-
-def _load_artisan_template() -> dict:
-    global _artisan_template_cache
-    if _artisan_template_cache is None:
-        with open(_ARTISAN_TEMPLATE_PATH, "r", encoding="utf-8") as f:
-            _artisan_template_cache = json.load(f)
-    return copy.deepcopy(_artisan_template_cache)
-
 
 def _nearest_index(sorted_times: list, t: float) -> int:
     """Index into `sorted_times` closest to `t` -- events fire at whatever
@@ -143,21 +132,16 @@ def roast_to_artisan_native_dict(
     (True/False/None), the `timeindex`/`computed` milestone blocks, and
     parallel-array `specialevents`, not a list of dicts.
 
-    Rather than guess at the ~190 other fields a real Artisan save
-    carries (colorimeter settings, alarm config, BTU/CO2 accounting,
-    cupping scores, ...) and risk the file being rejected over one we
-    didn't know was required, this clones a real, confirmed-working
-    Artisan export (artisan_native_template.json, captured from an
-    actual roast) and only overwrites the fields that make *this*
-    roast's own curve, milestones, events, and metadata correct.
-    Everything else keeps that donor roast's own values -- cosmetically
-    stale (its cupping notes, alarm settings, etc.) but never a reason
-    Artisan would fail to load or render the file.
+    Starts from artisan_profile_base.new_profile_base() -- the field names
+    Artisan's loader reads, with neutral values -- and overwrites the
+    fields that make *this* roast's own curve, milestones, events, and
+    metadata correct. Fields Artisan treats as optional are left out, so
+    it uses its own defaults for them.
 
     Serialize the result with save_artisan_native_alog (Python-literal
     syntax, not JSON) -- see that function below.
     """
-    data = _load_artisan_template()
+    data = new_profile_base()
 
     # Real Artisan files always have a brief pre-charge lead-in, so index 0
     # being reserved as "not recorded" never collides with a real milestone
@@ -242,9 +226,9 @@ def roast_to_artisan_native_dict(
     computed["DROP_time"], computed["DROP_ET"], computed["DROP_BT"] = time_at(drop_idx), et_at(drop_idx), bt_at(drop_idx)
     computed["COOL_time"], computed["COOL_ET"], computed["COOL_BT"] = time_at(coolend_idx), et_at(coolend_idx), bt_at(coolend_idx)
 
-    # Phase durations -- confirmed against the template's own donor roast
-    # (dryphasetime == DRY_time, midphasetime == FCs_time - DRY_time, etc,
-    # since profile time_s is already charge-relative, i.e. t=0 is Charge).
+    # Phase durations (dryphasetime == DRY_time, midphasetime ==
+    # FCs_time - DRY_time, etc, since profile time_s is already
+    # charge-relative, i.e. t=0 is Charge).
     dry_t, fcs_t, drop_t, cool_t = computed["DRY_time"], computed["FCs_time"], computed["DROP_time"], computed["COOL_time"]
     if dry_t is not None:
         computed["dryphasetime"] = dry_t
@@ -294,27 +278,22 @@ def roast_to_artisan_native_dict(
         _fill_and_floatify([p.get("fan_pct") for p in export_profile]),
         _fill_and_floatify([p.get("drum_speed_pct") for p in export_profile]),
     ]
-    # The donor template's own extraname2 (second extra-device bank, e.g.
-    # a Kaleido's SV/AT/AH sensors) is left the same *length* rather than
-    # emptied -- roughly a dozen *other* per-device fields
-    # (extradevicecolor2, extraCurveVisibility2, extraNoneTempHint2, ...)
-    # are all still sized to match its original device count, and
-    # clearing extraname2 without also clearing every one of those was
-    # the actual cause of a later "setProfile() list index out of range"
-    # crash: Artisan indexes those metadata arrays by device position
-    # regardless of what's actually in extraname2/extratemp2. Slot 0 is
-    # repurposed for DT (drum space temp -- a real third probe on the
-    # FZ-94, its own Modbus slave ID, not the same thing as BT/ET;
-    # see modbus_bridge/engine.py) when available; any further
-    # role=EXTRA channels from a DeviceProfile (see
-    # RoastProfilePoint.extra) repurpose whatever slots remain the exact
-    # same safe way, ordered by first appearance in this roast's own
-    # profile -- there are only 3 slots total in the donor template (DT
-    # + 2 more), a real, fixed ceiling, not an arbitrary one; anything
-    # past that still lives in profile[i]["extra"] for the live chart/
-    # readouts, it just doesn't round-trip through this export. Any slot
-    # still unused after that stays a flat placeholder curve, same as
-    # before this app had any extra-channel data to put there at all.
+    # Bank 2 keeps the base profile's slot count (EXTRA_SLOTS) rather than
+    # being emptied -- roughly a dozen per-device lists (extradevicecolor2,
+    # extraCurveVisibility2, extraNoneTempHint2, ...) are all sized to
+    # match it, and Artisan indexes those by device position regardless of
+    # what's actually in extraname2/extratemp2 (a mismatch was the cause
+    # of a "setProfile() list index out of range" crash). Slot 0 is used
+    # for DT (drum space temp -- a real third probe on the FZ-94, its own
+    # Modbus slave ID, not the same thing as BT/ET; see
+    # modbus_bridge/engine.py) when available; any further role=EXTRA
+    # channels from a DeviceProfile (see RoastProfilePoint.extra) take the
+    # remaining slots, ordered by first appearance in this roast's own
+    # profile. There are only EXTRA_SLOTS slots in total, a real, fixed
+    # ceiling; anything past that still lives in profile[i]["extra"] for
+    # the live chart/readouts, it just doesn't round-trip through this
+    # export. A slot with nothing in it stays a flat placeholder curve
+    # (hidden in Artisan, see extraCurveVisibility2 below).
     extra_labels: list[str] = []
     for p in export_profile:
         for label in p.get("extra") or {}:
@@ -333,16 +312,20 @@ def roast_to_artisan_native_dict(
     has_dt = any(p.get("dt") is not None for p in export_profile)
     extraname2 = list(data.get("extraname2") or [])
     extratemp2 = []
+    extra2_used = []  # which slots carry real data (the rest are placeholders)
     for i in range(len(extraname2)):
         if i == 0 and has_dt:
             extraname2[0] = "DT"
             extratemp2.append(_fill_and_floatify([p.get("dt") for p in export_profile]))
+            extra2_used.append(True)
         elif i >= 1 and i - 1 < len(extra_labels):
             label = extra_labels[i - 1]
             extraname2[i] = label
             extratemp2.append(_fill_and_floatify([(p.get("extra") or {}).get(label) for p in export_profile]))
+            extra2_used.append(True)
         else:
             extratemp2.append([0.0] * len(timex))
+            extra2_used.append(False)
     extratimex = [timex] * max(len(extraname1), len(extraname2), 1)
 
     roastdate_dt = None
@@ -354,7 +337,7 @@ def roast_to_artisan_native_dict(
 
     # Real Artisan's own file has no native per-timestamp `notes` list at
     # all -- only this single free-text `roastingnotes` field (confirmed
-    # against the raw donor export: no `'notes':` key anywhere in it).
+    # against real Artisan exports: no `'notes':` key anywhere in them).
     # alog_dict_to_points below parses this same "[Ns] text" format back
     # into individual note entries, so this app's own reader still
     # recovers them -- writing an extra `notes` key here (a shape real
@@ -362,9 +345,7 @@ def roast_to_artisan_native_dict(
     # Artisan reject the file as invalid.
     notes_text = "\n".join(f"[{n.get('time_s', 0):.0f}s] {n.get('text', '')}" for n in notes)
 
-    # Temp axis range -- was left as the donor template's own stale
-    # ymin/ymax (0-275, sized for that roast's own curve), unrelated to
-    # this one's actual temperatures. 0 as a floor (a roast chart never
+    # Temp axis range, sized to this roast's own temperatures. 0 as a floor (a roast chart never
     # needs to show sub-zero), max recorded temp rounded up to the next
     # 25 with a little headroom above it so the curve doesn't touch the
     # top edge.
@@ -385,8 +366,8 @@ def roast_to_artisan_native_dict(
         "roasttime": roastdate_dt.strftime("%H:%M:%S") if roastdate_dt else data.get("roasttime", ""),
         # Artisan's own UI reads this (a Unix timestamp), not the
         # roastdate/roastisodate/roasttime strings above -- without it the
-        # date shown in the app is the donor template's own, regardless of
-        # what those string fields say.
+        # date shown in the app would be blank, regardless of what those
+        # string fields say.
         "roastepoch": int(roastdate_dt.timestamp()) if roastdate_dt else data.get("roastepoch", 0),
         **({"ymin": 0, "ymax": computed_ymax} if all_temps else {}),
         "timex": timex,
@@ -404,6 +385,8 @@ def roast_to_artisan_native_dict(
         "extraname2": extraname2,
         "extratemp2": extratemp2,
         "extratimex": extratimex,
+        # Only slots that carry real data are drawn; placeholders stay hidden.
+        "extraCurveVisibility2": (extra2_used + [False] * 10)[:10],
     })
     return data
 

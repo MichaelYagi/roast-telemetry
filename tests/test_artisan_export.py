@@ -1,8 +1,7 @@
 """alog_playback/alog_io.py's roast_to_artisan_native_dict/save_artisan_native_alog
 -- exports a roast recorded natively by this app into a shape real Artisan
 can actually open (Python-literal syntax + Artisan's own timeindex/computed/
-specialevents fields), cloned from a confirmed-working real Artisan export
-(artisan_native_template.json) rather than guessed from scratch."""
+specialevents fields), built on artisan_profile_base's from-scratch base."""
 from __future__ import annotations
 
 from alog_playback.alog_io import (
@@ -93,16 +92,16 @@ def test_weight_loss_computed_when_both_weights_present():
     assert d["computed"]["weight_loss"] == round((350.0 - 301.0) / 350.0 * 100, 1)
 
 
-def test_no_key_beyond_the_template_and_no_native_notes_field():
-    # Regression: the template used to be built via load_alog(), which
+def test_no_key_beyond_the_base_and_no_native_notes_field():
+    # Regression: the base used to be built via load_alog(), which
     # defensively adds `control`/`ror_bt`/`ror_et` for this app's own
     # reader -- fields a real Artisan file doesn't actually have. Real
     # Artisan also has no native `notes` list (only roastingnotes, a
     # single free-text field) -- writing one anyway was exactly what got
     # a real export rejected as "Invalid artisan format".
-    from alog_playback.alog_io import _load_artisan_template
+    from alog_playback.artisan_profile_base import new_profile_base
 
-    template_keys = set(_load_artisan_template().keys())
+    template_keys = set(new_profile_base().keys())
     d = roast_to_artisan_native_dict(title="t", profile=_profile(3), events=[], notes=[{"id": "n1", "time_s": 1.0, "text": "hi"}])
     assert set(d.keys()) == template_keys
     assert "notes" not in d

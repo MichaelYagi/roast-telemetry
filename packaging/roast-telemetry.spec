@@ -164,14 +164,6 @@ datas = [
     (repo_path("frontend", "dist"), "frontend/dist"),
     (repo_path("backend", "data", "sample_roasts"), "backend/data/sample_roasts"),
     (repo_path("frontend", "public", "icon-256x256.png"), "assets"),
-    # alog_playback/alog_io.py resolves this JSON file relative to its own
-    # __file__ at import time -- correct once frozen too (__file__ then
-    # points inside sys._MEIPASS/alog_playback/), but PyInstaller's
-    # Analysis only auto-bundles .py files via hiddenimports, never a
-    # package's own non-Python data files, so this needs listing
-    # explicitly or every roast stop/finish 500s with a FileNotFoundError
-    # (confirmed live: exactly this happened on a real macOS onefile build).
-    (repo_path("alog_playback", "artisan_native_template.json"), "alog_playback"),
 ]
 
 # Windows wants a .ico (frontend/public/favicon.ico already exists and

@@ -131,7 +131,7 @@ def test_dt_less_roast_does_not_export_a_fake_flat_dt_curve(tmp_path):
 
 
 def test_a_third_extra_channel_beyond_the_two_free_slots_does_not_export(tmp_path):
-    # Documents the real, fixed ceiling (donor template has exactly 3
+    # Documents the real, fixed ceiling (the base profile has exactly 3
     # extraname2 slots: DT + 2 more) rather than silently corrupting
     # anything -- a third role=EXTRA channel just isn't in the export.
     profile = [

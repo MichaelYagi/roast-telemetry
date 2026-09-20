@@ -13,7 +13,7 @@ def test_alog_filename_basic():
 
 
 def test_alog_filename_sanitizes_unsafe_characters():
-    name = alog_filename('Guatemala / Finca "Rosma": Batch?', "2026-03-05T14:32:10")
+    name = alog_filename('Test / Lot "A": Batch?', "2026-03-05T14:32:10")
     assert name.endswith("_2026-03-05_1432.alog")
     for char in '/\\:*?"<>|':
         assert char not in name
