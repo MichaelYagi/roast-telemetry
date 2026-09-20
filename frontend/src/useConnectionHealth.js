@@ -8,7 +8,7 @@ import { analyzeReadSamples, channelsForMode } from "./connectionPlausibility.js
 const MAX_BUFFERED_SAMPLES = 10;
 
 // Powers the small connection-status dot next to the roast title in
-// ArtisanToolbar -- continuously live for as long as a live-hardware
+// RoastToolbar -- continuously live for as long as a live-hardware
 // connection is relevant (armed through roasting/cooling), not just a
 // one-shot pre-roast check. Same underlying plausibility bounds as
 // ConnectionTestPanel.jsx's manual "Run read-only test" (shared via

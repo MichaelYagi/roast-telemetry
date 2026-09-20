@@ -169,12 +169,12 @@ body.breakout-split-active .app-header {
      by DOM position among its .app-shell siblings. Since
      .breakout-split-escape's content starts at the same y=0 the header
      occupies (by design, so the toolbar row lines up with the title),
-     anything of its that overlaps the header there -- e.g. .artisan-toolbar
+     anything of its that overlaps the header there -- e.g. .roast-toolbar
      -- would paint on top of the theme dropdown regardless of its
      z-index, because that z-index only wins *inside* the header's own
      stacking context, not against a later root-level sibling. This was
      the actual cause of the theme dropdown becoming unclickable once a
-     roast starts (confirmed via Playwright: .artisan-toolbar was
+     roast starts (confirmed via Playwright: .roast-toolbar was
      intercepting the click). */
   margin-left: calc(var(--breakout-viewport-width, 100vw) / -2);
   /* Same top+bottom as the base (non-split) .app-header rule above
@@ -2078,9 +2078,9 @@ button:disabled {
   color: var(--text-muted);
 }
 
-/* --- Artisan-style toolbar -------------------------------------------- */
+/* --- Roast toolbar (RoastToolbar.jsx) -------------------------------------------- */
 
-.artisan-toolbar-wrap {
+.roast-toolbar-wrap {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -2088,7 +2088,7 @@ button:disabled {
   overflow: hidden;
 }
 
-.artisan-toolbar {
+.roast-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2097,14 +2097,14 @@ button:disabled {
   flex-wrap: wrap;
 }
 
-.artisan-toolbar-title-group {
+.roast-toolbar-title-group {
   /* Lets the title/status text actually wrap/shrink instead of forcing
      the row wider -- a flex item's default min-width is auto (its
      content's own natural width), which ignores overflow-wrap entirely. */
   min-width: 0;
 }
 
-.artisan-toolbar-title {
+.roast-toolbar-title {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 700;
@@ -2115,7 +2115,7 @@ button:disabled {
   overflow-wrap: break-word;
 }
 
-/* Connection-status dot beside the title (ArtisanToolbar) -- yellow
+/* Connection-status dot beside the title (RoastToolbar) -- yellow
    while checking (right after ON, before enough readings have come in
    to call it either way), green once readings look normal, red if
    they don't. See useConnectionHealth.js. */
@@ -2140,20 +2140,20 @@ button:disabled {
   background: #dc2626;
 }
 
-.artisan-toolbar-meta {
+.roast-toolbar-meta {
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--text-muted);
 }
 
-.artisan-toolbar-controls {
+.roast-toolbar-controls {
   display: flex;
   align-items: center;
   gap: 1.25rem;
   margin-left: auto;
 }
 
-.artisan-toolbar-power {
+.roast-toolbar-power {
   display: flex;
   gap: 0.5rem;
 }
@@ -2648,10 +2648,10 @@ button:disabled {
     min-width: 70px;
     flex-shrink: 0;
   }
-  .artisan-toolbar-controls {
+  .roast-toolbar-controls {
     margin-left: 0;
     /* RESET+START+clock together are wider than a narrow phone screen
-       -- .artisan-toolbar-wrap's overflow:hidden (for its rounded
+       -- .roast-toolbar-wrap's overflow:hidden (for its rounded
        corners) was clipping the clock's right edge instead of it
        wrapping. Letting the clock drop to its own line under the
        buttons keeps everything fully visible instead. */

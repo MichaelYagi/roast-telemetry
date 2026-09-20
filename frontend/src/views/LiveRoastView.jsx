@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, settingsStreamUrl } from "../api/client.js";
 import { useRoastStream } from "../api/ws.js";
-import ArtisanToolbar from "../components/ArtisanToolbar.jsx";
+import RoastToolbar from "../components/RoastToolbar.jsx";
 import useConnectionHealth from "../useConnectionHealth.js";
 import BackgroundProfilePicker from "../components/BackgroundProfilePicker.jsx";
 import BreakoutPanel from "../components/BreakoutPanel.jsx";
@@ -1094,7 +1094,7 @@ export default function LiveRoastView() {
   const showConnectionDot =
     LIVE_MODES.includes(activeMode) && (phase === "armed" || phase === "roasting" || phase === "cooling");
   const toolbarElement = (
-    <ArtisanToolbar
+    <RoastToolbar
       title={roast?.title || form.title}
       beans={roast?.beans || form.beans}
       weightGreenG={roast?.weight_green_g ?? (form.weight_green_g ? Number(form.weight_green_g) : null)}
@@ -1826,7 +1826,7 @@ export default function LiveRoastView() {
               handleToggleConnect/RoastSession.connect()) and only for the
               two modes that have a real connection worth verifying before
               committing to a roast. The ambient connection-status dot
-              itself lives in ArtisanToolbar (see toolbarElement below) --
+              itself lives in RoastToolbar (see toolbarElement below) --
               it stays visible through roasting/cooling too, not just here. */}
           {phase === "armed" && LIVE_MODES.includes(activeMode) && (
             <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} />

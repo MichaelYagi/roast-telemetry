@@ -1,4 +1,4 @@
-// Mirrors Artisan desktop's top toolbar during a roast: the ON/OFF
+// The top toolbar during a roast: the ON/OFF
 // device toggle + START recording button, and a big digital
 // elapsed-time clock. Used to also carry a fixed DRY%/»DRY/»FCs
 // milestone-box row, but those are just as available (and freely
@@ -10,7 +10,7 @@
 // shown right after ON, before enough readings have come in to call it
 // either way -- turning green once they look normal, or red if they
 // don't. See useConnectionHealth.js for how this gets computed.
-export default function ArtisanToolbar({
+export default function RoastToolbar({
   title,
   beans,
   weightGreenG,
@@ -30,16 +30,16 @@ export default function ArtisanToolbar({
   const meta = [beans, weightGreenG != null ? `${weightGreenG} g` : null].filter(Boolean).join(" · ");
 
   return (
-    <div className="artisan-toolbar-wrap">
-      <div className="artisan-toolbar">
+    <div className="roast-toolbar-wrap">
+      <div className="roast-toolbar">
         {/* Title is a required field (see LiveRoastView.jsx's
             requireTitle()), so this is live -- what you're currently
             typing in Configure Roast's General tab, then whatever the
             roast was actually created with once connected. The status
             line sits directly under it, not as its own separate row --
             both are on the left, controls/clock on the right, same row. */}
-        <div className="artisan-toolbar-title-group">
-          <h2 className="artisan-toolbar-title">
+        <div className="roast-toolbar-title-group">
+          <h2 className="roast-toolbar-title">
             {connectionStatus && (
               <span
                 className={`connection-status-dot connection-status-dot-${connectionStatus}`}
@@ -53,13 +53,13 @@ export default function ArtisanToolbar({
               />
             )}
             {title || "Untitled roast"}
-            {meta && <span className="artisan-toolbar-meta"> · {meta}</span>}
+            {meta && <span className="roast-toolbar-meta"> · {meta}</span>}
           </h2>
           <div className="status-line">{statusText}</div>
         </div>
 
-        <div className="artisan-toolbar-controls">
-          <div className="artisan-toolbar-power">
+        <div className="roast-toolbar-controls">
+          <div className="roast-toolbar-power">
             <button
               type="button"
               className={`power-btn ${
