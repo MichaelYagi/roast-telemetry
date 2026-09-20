@@ -374,7 +374,7 @@ export default function RoastChart({
   background = [],
   backgroundLabel = null,
   height = 420,
-  title = "Roaster Scope",
+  title = "Roast chart",
   tempUnit = "c",
   // False only on LiveRoastView while a roast is actively roasting/cooling
   // -- zoom/pan and the hide-labels control are for reviewing a finished
