@@ -42,7 +42,7 @@ for the `pystray`/`pyserial` hidden-import fixes.
 ## Windows
 
 1. Clone/pull the repo onto the Windows machine.
-2. If you haven't already: `scripts\install.ps1` (sets up `.venv` with
+2. If you haven't already: `scripts\install.ps1` (sets up `.venv-windows` with
    every dependency this app needs to run from source).
 3. `packaging\build-windows.ps1` (or `packaging\build-windows.ps1 -Mode onedir`
    for a folder instead of a single file).

@@ -29,6 +29,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
+. "$PSScriptRoot\venv-path.ps1"
 
 function Confirm-Action($message) {
     if ($Yes) {
@@ -86,30 +87,21 @@ Write-Host "Using node $(node --version), npm $(npm --version)"
 
 # --- Backend venv ---
 Write-Host ""
-if (Test-Path .venv\Scripts\python.exe) {
-    Write-Host "Reusing existing .venv"
-} elseif (Test-Path .venv) {
-    # The folder exists but isn't a native-Windows venv -- almost always
-    # because a .venv was created from WSL2/Linux in this same repo
-    # folder (they use .venv/bin/python, not .venv\Scripts\python.exe --
-    # a different, incompatible internal layout; see run-server.ps1's
-    # own header comment on this exact mismatch). Bailing out here with
-    # a clear explanation instead of either silently reusing something
-    # broken or guessing at whether `python -m venv .venv` can safely
-    # write into a folder with unknown existing contents.
-    Write-Host ".venv exists but isn't a native-Windows venv (no .venv\Scripts\python.exe) -- most likely created from WSL2/Linux in this same folder, which uses a different, incompatible layout." -ForegroundColor Red
-    Write-Host "Rename or delete it, then re-run this script, e.g.:"
-    Write-Host "    Rename-Item .venv .venv-wsl2"
+if (Test-Path "$VenvDir\Scripts\python.exe") {
+    Write-Host "Reusing existing $VenvDir"
+} elseif (Test-Path $VenvDir) {
+    Write-Host "$VenvDir exists but isn't a working Windows venv (no $VenvDir\Scripts\python.exe)." -ForegroundColor Red
+    Write-Host "Delete it and re-run this script:  Remove-Item -Recurse -Force $VenvDir"
     exit 1
 } else {
-    Write-Host "Creating .venv..."
-    python -m venv .venv
+    Write-Host "Creating $VenvDir..."
+    python -m venv $VenvDir
 }
 Write-Host "Installing backend dependencies..."
-& .\.venv\Scripts\python.exe -m pip install --upgrade pip | Out-Null
-& .\.venv\Scripts\pip.exe install -r backend\requirements.txt
+& ".\$VenvDir\Scripts\python.exe" -m pip install --upgrade pip | Out-Null
+& ".\$VenvDir\Scripts\python.exe" -m pip install -r backend\requirements.txt
 Write-Host "Installing tray icon dependencies..."
-& .\.venv\Scripts\pip.exe install -r scripts\tray_requirements.txt
+& ".\$VenvDir\Scripts\python.exe" -m pip install -r scripts\tray_requirements.txt
 
 # --- Frontend deps ---
 Write-Host ""

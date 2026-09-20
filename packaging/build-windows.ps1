@@ -4,7 +4,7 @@
 # path) -- run this from PowerShell on the actual Windows machine, not
 # WSL2.
 #
-# Prerequisite: scripts\install.ps1 already run once (sets up .venv with
+# Prerequisite: scripts\install.ps1 already run once (sets up the venv with
 # every backend + tray dependency). This script only adds pyinstaller on
 # top of that and doesn't redo the rest of install.ps1's own setup.
 #
@@ -20,9 +20,10 @@ param(
 )
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
+. "$PSScriptRoot\..\scripts\venv-path.ps1"
 
-if (-not (Test-Path .venv\Scripts\python.exe)) {
-    Write-Host "No .venv found -- run scripts\install.ps1 first." -ForegroundColor Red
+if (-not (Test-Path "$VenvDir\Scripts\python.exe")) {
+    Write-Host "No Windows venv found -- run scripts\install.ps1 first." -ForegroundColor Red
     exit 1
 }
 
@@ -35,22 +36,22 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "== Installing pyinstaller + tray dependencies into .venv =="
+Write-Host "== Installing pyinstaller + tray dependencies into $VenvDir =="
 # The tray deps (pystray/Pillow) are a separate requirements file from
 # backend/requirements.txt (see that file's own comment) -- install.ps1
 # already installs them for the from-source workflow, but re-asserting
 # it here too means a build can never silently produce a broken
 # "ModuleNotFoundError: No module named 'pystray'" exe just because
-# .venv happened to be missing them for some other reason (an older
+# the venv happened to be missing them for some other reason (an older
 # install.ps1 run, a different venv than expected, etc.) -- confirmed
 # live: this exact failure happened before this line existed.
-& .\.venv\Scripts\pip.exe install pyinstaller
-& .\.venv\Scripts\pip.exe install -r scripts\tray_requirements.txt
+& ".\$VenvDir\Scripts\python.exe" -m pip install pyinstaller
+& ".\$VenvDir\Scripts\python.exe" -m pip install -r scripts\tray_requirements.txt
 
 Write-Host "== Running PyInstaller ($Mode) =="
 Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
 $env:PACKAGE_MODE = $Mode
-& .\.venv\Scripts\pyinstaller.exe packaging\roast-telemetry.spec --distpath dist --workpath build
+& ".\$VenvDir\Scripts\python.exe" -m PyInstaller packaging\roast-telemetry.spec --distpath dist --workpath build
 $buildExitCode = $LASTEXITCODE
 Remove-Item Env:\PACKAGE_MODE
 if ($buildExitCode -ne 0) {

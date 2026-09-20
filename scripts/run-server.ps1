@@ -3,11 +3,12 @@
 # roaster's actual COM port needs direct Windows access, which WSL
 # doesn't give you without extra setup (usbipd-win, still awkward).
 #
-# Requires a venv created natively on Windows (python -m venv .venv from
-# a Windows Python, not the WSL .venv directory -- the two aren't
-# interchangeable, their executables target different platforms):
-#   python -m venv .venv
-#   .\.venv\Scripts\Activate.ps1
+# Requires a venv created natively on Windows -- scripts\install.ps1 makes
+# one at .venv-windows (an older .venv\Scripts one is still picked up; see
+# venv-path.ps1). It can't share the plain .venv name with a WSL2/Linux venv
+# -- their executables target different platforms. By hand:
+#   python -m venv .venv-windows
+#   .\.venv-windows\Scripts\Activate.ps1
 #   pip install -r backend\requirements.txt
 #   cd frontend; npm install; cd ..
 #
@@ -50,6 +51,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
+. "$PSScriptRoot\venv-path.ps1"
 
 if ($Lan) { $BindHost = "0.0.0.0" }
 
@@ -121,4 +123,4 @@ if ($BindHost -eq "0.0.0.0") {
 }
 $uvicornArgs = @("backend.app.main:app", "--host", $BindHost, "--port", $Port)
 if ($Reload) { $uvicornArgs += "--reload" }
-& .\.venv\Scripts\uvicorn.exe @uvicornArgs
+& ".\$VenvDir\Scripts\python.exe" -m uvicorn @uvicornArgs
