@@ -164,3 +164,20 @@ def test_missing_weight_and_empty_profile_do_not_crash():
     d = roast_to_artisan_native_dict(title="Empty", profile=[], events=[], notes=[])
     assert d["timeindex"] == [0, 0, 0, 0, 0, 0, 0, 0]
     assert d["weight"] == [0.0, 0.0, "g"]
+
+
+def test_computed_never_holds_none_and_temps_are_plain_floats():
+    # Regression: real Artisan validates the whole file against a typed
+    # schema in which every `computed` field is a number that may be
+    # absent but not None, and temp1/temp2 are list[float]. A None in any
+    # of them made Artisan reject the file as "Invalid artisan format".
+    profile = _profile(30)
+    profile[5] = {**profile[5], "et": None, "bt": None}  # one dropped reading
+    events = [{"type": "CHARGE", "time_s": 0.0}, {"type": "DROP", "time_s": 20.0}]  # no TP, no cool end
+    d = roast_to_artisan_native_dict(title="t", profile=profile, events=events, notes=[])
+
+    assert None not in d["computed"].values()
+    assert "COOL_time" not in d["computed"]
+    assert "TP_idx" not in d["computed"]
+    for key in ("temp1", "temp2", "timex"):
+        assert all(isinstance(v, float) for v in d[key]), key

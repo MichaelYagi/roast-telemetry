@@ -371,10 +371,15 @@ def roast_to_artisan_native_dict(
         "roastepoch": int(roastdate_dt.timestamp()) if roastdate_dt else data.get("roastepoch", 0),
         **({"ymin": 0, "ymax": computed_ymax} if all_temps else {}),
         "timex": timex,
-        "temp1": temp1,
-        "temp2": temp2,
+        # Artisan's schema is list[float]: a missing reading is -1, never None.
+        "temp1": [-1.0 if t is None else float(t) for t in temp1],
+        "temp2": [-1.0 if t is None else float(t) for t in temp2],
         "timeindex": timeindex,
-        "computed": computed,
+        # Every computed field is a plain number that may be *absent* but
+        # never None -- Artisan rejects the whole file ("Invalid artisan
+        # format") on a None here, so unrecorded milestones are left out,
+        # as Artisan's own files do.
+        "computed": {k: v for k, v in computed.items() if v is not None},
         "etypes": ARTISAN_ETYPES,
         "specialevents": specialevents,
         "specialeventstype": specialeventstype,
