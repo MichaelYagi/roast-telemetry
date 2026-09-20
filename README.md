@@ -161,3 +161,13 @@ reference](docs/getting-started.html#scripts-reference). Full docs:
 - [Architecture reference](docs/architecture.html) — layout, storage, API
   summary, assumptions
 - [Contributing](CONTRIBUTING.md) — running tests, code style, releasing
+
+## License
+
+Roast Telemetry is free software, licensed under the
+[GNU Affero General Public License v3.0 or later](LICENSE) (AGPL-3.0-or-later).
+You can use, study, change and share it. If you run a modified version as a
+network service, the AGPL requires you to offer its users the source of your
+version; the app's footer links to this repository for that reason.
+Third-party components keep their own licenses -- see the
+`THIRD-PARTY-NOTICES.txt` shipped with each build.

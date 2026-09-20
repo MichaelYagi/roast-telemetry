@@ -47,18 +47,31 @@ LICENSE_FILE_RE = re.compile(r"(^|/)(licen[sc]e|copying|notice|copyright)[^/]*$"
 HEADER = """\
 THIRD-PARTY NOTICES
 
-This application (Roast Telemetry) bundles the third-party software listed
-below. Each component is distributed under its own license; the license
-text each package ships with is reproduced in full. Roast Telemetry's own
-license is in LICENSE.txt, next to this file.
+This application (Roast Telemetry) is free software, licensed under the GNU
+Affero General Public License, version 3 or (at your option) any later
+version; the full text is in LICENSE.txt, next to this file. It bundles the
+third-party software listed below. Each of those components is distributed
+under its own license; the license text each package ships with is
+reproduced in full.
 
 Source code
 -----------
-Complete source code for this application, and the build scripts used to
-produce this package, are public at
-https://github.com/MichaelYagi/roast-telemetry -- so any component below,
-including the LGPL-licensed ones, can be replaced with a modified version
-and the application rebuilt.
+The complete corresponding source code for this application, and the build
+scripts used to produce this package, are available at
+https://github.com/MichaelYagi/roast-telemetry, at the tag matching the
+version shown in the app's footer -- so any component below, including the
+LGPL-licensed ones, can be replaced with a modified version and the
+application rebuilt. If you received this build and cannot reach that
+address, ask the person you received it from for the source.
+
+Portions derived from other free software
+-----------------------------------------
+The Aillio Bullet support (the aillio_bridge package) is derived from the
+Aillio R1 driver in Artisan (https://github.com/artisan-roaster-scope/artisan):
+Copyright (C) 2010-2026 The Artisan team, represented by Marko Luther and all
+contributors; that driver by Rui Paulo, 2023. Artisan is licensed under the
+GNU Affero General Public License, version 3 or later, the same license as
+this application.
 
 LGPL-licensed components
 ------------------------

@@ -71,7 +71,7 @@ jobs:
           # aillio_bridge/tc4_bridge were missing for several releases, and
           # backend/app/roast_session/session.py imports both at module
           # level, so the zip couldn't even start (ModuleNotFoundError).
-          # LICENSE has to travel with the copy (MIT requires the notice).
+          # LICENSE has to travel with the copy (the AGPL requires it to accompany copies).
           cp -r backend simulator mock_device alog_playback \
             modbus_bridge ms6514_bridge aillio_bridge tc4_bridge \
             roast_heuristics hardware_fakes \

@@ -80,7 +80,13 @@ function AppShell() {
         </Routes>
       </main>
       <footer className="app-footer no-print">
-        v{__APP_VERSION__} · build {__APP_BUILD__}
+        v{__APP_VERSION__} · build {__APP_BUILD__} · AGPL-3.0-or-later ·{" "}
+        {/* AGPL section 13: a network-served program has to offer its users
+            its source -- the license's own guidance is a "Source" link in the
+            interface. */}
+        <a href="https://github.com/MichaelYagi/roast-telemetry" target="_blank" rel="noreferrer">
+          Source code
+        </a>
       </footer>
     </div>
   );

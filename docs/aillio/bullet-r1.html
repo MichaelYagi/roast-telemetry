@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aillio Bullet R1 — Roast Telemetry</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="icon" href="../assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16x16.png">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="../index.html"><img src="../assets/icon-48x48.png" alt="" width="24" height="24"> Roast Telemetry</a>
+  <nav>
+    <a href="../index.html">Docs</a>
+    <a href="../getting-started.html">Getting Started</a>
+    <a href="../modbus/index.html">Direct Modbus</a>
+    <a href="../architecture.html">Architecture</a>
+    <a href="../glossary.html">Glossary</a>
+    <a href="https://github.com/MichaelYagi/roast-telemetry">GitHub</a>
+  </nav>
+</header>
+<main>
+  <h1>Aillio Bullet R1</h1>
+  <p>
+    A genuinely different data source from everything else this app
+    supports: the Bullet talks over a <strong>raw, vendor-specific USB
+    protocol</strong>, not Modbus and not even a serial/COM port. There's
+    no register map to configure and no port/host to type in — the app
+    finds the roaster by its own USB vendor/product id and talks to it
+    directly.
+  </p>
+  <p>
+    Only the <strong>R1</strong> model is supported today. The R2 has a
+    different USB product id and a materially different frame layout —
+    it isn't just a different register map the way the FZ-94/FZ-94 Evo
+    are related, so it needs its own protocol implementation, not
+    reuse of R1's.
+  </p>
+
+  <h2>Install requirements</h2>
+  <p>
+    Needs <a href="https://github.com/pyusb/pyusb"><code>pyusb</code></a>
+    plus a native <code>libusb</code> shared library — already part of
+    this project's own <code>backend/requirements.txt</code>, so a plain
+    <code>pip install -r backend/requirements.txt</code> covers it.
+  </p>
+  <ul>
+    <li><strong>Linux/macOS</strong> — no extra step needed in most
+      cases; a system <code>libusb</code> is typically already present,
+      and <code>pyusb</code> falls back to a bundled one otherwise.</li>
+    <li><strong>Windows</strong> — needs the roaster's USB driver swapped
+      to a generic <code>libusb</code>-compatible one before this app
+      can see it at all (the OS's own default driver claims the device
+      exclusively otherwise). <a href="https://zadig.akeo.ie/">Zadig</a>
+      is the standard tool for this — plug the Bullet in, run Zadig,
+      select the Bullet's USB interface, and install the
+      <code>libusb-win32</code> (or <code>WinUSB</code>) driver over the
+      default one. This is a one-time step per machine, but it's a real,
+      manual one — unlike every other data source this app supports,
+      which only ever need a COM port.</li>
+  </ul>
+
+  <h2>Connecting</h2>
+  <p>
+    Configure Roast &rarr; Data source &rarr; <strong>Aillio Bullet
+    (USB)</strong> &rarr; Device tab &rarr; Model &rarr; <strong>Bullet
+    R1</strong>. That's the entire configuration — press <strong>ON</strong>
+    once the roaster is plugged in and its driver is set up.
+  </p>
+  <p>
+    Heater/Fan/Drum read back the device's own last-reported state (not
+    an echo of this app's own commands), same "don't clobber real state
+    on connect" behavior as Direct Modbus — see
+    <a href="../getting-started.html#the-data-sources">Getting started
+    &rarr; The data sources</a>.
+  </p>
+
+  <h2>Protocol confidence</h2>
+  <p>
+    Aillio has never published an official protocol specification for
+    this device. The register offsets, opcodes, and control semantics
+    this app uses were traced directly from the manufacturer's own
+    shipped roaster-scope driver source (not guessed, not reverse
+    engineered from scratch) — see <code>aillio_bridge/r1.py</code>'s own
+    module docstring for the full byte-level detail. <strong>Not tested
+    against real Bullet R1 hardware</strong> in this project's own
+    development environment (none available) — the logic is a faithful
+    port of that confirmed source, but hasn't been independently
+    verified against a physical unit here. If something doesn't match
+    real behavior, that's the most likely place to look first.
+  </p>
+
+  <h2>Known limitations</h2>
+  <ul>
+    <li><strong>R1 only</strong> — R2 support needs its own research
+      pass and protocol implementation; not yet built.</li>
+    <li><strong>No fake-hardware test rig.</strong> Every other
+      live-hardware mode this app supports has a standalone fake
+      process you can point the app at instead of real hardware (see
+      <code>hardware_fakes/</code>) — those all work by standing in on
+      the other end of a real OS-level channel (a virtual serial port,
+      a TCP socket) the real client already knows how to open. Raw USB
+      has no equivalent generic channel; convincingly faking a real USB
+      device needs kernel-level emulation, well beyond what the other
+      fakes need. This is instead covered by thorough backend pytest
+      coverage of the protocol decoding/command-building logic itself
+      (pure functions, no hardware or even <code>pyusb</code> involved
+      — see <code>tests/test_aillio_r1_protocol.py</code> and
+      <code>tests/test_aillio_engine.py</code>), just not something you
+      can click through in a running instance of the app without a real
+      Bullet.</li>
+    <li><strong>No milestone-triggered automation rules</strong> (the
+      Artisan-Alarms-style bindings Direct Modbus has) — not extended to
+      this mode. Milestones are always manual clicks here, same as
+      Direct USB (thermocouple meter).</li>
+  </ul>
+
+  <div class="page-nav"><a href="../index.html">&larr; Back to docs home</a></div>
+</main>
+<script src="../assets/toc.js" defer></script>
+</body>
+</html>
