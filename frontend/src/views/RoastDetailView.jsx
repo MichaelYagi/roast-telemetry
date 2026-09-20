@@ -394,11 +394,7 @@ export default function RoastDetailView() {
           </ul>
         </div>
 
-        <RoastReviewCard
-          roastId={roast.id}
-          roastActive={roast.status === "roasting" || roast.status === "cooling"}
-          roastStatus={roast.status}
-        />
+        <RoastReviewCard roastId={roast.id} roastActive={roast.status === "roasting" || roast.status === "cooling"} />
       </div>
     </div>
   );
