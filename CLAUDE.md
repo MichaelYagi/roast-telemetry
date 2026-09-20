@@ -29,6 +29,12 @@ Artisan's license as binding on every change you make.
   were the official tool. Keep Artisan citations out of `docs/` and the
   README (the user's rule); legal attribution belongs only in source
   headers and the notices file.
+- **Machine presets:** you may read another project's machine presets for
+  device facts (slave IDs, register numbers, baud rate, scaling). Transcribe
+  the facts only, into our own Device Profile in our own words; update the
+  acknowledgement paragraph in `packaging/gen_third_party_notices.py`; verify
+  on real hardware before marking it tested; never copy the files or write a
+  bulk importer for them.
 - **When in doubt, don't, and ask the user.** Reading Artisan's public
   source to understand a file format or protocol is fine; reproducing it is
   not.
