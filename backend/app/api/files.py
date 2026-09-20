@@ -20,7 +20,6 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
-from .. import storage
 from ..models import FileEntry, FileListing, FileShortcut
 
 router = APIRouter(prefix="/files", tags=["files"])
@@ -44,11 +43,6 @@ def _windows_drives() -> list[str]:
 def _shortcuts() -> list[FileShortcut]:
     home = os.path.expanduser("~")
     out = [FileShortcut(label="Home", path=home)]
-    for label, folder in (
-        ("This app's saved roasts", storage.ROASTS_DIR),
-        ("Sample roasts", storage.SAMPLE_ROASTS_DIR),
-    ):
-        out.append(FileShortcut(label=label, path=os.path.abspath(str(folder))))
     if sys.platform == "win32":
         out.extend(FileShortcut(label=d, path=d) for d in _windows_drives())
     else:

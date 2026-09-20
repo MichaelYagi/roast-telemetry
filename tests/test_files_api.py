@@ -59,11 +59,13 @@ def test_defaults_to_the_home_folder_when_no_path_is_given(client, tmp_path, mon
         assert body["path"] == str(tmp_path)
 
 
-def test_shortcuts_include_home_and_the_apps_own_roast_folders(client, tmp_path):
-    labels = [s["label"] for s in client.get("/api/files", params={"path": str(tmp_path)}).json()["shortcuts"]]
-    assert "Home" in labels
-    assert "Sample roasts" in labels
-    assert "This app's saved roasts" in labels
+def test_shortcuts_are_home_plus_the_filesystem_roots(client, tmp_path):
+    shortcuts = client.get("/api/files", params={"path": str(tmp_path)}).json()["shortcuts"]
+    assert shortcuts[0]["label"] == "Home"
+    assert len(shortcuts) >= 2  # a root ("/") or the drive letters
+    # The app's own data folders are deliberately not offered: saved roasts
+    # have UUID names, and the samples folder holds one demo file.
+    assert not any("roasts" in s["label"].lower() for s in shortcuts)
 
 
 def test_missing_folder_is_404_and_a_file_path_is_400(client, tmp_path):
