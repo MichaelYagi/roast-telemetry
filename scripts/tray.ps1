@@ -9,6 +9,15 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
+if (-not (Test-Path .venv\Scripts\python.exe)) {
+    Write-Host "No Windows virtual environment found (.venv\Scripts\python.exe)." -ForegroundColor Red
+    if (Test-Path .venv) {
+        Write-Host "A .venv folder exists but it isn't a Windows one -- most likely created from WSL2/Linux in this same folder (they use a different layout)."
+    }
+    Write-Host "Run scripts\start.ps1 (or scripts\install.ps1 first) -- it sets this up and explains what to do if .venv is in the way."
+    exit 1
+}
+
 & .\.venv\Scripts\python.exe -c "import pystray" 2>$null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Tray dependencies aren't installed yet. Run this once:" -ForegroundColor Red
