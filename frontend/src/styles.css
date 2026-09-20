@@ -2569,6 +2569,13 @@ button:disabled {
   font-weight: 600;
 }
 
+/* Sits directly above the Test Connection panel's own box (which has its
+   own top margin via .panel) -- a bit of bottom breathing room so the two
+   don't read as visually stuck together. */
+.connection-status-badge {
+  margin-bottom: 0.75rem;
+}
+
 .connection-test-nudge,
 .connection-test-visible-confirm,
 .connection-test-visible-confirm-no {

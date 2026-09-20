@@ -8,6 +8,7 @@ import BreakoutPanel from "../components/BreakoutPanel.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 import ConnectionBadge from "../components/ConnectionBadge.jsx";
 import AlarmRulesEditor from "../components/AlarmRulesEditor.jsx";
+import ConnectionStatusBadge from "../components/ConnectionStatusBadge.jsx";
 import ConnectionTestPanel from "../components/ConnectionTestPanel.jsx";
 import VerticalControlPanel from "../components/VerticalControlPanel.jsx";
 import DeviceProfileEditor from "../components/DeviceProfileEditor.jsx";
@@ -1812,7 +1813,10 @@ export default function LiveRoastView() {
               two modes that have a real connection worth verifying before
               committing to a roast. */}
           {phase === "armed" && LIVE_MODES.includes(activeMode) && (
-            <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} />
+            <>
+              <ConnectionStatusBadge roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} />
+              <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} />
+            </>
           )}
           <div className="panel scope-panel">
             <div className="scope-body">
