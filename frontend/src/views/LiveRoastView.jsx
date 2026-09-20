@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import { api, settingsStreamUrl } from "../api/client.js";
 import { useRoastStream } from "../api/ws.js";
 import ArtisanToolbar from "../components/ArtisanToolbar.jsx";
+import useConnectionHealth from "../useConnectionHealth.js";
 import BackgroundProfilePicker from "../components/BackgroundProfilePicker.jsx";
 import BreakoutPanel from "../components/BreakoutPanel.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 import ConnectionBadge from "../components/ConnectionBadge.jsx";
 import AlarmRulesEditor from "../components/AlarmRulesEditor.jsx";
-import ConnectionStatusBadge from "../components/ConnectionStatusBadge.jsx";
 import ConnectionTestPanel from "../components/ConnectionTestPanel.jsx";
 import VerticalControlPanel from "../components/VerticalControlPanel.jsx";
 import DeviceProfileEditor from "../components/DeviceProfileEditor.jsx";
@@ -1017,6 +1017,12 @@ export default function LiveRoastView() {
   // local state, which resets to its defaults on every page load.
   const activeMode = roast?.mode || form.mode;
 
+  // Always called (hook rules), even for simulator/alog_playback/idle --
+  // its result is only actually rendered for live-hardware modes while
+  // armed/roasting/cooling (see toolbarElement below). Harmless the rest
+  // of the time: with no `latest` yet it just sits at "checking".
+  const connectionHealth = useConnectionHealth(roastId, latest, activeMode);
+
   const chargeEvent = roast?.events?.find((e) => e.type === "CHARGE");
   const dryEndEvent = roast?.events?.find((e) => e.type === "DRY_END");
   const fcStartEvent = roast?.events?.find((e) => e.type === "FC_START");
@@ -1081,6 +1087,12 @@ export default function LiveRoastView() {
   // etc.) are shown per-mode in the .live-meta list below once `roast`
   // exists, matching the existing alog_playback rows there (source
   // file/speed) -- not appended to this status line.
+  // Only meaningful for a real device connection, and only for as long
+  // as one is live (armed through roasting/cooling) -- simulator/
+  // alog_playback have no real connection to verify, and "finished"'s
+  // device is already disconnected.
+  const showConnectionDot =
+    LIVE_MODES.includes(activeMode) && (phase === "armed" || phase === "roasting" || phase === "cooling");
   const toolbarElement = (
     <ArtisanToolbar
       title={roast?.title || form.title}
@@ -1091,6 +1103,8 @@ export default function LiveRoastView() {
       statusText={STATUS_TEXT[phase]}
       onToggleConnect={handleToggleConnect}
       onStart={handleStart}
+      connectionStatus={showConnectionDot ? connectionHealth.status : null}
+      connectionFailedLabels={connectionHealth.failedLabels}
     />
   );
 
@@ -1811,12 +1825,11 @@ export default function LiveRoastView() {
           {/* Only while armed (connected via ON, not yet recording -- see
               handleToggleConnect/RoastSession.connect()) and only for the
               two modes that have a real connection worth verifying before
-              committing to a roast. */}
+              committing to a roast. The ambient connection-status dot
+              itself lives in ArtisanToolbar (see toolbarElement below) --
+              it stays visible through roasting/cooling too, not just here. */}
           {phase === "armed" && LIVE_MODES.includes(activeMode) && (
-            <>
-              <ConnectionStatusBadge roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} />
-              <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} />
-            </>
+            <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} />
           )}
           <div className="panel scope-panel">
             <div className="scope-body">

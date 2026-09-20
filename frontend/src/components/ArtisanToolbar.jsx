@@ -4,6 +4,12 @@
 // milestone-box row, but those are just as available (and freely
 // choosable alongside DEV%/DEV TIME/etc.) via the Big/Small Readout
 // Panel now, so hardcoding this one fixed trio here was redundant.
+// connectionStatus: "checking" | "pass" | "fail" | null (null/undefined
+// -- no live-hardware connection worth showing a dot for, e.g.
+// simulator/alog_playback, or idle/finished). "checking" is yellow --
+// shown right after ON, before enough readings have come in to call it
+// either way -- turning green once they look normal, or red if they
+// don't. See useConnectionHealth.js for how this gets computed.
 export default function ArtisanToolbar({
   title,
   beans,
@@ -13,6 +19,8 @@ export default function ArtisanToolbar({
   statusText,
   onToggleConnect,
   onStart,
+  connectionStatus,
+  connectionFailedLabels = [],
 }) {
   const connected = phase !== "idle";
   const recording = phase === "roasting" || phase === "cooling" || phase === "finished";
@@ -32,6 +40,18 @@ export default function ArtisanToolbar({
             both are on the left, controls/clock on the right, same row. */}
         <div className="artisan-toolbar-title-group">
           <h2 className="artisan-toolbar-title">
+            {connectionStatus && (
+              <span
+                className={`connection-status-dot connection-status-dot-${connectionStatus}`}
+                title={
+                  connectionStatus === "pass"
+                    ? "Readings look normal"
+                    : connectionStatus === "fail"
+                      ? `${connectionFailedLabels.join(", ")} out of range -- see Test Connection`
+                      : "Checking connection…"
+                }
+              />
+            )}
             {title || "Untitled roast"}
             {meta && <span className="artisan-toolbar-meta"> · {meta}</span>}
           </h2>

@@ -2115,6 +2115,31 @@ button:disabled {
   overflow-wrap: break-word;
 }
 
+/* Connection-status dot beside the title (ArtisanToolbar) -- yellow
+   while checking (right after ON, before enough readings have come in
+   to call it either way), green once readings look normal, red if
+   they don't. See useConnectionHealth.js. */
+.connection-status-dot {
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  margin-right: 0.4em;
+  vertical-align: middle;
+}
+
+.connection-status-dot-checking {
+  background: #ca8a04;
+}
+
+.connection-status-dot-pass {
+  background: #16a34a;
+}
+
+.connection-status-dot-fail {
+  background: #dc2626;
+}
+
 .artisan-toolbar-meta {
   font-size: 0.85rem;
   font-weight: 500;
@@ -2569,12 +2594,6 @@ button:disabled {
   font-weight: 600;
 }
 
-/* Sits directly above the Test Connection panel's own box (which has its
-   own top margin via .panel) -- a bit of bottom breathing room so the two
-   don't read as visually stuck together. */
-.connection-status-badge {
-  margin-bottom: 0.75rem;
-}
 
 .connection-test-nudge,
 .connection-test-visible-confirm,
