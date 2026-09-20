@@ -18,13 +18,38 @@ name: Build desktop app
 # interactive (prompt before touching system state via brew/apt/winget),
 # meant for a first-time human on their own machine, not CI. This runs
 # the handful of non-interactive equivalent steps directly instead.
+#
+# backend-tests gates both platform builds (needs:) -- this is a
+# separate workflow from release.yml, so it can't depend on *that* one's
+# own backend-tests job even though the two run on the same tag push;
+# without this, a broken commit could still produce a downloadable
+# .exe/.app even though release.yml correctly refuses to publish the
+# source zip for it. Runs once on ubuntu-latest, not once per platform
+# job -- the suite itself is platform-independent, and re-running it on
+# macos-latest/windows-latest would be pure waste (slower, pricier
+# runners) for no extra signal. Actively can't run on windows-latest
+# anyway: tests/test_tc4_engine.py imports the POSIX-only `pty` module
+# at the top of the file, which doesn't exist on native Windows Python
+# -- that would fail the whole file at collection time for a platform
+# reason having nothing to do with whether the code actually works.
 on:
   push:
     tags:
       - "v*.*.*"
 
 jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements-dev.txt
+      - run: PYTHONPATH=. pytest -q
+
   build-macos:
+    needs: backend-tests
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,6 +94,7 @@ jobs:
           path: dist
 
   build-windows:
+    needs: backend-tests
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
