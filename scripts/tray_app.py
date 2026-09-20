@@ -41,6 +41,18 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # this is always False there, and every branch below that checks it is
 # a no-op for that case, not a behavior change.
 FROZEN = bool(getattr(sys, "frozen", False))
+
+# scripts/tray.sh/.ps1 launch this as `python scripts/tray_app.py`, no
+# PYTHONPATH set for *this* process (unlike the server subprocess start()
+# spawns below, which does set one) -- sys.path[0] is this file's own
+# scripts/ directory by default, which has no `backend` package in it.
+# Only needed from source; a frozen build resolves backend.app.version
+# through PyInstaller's own bundled-import machinery instead, same as
+# backend.app.main already does (see roast-telemetry.spec's own
+# hiddenimports comment).
+if not FROZEN and str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+from backend.app.version import VERSION  # noqa: E402
 # Bundled read-only resources (icon, the sample .alog files shipped
 # with the app) -- sys._MEIPASS is where PyInstaller unpacks/exposes
 # them (set for both onefile and onedir builds), REPO_ROOT is the
@@ -393,6 +405,11 @@ class TrayApp:
             icon=self.icon_idle,
             title="Roast Telemetry (stopped)",
             menu=pystray.Menu(
+                # Non-interactive -- action=None, enabled=False -- just
+                # so the running build's version is visible at a glance,
+                # without needing the server up and a browser open.
+                pystray.MenuItem(f"Roast Telemetry v{VERSION}", None, enabled=False),
+                pystray.Menu.SEPARATOR,
                 pystray.MenuItem("Start server", self.start, enabled=lambda _: not self.is_running()),
                 pystray.MenuItem("Stop server", self.stop, enabled=lambda _: self.is_running()),
                 pystray.MenuItem("Restart server", self.restart, enabled=lambda _: self.is_running()),

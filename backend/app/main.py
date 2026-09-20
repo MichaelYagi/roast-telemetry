@@ -13,6 +13,7 @@ from . import auth, storage
 from .api import auth as auth_api
 from .api import device_profiles, devices, presets, roasts, serial_ports, settings
 from .models import DeviceProfileCreateRequest, RoastCreateRequest, UserStatus
+from .version import VERSION
 from modbus_bridge.device_profiles import BUILT_IN_PROFILES
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
@@ -99,7 +100,7 @@ app = FastAPI(
         "a mock USB/serial device layer, and an .alog playback engine, "
         "all running without physical hardware."
     ),
-    version="1.2.7",
+    version=VERSION,
     lifespan=lifespan,
 )
 
