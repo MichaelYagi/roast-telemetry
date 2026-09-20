@@ -52,25 +52,25 @@ export default function ConnectionStatusBadge({ roastId, latest, mode, tempUnit 
   if (failed.length > 0) {
     return (
       <p className="connection-test-write connection-test-fail connection-status-badge">
-        ✗ {failed.map((r) => r.label).join(", ")} {failed.length === 1 ? "looks" : "look"} implausible -- double-check
+        ✗ {failed.map((r) => r.label).join(", ")} {failed.length === 1 ? "is" : "are"} out of range -- double-check
         the selected preset/port before starting. See Test Connection below for detail.
       </p>
     );
   }
   // Every channel came back "warn" (no data at all so far) -- not itself
   // a failure (a channel can be legitimately unconfigured, e.g. DT), but
-  // there's nothing to call plausible yet either.
+  // there's nothing to call normal yet either.
   if (passed.length === 0) {
     return <p className="hint connection-status-badge">Waiting for a reading…</p>;
   }
   // Deliberately not listing every passing channel by name here -- fine
   // (even useful) for the failure case above, where it says exactly
   // what's wrong, but just noise once everything's fine ("BT, ET, DT,
-  // Burner SV, Air RPM, Drum RPM look plausible" helps nobody). Anyone
-  // who wants the per-channel breakdown has Test Connection right below.
+  // Burner SV, Air RPM, Drum RPM look normal" helps nobody). Anyone who
+  // wants the per-channel breakdown has Test Connection right below.
   return (
     <p className="connection-test-write connection-test-pass connection-status-badge">
-      ✓ Readings look plausible
+      ✓ Readings look normal
     </p>
   );
 }

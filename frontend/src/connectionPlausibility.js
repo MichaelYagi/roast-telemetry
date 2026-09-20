@@ -55,16 +55,16 @@ export function analyzeReadSamples(samples, channels, tempUnit, { celsiusToUnit,
       return { ...ch, status: "warn", detail: "no data (not configured, or not reading)" };
     }
     const min = Math.min(...values);
-    // No artificial cap here -- this feeds the "out of plausible range"
-    // detail text below, which exists specifically to show *how far* out
-    // of range a bad reading actually is. A hardcoded ceiling (this used
-    // to be `Math.min(300, ...)`, understating anything above 300 even
-    // for Burner SV's real 400 ceiling) defeats that purpose by hiding
-    // the true severity of the out-of-range value.
+    // No artificial cap here -- this feeds the "out of range" detail text
+    // below, which exists specifically to show *how far* out of range a
+    // bad reading actually is. A hardcoded ceiling (this used to be
+    // `Math.min(300, ...)`, understating anything above 300 even for
+    // Burner SV's real 400 ceiling) defeats that purpose by hiding the
+    // true severity of the out-of-range value.
     const max = Math.max(...values);
     const inRange = values.every((v) => v >= ch.min && v <= ch.max);
     if (!inRange) {
-      return { ...ch, status: "fail", detail: `out of plausible range (${display(min).toFixed(1)}-${display(max).toFixed(1)})` };
+      return { ...ch, status: "fail", detail: `out of range (${display(min).toFixed(1)}-${display(max).toFixed(1)})` };
     }
     const varies = max - min > 0.001;
     const last = values[values.length - 1];
