@@ -63,9 +63,14 @@ export default function ConnectionStatusBadge({ roastId, latest, mode, tempUnit 
   if (passed.length === 0) {
     return <p className="hint connection-status-badge">Waiting for a reading…</p>;
   }
+  // Deliberately not listing every passing channel by name here -- fine
+  // (even useful) for the failure case above, where it says exactly
+  // what's wrong, but just noise once everything's fine ("BT, ET, DT,
+  // Burner SV, Air RPM, Drum RPM look plausible" helps nobody). Anyone
+  // who wants the per-channel breakdown has Test Connection right below.
   return (
     <p className="connection-test-write connection-test-pass connection-status-badge">
-      ✓ {passed.map((r) => r.label).join(", ")} {passed.length === 1 ? "looks" : "look"} plausible
+      ✓ Readings look plausible
     </p>
   );
 }
