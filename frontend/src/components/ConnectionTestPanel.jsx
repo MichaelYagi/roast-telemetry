@@ -7,37 +7,54 @@ import { analyzeReadSamples as analyzeReadSamplesShared, channelsForMode } from 
 const SAMPLE_WINDOW_MS = 4000;
 const SAMPLE_INTERVAL_MS = 250; // just samples the already-live `latest` prop -- no extra network calls
 
-// Air/Drum (Modbus) share identical register-map confidence (see
-// modbus_bridge/engine.py's own docstring: same registers 8192/8193/
-// 8451, same blog-sourced-only origin, just different slave IDs) -- Drum
-// is a genuine differential test if Air's nudge doesn't visibly move
-// anything, not a "more trustworthy" alternative. Heater (TC4) is a
-// completely different protocol (OT1, plain 0-100% PWM duty, no register
-// map at all) sharing only the same "bump it, watch it, put it back"
-// shape -- each channel gets its own label/unit/nudge size/hold time
-// below rather than assuming they're interchangeable.
-const CHANNEL_LABEL = { fan_pct: "Air", drum_speed_pct: "Drum", heater_pct: "Heater" };
-const CHANNEL_UNIT = { fan_pct: "RPM", drum_speed_pct: "RPM", heater_pct: "%" };
-// Max mirrors the FZ-94 built-in profile's own default operating ranges
-// (Air 0-100 RPM, Drum 0-70 RPM) purely so the nudge target shown here
-// doesn't overstate what the drive will actually accept -- the backend
-// clamps to whatever's really configured regardless. Heater's 0-100 is
-// TC4's own real OT1 duty range, not a guess.
-const CHANNEL_NUDGE_MAX = { fan_pct: 100, drum_speed_pct: 70, heater_pct: 100 };
-// A 5-unit bump is plenty to visibly move an RPM reading, but 5% OT1 duty
-// for 2 seconds is unlikely to move BT/ET at all (thermal lag) -- Heater
-// gets a bigger, longer nudge so there's actually something to notice.
-const CHANNEL_NUDGE_AMOUNT = { fan_pct: 5, drum_speed_pct: 5, heater_pct: 25 };
-const CHANNEL_NUDGE_HOLD_MS = { fan_pct: 2000, drum_speed_pct: 2000, heater_pct: 4000 };
-// What to ask the operator to look/listen for -- TC4 has no motor to
-// watch, just a heating element/SSR and (indirectly, over a longer
-// timescale than this quick nudge) BT itself.
-const CHANNEL_MOVER_LABEL = { fan_pct: "fan", drum_speed_pct: "drum motor", heater_pct: "heater (SSR/element click or glow)" };
+// Per-(mode, channel) metadata for whichever channel(s) that mode's
+// write-test/nudge flow actually uses. fan_pct/drum_speed_pct mean
+// genuinely different things depending on which device is on the other
+// end -- Modbus's Air/Drum are real RPM-reporting VFD drives (register
+// writes, see modbus_bridge/engine.py's own docstring: same registers
+// 8192/8193/8451, same blog-sourced-only origin, just different slave
+// IDs -- Drum is a genuine differential test if Air's nudge doesn't
+// visibly move anything, not a "more trustworthy" alternative); Aillio's
+// Fan/Drum are a small device-native 0-100% scale sent as raw USB
+// command packets, not registers at all (see aillio_bridge/r1.py --
+// Heater/Fan move via relative +1/-1 packets, Drum via one absolute
+// packet). TC4's Heater (OT1, plain 0-100% PWM duty) has no feedback
+// register/poll at all, unlike the other two -- so it's the only one
+// that can't use the round-trip write-check below, only the nudge.
+// A flat, channel-name-only map can't express this (fan_pct would mean
+// three different things), so this is keyed by mode first.
+const CHANNEL_META = {
+  modbus_live: {
+    fan_pct: { label: "Air", unit: "RPM", nudgeMax: 100, nudgeAmount: 5, nudgeHoldMs: 2000, moverLabel: "fan" },
+    drum_speed_pct: { label: "Drum", unit: "RPM", nudgeMax: 70, nudgeAmount: 5, nudgeHoldMs: 2000, moverLabel: "drum motor" },
+  },
+  aillio_live: {
+    fan_pct: { label: "Fan", unit: "%", nudgeMax: 100, nudgeAmount: 10, nudgeHoldMs: 2000, moverLabel: "fan" },
+    drum_speed_pct: { label: "Drum", unit: "%", nudgeMax: 100, nudgeAmount: 10, nudgeHoldMs: 2000, moverLabel: "drum motor" },
+  },
+  tc4_live: {
+    // A 5-unit bump is plenty to visibly move an RPM/%-of-a-drive
+    // reading, but 5% OT1 duty for 2 seconds is unlikely to move BT/ET
+    // at all (thermal lag) -- Heater gets a bigger, longer nudge so
+    // there's actually something to notice.
+    heater_pct: { label: "Heater", unit: "%", nudgeMax: 100, nudgeAmount: 25, nudgeHoldMs: 4000, moverLabel: "heater (SSR/element click or glow)" },
+  },
+};
 
-function unitSuffixFor(channel) {
-  const unit = CHANNEL_UNIT[channel];
+function meta(mode, channel) {
+  return CHANNEL_META[mode]?.[channel];
+}
+
+function unitSuffixFor(mode, channel) {
+  const unit = meta(mode, channel)?.unit;
   return unit === "%" ? "%" : ` ${unit}`;
 }
+
+// modbus_live and aillio_live both genuinely poll Fan back from the
+// device (Air's VFD feedback register / AillioEngine.tick()'s _poll())
+// -- a round-trip write-then-read-back check means something real for
+// either. tc4_live's OT1/DCFAN are write-only, no such poll exists.
+const ROUNDTRIP_CHANNEL = { modbus_live: "fan_pct", aillio_live: "fan_pct" };
 
 function analyzeReadSamples(samples, channels, tempUnit) {
   return analyzeReadSamplesShared(samples, channels, tempUnit, { celsiusToUnit, unitSuffix });
@@ -80,10 +97,12 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
   // ms6514 is a read-only thermocouple meter (no Burner/Air/Drum, no
   // apply_command effect at all -- see ms6514_bridge/engine.py) -- nothing
   // to write there. modbus_live has Air/Drum VFD registers plus a Burner
-  // SV register. tc4_live has real Heater (OT1)/Fan (DCFAN) control, just
-  // with no feedback register at all -- see the write-test branching
-  // below for how that changes what "write check" even means.
-  const canWrite = mode === "modbus_live" || mode === "tc4_live";
+  // SV register. aillio_live has real Heater/Fan/Drum control, genuinely
+  // polled back from the device. tc4_live has real Heater (OT1)/Fan
+  // (DCFAN) control, just with no feedback register at all -- see the
+  // write-test branching below for how that changes what "write check"
+  // even means.
+  const canWrite = mode === "modbus_live" || mode === "aillio_live" || mode === "tc4_live";
   const channels = channelsForMode(mode);
   const defaultNudgeChannel = mode === "tc4_live" ? "heater_pct" : "fan_pct";
 
@@ -111,15 +130,15 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
   // with the write check's own "running…" state appearing right after,
   // instead of the whole panel waiting on both before showing anything.
   //
-  // modbus_live is the only mode with an actual feedback register to poll
-  // (Air's fan_pct read-back) -- tc4_live's OT1/DCFAN are write-only, so
-  // TC4Engine.tick() always reports heater_pct/fan_pct as null; polling
-  // that would always read null and vacuously "pass" without proving
-  // anything, so tc4_live skips straight to the nudge below instead of
-  // running a register check that can't ever fail honestly.
+  // modbus_live/aillio_live both have an actual feedback channel to poll
+  // (see ROUNDTRIP_CHANNEL's own comment) -- tc4_live's OT1/DCFAN are
+  // write-only, so TC4Engine.tick() always reports heater_pct/fan_pct as
+  // null; polling that would always read null and vacuously "pass"
+  // without proving anything, so tc4_live skips straight to the nudge
+  // below instead of running a check that can't ever fail honestly.
   useEffect(() => {
     if (running || testMode !== "read_write" || readResults === null || writeStep !== "idle") return;
-    if (mode === "modbus_live") {
+    if (ROUNDTRIP_CHANNEL[mode]) {
       runWriteCheck();
     } else {
       setWriteStep("skipped");
@@ -130,29 +149,32 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
   async function runWriteCheck() {
     setWriteStep("running");
     setWriteDetail(null);
-    const before = latestRef.current?.fan_pct;
+    const channel = ROUNDTRIP_CHANNEL[mode];
+    const { label, unit } = meta(mode, channel);
+    const suffix = unitSuffixFor(mode, channel);
+    const before = latestRef.current?.[channel];
     if (before == null) {
       setWriteStep("failed");
-      setWriteDetail("no Air reading available yet -- can't verify a round-trip");
+      setWriteDetail(`no ${label} reading available yet -- can't verify a round-trip`);
       return;
     }
     try {
-      // The benign write: read Air's own current value, write that exact
-      // same value straight back. On an idle machine (Air almost always
-      // already off) this writes "off" over "off" -- genuinely zero
-      // physical effect, while still exercising the real write path
-      // (command encoding, the control connection, the PLC's
+      // The benign write: read the channel's own current value, write
+      // that exact same value straight back. On an idle machine (Fan/Air
+      // almost always already off) this writes "off" over "off" --
+      // genuinely zero physical effect, while still exercising the real
+      // write path (command encoding, the connection, the device's own
       // acknowledgement) end to end. More benign than an on/off toggle.
-      await api.sendCommand(roastId, { fan_pct: before });
-      await new Promise((resolve) => setTimeout(resolve, 1500)); // let the drive report back
-      const after = latestRef.current?.fan_pct;
+      await api.sendCommand(roastId, { [channel]: before });
+      await new Promise((resolve) => setTimeout(resolve, 1500)); // let the device report back
+      const after = latestRef.current?.[channel];
       if (after != null && Math.abs(after - before) > 1) {
         setWriteStep("failed");
-        setWriteDetail(`wrote ${before.toFixed(0)} RPM but feedback now reads ${after.toFixed(0)} RPM -- write may not be reaching the drive`);
+        setWriteDetail(`wrote ${before.toFixed(0)}${suffix} but feedback now reads ${after.toFixed(0)}${suffix} -- write may not be reaching the device`);
         return;
       }
       setWriteStep("done");
-      setWriteDetail(`wrote Air back at its current ${before.toFixed(0)} RPM (no-op) -- feedback confirms it took effect`);
+      setWriteDetail(`wrote ${label} back at its current ${before.toFixed(0)}${suffix} (no-op) -- feedback confirms it took effect`);
     } catch (err) {
       setWriteStep("failed");
       setWriteDetail(err.message);
@@ -162,9 +184,7 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
   async function runNudge(channel) {
     setNudgeConfirming(null);
     setVisibleConfirm(null);
-    const label = CHANNEL_LABEL[channel];
-    const max = CHANNEL_NUDGE_MAX[channel];
-    const amount = CHANNEL_NUDGE_AMOUNT[channel];
+    const { label, nudgeMax: max, nudgeAmount: amount } = meta(mode, channel);
     const before = latestRef.current?.[channel] ?? 0;
     // Real bug: clamping a nudge-up to `max` silently no-ops when already
     // at/near the ceiling (before === nudged), which then reports "done"
@@ -176,7 +196,7 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     setNudgeResult({
       channel,
       status: "pending",
-      detail: `nudging ${label} ${direction > 0 ? "up" : "down"} to ${nudged.toFixed(0)}${unitSuffixFor(channel)} -- watch/listen for it…`,
+      detail: `nudging ${label} ${direction > 0 ? "up" : "down"} to ${nudged.toFixed(0)}${unitSuffixFor(mode, channel)} -- watch/listen for it…`,
     });
     // The nudge-up and restore writes are deliberately two separate
     // try/catches, not one -- if the FIRST fails, nothing changed at all
@@ -191,20 +211,20 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
       setNudgeResult({ channel, status: "failed", detail: `nudge failed, nothing changed -- ${err.message}` });
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, CHANNEL_NUDGE_HOLD_MS[channel]));
+    await new Promise((resolve) => setTimeout(resolve, meta(mode, channel).nudgeHoldMs));
     await restoreChannelTo(channel, before);
   }
 
   async function restoreChannelTo(channel, before) {
-    const label = CHANNEL_LABEL[channel];
+    const { label } = meta(mode, channel);
     try {
       await api.sendCommand(roastId, { [channel]: before });
-      setNudgeResult({ channel, status: "done", detail: `set back to ${before.toFixed(0)}${unitSuffixFor(channel)}` });
+      setNudgeResult({ channel, status: "done", detail: `set back to ${before.toFixed(0)}${unitSuffixFor(mode, channel)}` });
     } catch (err) {
       setNudgeResult({
         channel,
         status: "failed",
-        detail: `${label} is still nudged up -- restoring it to ${before.toFixed(0)}${unitSuffixFor(channel)} failed: ${err.message}. Set it back yourself with the ${label} slider below, or retry.`,
+        detail: `${label} is still nudged up -- restoring it to ${before.toFixed(0)}${unitSuffixFor(mode, channel)} failed: ${err.message}. Set it back yourself with the ${label} slider below, or retry.`,
         retryTo: before,
       });
     }
@@ -229,6 +249,8 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
         channel for a few seconds.
         {canWrite && mode === "modbus_live" &&
           " Read + write also confirms Air can be controlled, using the most benign possible write: reading its current value back and writing that exact same value again (a no-op)."}
+        {canWrite && mode === "aillio_live" &&
+          " Read + write also confirms Fan can be controlled, using the most benign possible write: reading its current value back and writing that exact same value again (a no-op)."}
         {canWrite && mode === "tc4_live" &&
           " Read + write also confirms Heater can be controlled -- TC4 has no write feedback register at all, so instead of a silent round-trip this briefly bumps OT1 and asks you to confirm you actually saw/heard it respond, then sets it back."}
       </p>
@@ -255,9 +277,9 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
         </ul>
       )}
 
-      {testMode === "read_write" && mode === "modbus_live" && writeStep !== "idle" && (
+      {testMode === "read_write" && ROUNDTRIP_CHANNEL[mode] && writeStep !== "idle" && (
         <p className={`connection-test-write connection-test-${writeStep === "done" ? "pass" : writeStep === "failed" ? "fail" : "pending"}`}>
-          {writeStep === "running" && "Testing write (Air, no-op round-trip)…"}
+          {writeStep === "running" && `Testing write (${meta(mode, ROUNDTRIP_CHANNEL[mode]).label}, no-op round-trip)…`}
           {writeStep === "done" && `✓ Write check passed — ${writeDetail}`}
           {writeStep === "failed" && `✗ Write check failed — ${writeDetail}`}
         </p>
@@ -278,18 +300,18 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
           ) : (
             <>
               <p className="hint">
-                This will briefly bump {CHANNEL_LABEL[nudgeConfirming]}{" "}
-                {(latestRef.current?.[nudgeConfirming] ?? 0) + CHANNEL_NUDGE_AMOUNT[nudgeConfirming] > CHANNEL_NUDGE_MAX[nudgeConfirming] ? "down" : "up"}{" "}
-                by {CHANNEL_NUDGE_AMOUNT[nudgeConfirming]}{unitSuffixFor(nudgeConfirming)} for about{" "}
-                {(CHANNEL_NUDGE_HOLD_MS[nudgeConfirming] / 1000).toFixed(0)} seconds (you should see/hear the{" "}
-                {CHANNEL_MOVER_LABEL[nudgeConfirming]} respond), then set it back to exactly what it was. Only do this
-                if that's fine right now.
+                This will briefly bump {meta(mode, nudgeConfirming).label}{" "}
+                {(latestRef.current?.[nudgeConfirming] ?? 0) + meta(mode, nudgeConfirming).nudgeAmount > meta(mode, nudgeConfirming).nudgeMax ? "down" : "up"}{" "}
+                by {meta(mode, nudgeConfirming).nudgeAmount}{unitSuffixFor(mode, nudgeConfirming)} for about{" "}
+                {(meta(mode, nudgeConfirming).nudgeHoldMs / 1000).toFixed(0)} seconds (you should see/hear the{" "}
+                {meta(mode, nudgeConfirming).moverLabel} respond), then set it back to exactly what it was. Only do
+                this if that's fine right now.
               </p>
               <div className="event-button-row">
                 <button type="button" onClick={() => runNudge(nudgeConfirming)}>
-                  Confirm: nudge {CHANNEL_LABEL[nudgeConfirming]}{" "}
-                  {(latestRef.current?.[nudgeConfirming] ?? 0) + CHANNEL_NUDGE_AMOUNT[nudgeConfirming] > CHANNEL_NUDGE_MAX[nudgeConfirming] ? "-" : "+"}
-                  {CHANNEL_NUDGE_AMOUNT[nudgeConfirming]}{unitSuffixFor(nudgeConfirming)} and back
+                  Confirm: nudge {meta(mode, nudgeConfirming).label}{" "}
+                  {(latestRef.current?.[nudgeConfirming] ?? 0) + meta(mode, nudgeConfirming).nudgeAmount > meta(mode, nudgeConfirming).nudgeMax ? "-" : "+"}
+                  {meta(mode, nudgeConfirming).nudgeAmount}{unitSuffixFor(mode, nudgeConfirming)} and back
                 </button>
                 <button type="button" className="danger" onClick={() => setNudgeConfirming(null)}>
                   Cancel
@@ -306,21 +328,21 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
           </p>
           {nudgeResult.retryTo != null && (
             <button type="button" onClick={() => restoreChannelTo(nudgeResult.channel, nudgeResult.retryTo)}>
-              Retry restoring {CHANNEL_LABEL[nudgeResult.channel]} to {nudgeResult.retryTo.toFixed(0)}{unitSuffixFor(nudgeResult.channel)}
+              Retry restoring {meta(mode, nudgeResult.channel).label} to {nudgeResult.retryTo.toFixed(0)}{unitSuffixFor(mode, nudgeResult.channel)}
             </button>
           )}
 
           {/* The register write reporting "done" only proves the feedback
-              register echoed the commanded value back (modbus_live) -- a
-              drive that updates its own feedback without the fan/motor
-              physically spinning would still land here. For tc4_live
-              there's no feedback register at all, so this confirmation is
-              the *only* evidence a write test has. Either way, this is the
-              actual human confirmation, asked directly rather than
-              inferred. */}
+              register/poll echoed the commanded value back (modbus_live/
+              aillio_live) -- a drive that updates its own feedback
+              without the fan physically spinning would still land here.
+              For tc4_live there's no feedback register at all, so this
+              confirmation is the *only* evidence a write test has.
+              Either way, this is the actual human confirmation, asked
+              directly rather than inferred. */}
           {nudgeResult.status === "done" && visibleConfirm === null && (
             <div className="connection-test-visible-confirm">
-              <p className="hint">Did the {CHANNEL_MOVER_LABEL[nudgeResult.channel]} actually respond?</p>
+              <p className="hint">Did the {meta(mode, nudgeResult.channel).moverLabel} actually respond?</p>
               <div className="event-button-row">
                 <button type="button" onClick={() => setVisibleConfirm("yes")}>
                   Yes, it responded
@@ -341,7 +363,7 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
 
           {nudgeResult.status === "done" && visibleConfirm === "no" && (
             <div className="connection-test-visible-confirm-no">
-              {nudgeResult.channel === "fan_pct" ? (
+              {nudgeResult.channel === "fan_pct" && mode === "modbus_live" ? (
                 <>
                   <p className="connection-test-write connection-test-fail">
                     ✗ The register write succeeded but nothing physically moved. Air and Drum share identical
@@ -364,19 +386,44 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
                     Try Drum instead
                   </button>
                 </>
-              ) : nudgeResult.channel === "drum_speed_pct" ? (
+              ) : nudgeResult.channel === "drum_speed_pct" && mode === "modbus_live" ? (
                 <p className="connection-test-write connection-test-fail">
                   ✗ Drum didn't respond either -- that's real evidence the shared register scheme (8192/8193) is
                   wrong for this unit, not just something specific to Air/slave 1. Worth checking your VFD's own
                   nameplate/front-panel parameters against those numbers.
                 </p>
+              ) : nudgeResult.channel === "fan_pct" && mode === "aillio_live" ? (
+                <>
+                  <p className="connection-test-write connection-test-fail">
+                    ✗ The device acknowledged the write (no USB error) but nothing physically moved. Fan and Drum use
+                    the same underlying command mechanism on this device -- Drum is a genuine differential test, not
+                    just "try something else."
+                  </p>
+                  <button
+                    type="button"
+                    className="advanced-toggle"
+                    onClick={() => {
+                      setNudgeResult(null);
+                      setNudgeConfirming("drum_speed_pct");
+                    }}
+                  >
+                    Try Drum instead
+                  </button>
+                </>
+              ) : nudgeResult.channel === "drum_speed_pct" && mode === "aillio_live" ? (
+                <p className="connection-test-write connection-test-fail">
+                  ✗ Drum didn't respond either -- worth double-checking this is genuinely the roaster's own Fan/Drum
+                  command (see aillio_bridge/r1.py for the confirmed opcodes) rather than a connection/firmware issue
+                  specific to this unit.
+                </p>
               ) : (
                 <p className="connection-test-write connection-test-fail">
                   ✗ The OT1 write itself succeeded (no serial error) but nothing visibly responded. Since TC4 has no
                   feedback register at all, this either means a real wiring/SSR problem, or the{" "}
-                  {CHANNEL_NUDGE_AMOUNT.heater_pct}% bump for {(CHANNEL_NUDGE_HOLD_MS.heater_pct / 1000).toFixed(0)}s
-                  just wasn't enough to notice -- check the board's own OT1 output directly (multimeter/scope on the
-                  pin, or the heating element itself) before assuming the write path is broken.
+                  {meta("tc4_live", "heater_pct").nudgeAmount}% bump for{" "}
+                  {(meta("tc4_live", "heater_pct").nudgeHoldMs / 1000).toFixed(0)}s just wasn't enough to notice --
+                  check the board's own OT1 output directly (multimeter/scope on the pin, or the heating element
+                  itself) before assuming the write path is broken.
                 </p>
               )}
             </div>

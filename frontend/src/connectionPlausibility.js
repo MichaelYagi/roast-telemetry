@@ -32,6 +32,21 @@ export function channelsForMode(mode) {
   // "no data" for reasons that have nothing to do with the connection
   // actually working.
   if (mode === "tc4_live") return READ_CHANNELS.filter((c) => ["bt", "et", "dt"].includes(c.key));
+  // aillio_live: no Burner SV concept at all (always null -- see
+  // aillio_bridge/engine.py's own comment), and Fan/Drum are a small
+  // device-native 0-100% scale, not the FZ-94's real RPM-reporting VFD
+  // drives -- reusing READ_CHANNELS' "Air RPM"/"Drum RPM" entries as-is
+  // would be a wrong unit label, not just a generic one. Genuinely
+  // polled device feedback though (see AillioEngine.tick()'s _poll()),
+  // not write-only like TC4 -- these get real "pass"/"fail" plausibility
+  // checks, just against a 0-100% bound instead of RPM.
+  if (mode === "aillio_live") {
+    return [
+      ...READ_CHANNELS.filter((c) => ["bt", "et", "dt"].includes(c.key)),
+      { key: "fan_pct", label: "Fan %", unit: "%", min: 0, max: 100 },
+      { key: "drum_speed_pct", label: "Drum %", unit: "%", min: 0, max: 100 },
+    ];
+  }
   return READ_CHANNELS;
 }
 
