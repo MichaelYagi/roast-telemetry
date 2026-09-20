@@ -1,6 +1,6 @@
 import { TERM_TOOLTIPS } from "../termTooltips.js";
 
-// The row of manual event-marker buttons Artisan shows under the scope,
+// The row of manual event-marker buttons shown under the chart,
 // for logging milestones by hand. CHARGE is auto-detected for
 // simulator/alog_playback (SimulatorEngine fires it immediately on
 // start; alog_playback just replays whatever the source file already

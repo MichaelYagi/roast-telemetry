@@ -30,7 +30,7 @@ const EVENT_COLORS = {
 };
 
 // Continuous simulator control channels that map onto the same named
-// channels real Artisan uses for manual burner/air/drum/damper events.
+// channels used for manual burner/air/drum/damper events in .alog files.
 const CONTINUOUS_FIELD_BY_CHANNEL = {
   Burner: "heater_pct",
   Air: "fan_pct",
@@ -61,8 +61,8 @@ const SERIES_DEFS = [
 // live curves (both are already plotted against time_s from their own
 // Charge event, so no re-alignment math is needed -- putting both on the
 // same x-axis is the entire trick). Lighter/dashed so they read as "the
-// thing you're chasing," not a second live curve -- Artisan's own
-// Background Profile feature does the same visual distinction. Only
+// thing you're chasing," not a second live curve -- the
+// usual visual distinction for a background profile. Only
 // built when a background roast is actually loaded (see
 // backgroundSeriesDefs below), not part of the static SERIES_DEFS list
 // above, so they never show up as an empty/disabled toggle when nothing's
@@ -131,7 +131,7 @@ function computePhases(events) {
   }).filter(Boolean);
 }
 
-// Real Artisan files only log control-channel *adjustments* (discrete
+// .alog files only log control-channel *adjustments* (discrete
 // events), not a continuous stream -- reconstruct a step curve from them
 // (flat between adjustments, matching what actually happened) rather
 // than interpolating a slope that was never really there.
@@ -186,7 +186,7 @@ const phaseBandsPlugin = {
   },
 };
 
-// Artisan's "Roaster Scope" draws alternating light/white horizontal bands
+// Alternating light/white horizontal bands are drawn
 // behind the curves, keyed to the temperature axis gridlines.
 const scopeBandsPlugin = {
   id: "scopeBands",
@@ -207,8 +207,8 @@ const scopeBandsPlugin = {
   },
 };
 
-// Mimics Artisan's compact "F" / "F/min" unit labels pinned to the top
-// corners of the scope, instead of full rotated axis titles.
+// Compact "F" / "F/min" unit labels pinned to the top
+// corners of the chart, instead of full rotated axis titles.
 const axisUnitLabelsPlugin = {
   id: "axisUnitLabels",
   afterDraw(chart, _args, opts) {
@@ -383,7 +383,7 @@ export default function RoastChart({
   // START / after STOP) leaves this at the default, fully interactive.
   interactive = true,
   // Right-click-to-delete / drag-to-retime an already-marked milestone
-  // (item #7 from the real-hardware feedback round -- matching Artisan).
+  // (item #7 from the real-hardware feedback round).
   // Both optional and independent of `interactive` above: that flag only
   // gates zoom/pan, but editing a milestone has to keep working during
   // an active roast too, per the user's own scoping answer ("both live
@@ -772,7 +772,7 @@ export default function RoastChart({
           grid: { drawOnChartArea: false },
           ticks: { color: "#78716c" },
           display: showRor,
-          // Fixed range (matches typical Artisan RoR scope bounds) so a
+          // Fixed range (typical RoR chart bounds) so a
           // single transient spike -- e.g. the sharp BT dip right after
           // charge -- can't stretch the axis and flatten the rest of the
           // roast's curve into an unreadable line near zero. Scaled by
@@ -793,12 +793,10 @@ export default function RoastChart({
           // here too, Chart.js auto-fit whatever narrow slice of values
           // was actually visible, so a ~constant 50 Drum line (say)
           // landed at an arbitrary height instead of a real 0-100 scale.
-          // Artisan itself plots these against its own
-          // temperature axis rather than a dedicated one -- this app
-          // deliberately doesn't match that (a real 0-100 scale is more
-          // readable than a control value squashed near zero on a 350-
-          // degree axis), so don't "fix" this to match Artisan's own
-          // choice here.
+          // Deliberately a dedicated axis, not the temperature axis (a
+          // real 0-100 scale is more readable than a control value
+          // squashed near zero on a 350-degree axis), so don't "fix"
+          // this to plot them on the temperature axis.
           min: 0,
           max: 100,
         },

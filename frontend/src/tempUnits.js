@@ -1,5 +1,5 @@
-// Display-only Celsius/Fahrenheit conversion -- mirrors Artisan's own
-// Config > Temperature > Fahrenheit/Celsius Mode toggle. Every stored
+// Display-only Celsius/Fahrenheit conversion -- the
+// Fahrenheit/Celsius display toggle. Every stored
 // value and every config input field (thresholds, SV ranges, alarm rule
 // temperatures) stays Celsius always; this only converts what's shown
 // for *live readings* (readouts, chart, event history). See

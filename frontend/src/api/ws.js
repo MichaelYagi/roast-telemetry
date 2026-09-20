@@ -12,7 +12,7 @@ export function useRoastStream(roastId) {
   // Live readings while connected but not yet recording (roast.status ===
   // "idle" -- see RoastSession.connect() in the backend): the server
   // deliberately never appends these to roast.profile (that's what keeps
-  // the chart showing no curve pre-recording, matching Artisan), so
+  // the chart showing no curve pre-recording), so
   // there's nothing in `roast` itself for a caller to read the latest
   // BT/ET/etc. from during that window -- this is that value instead.
   const [latestPreview, setLatestPreview] = useState(null);

@@ -152,7 +152,7 @@ export default function RoastDetailView() {
     }
   }
 
-  // Matches Artisan's own "Weight loss" convention (a negative percentage,
+  // "Weight loss" convention (a negative percentage,
   // e.g. "-13.2%") -- roast_review.py computes the same ratio but as a
   // positive "percent lost" for the AI review prompt; this is purely a
   // different display convention for the same underlying numbers, not a
@@ -186,8 +186,8 @@ export default function RoastDetailView() {
             // attachment, so it downloads without navigating away; adding
             // _blank just pops an empty new tab in some browsers while the
             // file downloads silently in the background, looking like a
-            // no-op click. Real Artisan's own native format -- File > Open
-            // in Artisan itself opens this directly, no conversion needed.
+            // no-op click. The native .alog format, which
+            // compatible roasting software opens directly, no conversion needed.
             <p>
               Download <a href={api.alogDownloadUrl(roast.id)}>{alogFilename(roast.title, roast.created_at)}</a>
             </p>

@@ -185,8 +185,8 @@ export default function DeviceProfileEditor({ onChange }) {
           <p className="hint">
             A device profile is a full Modbus register map for one roaster brand/model, saved once and reusable
             across roasts (see the "Device profile" dropdown above). Built-in profiles can't be edited here. At
-            most 2 "extra" temperature channels round-trip through a saved .alog export (a fixed limit in real
-            Artisan's own file format) -- more can still be recorded and charted live.
+            most 2 "extra" temperature channels round-trip through a saved .alog export (a fixed limit of the
+            .alog file format) -- more can still be recorded and charted live.
           </p>
           {error && <p className="error">{error}</p>}
 

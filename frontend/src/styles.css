@@ -1555,7 +1555,7 @@ button:disabled {
 
 /* A "group" is one lane -- one or more sliders sharing that lane's width,
    arranged one *above* the other (not side by side -- confirmed against
-   the reference Artisan photo: Drum sits in the top half of its own lane,
+   a reference photo of a real roaster's control panel: Drum sits in the top half of its own lane,
    Fan in the bottom half, same x-position throughout). The gap *between*
    lanes is .vertical-control-stack's own `gap`, not this.
    Deliberately no explicit height here (was `height: 100%`) -- align-items:
@@ -1737,7 +1737,7 @@ button:disabled {
    currently-relevant engine (Firefox, current Chrome/Edge/Safari all
    honor writing-mode on a range input). `direction: rtl` is what makes
    the value increase upward (min at the bottom, matching every physical
-   fader/the Artisan screenshot this was modeled on) instead of the
+   fader) instead of the
    default top-to-bottom.
    No `appearance`/`-webkit-appearance: slider-vertical` -- 'slider-
    vertical' was never part of the standardized `appearance` property's

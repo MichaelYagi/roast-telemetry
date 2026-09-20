@@ -9,8 +9,7 @@ import { api } from "../api/client.js";
 const FINISHED_STATUSES = new Set(["stopped", "complete"]);
 
 // Lets the operator load a previously recorded roast's BT/ET curve onto
-// the live chart as a reference to pace against -- Artisan calls this a
-// "Background Profile". Purely a display overlay (see RoastChart.jsx):
+// the live chart as a reference to pace against (a "Background Profile"). Purely a display overlay (see RoastChart.jsx):
 // it never reads from or influences the live roast's own recording or
 // its automation, and the choice isn't saved anywhere -- picking one is
 // a per-session decision, cleared on refresh, same as it not being part

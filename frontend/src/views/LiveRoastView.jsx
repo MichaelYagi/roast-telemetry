@@ -179,7 +179,7 @@ export default function LiveRoastView() {
     heater_pct: 70,
     fan_pct: 20,
     drum_speed_pct: 50,
-    // Milestone-triggered automations (Artisan-style Alarms), modbus_live
+    // Milestone-triggered automations (alarm-style rules), modbus_live
     // only -- see AlarmRulesEditor. Lives inside the roast's own config
     // (not a separate "controls" field like heater_pct/fan_pct/
     // drum_speed_pct above), since it rides through saved-preset
@@ -985,7 +985,7 @@ export default function LiveRoastView() {
   // "idle" here means "connected via connect(), not yet recording" (see
   // RoastSession.connect()/apply_command() on the backend) -- lets
   // Air/Drum/Burner controls (and Testing Mode's checks) work while
-  // merely armed, matching Artisan's own control-before-record model, not
+  // merely armed (controls work before recording starts), not
   // just once an actual roast is roasting/cooling.
   const isActive = roast && (roast.status === "roasting" || roast.status === "cooling" || roast.status === "idle");
   // Narrower than isActive on purpose -- milestone events (EventButtonRow)
@@ -1003,7 +1003,7 @@ export default function LiveRoastView() {
   const latest = roast?.status === "idle" ? latestPreview : roast?.profile?.[roast.profile.length - 1];
   // Stays 00:00 while merely connected/previewing (status "idle") even
   // though the engine's own clock is already ticking (that's how BT/ET's
-  // RoR gets computed live) -- matches Artisan, where the elapsed timer
+  // RoR gets computed live) -- the elapsed timer
   // starts at Charge, not at connect. The recorded roast's own time axis
   // genuinely resets to 0 at that point too (see ModbusEngine/MS6514Engine's
   // reset_detection(), called from begin_recording()) -- this just keeps
