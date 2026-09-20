@@ -107,7 +107,7 @@ from-source dev workflow (`scripts/install.sh`/`.ps1` +
   (`%APPDATA%\RoastTelemetry` on Windows, `~/Library/Application
   Support/RoastTelemetry` on macOS) instead of a path next to the
   executable (which may not even be writable, e.g. Program Files);
-  skips the "rebuild frontend on start" step (no npm/source frontend
+  skips the frontend-rebuild check (no npm/source frontend
   exists inside a frozen build, it's already baked in); re-invokes
   itself with a hidden `--run-server` flag instead of shelling out to
   `python -m uvicorn` (there's no separate python.exe bundled -- see
@@ -127,3 +127,13 @@ from-source dev workflow (`scripts/install.sh`/`.ps1` +
   yourself. A reasonable next step once the raw build is confirmed
   working, not bundled into this first pass.
 - **Auto-update.** Every new version is a fresh manual build/download.
+- **Linux packages (`.deb`, `.rpm`, AppImage), including for Raspberry
+  Pi OS.** Considered and deliberately not built: Linux has no tray icon
+  (see above), so the app there is a server you open in a browser, and
+  `scripts/install.sh` + `scripts/run-server.sh` (`--yes` for unattended
+  setup) already do the real work -- see docs/getting-started.html's
+  "Linux / Raspberry Pi (server only)". A package would add three
+  formats to maintain across two CPU architectures (arm64 runners aren't
+  free for private repos) for little gain. If one were ever added, the
+  `.deb` is the only one with a real payoff (a systemd unit, USB/serial
+  permissions).

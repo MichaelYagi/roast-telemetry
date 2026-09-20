@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Launches the system tray icon (scripts/tray_app.py) that starts/stops
-# the server with a click -- for macOS or a real Linux desktop (not
-# WSL2, which has no tray without WSLg; see tray_app.py's own header).
+# Launches the macOS menu-bar icon (scripts/tray_app.py) that starts/stops
+# the server with a click. macOS only from this script (Windows uses
+# scripts/tray.ps1) -- deliberately no native Linux desktop tray, see
+# tray_app.py's own header for why. On Linux/WSL2 use
+# scripts/run-server.sh instead.
 #
 # scripts/install.sh already installs the tray deps by default -- the
 # check below is only a safety net for a .venv created before that
@@ -11,13 +13,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Same check as run-server.sh -- a Windows-created .venv (Scripts/, not
-# bin/) can't run from WSL2/Linux bash at all; without this, the checks
-# below just silently read as "pystray isn't installed" and send you
-# down the wrong fix.
-if [[ -d .venv ]] && [[ ! -e .venv/bin/python ]] && [[ -e .venv/Scripts/python.exe ]]; then
-  echo "$(basename "$0"): .venv was created by native Windows Python (.venv/Scripts/python.exe exists, .venv/bin/python doesn't) -- that can't run from WSL2/Linux." >&2
-  echo "Rename or delete .venv, then run scripts/install.sh from this WSL2 shell to create a proper Linux one." >&2
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "$(basename "$0"): the tray icon is macOS/Windows only -- there's no native Linux desktop tray." >&2
+  echo "Use scripts/run-server.sh instead (it serves the app at http://localhost:8000 from this terminal)." >&2
   exit 1
 fi
 
@@ -28,17 +26,9 @@ if ! .venv/bin/python -c "import pystray" 2>/dev/null; then
   exit 1
 fi
 
-# A separate check from the above (Linux only) -- tkinter doesn't come
-# from tray_requirements.txt (pystray/Pillow) at all, it's a system
-# package (python3-tk on Debian/Ubuntu), so pip can't fix a missing one
-# and the message has to say something different. Not checked on
-# macOS: tray_app.py deliberately doesn't use tkinter there at all --
-# Tk 9.0 hard-crashes on a real Mac the instant it tries to create a
-# window (an upstream Tk/macOS bug, confirmed live), so macOS uses
-# osascript instead, which needs nothing this check would catch.
-if [[ "$(uname -s)" != "Darwin" ]] && ! .venv/bin/python -c "import tkinter" 2>/dev/null; then
-  echo "tkinter isn't installed. Re-run scripts/install.sh, which knows how to fix this per-OS (apt/brew), then try again." >&2
-  exit 1
-fi
+# No tkinter check here: tray_app.py deliberately doesn't use tkinter on
+# macOS at all -- Tk 9.0 hard-crashes on a real Mac the instant it tries
+# to create a window (an upstream Tk/macOS bug, confirmed live), so it
+# uses osascript instead, which needs nothing this check would catch.
 
 exec .venv/bin/python scripts/tray_app.py

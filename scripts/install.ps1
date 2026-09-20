@@ -14,11 +14,27 @@
 # this system"), either run once: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 # or invoke it with: powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 #
-# Usage: scripts\install.ps1
+# -Yes: never prompt -- answers yes to the required installs (Python,
+# Node.js via winget) so this can run unattended. The optional WSL2 setup
+# is skipped under -Yes rather than auto-accepted ("install what's
+# required", not "everything nice-to-have"). Note that means it runs
+# winget installs without asking -- only pass it where that's intended.
+# (A winget install still ends with "close and reopen PowerShell" --
+# PATH isn't refreshed in the current session -- so an unattended run on
+# a machine with neither installed needs a second invocation.)
+#
+# Usage: scripts\install.ps1 [-Yes]
+param(
+    [switch]$Yes
+)
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
 function Confirm-Action($message) {
+    if ($Yes) {
+        Write-Host "$message [y/N] y (-Yes)"
+        return $true
+    }
     $reply = Read-Host "$message [y/N]"
     return $reply -match '^[Yy]'
 }
@@ -112,6 +128,8 @@ if (Get-Command wsl -ErrorAction SilentlyContinue) {
 
 if (-not $wslAvailable) {
     Write-Host "WSL2 not found -- skipping (only needed for scripts/fake-hardware.sh's fake FZ-94/meter; the app itself runs fine without it)."
+} elseif ($Yes) {
+    Write-Host "WSL2 found -- skipping its optional fake-hardware setup under -Yes (run scripts/install.sh from inside WSL2 yourself if you want it)."
 } elseif (Confirm-Action "WSL2 found. Set it up too, for scripts/fake-hardware.sh (fake hardware for testing)?") {
     # wsl.exe's own argument marshaling treats backslashes as shell
     # escape characters when passing them through to the Linux-side
@@ -133,6 +151,6 @@ if (-not $wslAvailable) {
 
 Write-Host ""
 Write-Host "Done. Next:"
-Write-Host "  scripts\run-server.ps1               # build + start the app at http://localhost:8000"
+Write-Host "  scripts\run-server.ps1               # build (if needed) + start the app at http://localhost:8000"
 Write-Host "  scripts\tray.ps1                     # optional -- a tray icon instead of the terminal"
 Write-Host "  scripts\fake-hardware.sh fz94 --tcp  # optional, run from WSL2 -- test without real hardware"

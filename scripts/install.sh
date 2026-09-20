@@ -11,9 +11,28 @@
 # instead, which also offers to bootstrap this inside WSL2 (if present)
 # for fake-hardware.sh's sake.
 #
-# Usage: scripts/install.sh
+# --yes / -y: never prompt -- answers yes to every *required* install
+# (Homebrew, Python, Node) so this can run unattended (CI, provisioning a
+# Raspberry Pi over SSH). Optional extras (socat) are skipped under
+# --yes rather than auto-installed: "do what's needed" isn't "install
+# everything nice-to-have". Note that means it will run sudo apt-get /
+# brew / Homebrew's own installer without asking -- only pass it where
+# that's intended.
+#
+# Usage: scripts/install.sh [--yes]
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+ASSUME_YES=0
+for arg in "$@"; do
+  case "$arg" in
+    -y|--yes) ASSUME_YES=1 ;;
+    *)
+      echo "Unrecognized argument: $arg (usage: scripts/install.sh [--yes])" >&2
+      exit 1
+      ;;
+  esac
+done
 
 OS="$(uname -s)"
 IS_MAC=0
@@ -27,6 +46,10 @@ have() { command -v "$1" >/dev/null 2>&1; }
 # moment someone answers no (a non-zero exit from a plain statement, not
 # an if-condition, aborts the whole script under -e).
 ask() {
+  if [[ "$ASSUME_YES" -eq 1 ]]; then
+    echo "$1 [y/N] y (--yes)"
+    return 0
+  fi
   local reply
   read -r -p "$1 [y/N] " reply
   [[ "$reply" =~ ^[Yy]$ ]]
@@ -111,53 +134,10 @@ if [[ -z "$PYTHON" ]]; then
 fi
 echo "Using $("$PYTHON" --version)"
 
-# --- tkinter (Linux only) -- needed for scripts/tray_app.py's
-# Port/Host/save-logs dialogs on Windows/Linux, not the app itself, and
-# not guaranteed just because Python is present -- Debian/Ubuntu split
-# it out of the main python3 package into python3-tk (apt). NOT checked
-# on macOS: tray_app.py deliberately doesn't use tkinter there at all
-# -- Tk 9.0 (via Homebrew's python-tk@X.Y, which this used to offer to
-# install) hard-crashes the whole process on a real Mac the instant it
-# tries to create a window (an upstream Tk/macOS bug, confirmed live),
-# so macOS uses osascript (AppleScript) instead, which needs nothing
-# from Homebrew at all. ---
-if [[ "$IS_MAC" -eq 0 ]] && ! "$PYTHON" -c "import tkinter" 2>/dev/null; then
-  echo
-  echo "tkinter not found -- needed for the tray icon's Port/Host/save-logs dialogs (scripts/tray.sh), not the app itself."
-  if have apt-get; then
-    if ask "Install it now via 'sudo apt-get install -y python3-tk'?"; then
-      sudo apt-get install -y python3-tk
-    fi
-  else
-    echo "No apt-get found -- install your distro's tkinter package for Python 3, then re-run this script if you want the tray icon."
-  fi
-fi
-
-# --- AppIndicator/GTK bindings (Linux only) -- needed for the tray
-# MENU to actually work, not just the icon itself. Without python3-gi
-# + the AppIndicator GI typelib, pystray silently falls back to its own
-# plain Xorg backend, which -- confirmed live, not just documented --
-# shows the icon fine but implements no menu functionality at all (not
-# a click-detection bug; that backend just doesn't have one). Debian/
-# Ubuntu (Raspberry Pi OS included) package this as
-# gir1.2-appindicator3-0.1, though newer releases have moved to the
-# Ayatana fork under gir1.2-ayatanaappindicator3-0.1 -- tried in that
-# order, falling back to the second name if the first isn't in this
-# distro's repos.
-if [[ "$IS_MAC" -eq 0 ]] && have apt-get; then
-  if ! dpkg -s python3-gi gir1.2-gtk-3.0 >/dev/null 2>&1 || \
-     { ! dpkg -s gir1.2-appindicator3-0.1 >/dev/null 2>&1 && ! dpkg -s gir1.2-ayatanaappindicator3-0.1 >/dev/null 2>&1; }; then
-    echo
-    echo "AppIndicator GTK bindings not found -- without them, the tray icon shows up but its menu won't open at all."
-    if ask "Install them now via apt (python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1)?"; then
-      sudo apt-get update
-      if ! sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-appindicator3-0.1; then
-        echo "gir1.2-appindicator3-0.1 not found -- trying the newer Ayatana package name instead..."
-        sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1
-      fi
-    fi
-  fi
-fi
+# (No tkinter/AppIndicator setup here anymore -- those were only for the
+# native-Linux tray icon, which is deliberately unsupported. See
+# tray_app.py's own docstring. Linux/WSL2 runs the server in a terminal
+# via run-server.sh; macOS's tray needs neither.)
 
 # --- Node.js / npm ---
 if ! have node || ! have npm; then
@@ -190,7 +170,9 @@ fi
 echo "Using node $(node --version), npm $(npm --version)"
 
 # --- socat (optional -- only scripts/fake-hardware.sh needs it) ---
-if ! have socat; then
+# Skipped entirely under --yes -- see this file's header: --yes means
+# "install what's required", not "install every optional extra too".
+if ! have socat && [[ "$ASSUME_YES" -eq 0 ]]; then
   echo
   echo "socat not found -- only needed for scripts/fake-hardware.sh (testing without real hardware), skip this if you don't need that."
   if [[ "$IS_MAC" -eq 1 ]]; then
@@ -223,23 +205,9 @@ if [[ -d .venv ]] && [[ ! -e .venv/bin/python ]] && [[ -e .venv/Scripts/python.e
 fi
 if [[ -d .venv ]]; then
   echo "Reusing existing .venv"
-  # Retrofit: an existing venv predating the --system-site-packages
-  # flag below won't have it -- flip pyvenv.cfg's own setting in place
-  # instead of requiring a full recreate. Needed on Linux specifically
-  # so the venv can actually see the AppIndicator GTK bindings just
-  # installed above -- python3-gi is a system package, tied to the
-  # system Python + GTK libraries, not something pip can install into
-  # an isolated venv the normal way.
-  if [[ "$IS_MAC" -eq 0 ]] && [[ -f .venv/pyvenv.cfg ]] && grep -q "^include-system-site-packages = false" .venv/pyvenv.cfg; then
-    sed -i "s|^include-system-site-packages = false|include-system-site-packages = true|" .venv/pyvenv.cfg
-  fi
 else
   echo "Creating .venv..."
-  if [[ "$IS_MAC" -eq 0 ]]; then
-    "$PYTHON" -m venv --system-site-packages .venv
-  else
-    "$PYTHON" -m venv .venv
-  fi
+  "$PYTHON" -m venv .venv
 fi
 echo "Installing backend dependencies..."
 .venv/bin/pip install --upgrade pip >/dev/null
@@ -258,6 +226,8 @@ echo "Installing frontend dependencies (npm install)..."
 
 echo
 echo "Done. Next:"
-echo "  scripts/run-server.sh          # build + start the app at http://localhost:8000"
-echo "  scripts/tray.sh                # optional -- a tray icon instead of the terminal (needs a real desktop, not WSL2)"
-echo "  scripts/fake-hardware.sh fz94  # optional -- test without real hardware"
+echo "  scripts/run-server.sh          # build (if needed) + start the app at http://localhost:8000"
+if [[ "$IS_MAC" -eq 1 ]]; then
+  echo "  scripts/tray.sh                # optional -- a menu-bar icon instead of the terminal"
+fi
+echo "  scripts/fake-hardware.sh fz94  # optional -- test without real hardware (needs socat)"

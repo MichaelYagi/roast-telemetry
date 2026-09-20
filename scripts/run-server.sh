@@ -3,20 +3,26 @@
 # docs/getting-started.html so there's nothing to remember, just run
 # this.
 #
-# Rebuilds the frontend first by default. The backend serves whatever's
-# already sitting in frontend/dist/ and never rebuilds it for you (see
-# main.py's static-file fallback) -- a stale build silently keeps serving
-# old code, including old auth/login behavior, with no error of any
-# kind (confirmed live: an old pre-auth build let anyone straight into
-# the app with no login screen, even though the backend itself was
-# correctly rejecting every API call). Pass --skip-build once you know
-# your build is current and want faster iteration.
+# Rebuilds the frontend first *when it's out of date*. The backend serves
+# whatever's already sitting in frontend/dist/ and never rebuilds it for
+# you (see main.py's static-file fallback) -- a stale build silently
+# keeps serving old code, including old auth/login behavior, with no
+# error of any kind (confirmed live: an old pre-auth build let anyone
+# straight into the app with no login screen, even though the backend
+# itself was correctly rejecting every API call). "Out of date" = dist/
+# is missing, or anything under frontend/src, public, index.html,
+# vite.config.js or package.json is newer than dist/index.html -- same
+# check the tray icon does (see tray_app.py's _frontend_needs_rebuild),
+# so a restart with nothing changed doesn't pay for a rebuild. Use
+# --force-build to rebuild regardless (e.g. after `npm install` changed
+# dependencies without touching package.json), --skip-build to never.
 #
 # Usage:
-#   scripts/run-server.sh                # rebuild, then port 8000, localhost only
+#   scripts/run-server.sh                # rebuild if stale, then port 8000, localhost only
 #   scripts/run-server.sh 7890           # a different port
 #   scripts/run-server.sh --reload       # auto-restart on backend code changes
 #   scripts/run-server.sh --skip-build 7890
+#   scripts/run-server.sh --force-build  # rebuild even if it looks current
 #   scripts/run-server.sh --lan          # reachable from other devices on your LAN
 #   scripts/run-server.sh --host 0.0.0.0 # same as --lan, spelled out
 set -euo pipefail
@@ -37,12 +43,14 @@ fi
 
 RELOAD=()
 SKIP_BUILD=0
+FORCE_BUILD=0
 PORT=8000
 HOST_ADDR=127.0.0.1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --reload) RELOAD=(--reload) ;;
     --skip-build) SKIP_BUILD=1 ;;
+    --force-build) FORCE_BUILD=1 ;;
     --lan) HOST_ADDR=0.0.0.0 ;;
     --host)
       HOST_ADDR="${2:-}"
@@ -53,9 +61,29 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-if [[ "$SKIP_BUILD" -eq 0 ]]; then
-  echo "Building frontend (pass --skip-build to skip this)..."
+# True (exit 0) when frontend/dist/ is missing or any frontend source file
+# is newer than dist/index.html. `find ... | head -n 1` can SIGPIPE find
+# once head has its line -- harmless, but under `set -o pipefail` it
+# would make the assignment fail, hence the `|| true`. Paths that don't
+# exist just make find complain on stderr (suppressed) and carry on.
+frontend_is_stale() {
+  local dist=frontend/dist/index.html newer
+  [[ -f "$dist" ]] || return 0
+  newer="$(find frontend/src frontend/public frontend/index.html frontend/vite.config.js frontend/package.json \
+    -newer "$dist" 2>/dev/null | head -n 1)" || true
+  [[ -n "$newer" ]]
+}
+
+if [[ "$FORCE_BUILD" -eq 1 ]]; then
+  echo "Building frontend (--force-build)..."
   (cd frontend && npm run build)
+elif [[ "$SKIP_BUILD" -eq 1 ]]; then
+  echo "Skipping frontend build (--skip-build)."
+elif frontend_is_stale; then
+  echo "Frontend changed since the last build (or was never built) -- rebuilding..."
+  (cd frontend && npm run build)
+else
+  echo "Frontend build is current -- skipping rebuild (--force-build to rebuild anyway)."
 fi
 
 echo "Starting Roast Telemetry on http://localhost:$PORT (Ctrl+C to stop)"

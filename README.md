@@ -143,7 +143,13 @@ server can run anywhere that can reach its IP. See
 for the full explanation, including the safety side of LAN access.
 
 See [docs/getting-started.html](docs/getting-started.html) for
-installation and running it. Full docs:
+installation and running it. In short: `scripts/start.sh` (or
+`scripts\start.ps1` on Windows) installs if needed and starts the app —
+a tray icon on macOS/Windows; on Linux (Raspberry Pi included) the
+server runs in your terminal and you open it in a browser, with no tray
+icon and no `.deb`/`.rpm`/AppImage packages (the scripts cover it).
+What every script does is in the docs' [Scripts
+reference](docs/getting-started.html#scripts-reference). Full docs:
 
 - [Getting started](docs/getting-started.html)
 - [Direct Modbus Bridge](docs/modbus/index.html), and
