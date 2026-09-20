@@ -82,7 +82,7 @@ def test_milestones_can_be_marked_in_order():
 
 
 def test_skipping_ahead_is_allowed():
-    # Real Artisan allows e.g. marking Drop without ever marking Second
+    # Marking Drop is allowed without ever marking Second
     # Crack -- skipping is fine, only going *backward* after a later
     # milestone exists is rejected.
     session = make_session()

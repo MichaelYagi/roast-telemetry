@@ -73,6 +73,14 @@ contributors; that driver by Rui Paulo, 2023. Artisan is licensed under the
 GNU Affero General Public License, version 3 or later, the same license as
 this application.
 
+The Mastech MS6514 support (ms6514_bridge) was written with reference to
+Artisan's driver for that meter (frame layout and mode decoding), and the
+default Modbus register map and serial settings for the Coffee-Tech FZ-94
+(modbus_bridge) with reference to the machine settings and Modbus handling
+Artisan publishes, under the same copyright notice and license as above.
+The TC4+ command set follows the published documentation of the aArtisanQ
+firmware.
+
 LGPL-licensed components
 ------------------------
 Any component marked LGPL below (for example pystray, and libusb where it is

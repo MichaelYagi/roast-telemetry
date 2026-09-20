@@ -3,8 +3,8 @@ USB/RTU -- not the EVO, which is Modbus TCP over Ethernet, a different
 connection method entirely; see ``modbus_bridge/engine.py``'s docstring).
 
 Serves the register/slave map ``modbus_bridge/engine.py`` expects,
-confirmed against Artisan's own shipped FZ-94 preset/source (see that
-module's docstring for the full citations):
+confirmed against a real FZ-94 (see that
+module's docstring for details):
 
     - BT:      slave 11, register 0    (function code 3, read),  x10 int
     - ET:      slave 13, register 0    (function code 3, read),  x10 int
@@ -18,8 +18,8 @@ module's docstring for the full citations):
                write, x100) + 8451 (actual speed, read, x100)
     - Air:     slave 2,  same three registers, its own slave
 
-One connection handles all of it by default (19200 baud, 8N2 -- Artisan's
-own shipped preset's exact settings), matching the real engine's default
+One connection handles all of it by default (19200 baud, 8N2 -- the
+machine's stock settings), matching the real engine's default
 of sharing one connection for BT/ET/DT/Burner *and* Air/Drum. Passing
 ``--drive-port`` instead runs a second bus concurrently (on a background
 thread) for the uncommon case of wiring that genuinely needs two

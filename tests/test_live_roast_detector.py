@@ -77,8 +77,8 @@ def test_notify_manual_charge_still_lets_turning_point_auto_fire():
     Charge), not a judgment call -- so it stays auto-detected even with
     detect_milestones off, as long as the caller tells the detector CHARGE
     happened (see notify_manual_charge's own docstring). Confirmed against
-    a real FZ-94 roast in Artisan, which auto-plots Turning Point despite
-    every other milestone being a manual click there too."""
+    a real FZ-94 roast, where Turning Point is auto-plotted despite
+    every other milestone being a manual click."""
     detector = LiveRoastDetector(detect_milestones=False)
     detector.notify_manual_charge(0.0, 96.0)
 

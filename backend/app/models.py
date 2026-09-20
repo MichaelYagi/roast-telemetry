@@ -62,13 +62,13 @@ class RoastEventType(str, Enum):
     CUSTOM = "CUSTOM"
 
 
-# Canonical roast-milestone order, matching real Artisan's own button
+# Canonical roast-milestone order, matching the usual button
 # behavior: a milestone can only be marked if nothing *later* in this
 # sequence has fired yet (skipping ahead is fine -- e.g. Drop without
 # ever marking SC Start/SC End -- but going back is not), and once any
 # milestone fires (auto or manual), it's permanently set -- no re-marking
 # it, and marking a later one locks out any earlier ones that were
-# skipped. CUSTOM isn't part of this -- imported real-Artisan manual
+# skipped. CUSTOM isn't part of this -- imported manual
 # control-channel events are legitimately repeatable, not milestones.
 MILESTONE_SEQUENCE = [
     RoastEventType.CHARGE,
@@ -105,9 +105,9 @@ MILESTONE_LABELS = {
 # see modbus_bridge/ms6514_bridge), RoastSession.add_event() forwards
 # a manual CHARGE to the engine's notify_manual_charge(), which starts
 # Turning Point tracking exactly as if CHARGE had auto-fired (see
-# roast_heuristics/detector.py) -- confirmed against a real FZ-94 roast
-# in Artisan, which auto-plots Turning Point the same way despite every
-# other milestone being marked by hand there too. It has no button in
+# roast_heuristics/detector.py) -- confirmed against a real FZ-94 roast,
+# where Turning Point is auto-plotted the same way despite every
+# other milestone being marked by hand. It has no button in
 # the UI for any mode (EventButtonRow.jsx), so there's nothing to
 # unblock regardless.
 ALWAYS_AUTO_EVENT_TYPES = {RoastEventType.TURNING_POINT}
@@ -159,7 +159,7 @@ class RoastEvent(BaseModel):
     label: str
     value: Optional[float] = None
     # Control channel this event adjusted ("Air"/"Drum"/"Damper"/"Burner"),
-    # when it came from a real Artisan file's manual control-channel log.
+    # when it came from a real .alog file's manual control-channel log.
     # Absent for auto-detected/simulator/manually-added events.
     channel: Optional[str] = None
 
@@ -299,7 +299,7 @@ class AlarmTriggerKind(str, Enum):
 
 
 class AlarmRule(BaseModel):
-    """An automation -- Artisan-style "Alarms": when the trigger condition
+    """An automation ("alarm"): when the trigger condition
     is met, fire a bound command (and/or show a banner message) after
     `delay_s` (0 = as soon as the condition is met, no extra wait).
     modbus_live only -- ms6514_live has no write capability at all.
@@ -361,8 +361,8 @@ class RoastCreateRequest(BaseModel):
     weight_green_g: Optional[float] = None
     alog_path: Optional[str] = Field(default=None, description="Required when mode=alog_playback")
     playback_speed: float = 1.0
-    modbus_port: Optional[str] = Field(default=None, description="Required when mode=modbus_live: serial port the roaster is on, e.g. 'COM3'. One connection handles BT/ET/DT/Burner and Air/Drum together, matching Artisan's own shipped Coffee-Tech FZ-94 preset.")
-    modbus_baudrate: int = Field(default=19200, description="modbus_live mode only; default matches Artisan's own shipped Coffee-Tech FZ-94 preset (19200/8N2)")
+    modbus_port: Optional[str] = Field(default=None, description="Required when mode=modbus_live: serial port the roaster is on, e.g. 'COM3'. One connection handles BT/ET/DT/Burner and Air/Drum together, as on the Coffee-Tech FZ-94's single multi-drop bus.")
+    modbus_baudrate: int = Field(default=19200, description="modbus_live mode only; default matches the Coffee-Tech FZ-94's stock serial settings (19200/8N2)")
     modbus_control_port: Optional[str] = Field(default=None, description="modbus_live mode only, optional: only set this if your own wiring genuinely needs a *separate* connection for Air/Drum drive control (uncommon) -- e.g. 'COM4'. Leave blank (the normal case) to send Air/Drum over modbus_port along with everything else.")
     modbus_control_baudrate: int = Field(default=19200, description="modbus_live mode only; baud rate for modbus_control_port, if that's set")
     modbus_device_profile_id: Optional[str] = Field(default=None, description="modbus_live, optional: use a saved/built-in DeviceProfile's full channel map instead of the individual modbus_* override fields below. When set, those flat fields are ignored (a profile fully replaces them, no merging) -- see api/device_profiles.py. Leave unset (the default) for exactly today's behavior.")
@@ -372,12 +372,12 @@ class RoastCreateRequest(BaseModel):
     # Full ModbusEngine register-map override set -- all optional and None
     # by default, meaning "use ModbusEngine's own (FZ-94) default"; only
     # set what your own unit actually needs overridden. BT/ET/DT/Burner's
-    # own slave/register/divisor are confirmed against Artisan's shipped
-    # FZ94.aset (see modbus_bridge/engine.py's docstring) -- exposed here
+    # own slave/register/divisor match the FZ-94's stock
+    # configuration (see modbus_bridge/engine.py's docstring) -- exposed here
     # anyway for a genuinely different Modbus roaster, not because they're
     # expected to need changing for an actual FZ-94. Air/Drum and
     # burner_sv_range_c are that engine's least-confirmed defaults
-    # (blog-sourced only, one person's own installation). Every *_min_c
+    # (sourced only from one published write-up of one person's own installation). Every *_min_c
     # and *_min_pct/*_max_pct pair requires both halves together to take
     # effect (a lone one is ignored rather than guessing the other half).
     modbus_bt_slave_id: Optional[int] = Field(default=None, description="modbus_live, advanced: BT probe Modbus slave ID. Default 11.")
@@ -413,7 +413,7 @@ class RoastCreateRequest(BaseModel):
     dry_end_c: Optional[float] = Field(default=160.0, description="BT threshold for auto-detecting Dry End when auto_detect_milestones is on; live-bridge modes only. Null disables it.")
     fc_start_c: Optional[float] = Field(default=196.0, description="BT threshold for auto-detecting FC Start when auto_detect_milestones is on; live-bridge modes only. Null disables it.")
     sample_interval_s: float = 1.0
-    alarms: list[AlarmRule] = Field(default=[], description="modbus_live only: event/temperature/time-triggered automations (Artisan-style Alarms). Part of the roast's own config, not a runtime command -- rides through saved-preset config_json for free.")
+    alarms: list[AlarmRule] = Field(default=[], description="modbus_live only: event/temperature/time-triggered automations (alarms). Part of the roast's own config, not a runtime command -- rides through saved-preset config_json for free.")
 
 
 class RoastSummary(BaseModel):
@@ -557,8 +557,8 @@ class AppSettings(BaseModel):
     # so existing installs see no visual change until they actually touch
     # Settings > Small Readout.
     small_readout_panels: list[str] = []
-    # Display-only, "c" or "f" -- same idea as Artisan's own Config >
-    # Temperature > Fahrenheit/Celsius Mode toggle. Only affects how
+    # Display-only, "c" or "f" -- a Fahrenheit/Celsius display
+    # toggle. Only affects how
     # already-Celsius values are *shown* (readouts, chart, event history);
     # every stored value, every config input field (thresholds, SV
     # ranges, alarm rule temperatures), and everything sent to/from the
@@ -572,8 +572,8 @@ class AppSettings(BaseModel):
     # each lane an ordered list of 1+ VERTICAL_CONTROL_KEYS -- a lane with
     # one key renders as its own siloed, full-height slider; a lane with
     # multiple keys splits that lane's height between them, stacked one
-    # above the other top to bottom (confirmed against a real Artisan
-    # screenshot: Drum sits in the top half of its lane, Fan in the bottom
+    # above the other top to bottom (confirmed against a real roaster's
+    # control panel: Drum sits in the top half of its lane, Fan in the bottom
     # half, same x-position throughout) -- each still its own independent
     # draggable control, just sharing width with its lane-mates instead of
     # getting a lane of its own. storage.get_settings() seeds this to
@@ -640,8 +640,8 @@ class RoastReview(BaseModel):
 class RoastPhaseStat(BaseModel):
     """One PHASE_DEFS entry from roast_stats.py -- Dry (CHARGE->DRY_END),
     Maillard (DRY_END->FC_START), or Development (FC_START->DROP).
-    pct_of_roast is DRY%/DTR respectively, the same numbers Artisan's own
-    phase breakdown shows -- absent entirely (not just null fields) when
+    pct_of_roast is DRY%/DTR respectively, the usual
+    phase-breakdown numbers -- absent entirely (not just null fields) when
     the roast is missing the milestones a phase needs."""
 
     phase: str

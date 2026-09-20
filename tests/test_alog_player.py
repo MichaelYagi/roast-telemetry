@@ -5,17 +5,17 @@ from __future__ import annotations
 
 import pytest
 
-from alog_playback.alog_io import save_artisan_native_alog
+from alog_playback.alog_io import save_native_alog
 from alog_playback.player import AlogPlayer
 
 
 def _write_test_alog(tmp_path, *, n_points=6, step_s=1.0):
     """A minimal, hand-built alog dict in the shape load_alog/
     alog_dict_to_points already understand -- deliberately NOT going
-    through roast_to_artisan_native_dict, which prepends a synthetic
+    through roast_to_native_alog_dict, which prepends a synthetic
     pre-charge sample (see that function's docstring) that would shift
-    every index/timing assertion below. save_artisan_native_alog works on
-    any plain dict, not just an Artisan-shaped one -- it's just repr()."""
+    every index/timing assertion below. save_native_alog works on
+    any plain dict, not just a native-shaped one -- it's just repr()."""
     profile = [
         {"time_s": i * step_s, "bt": 20.0 + i * 10.0, "et": 25.0 + i * 10.0,
          "heater_pct": 70.0, "fan_pct": 50.0, "drum_speed_pct": 60.0}
@@ -37,7 +37,7 @@ def _write_test_alog(tmp_path, *, n_points=6, step_s=1.0):
         ],
     }
     path = str(tmp_path / "playback.alog")
-    save_artisan_native_alog(path, data)
+    save_native_alog(path, data)
     return path, profile
 
 
@@ -118,7 +118,7 @@ def test_get_new_events_fires_each_event_exactly_once(tmp_path):
 def test_empty_profile_is_immediately_finished(tmp_path):
     data = {"timex": [], "temp1": [], "temp2": [], "specialevents": [], "notes": [], "control": []}
     path = str(tmp_path / "empty.alog")
-    save_artisan_native_alog(path, data)
+    save_native_alog(path, data)
 
     player = AlogPlayer(path)
 

@@ -212,7 +212,7 @@ def test_apply_command_zero_drive_value_sends_stop_not_run():
 
 
 def test_apply_command_zero_then_nonzero_drive_value_resumes_at_new_speed():
-    # Real VFD-L behavior (confirmed against a live FZ-94's Artisan button
+    # Real VFD-L behavior (confirmed against a live FZ-94's manual
     # control): Off only stops the drive, it doesn't forget the frequency
     # setpoint -- turning back on with a new value should still write that
     # new value, not silently skip the frequency register a second time.
@@ -228,7 +228,7 @@ def test_apply_command_zero_then_nonzero_drive_value_resumes_at_new_speed():
 
 
 def test_drives_share_the_primary_connection_by_default():
-    # Confirmed single-bus architecture (Artisan's own shipped FZ94.aset
+    # Confirmed single-bus architecture (the FZ-94's stock setup
     # uses one connection for BT/ET/DT/Burner *and* Air/Drum) -- without
     # a separate control_port, drive writes go out on the same client as
     # everything else, not dropped as a no-op.
@@ -245,12 +245,12 @@ def test_drives_share_the_primary_connection_by_default():
     assert (8193, 5000, 2) in primary.writes
 
 
-def test_default_connection_settings_match_the_shipped_artisan_preset():
+def test_default_connection_settings_match_the_shipped_preset():
     client_cls, instances = _make_fake_client_cls()
     ModbusEngine("PRIMARY", client_cls=client_cls)
 
-    # 19200 baud, 8 data bits, no parity, 2 stop bits -- straight from
-    # Artisan's own FZ94.aset [Modbus] block, not the earlier (wrong)
+    # 19200 baud, 8 data bits, no parity, 2 stop bits -- the FZ-94's stock
+    # serial settings, not the earlier (wrong)
     # 2400/8N1 assumption.
     assert instances["PRIMARY"].baudrate == 19200
     assert instances["PRIMARY"].stopbits == 2

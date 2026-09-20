@@ -172,8 +172,8 @@ def test_set_weight_green_persists_to_the_db_row(isolated_db):
 
 def test_apply_command_allowed_while_connected_but_not_recording(isolated_db):
     """Air/Drum/Burner sliders (or Testing Mode's write check) need to work
-    during the armed-not-recording window too, matching Artisan's own
-    control-before-record model -- not just once ROASTING."""
+    during the armed-not-recording window too -- not just once
+    ROASTING."""
     async def body():
         manager, request = make_manager_and_request()
         session = manager.create(request)

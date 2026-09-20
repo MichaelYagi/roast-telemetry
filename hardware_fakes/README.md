@@ -4,7 +4,7 @@ Standalone scripts that stand in for real roasting hardware, so
 `modbus_live`, `ms6514_live`, and `tc4_live` can each be tested
 end-to-end through the app's actual connection code without owning a
 roaster. All are driven by the same roast physics as the app's own
-"Artisan Simulator" mode (`_thermal.py`, wrapping
+simulator mode (`_thermal.py`, wrapping
 `simulator.SimulatorEngine`) so BT/ET behave like a real roast no
 matter which one you're using.
 

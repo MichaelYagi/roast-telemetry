@@ -1,9 +1,9 @@
 """Direct USB-serial reader/controller for a TC4+ shield running the
-aArtisanQ (PID) firmware -- bypasses Artisan entirely, same as
+aArtisanQ (PID) firmware -- the same idea as
 modbus_bridge/ms6514_bridge for their own devices.
 
-Protocol confirmed against the real spec (not guessed): Artisan's own
-docs (artisan-scope.org/devices/arduino/) and
+Protocol confirmed against the real spec (not guessed): the firmware's
+published documentation and
 github.com/greencardigan/TC4-shield's own commands.txt. Plain
 newline-terminated ASCII commands, comma-delimited CSV responses --
 genuinely simpler than every other live-bridge protocol this app
@@ -18,8 +18,8 @@ Commands used:
               (this app is internally always-Celsius, same convention
               every other engine already follows).
   READ      -- request a reading. Response: "ambient,chan1,chan2,chan3,chan4"
-              (CSV, 5 fields). Channel 1 = BT, channel 2 = ET (Artisan's
-              own ArduinoTC4 default wiring convention) -- channel 3
+              (CSV, 5 fields). Channel 1 = BT, channel 2 = ET (the TC4
+              shield's default wiring convention) -- channel 3
               mapped to this app's own "third probe" DT slot (same
               convention modbus_bridge's DT already uses) if the field
               parses; channel 4 and ambient aren't used by this app.

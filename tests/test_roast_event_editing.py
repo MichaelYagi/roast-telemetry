@@ -1,6 +1,6 @@
 """RoastSession.delete_event/retime_event -- editing an already-marked
 milestone (item #7 from the real-hardware feedback round: right-click a
-milestone on the chart to delete or drag-retime it, matching Artisan).
+milestone on the chart to delete or drag-retime it).
 Confirmed via code reading that this genuinely didn't exist before this
 change -- POST /roasts/{id}/events was add-only, and add_event() itself
 explicitly rejects re-marking anything already recorded.
@@ -221,7 +221,7 @@ def test_delete_event_via_api_cold(client):
     # Simulates a backend restart since this roast finished -- same trick
     # test_roast_created_before_this_field_existed_has_no_attribution
     # already uses: pop the in-memory session, forcing every read/write
-    # through storage + the .alog file alone. Real Artisan-native .alog
+    # through storage + the .alog file alone. Native .alog
     # milestones don't carry the original in-memory UUID across a
     # round-trip -- _extract_named_milestones synthesizes a stable
     # "milestone-{TYPE}" id instead (confirmed in alog_playback/alog_io.py) --

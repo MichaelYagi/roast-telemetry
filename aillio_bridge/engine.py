@@ -12,7 +12,7 @@
 # 2026 by Michael Yagi. Roast Telemetry as a whole is licensed under the
 # same terms, AGPL-3.0-or-later (see LICENSE).
 """Direct USB telemetry + control for a real Aillio Bullet roaster --
-bypasses Artisan entirely, same as modbus_bridge/ms6514_bridge for
+same idea as modbus_bridge/ms6514_bridge for
 their own devices. Genuinely different from both: not Modbus, not even
 a serial port -- a raw USB device (vendor-specific bulk-transfer
 protocol), opened via aillio_bridge/transport.py's UsbTransport

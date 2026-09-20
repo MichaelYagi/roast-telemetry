@@ -4,7 +4,7 @@ Pretends to be a physical roaster's serial/USB interface. Callers
 (``roast_session``) talk to this exactly as they would to a real port:
 ``connect()`` / ``disconnect()`` / ``read()`` / ``write()`` / ``status()``.
 Underneath, a ``MockDevice`` doesn't know or care whether its readings
-come from the Artisan-style simulator or from an ``.alog`` playback
+come from the simulator or from an ``.alog`` playback
 engine -- both satisfy the same small structural contract (``RoastEngine``
 below), so either can be plugged in transparently.
 """

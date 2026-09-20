@@ -26,7 +26,7 @@
   <p>
     <code>modbus_bridge</code> (<code>ModbusEngine</code>) talks straight
     to a real roaster's PLC over Modbus RTU (USB/serial) or TCP
-    (Ethernet), bypassing Artisan entirely. It can also
+    (Ethernet). It can also
     <em>control</em> the roaster (Burner/Air/Drum), since that's just
     standard Modbus register reads and writes — alongside the Simulator
     and the Aillio Bullet (its own, genuinely different USB protocol —
@@ -104,7 +104,7 @@
     Extra temperature channels are recorded and shown on the live chart
     regardless of how many you declare, but only the first two (by
     declared order) round-trip through a saved <code>.alog</code>
-    export — a fixed capacity in real Artisan's own native file format
+    export — a fixed capacity of the native <code>.alog</code> file format
     (its "extra device" bank has exactly 3 slots total; one is always
     reserved for DT), not an arbitrary limit. Anything beyond that stays
     live-only.
@@ -124,8 +124,8 @@
     </li>
     <li>
       <strong>Mutually exclusive with anything else holding the same
-      port</strong> — Modbus RTU assumes one master per bus. If Artisan
-      (or any other software) is already connected to the same serial
+      port</strong> — Modbus RTU assumes one master per bus. If any
+      other software is already connected to the same serial
       port, disconnect it first; two masters polling the same bus
       concurrently produces garbled reads on both sides, not a clean
       error.
@@ -223,8 +223,8 @@
     click by default — see
     <a href="../getting-started.html#the-data-sources">Getting started</a>.
     You can optionally bind a Burner/Air/Drum command, an in-app banner
-    message, or both, to fire automatically — matching what Artisan calls
-    "Alarms." Configured per saved preset, from the "Automation rules"
+    message, or both, to fire automatically — commonly called
+    "alarms." Configured per saved preset, from the "Automation rules"
     section of the Configure Roast form — it travels with "Save this
     configuration as," same as everything else in the form. Three
     trigger types:

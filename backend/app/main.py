@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Roast Telemetry",
     description=(
-        "API-first coffee roasting platform: Artisan-style simulator mode, "
+        "API-first coffee roasting platform: a simulator mode, "
         "a mock USB/serial device layer, and an .alog playback engine, "
         "all running without physical hardware."
     ),

@@ -262,8 +262,7 @@ npm run dev</code></pre>
     platform.
   </p>
   <p>
-    The Live Roast screen deliberately mirrors Artisan desktop's own
-    layout: a toolbar with the title, ON/OFF device toggle + START
+    The Live Roast screen is laid out like a roasting-scope screen: a toolbar with the title, ON/OFF device toggle + START
     recording button, and digital elapsed-time clock; vertical control
     sliders (Burner/Air/Drum, plus Burner SV in native &deg;C for
     <code>modbus_live</code>) beside the banded "Roaster Scope" chart,
@@ -319,12 +318,12 @@ npm run dev</code></pre>
     Configure Roast form's "Data source" dropdown:
   </p>
   <ol>
-    <li><strong>Artisan Simulator</strong> — a small thermal model that generates realistic BT/ET/RoR curves and auto-detects roast events (turning point, dry end, first crack, drop). No hardware needed.</li>
-    <li><strong>.alog Playback</strong> — loads a real roast log and replays it at real (or accelerated) speed, including its events and notes. Also reads genuine Artisan-exported <code>.alog</code> files, not just this project's own.</li>
-    <li><strong>Direct Modbus (USB or Ethernet)</strong> — talks straight to a real roaster's PLC over Modbus, bypassing Artisan entirely. Ships with defaults for Coffee-Tech's FZ-94 (USB/RTU) and FZ-94 Evo (Ethernet/TCP); every register is overridable for a different Modbus roaster. See <a href="modbus/index.html">docs/modbus/</a>.</li>
+    <li><strong>Simulator</strong> — a small thermal model that generates realistic BT/ET/RoR curves and auto-detects roast events (turning point, dry end, first crack, drop). No hardware needed.</li>
+    <li><strong>.alog Playback</strong> — loads a real roast log and replays it at real (or accelerated) speed, including its events and notes. Also reads real-world <code>.alog</code> files, not just this project's own.</li>
+    <li><strong>Direct Modbus (USB or Ethernet)</strong> — talks straight to a real roaster's PLC over Modbus. Ships with defaults for Coffee-Tech's FZ-94 (USB/RTU) and FZ-94 Evo (Ethernet/TCP); every register is overridable for a different Modbus roaster. See <a href="modbus/index.html">docs/modbus/</a>.</li>
     <li><strong>Direct USB (thermocouple meter)</strong> — reads a Mastech MS6514 dual K-type thermocouple meter straight over USB-serial. Read-only (the meter has no command channel); T1 &rarr; BT, T2 &rarr; ET.</li>
     <li><strong>Aillio Bullet (USB)</strong> — talks straight to a real Aillio Bullet over its own vendor-specific USB protocol (not Modbus/serial at all). Ships with the R1 model; nothing else to configure per-install (no port/host, the app finds it by its own USB id). See <a href="aillio/bullet-r1.html">docs/aillio/bullet-r1.html</a>.</li>
-    <li><strong>TC4+ (USB, aArtisanQ/PID firmware)</strong> — plain ASCII serial commands over USB to a TC4+ shield, bypassing Artisan entirely. Real Heater/Fan control (this hardware has no Drum channel at all); no feedback readback for either, so writes are fire-and-forget. DIY hardware with no single default wiring/config, so unlike the rest of these it has no built-in preset.</li>
+    <li><strong>TC4+ (USB, aArtisanQ/PID firmware)</strong> — plain ASCII serial commands over USB to a TC4+ shield. Real Heater/Fan control (this hardware has no Drum channel at all); no feedback readback for either, so writes are fire-and-forget. DIY hardware with no single default wiring/config, so unlike the rest of these it has no built-in preset.</li>
   </ol>
   <p>
     Every live-hardware mode leaves every milestone (Charge, Dry End, FC
@@ -343,8 +342,7 @@ npm run dev</code></pre>
     begins actually recording that stream into a roast — for
     <code>modbus_live</code>/<code>ms6514_live</code>/<code>aillio_live</code>/<code>tc4_live</code>
     these are two genuinely separate steps (verify the connection before
-    committing to a roast), matching real Artisan's own connect-then-record
-    model. For <code>simulator</code>/<code>alog_playback</code>, connecting
+    committing to a roast). For <code>simulator</code>/<code>alog_playback</code>, connecting
     and recording happen together in one step, since there's no real
     external connection to verify first.
   </p>
@@ -374,8 +372,8 @@ npm run dev</code></pre>
     default wiring/config to ship, unlike the rest of these.
   </p>
   <p>
-    <strong>More machine support is planned over time</strong>, the way
-    Artisan covers a wide range of roasters/meters. In practice that
+    <strong>More machine support is planned over time</strong>, covering
+    a wide range of roasters/meters. In practice that
     mostly isn't new engine code: a new <em>Modbus</em> roaster model is
     usually just a new
     <a href="modbus/index.html#device-profiles">Device Profile</a>

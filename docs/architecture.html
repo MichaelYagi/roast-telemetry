@@ -156,10 +156,10 @@
   <h2>Assumptions worth knowing about</h2>
   <ul>
     <li>
-      <strong>.alog schema</strong>: reading real Artisan files is now
+      <strong>.alog schema</strong>: reading real <code>.alog</code> files is now
       verified, not guessed — <code>alog_playback/alog_io.py</code> was
-      checked against an actual Kaleido-exported <code>.alog</code>. Two
-      things worth knowing: (1) real Artisan writes the file as a Python
+      checked against an actual real-world <code>.alog</code>. Two
+      things worth knowing: (1) the format is a Python
       dict literal (<code>str(dict)</code>, single quotes, meant to be
       <code>eval</code>'d) rather than strict JSON — the loader tries
       <code>json</code> first and falls back to
@@ -176,8 +176,8 @@
       <code>specialeventsvalue</code>/<code>specialeventsStrings</code>
       parallel arrays. Writing still uses this project's own simpler JSON
       shape (events/notes as plain objects) — round-trips perfectly
-      within itself, but isn't byte-for-byte what Artisan's own exporter
-      would produce. Real Artisan files also don't store a per-sample RoR
+      within itself, but isn't byte-for-byte what other software's exporter
+      would produce. Real <code>.alog</code> files also don't store a per-sample RoR
       array (only phase-average RoR in <code>computed</code>) —
       <code>alog_io.py</code> reconstructs RoR from the BT/ET curve itself
       (24s trailing-window derivative) whenever the source doesn't
@@ -194,8 +194,7 @@
       is a first-order thermal model (ET chases a heater-driven setpoint;
       BT lags ET with an explicit charge-dip/turning-point phase) tuned
       to produce a ~10-11 minute roast with realistic event timing, not a
-      reproduction of Artisan's actual simulator internals (which we
-      don't have source access to).
+      reproduction of any particular machine's numbers.
     </li>
     <li>
       <strong>Persistence</strong>: SQLite indexes roast metadata for

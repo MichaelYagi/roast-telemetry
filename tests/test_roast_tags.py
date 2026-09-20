@@ -2,7 +2,7 @@
 GET /roasts?q=...&tag=... -- tags are freely editable at any time,
 mirroring the warm/cold split test_roast_weight_editing.py already
 established for weight edits. Unlike weight, tags never touch the
-.alog file (not an Artisan concept), so the cold path here only needs
+.alog file (not part of the format), so the cold path here only needs
 the DB row to exist, not a saved .alog.
 """
 from __future__ import annotations

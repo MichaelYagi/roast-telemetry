@@ -2,7 +2,7 @@
 USB meter, for testing ``ms6514_bridge`` without one on hand.
 
 Frame layout (see ``ms6514_bridge/engine.py``'s docstring for the full
-citation against Artisan's own driver): 18 bytes, streamed continuously
+sourcing notes): 18 bytes, streamed continuously
 and unsolicited (no request needed) --
 
     byte0-1:   sync, 0x65 0x14

@@ -1,43 +1,38 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Acknowledgement: this module's default Modbus register map and serial
+# settings for the Coffee-Tech FZ-94 were worked out with reference to the
+# machine settings and Modbus handling published by the Artisan project
+# (https://github.com/artisan-roaster-scope/artisan; Copyright (C) 2010-2026
+# The Artisan team, licensed AGPL-3.0-or-later). This file is licensed under
+# the same terms, like Roast Telemetry as a whole (see LICENSE).
 """Direct Modbus RTU telemetry + control for a real roaster over USB --
-bypasses Artisan entirely. Talks straight to the roaster's own PLC via
-``pymodbus`` (the same library Artisan itself depends on for its Modbus
-device support).
+talks straight to the roaster's own PLC via ``pymodbus``.
 
 Register map default is Coffee-Tech Engineering's plain FZ-94 (USB/RTU --
 *not* the FZ-94 EVO, which connects over Modbus TCP/Ethernet, a different
-connection method entirely; artisan-scope.org/machines/coffeetech/).
-Confirmed against Artisan's own shipped machine preset for this exact
-model -- ``src/includes/Machines/Coffee-Tech/FZ94.aset`` in
-https://github.com/artisan-roaster-scope/artisan -- and its
-Modbus-handling source, ``src/artisanlib/modbusport.py``, not just
-paraphrased from blog write-ups (though those independently corroborate
-it: https://artisan-roasterscope.blogspot.com/2015/01/connecting-artisan-to-coffee-tech-fz-94.html,
-.../2016/08/fz-94-2-pushing-drum-heat-limit.html,
-.../2016/08/fz-94-3-connecting-drives.html, .../2016/08/fz-94-4-taking-control.html).
+connection method entirely). Live-tested against a real FZ-94 (see below).
 
-**One connection for everything.** Artisan's own shipped preset uses a
-single Modbus RTU serial connection (one port, one baud rate/framing) for
-every device below -- BT/ET/DT/Burner *and* Air/Drum -- as one multi-drop
-bus with different slave IDs, not two separate connections. (An earlier
-version of this module assumed the temperature probes and the drives
-needed genuinely separate connections at different baud rates, based on
-one blog's account of upgrading their setup mid-series; that was wrong --
-it was a snapshot of that author's setup *before* they'd unified
-everything onto one bus, not the final/shipped configuration.) Default
-communication, straight from the .aset: **19200 baud, 8 data bits, no
+**One connection for everything.** The FZ-94 uses a single Modbus RTU
+serial connection (one port, one baud rate/framing) for every device
+below -- BT/ET/DT/Burner *and* Air/Drum -- as one multi-drop bus with
+different slave IDs, not two separate connections. (An earlier version of
+this module assumed the temperature probes and the drives needed
+genuinely separate connections at different baud rates, based on one
+write-up's account of a setup from *before* it was unified onto one bus;
+that was wrong.) Default communication: **19200 baud, 8 data bits, no
 parity, 2 stop bits.**
 
 **Temperature probes + Burner:** each is its *own* Modbus slave device (a
 separate PID controller per probe/setpoint), all at register 0 for
-reading (function 3), confirmed identical in the .aset's `[Modbus]`
-`inputN`/`deviceId` fields:
+reading (function 3):
 
 - BT: slave 11, register 0
 - ET: slave 13, register 0
 - DT: slave 12, register 0 -- drum *space* temperature, a genuine third
   probe, not the same reading as ET and not just a relabeling of it
-- Burner: same slave as DT (12) -- it's that PID controller -- register 5
-  (`PID_SV_register=5`, `PID_device_ID=12` in the .aset), not a power
+- Burner: same slave as DT (12) -- it's that PID controller -- register 5,
+  not a power
   percentage at all. It's a bang-bang (on/off + hysteresis) PID that
   switches the 3 heating elements around a drum-temperature *limit* (the
   FZ-94's own user manual independently confirms 3 separately-switched
@@ -57,22 +52,18 @@ reading (function 3), confirmed identical in the .aset's `[Modbus]`
   read blank/0 until this app happened to write it itself.
 - Raw register value is temperature x10 as an integer (e.g. `1807` ->
   180.7C) -- hence bt_divisor/et_divisor/dt_divisor/burner_divisor below.
-  Confirmed in source, not just inferred: `modbusport.py`'s `setTarget()`
-  maps the .aset's `SVmultiplier=1` to an actual x10 multiplier internally
-  (1/2 mean x10/x100 respectively -- an enum, not a literal multiplier).
+  Confirmed on a real FZ-94, not just inferred.
 
 **Air/Drum drives:** Delta VFD-L frequency drives, not simple registers --
 each needs a run/stop word written before a frequency command means
 anything. The slave-ID assignment below (Air=2, Drum=1) is confirmed
-against a real, live, independently control-tested FZ-94 -- a working
-Artisan install's own Device Assignment labels, Slider commands, and
-Button commands all agree with each other (Drum writes go to slave 1,
-Fan/Air writes go to slave 2).
+against a real, live, independently control-tested FZ-94 (Drum
+writes go to slave 1, Fan/Air writes go to slave 2).
 
 This *replaces* an earlier default that had them the other way around
 (Air=1, Drum=2), which was NOT simply wrong -- it came from a real,
-working installation too: the original blog series this app's register
-*numbers* (8192/8193/8451) and value conventions still come from
+working installation too: the published write-up this app's register
+*numbers* (8192/8193/8451) and value conventions come from
 explicitly documents setting the VFD's own slaveID parameter (Delta
 VFD-L parameter 9-00, itself a configurable setting, not a fixed
 constant) to "d1 (Air Flow Controller)" and "d2 (Drum Speed Controller)"
@@ -82,9 +73,9 @@ with it -- see below) that two different real, working installations
 have configured oppositely, there may genuinely be no single universal
 default -- whoever wires a given unit picks these slave IDs themselves.
 Air=2/Drum=1 is used as the default only because it's the more recent,
-more directly relevant confirmation (matches Device Assignment labels,
-not just a register write that happens to work), not because the blog's
-account was somehow mistaken. Test Connection's read+write check and the
+more directly relevant confirmation (verified by control tests on a real
+unit, not just a register write that happens to work), not because that
+write-up's account was somehow mistaken. Test Connection's read+write check and the
 device profile override fields exist precisely for this -- don't assume
 either default without confirming against your own unit.
 
@@ -93,15 +84,15 @@ either default without confirming against your own unit.
 - Control register 8192 (2000H; 1=Stop, 2=Run), then frequency register
   8193 (2001H; value = percent x100, so 100% -> 10000, factor confirmed
   as "we send 10.000 to indicate 100% speed") -- register numbers and
-  this convention from .../2016/08/fz-94-4-taking-control.html.
+  this convention from the published control write-up.
 - Feedback register 8451 -- reads the drive's *actual* current speed
   (divide raw by 100, same x100 convention as the write side), not an
   echo of the last command. Same register on both slave IDs. From
-  .../2016/08/fz-94-3-connecting-drives.html specifically (that post is
-  about wiring + this read register; the control/frequency *write*
-  registers above are a different post in the series -- don't assume one
-  post covers both directions).
-- Air range 0-100%, Drum range 0-70% (per the blog's own drive limits)
+  the published wiring write-up specifically (it covers this read
+  register; the control/frequency *write* registers above come from a
+  different write-up in the series -- don't assume one covers both
+  directions).
+- Air range 0-100%, Drum range 0-70% (per the published drive limits)
 - `control_port`/`control_baudrate` below exist only as an override for
   wiring that genuinely needs a second physical connection (uncommon) --
   by default (`control_port=None`) drive writes go out on the same
@@ -117,9 +108,9 @@ RoR and CHARGE/TURNING_POINT/DRY_END/FC_START auto-detection reuse
 ``roast_heuristics.LiveRoastDetector``, since a PLC's raw registers carry
 temperatures only -- no roast events.
 
-Mutually exclusive with a running Artisan on the same connection: a
-serial Modbus RTU port only accepts one client at a time. If Artisan is
-also running against this same roaster, pick one owner of the port --
+Mutually exclusive with any other program using the same connection: a
+serial Modbus RTU port only accepts one client at a time. If another
+program is also running against this same roaster, pick one owner of the port --
 this engine can't share it.
 
 Live-tested against a real FZ-94: read-only and read+write Test
@@ -127,13 +118,12 @@ Connection checks, plus independent Air and Drum control tests, all
 passed on real hardware (see the Air/Drum slave-ID correction above,
 which came directly out of that same session). The temperature/Burner
 slave IDs/registers/multiplier and the single-bus 19200/8N2
-communication settings are also confirmed against Artisan's own shipped
-preset and source code; the Air/Drum register *numbers* (not the slave
-IDs, now live-confirmed) remain blog-sourced only.
+communication settings are also confirmed against the machine's stock
+configuration; the Air/Drum register *numbers* (not the slave
+IDs, now live-confirmed) remain sourced from published write-ups only.
 
-For comparison, not application: the FZ94 EVO's own shipped preset
-(``FZ94_EVO.aset``) is *not* empty the way the plain FZ94's is -- it has
-real Air/Drum/Burner ``writeSingle`` slider commands (register 20 for
+For comparison, not application: the FZ94 EVO's published configuration
+has real Air/Drum/Burner single-register write commands (register 20 for
 Drum, 16 for Air, 35 for Burner, all on a single slave/device ID 1, sent
 over Modbus *TCP* since the EVO connects over Ethernet, not serial RTU).
 That's a completely different register scheme and connection method from

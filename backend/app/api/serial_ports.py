@@ -1,7 +1,6 @@
 """Lists the serial ports the OS currently sees -- lets the Configure
 Roast form's Serial port / drive-port fields offer a dropdown of what's
-actually plugged in (e.g. "COM3 -- USB-SERIAL CH340"), the same idea as
-Artisan's own port picker, instead of requiring a trip to Device Manager
+actually plugged in (e.g. "COM3 -- USB-SERIAL CH340"), instead of requiring a trip to Device Manager
 to find the right COM number. Free-text entry stays available in the
 form regardless -- this is just a convenience list, not a whitelist (a
 port not currently enumerated, e.g. the fake hardware's /tmp path used

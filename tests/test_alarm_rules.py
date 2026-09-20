@@ -1,4 +1,4 @@
-"""RoastSession's automation rules (Artisan-style "Alarms") -- event,
+"""RoastSession's automation rules ("alarms") -- event,
 temperature, and time triggers all fire a bound ControlCommand (and/or
 publish an optional banner message), modbus_live only, delay_s=0
 (fires as soon as the condition is met) vs >0 (scheduled + cancellable

@@ -1,5 +1,5 @@
-"""alog_playback/alog_io.py -- reading/writing .alog files, including real
-Artisan's own (non-JSON) shape. These are pure functions with no I/O beyond
+"""alog_playback/alog_io.py -- reading/writing .alog files, including the
+native (non-JSON) shape. These are pure functions with no I/O beyond
 a single file, so they're tested directly rather than through the API."""
 from __future__ import annotations
 
@@ -11,15 +11,15 @@ from alog_playback.alog_io import (
     _step_hold_align,
     alog_dict_to_points,
     load_alog,
-    roast_to_artisan_native_dict,
-    save_artisan_native_alog,
+    roast_to_native_alog_dict,
+    save_native_alog,
 )
 
 
 def test_roundtrip_through_save_and_load(tmp_path):
     # Full pipeline: build a roast -> write it (the app's one and only
-    # .alog format, real Artisan's own) -> read it back through this
-    # module's own reader too, not just Artisan's.
+    # .alog format) -> read it back through this
+    # module's own reader.
     profile = [
         {"time_s": 0.0, "bt": 20.0, "et": 25.0, "heater_pct": 70.0, "fan_pct": 50.0, "drum_speed_pct": 60.0},
         {"time_s": 1.0, "bt": 21.0, "et": 26.0, "heater_pct": 70.0, "fan_pct": 50.0, "drum_speed_pct": 60.0},
@@ -27,13 +27,13 @@ def test_roundtrip_through_save_and_load(tmp_path):
     events = [{"id": "e1", "time_s": 0.0, "type": "CHARGE", "label": "Charge", "value": 20.0}]
     notes = [{"id": "n1", "time_s": 0.5, "text": "hello", "author": None}]
 
-    alog_dict = roast_to_artisan_native_dict(
+    alog_dict = roast_to_native_alog_dict(
         title="Test Roast", profile=profile, events=events, notes=notes,
         beans="Guatemala", weight_green_g=200.0, weight_roasted_g=170.0,
         roastertype="Coffee-Tech FZ94", roastdate="2026-01-01T00:00:00+00:00",
     )
     path = str(tmp_path / "roast.alog")
-    save_artisan_native_alog(path, alog_dict)
+    save_native_alog(path, alog_dict)
 
     loaded = load_alog(path)
     points = alog_dict_to_points(loaded)
@@ -44,7 +44,7 @@ def test_roundtrip_through_save_and_load(tmp_path):
     assert points["weight_roasted_g"] == 170.0
     assert points["machine"] == {"brand": None, "model": "Coffee-Tech FZ94"}
     # Index 0 is a synthetic pre-charge lead-in sample -- see
-    # roast_to_artisan_native_dict's docstring for why one gets prepended.
+    # roast_to_native_alog_dict's docstring for why one gets prepended.
     assert [p["time_s"] for p in points["profile"]] == [-1.0, 0.0, 1.0]
     assert [p["bt"] for p in points["profile"]] == [20.0, 20.0, 21.0]
     assert points["events"][0]["type"] == "CHARGE"
@@ -59,7 +59,7 @@ def test_charge_survives_when_it_predates_the_first_profile_sample(tmp_path):
     # roundtrip test above assumes. When that gap exactly equals the
     # synthetic lead-in's own 1-tick offset, a plain nearest-time search
     # used to tie between the lead-in slot and profile[0], and the
-    # tie-break silently picked the lead-in (index 0, Artisan's "not
+    # tie-break silently picked the lead-in (index 0, the format's "not
     # recorded" sentinel) -- losing the Charge marker entirely on every
     # read-back. Confirmed live with the simulator's default 1s interval,
     # this profile/events shape is exactly that scenario.
@@ -73,9 +73,9 @@ def test_charge_survives_when_it_predates_the_first_profile_sample(tmp_path):
         {"id": "e2", "time_s": 4.0, "type": "DRY_END", "label": "Dry End", "value": None},
     ]
 
-    alog_dict = roast_to_artisan_native_dict(title="Gap Test", profile=profile, events=events, notes=[])
+    alog_dict = roast_to_native_alog_dict(title="Gap Test", profile=profile, events=events, notes=[])
     path = str(tmp_path / "gap.alog")
-    save_artisan_native_alog(path, alog_dict)
+    save_native_alog(path, alog_dict)
 
     points = alog_dict_to_points(load_alog(path))
     event_types = [e["type"] for e in points["events"]]
@@ -86,17 +86,17 @@ def test_charge_survives_when_it_predates_the_first_profile_sample(tmp_path):
 def test_extra_channels_roundtrip_through_the_extraname2_bank(tmp_path):
     # role=EXTRA DeviceProfile channels (see RoastProfilePoint.extra) --
     # up to 2 round-trip through the real .alog format's extraname2 bank
-    # (slot 0 is DT, slots 1/2 are free -- see roast_to_artisan_native_dict's
+    # (slot 0 is DT, slots 1/2 are free -- see roast_to_native_alog_dict's
     # own comment on why that's a fixed ceiling, not arbitrary).
     profile = [
         {"time_s": 0.0, "bt": 20.0, "et": 25.0, "dt": 30.0, "extra": {"Flue": 40.0, "Ambient": 18.0}},
         {"time_s": 1.0, "bt": 21.0, "et": 26.0, "dt": 31.0, "extra": {"Flue": 41.0, "Ambient": 18.5}},
     ]
-    alog_dict = roast_to_artisan_native_dict(
+    alog_dict = roast_to_native_alog_dict(
         title="Extra Channels Roast", profile=profile, events=[], notes=[],
     )
     path = str(tmp_path / "roast.alog")
-    save_artisan_native_alog(path, alog_dict)
+    save_native_alog(path, alog_dict)
 
     loaded = load_alog(path)
     points = alog_dict_to_points(loaded)
@@ -122,9 +122,9 @@ def test_dt_less_roast_does_not_export_a_fake_flat_dt_curve(tmp_path):
         {"time_s": 0.0, "bt": 20.0, "et": 25.0},
         {"time_s": 1.0, "bt": 21.0, "et": 26.0},
     ]
-    alog_dict = roast_to_artisan_native_dict(title="No DT probe", profile=profile, events=[], notes=[])
+    alog_dict = roast_to_native_alog_dict(title="No DT probe", profile=profile, events=[], notes=[])
     path = str(tmp_path / "roast.alog")
-    save_artisan_native_alog(path, alog_dict)
+    save_native_alog(path, alog_dict)
 
     points = alog_dict_to_points(load_alog(path))
     assert all(p.get("dt") is None for p in points["profile"])
@@ -137,9 +137,9 @@ def test_a_third_extra_channel_beyond_the_two_free_slots_does_not_export(tmp_pat
     profile = [
         {"time_s": 0.0, "bt": 20.0, "et": 25.0, "extra": {"A": 1.0, "B": 2.0, "C": 3.0}},
     ]
-    alog_dict = roast_to_artisan_native_dict(title="R", profile=profile, events=[], notes=[])
+    alog_dict = roast_to_native_alog_dict(title="R", profile=profile, events=[], notes=[])
     path = str(tmp_path / "roast.alog")
-    save_artisan_native_alog(path, alog_dict)
+    save_native_alog(path, alog_dict)
 
     points = alog_dict_to_points(load_alog(path))
     extras = points["profile"][-1]["extra"]
@@ -148,8 +148,8 @@ def test_a_third_extra_channel_beyond_the_two_free_slots_does_not_export(tmp_pat
     assert "C" not in extras
 
 
-def test_load_alog_parses_real_artisan_python_literal(tmp_path):
-    # Real Artisan .alog files are `str(dict)`, not JSON -- single quotes,
+def test_load_alog_parses_real_python_literal(tmp_path):
+    # Real .alog files are `str(dict)`, not JSON -- single quotes,
     # True/False/None -- loaded back with ast.literal_eval, never eval().
     raw = (
         "{'timex': [0.0, 1.0, 2.0], 'temp1': [25.0, 26.0, 27.0], "
@@ -180,9 +180,9 @@ def test_load_alog_missing_required_field_raises(tmp_path):
 
 
 def test_extract_named_milestones_and_turning_point():
-    # A synthetic real-Artisan-shaped dict: timeindex maps
+    # A synthetic real-shaped dict: timeindex maps
     # CHARGE/DRY_END/FC_START/FC_END/SC_START/SC_END/DROP/COOL_END to
-    # indices into timex (0 = not recorded -- real Artisan's own sentinel,
+    # indices into timex (0 = not recorded -- the format's own sentinel,
     # so index 0 of timex is reserved as a pre-charge baseline sample and
     # never itself a real milestone), and Turning Point comes from
     # computed.TP_idx instead.
@@ -243,7 +243,7 @@ def test_extract_manual_events_with_channel_and_custom_label():
 
 def test_our_own_writer_shape_events_pass_through_unchanged():
     # Our own writer already stores specialevents as dicts (roast_to_alog_dict) --
-    # _extract_events must return those as-is, not reinterpret them as Artisan's
+    # _extract_events must return those as-is, not reinterpret them as the native
     # parallel-array format.
     data = {
         "timex": [0.0, 1.0],

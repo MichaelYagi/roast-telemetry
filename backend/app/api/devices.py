@@ -19,7 +19,7 @@ def _to_device(session) -> Device:
     status = session.device.status()
     engine_status = status.get("engine_status") or {}
     # The MockDevice's own last_error only covers connect/read/write faults
-    # at that shim layer; for live bridges (Artisan/Modbus) the actually
+    # at that shim layer; for live bridges (Modbus, etc.) the actually
     # useful error -- "port busy", "connection refused", etc. -- lives one
     # level down in the engine's own status. Surface that when present.
     # modbus_bridge specifically also tracks a separate control_last_error

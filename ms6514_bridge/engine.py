@@ -1,7 +1,14 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Acknowledgement: this module's frame layout and byte-11 mode decoding were
+# worked out by reading the Mastech MS6514 driver in Artisan (src/artisanlib/
+# comm.py and util.py, https://github.com/artisan-roaster-scope/artisan;
+# Copyright (C) 2010-2026 The Artisan team, licensed AGPL-3.0-or-later). This
+# file is licensed under the same terms, like Roast Telemetry as a whole
+# (see LICENSE).
 """Direct USB-serial reader for the Mastech MS6514 dual K-type
-thermocouple meter -- bypasses Artisan entirely. Protocol traced
-directly from Artisan's own driver (`MS6514temperature()` in
-`artisanlib/comm.py`, and `hex2int()` in `artisanlib/util.py`), not
+thermocouple meter. Protocol traced directly from an existing
+open-source driver (see the notice above this docstring), not
 reverse-engineered guesswork.
 
 Serial: 9600 baud, 8 data bits, no parity, 1 stop bit. Unlike the
@@ -17,8 +24,8 @@ Frame layout (18 bytes, 0-indexed), when synced at offset 0:
   byte16-17: terminator, 0x0D 0x0A
 
 byte11 says which display mode the meter is in and disambiguates the
-two raw fields (verified by tracing Artisan's own reassignment logic
-line by line, not just reading the docstring table):
+two raw fields (verified by tracing the reference driver's reassignment logic
+line by line, not just reading its docstring table):
   0x08 ("Display T1", OK):  field[5-6]=T1, field[7-8]=T2 -- already in
                              canonical order, no correction needed.
   0x40 ("Display T1", T1 NC): same layout, T1 marked not-connected.
@@ -28,7 +35,7 @@ line by line, not just reading the docstring table):
   anything else (0x0A/0x8A/0x0B/0x8B/0x42/0x43/0x66/0xC2/0xC3/...):
       the meter is in "T1-T2" (delta) display mode. One of the two
       raw fields is a computed T1-T2 delta, not a direct reading, and
-      Artisan's own reconstruction logic for this mode is convoluted
+      the reference driver's reconstruction logic for this mode is convoluted
       enough that tracing it turned up what looks like a real bug on
       one branch (a value that always evaluates to zero). Rather than
       faithfully reproduce logic we can't verify is even correct in
@@ -45,7 +52,7 @@ RoR and CHARGE/TURNING_POINT/DRY_END/FC_START auto-detection reuse
 ``roast_heuristics.LiveRoastDetector``.
 
 Not tested against real MS6514 hardware -- none available in this
-environment. The byte layout and decoding are Artisan's own verified
+environment. The byte layout and decoding follow the reference driver's verified
 logic (traced, not guessed); the "T1-T2 mode is ambiguous" scope
 decision is a deliberate simplification, documented above, not a gap.
 """
@@ -84,7 +91,7 @@ def _parse_frame(frame: bytes) -> Optional[dict]:
     s2: Optional[float] = raw2 / 10.0
 
     # NC (probe not connected) flags, checked in raw field position --
-    # matches the order of operations in Artisan's own driver.
+    # matches the order of operations in the reference driver.
     if (64 <= b11 <= 67) or (194 <= b11 <= 195):
         s1 = None
     if b12 == 64:

@@ -398,9 +398,9 @@ def set_tags(roast_id: str, update: TagsUpdateRequest) -> dict:
 
 @router.get("/{roast_id}/alog")
 def download_alog(roast_id: str) -> FileResponse:
-    """Real Artisan's own native format (Python-literal syntax +
-    timeindex/computed/specialevents) -- File > Open in Artisan itself
-    opens this directly. See roast_to_artisan_native_dict's docstring for
+    """The native .alog format (Python-literal syntax +
+    timeindex/computed/specialevents), which software that reads .alog
+    opens directly. See roast_to_native_alog_dict's docstring for
     why that's the only format this app writes."""
     roast = session_manager.get_roast_detail(roast_id)
     if roast is None or not roast.alog_path:

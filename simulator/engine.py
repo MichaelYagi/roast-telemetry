@@ -1,14 +1,13 @@
-"""Artisan "Simulator Mode" wrapper.
+"""Simulator mode wrapper.
 
-Real Artisan ships a simulator mode that fabricates BT/ET without hardware,
-driven by a simplified thermodynamic model plus scripted roast events. We
-don't have access to Artisan's internal simulator implementation, so this
-module re-implements an equivalent approximation: a small first-order
+A simulator mode fabricates BT/ET without hardware, driven by a
+simplified thermodynamic model plus scripted roast events. This module
+implements one of our own: a small first-order
 thermal model (ET chases a heater-driven setpoint, BT lags ET with a
 charge-dip/turning-point phase) with threshold-based event detection
 (TURNING_POINT, DRY_END, FC_START, FC_END, DROP). It's tuned to produce
 curves that look and behave like a typical drum roast, not to reproduce
-Artisan's exact numbers.
+any particular machine's exact numbers.
 
 Two ways to use this module:
 

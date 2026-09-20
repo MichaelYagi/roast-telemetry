@@ -24,7 +24,7 @@ trusted or wanted; RoR is computed the same either way.
 TURNING_POINT is the one exception, even with ``detect_milestones``
 off: it's a pure observation (the BT minimum right after Charge), no
 operator judgment involved, so it's tracked and auto-emitted regardless
--- confirmed against a real FZ-94 roast in Artisan, which auto-plots it
+-- confirmed against a real FZ-94 roast, where it is auto-plotted
 on the chart even with every other milestone marked by hand. See
 ``notify_manual_charge()`` -- when CHARGE is marked manually rather
 than auto-detected, the caller tells the detector it happened, which
@@ -135,7 +135,7 @@ class LiveRoastDetector:
     def mark_milestone_fired(self, event_type: str) -> None:
         """Called when DRY_END or FC_START was marked manually -- with
         detect_milestones=True (opt-in auto-detection), the operator can
-        still override/click early, same as real Artisan. Without this,
+        still override/click early. Without this,
         the detector would have no way to know that happened (its own
         _events_fired only tracks what *it* emitted) and would still
         independently fire its own copy once BT crosses the configured

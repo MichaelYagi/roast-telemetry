@@ -24,7 +24,7 @@ python -m pytest
 
 Run from the repo root — `pytest.ini` puts it on `sys.path` (`pythonpath = .`,
 matching how the app itself is always run: `PYTHONPATH=. uvicorn ...`).
-Covers the `.alog` reader/writer (including real Artisan's own file
+Covers the `.alog` reader/writer (including the native file
 shape), `AlogPlayer`'s playback/interpolation, milestone event sequencing,
 the modbus/ms6514 engines' register maps and lifecycle (connect vs.
 record, detector reset on recording start), automation rules
@@ -51,11 +51,12 @@ suite yet.
 - Keep PRs scoped to one change. A bug fix doesn't need an accompanying
   refactor.
 - If you're touching `modbus_bridge/`, `ms6514_bridge/`, or anything
-  claiming to match real Artisan/hardware behavior, cite your source
-  (Artisan's own GitHub source, a shipped `.aset` preset, a manufacturer
-  manual) in a comment or the PR description — this codebase has been
-  burned before by blog-sourced assumptions that turned out wrong once
-  checked against Artisan's actual source. See
+  claiming to match real hardware behavior, cite your source
+  (a manufacturer manual, a published write-up, a real-hardware test) in
+  a comment or the PR description — this codebase has been burned before
+  by write-up-sourced assumptions that turned out wrong once checked
+  against a real machine. Don't copy code, data files or saved settings
+  from other projects (see [CLAUDE.md](CLAUDE.md)). See
   [docs/modbus/fz-94-usb.html](docs/modbus/fz-94-usb.html) for the existing
   citation style.
 

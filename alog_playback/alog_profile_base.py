@@ -1,20 +1,21 @@
-"""The starting point for the ``.alog`` files this app writes for Artisan.
+"""The starting point for the ``.alog`` files this app writes.
 
 Written from scratch for this project. It holds only:
 
-* the field *names* Artisan's ``.alog`` format defines (a file format has to
-  use its consumer's names -- there is no other way to be readable), and
+* the field *names* the ``.alog`` format defines (a file format has to
+  use the names its readers expect -- there is no other way to be
+  readable), and
 * neutral values chosen here: empty strings, zeros, and a few defaults of
   our own. No values come from any real roast or from any other program's
   saved settings.
 
-Fields Artisan's loader treats as optional (alarms, PID, energy accounting,
-cupping, axis ranges, ...) are deliberately left out, so Artisan falls back
-to its own defaults for them. Everything a roast actually says (curves,
+Fields the format treats as optional (alarms, PID, energy accounting,
+cupping, axis ranges, ...) are deliberately left out, so readers fall back
+to their own defaults for them. Everything a roast actually says (curves,
 milestones, events, weights, dates, notes) is filled in by
-``alog_io.roast_to_artisan_native_dict``.
+``alog_io.roast_to_native_alog_dict``.
 
-The extra-device slots are the one delicate part: Artisan indexes a dozen
+The extra-device slots are the one delicate part: readers index a dozen
 per-device metadata lists by slot number, so they must all stay the same
 length as the device lists. ``EXTRA_SLOTS`` is that length.
 """
@@ -25,10 +26,10 @@ from __future__ import annotations
 # many slots. Anything past it doesn't round-trip through the export.
 EXTRA_SLOTS = 3
 
-# Artisan's per-slot LCD/curve flags cover its full set of LCD frames.
+# The per-slot LCD/curve flags cover the format's full set of LCD frames.
 _FLAG_SLOTS = 10
 
-# The names of the `computed` summary block Artisan's own reports read.
+# The names of the `computed` summary block the format's reports read.
 # Filled with zeros here; alog_io overwrites what it can actually compute.
 _COMPUTED_FLOATS = (
     "CHARGE_ET", "CHARGE_BT", "TP_time", "TP_ET", "TP_BT", "MET",
@@ -99,7 +100,7 @@ def new_profile_base() -> dict:
         "extratemp1": [[] for _ in range(n)],
         "extratemp2": [[] for _ in range(n)],
         # Bank 1 is Burner/Air/Drum -- percentages, not temperatures, so
-        # Artisan must not convert them when switching to Fahrenheit.
+        # readers must not convert them when switching to Fahrenheit.
         "extraNoneTempHint1": [True] * n,
         "extraNoneTempHint2": [False] * n,
         "extradevicecolor1": ["#d9534f", "#5bc0de", "#8a6d3b"],

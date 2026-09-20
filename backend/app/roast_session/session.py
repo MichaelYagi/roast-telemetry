@@ -16,8 +16,8 @@ from alog_playback import (
     AlogPlayer,
     alog_dict_to_points,
     load_alog,
-    roast_to_artisan_native_dict,
-    save_artisan_native_alog,
+    roast_to_native_alog_dict,
+    save_native_alog,
 )
 from mock_device import MockDevice
 from modbus_bridge import ModbusEngine
@@ -591,13 +591,13 @@ class RoastSession:
         if isinstance(self._engine, (ModbusEngine, MS6514Engine, TC4Engine)):
             self._engine.close()  # release the serial port
 
-        # Written in real Artisan's own native shape (Python-literal syntax
+        # Written in the native .alog shape (Python-literal syntax
         # + timeindex/computed/specialevents), not a bespoke JSON one --
         # this app used to write its own minimal JSON format, but that
         # could only round-trip through this app's own reader, not
-        # actually open in Artisan itself. See roast_to_artisan_native_dict's
+        # open in other software. See roast_to_native_alog_dict's
         # docstring for the full rationale.
-        alog_dict = roast_to_artisan_native_dict(
+        alog_dict = roast_to_native_alog_dict(
             title=self.title,
             profile=self.profile,
             events=self.events,
@@ -607,7 +607,7 @@ class RoastSession:
             weight_roasted_g=self.weight_roasted_g,
             roastdate=self.created_at,
         )
-        save_artisan_native_alog(self.alog_path, alog_dict)
+        save_native_alog(self.alog_path, alog_dict)
 
         storage.update_roast(
             self.id,
@@ -627,7 +627,7 @@ class RoastSession:
         # isn't a status value, it's simply not having a session/roast_id
         # to call this on in the first place). Lets Air/Drum/Burner be
         # exercised -- Testing Mode's write check, or just manually -- while
-        # merely armed, matching Artisan's own control-before-record model.
+        # merely armed (controls work before recording starts).
         if self.status not in (RoastStatus.IDLE, RoastStatus.ROASTING, RoastStatus.COOLING):
             raise RoastSessionError(f"roast {self.id} is not active (status={self.status.value})")
         payload = command.model_dump(exclude_none=True)
@@ -676,8 +676,8 @@ class RoastSession:
         self.events.append(event)
         if req.type == RoastEventType.CHARGE:
             # Turning Point stays auto-detected even when CHARGE itself is
-            # a manual click -- confirmed against a real FZ-94 roast in
-            # Artisan, which auto-plots Turning Point on the chart despite
+            # a manual click -- confirmed against a real FZ-94 roast,
+            # where Turning Point is auto-plotted on the chart despite
             # every other milestone being marked by hand. Both live-hardware
             # engines expose this; simulator/alog_playback don't (and
             # don't need to -- CHARGE is never manual there).
@@ -836,7 +836,7 @@ class RoastSession:
         (set_weight_roasted, delete_event, retime_event), so the exported
         file never silently drifts from what the app itself shows."""
         if self.alog_path and os.path.exists(self.alog_path):
-            alog_dict = roast_to_artisan_native_dict(
+            alog_dict = roast_to_native_alog_dict(
                 title=self.title,
                 profile=self.profile,
                 events=self.events,
@@ -846,7 +846,7 @@ class RoastSession:
                 weight_roasted_g=self.weight_roasted_g,
                 roastdate=self.created_at,
             )
-            save_artisan_native_alog(self.alog_path, alog_dict)
+            save_native_alog(self.alog_path, alog_dict)
 
     def set_weight_roasted(self, grams: Optional[float]) -> None:
         # The natural workflow is: roast finishes, beans cool, *then* get
@@ -874,7 +874,7 @@ class RoastSession:
 
     def set_tags(self, tags: list[str]) -> None:
         # No _rewrite_alog() call here, unlike the weight setters -- tags
-        # aren't an Artisan .alog concept, so there's nothing to round-trip
+        # aren't part of the .alog format, so there's nothing to round-trip
         # into that file. storage.set_roast_tags is the only durable copy.
         self.tags = tags
         storage.set_roast_tags(self.id, tags)
@@ -997,7 +997,7 @@ class RoastSessionManager:
             # ModbusEngine/MS6514Engine/AillioEngine/TC4Engine's __init__ already made the real
             # connect attempt above and caught/swallowed any failure into
             # last_error rather than raising -- without this check, a bad
-            # port (wrong COM number, or one Artisan is still holding open)
+            # port (wrong COM number, or one another program is still holding open)
             # silently "succeeds" and the caller only ever discovers it by
             # noticing BT/ET never populate.
             engine_status = session._engine.status()
@@ -1097,7 +1097,7 @@ class RoastSessionManager:
         return row, parsed
 
     def _rewrite_cold_alog(self, row: dict, parsed: dict) -> None:
-        alog_dict = roast_to_artisan_native_dict(
+        alog_dict = roast_to_native_alog_dict(
             title=row["title"],
             profile=parsed["profile"],
             events=parsed["events"],
@@ -1107,7 +1107,7 @@ class RoastSessionManager:
             weight_roasted_g=row["weight_roasted_g"],
             roastdate=row["created_at"],
         )
-        save_artisan_native_alog(row["alog_path"], alog_dict)
+        save_native_alog(row["alog_path"], alog_dict)
 
     def delete_event(self, roast_id: str, event_id: str) -> None:
         session = self.get(roast_id)
@@ -1201,8 +1201,8 @@ class RoastSessionManager:
         data = load_alog(source_path)
         # A plain file copy, not a parse-then-reserialize round trip --
         # there's nothing to transform on import, and copying preserves
-        # the source file exactly (real Artisan's own syntax when it's a
-        # real Artisan export, which is the common case for this feature).
+        # the source file exactly (the native syntax when it's a
+        # real .alog export, which is the common case for this feature).
         os.makedirs(os.path.dirname(os.path.abspath(dest_path)), exist_ok=True)
         shutil.copyfile(source_path, dest_path)
         parsed = alog_dict_to_points(data)

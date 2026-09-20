@@ -1,13 +1,13 @@
-"""alog_playback/alog_io.py's roast_to_artisan_native_dict/save_artisan_native_alog
--- exports a roast recorded natively by this app into a shape real Artisan
-can actually open (Python-literal syntax + Artisan's own timeindex/computed/
-specialevents fields), built on artisan_profile_base's from-scratch base."""
+"""alog_playback/alog_io.py's roast_to_native_alog_dict/save_native_alog
+-- exports a roast recorded natively by this app into a shape other .alog readers
+can actually open (Python-literal syntax + the format's timeindex/computed/
+specialevents fields), built on alog_profile_base's from-scratch base."""
 from __future__ import annotations
 
 from alog_playback.alog_io import (
     load_alog,
-    roast_to_artisan_native_dict,
-    save_artisan_native_alog,
+    roast_to_native_alog_dict,
+    save_native_alog,
 )
 
 
@@ -26,12 +26,12 @@ def _profile(n=10, step=1.0, bt0=90.0, et0=150.0):
 
 
 def test_output_is_python_literal_syntax_not_json(tmp_path):
-    d = roast_to_artisan_native_dict(title="t", profile=_profile(3), events=[], notes=[])
+    d = roast_to_native_alog_dict(title="t", profile=_profile(3), events=[], notes=[])
     path = str(tmp_path / "out.alog")
-    save_artisan_native_alog(path, d)
+    save_native_alog(path, d)
     raw = (tmp_path / "out.alog").read_text(encoding="utf-8")
-    # JSON's true/false/null would break ast.literal_eval (real Artisan's
-    # own loader) -- this must be Python's True/False/None instead.
+    # JSON's true/false/null would break ast.literal_eval (other
+    # readers' loaders) -- this must be Python's True/False/None instead.
     assert "true" not in raw and "false" not in raw and ": null" not in raw
     reloaded = load_alog(path)
     assert reloaded["title"] == "t"
@@ -40,12 +40,12 @@ def test_output_is_python_literal_syntax_not_json(tmp_path):
 def test_charge_at_first_sample_does_not_collide_with_not_recorded_sentinel():
     # This app's roasts start recording *at* Charge (t=0 is the first
     # sample) -- without a synthetic lead-in sample, Charge would always
-    # land at timeindex[0], indistinguishable from Artisan's own "not
+    # land at timeindex[0], indistinguishable from the format's "not
     # recorded" convention (0). This was a real bug caught before shipping.
     profile = _profile(20)
     events = [{"id": "e1", "time_s": 0.0, "type": "CHARGE", "label": "Charge"}]
 
-    d = roast_to_artisan_native_dict(title="t", profile=profile, events=events, notes=[])
+    d = roast_to_native_alog_dict(title="t", profile=profile, events=events, notes=[])
 
     assert d["timeindex"][0] != 0  # CHARGE is the 0th entry in timeindex
     assert d["computed"]["CHARGE_BT"] == profile[0]["bt"]
@@ -62,7 +62,7 @@ def test_milestone_indices_and_computed_block():
         {"id": "e5", "time_s": 360.0, "type": "DROP", "label": "Drop"},
     ]
 
-    d = roast_to_artisan_native_dict(title="t", profile=profile, events=events, notes=[])
+    d = roast_to_native_alog_dict(title="t", profile=profile, events=events, notes=[])
     c = d["computed"]
 
     assert c["DRY_time"] == 215.0
@@ -75,7 +75,7 @@ def test_milestone_indices_and_computed_block():
     assert d["timeindex"][5] == 0  # SC_END
     assert d["timeindex"][7] == 0  # COOL_END
     # Phase durations derived from the above, confirmed against a real
-    # Artisan export's own arithmetic (see the function's docstring).
+    # export's own arithmetic (see the function's docstring).
     assert c["dryphasetime"] == 215.0
     assert c["midphasetime"] == 327.0 - 215.0
     assert c["finishphasetime"] == 360.0 - 327.0
@@ -83,7 +83,7 @@ def test_milestone_indices_and_computed_block():
 
 
 def test_weight_loss_computed_when_both_weights_present():
-    d = roast_to_artisan_native_dict(
+    d = roast_to_native_alog_dict(
         title="t", profile=_profile(3), events=[], notes=[],
         weight_green_g=350.0, weight_roasted_g=301.0,
     )
@@ -95,14 +95,14 @@ def test_weight_loss_computed_when_both_weights_present():
 def test_no_key_beyond_the_base_and_no_native_notes_field():
     # Regression: the base used to be built via load_alog(), which
     # defensively adds `control`/`ror_bt`/`ror_et` for this app's own
-    # reader -- fields a real Artisan file doesn't actually have. Real
-    # Artisan also has no native `notes` list (only roastingnotes, a
+    # reader -- fields a real .alog file doesn't actually have. The
+    # format also has no native `notes` list (only roastingnotes, a
     # single free-text field) -- writing one anyway was exactly what got
-    # a real export rejected as "Invalid artisan format".
-    from alog_playback.artisan_profile_base import new_profile_base
+    # a real export rejected as invalid.
+    from alog_playback.alog_profile_base import new_profile_base
 
     template_keys = set(new_profile_base().keys())
-    d = roast_to_artisan_native_dict(title="t", profile=_profile(3), events=[], notes=[{"id": "n1", "time_s": 1.0, "text": "hi"}])
+    d = roast_to_native_alog_dict(title="t", profile=_profile(3), events=[], notes=[{"id": "n1", "time_s": 1.0, "text": "hi"}])
     assert set(d.keys()) == template_keys
     assert "notes" not in d
     assert "control" not in d
@@ -113,14 +113,14 @@ def test_no_key_beyond_the_base_and_no_native_notes_field():
 def test_missing_control_values_at_start_dont_leave_gaps():
     # A real roast's first tick or two often has no Heater/Fan/Drum set
     # yet (before the operator touches a slider) -- a raw None there
-    # broke Artisan's own "extra device" channels outright, unlike its
+    # broke the format's "extra device" channels outright, unlike the
     # main BT/ET channels which do tolerate gaps.
     profile = [
         {"time_s": 0.0, "bt": 90.0, "et": 150.0, "heater_pct": None, "fan_pct": None, "drum_speed_pct": None},
         {"time_s": 1.0, "bt": 91.0, "et": 151.0, "heater_pct": None, "fan_pct": None, "drum_speed_pct": None},
         {"time_s": 2.0, "bt": 92.0, "et": 152.0, "heater_pct": 85.0, "fan_pct": 30, "drum_speed_pct": 50.0},
     ]
-    d = roast_to_artisan_native_dict(title="t", profile=profile, events=[], notes=[])
+    d = roast_to_native_alog_dict(title="t", profile=profile, events=[], notes=[])
 
     for channel in d["extratemp1"]:
         assert None not in channel
@@ -136,7 +136,7 @@ def test_custom_events_become_parallel_arrays_not_dicts():
         {"id": "e1", "time_s": 0.0, "type": "CHARGE", "label": "Charge"},
         {"id": "e2", "time_s": 50.0, "type": "CUSTOM", "label": "Burner 80", "value": 80.0, "channel": "Burner"},
     ]
-    d = roast_to_artisan_native_dict(title="t", profile=profile, events=events, notes=[])
+    d = roast_to_native_alog_dict(title="t", profile=profile, events=events, notes=[])
 
     assert isinstance(d["specialevents"], list) and isinstance(d["specialevents"][0], int)
     assert d["specialeventsvalue"] == [80.0]
@@ -147,9 +147,9 @@ def test_heater_fan_drum_become_continuous_extra_channels_and_round_trip(tmp_pat
     from alog_playback.alog_io import alog_dict_to_points
 
     profile = _profile(50)
-    d = roast_to_artisan_native_dict(title="t", profile=profile, events=[], notes=[])
+    d = roast_to_native_alog_dict(title="t", profile=profile, events=[], notes=[])
     path = str(tmp_path / "out.alog")
-    save_artisan_native_alog(path, d)
+    save_native_alog(path, d)
 
     reloaded = load_alog(path)
     points = alog_dict_to_points(reloaded)
@@ -161,20 +161,20 @@ def test_heater_fan_drum_become_continuous_extra_channels_and_round_trip(tmp_pat
 
 
 def test_missing_weight_and_empty_profile_do_not_crash():
-    d = roast_to_artisan_native_dict(title="Empty", profile=[], events=[], notes=[])
+    d = roast_to_native_alog_dict(title="Empty", profile=[], events=[], notes=[])
     assert d["timeindex"] == [0, 0, 0, 0, 0, 0, 0, 0]
     assert d["weight"] == [0.0, 0.0, "g"]
 
 
 def test_computed_never_holds_none_and_temps_are_plain_floats():
-    # Regression: real Artisan validates the whole file against a typed
+    # Regression: readers validate the whole file against a typed
     # schema in which every `computed` field is a number that may be
     # absent but not None, and temp1/temp2 are list[float]. A None in any
-    # of them made Artisan reject the file as "Invalid artisan format".
+    # of them made the file get rejected as invalid.
     profile = _profile(30)
     profile[5] = {**profile[5], "et": None, "bt": None}  # one dropped reading
     events = [{"type": "CHARGE", "time_s": 0.0}, {"type": "DROP", "time_s": 20.0}]  # no TP, no cool end
-    d = roast_to_artisan_native_dict(title="t", profile=profile, events=events, notes=[])
+    d = roast_to_native_alog_dict(title="t", profile=profile, events=events, notes=[])
 
     assert None not in d["computed"].values()
     assert "COOL_time" not in d["computed"]
