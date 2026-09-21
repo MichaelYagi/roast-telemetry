@@ -13,4 +13,4 @@ release -- three places, no automated sync between them (npm's
 package.json and a PyInstaller spec's plist dict can't import a Python
 module).
 """
-VERSION = "1.2.19"
+VERSION = "1.2.20"
