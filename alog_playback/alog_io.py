@@ -38,6 +38,8 @@ import re
 import uuid
 from datetime import datetime
 from typing import Any, Optional
+from roast_heuristics.ror import DEFAULT_SPAN_S, rate_of_rise_series
+
 from .alog_profile_base import new_profile_base
 
 
@@ -530,32 +532,28 @@ def _extract_roastdate(data: dict) -> Optional[str]:
     return data.get("roastdate")
 
 
-def _compute_ror(timex: list, temps: list, window_s: float = 24.0) -> list:
-    """Trailing-window rate-of-rise (degrees/minute).
+def _compute_ror(timex: list, temps: list, window_s: float = DEFAULT_SPAN_S) -> list:
+    """Rate-of-rise (degrees/minute) at every point, worked out the same
+    way as live readings (roast_heuristics/ror.py: a rate over a ``window_s``
+    span, then lightly smoothed) so an imported roast and a live one show
+    comparable numbers.
 
     Real .alog files store RoR only as phase averages in ``computed``,
     not a full per-sample array -- this reconstructs one from the raw
     temperature curve so RoR is available for any imported file.
     """
-    ror = [None] * len(timex)
-    j = 0
-    for i, t in enumerate(timex):
-        target = t - window_s
-        while j + 1 < i and timex[j + 1] <= target:
-            j += 1
-        if temps[i] is None or j >= i or temps[j] is None:
-            continue
-        dt = timex[i] - timex[j]
-        # Until the trailing window is fully populated (e.g. the first ~24s
-        # after charge), `dt` is much shorter than `window_s`, so dividing a
-        # small raw delta by a small dt and scaling by 60 wildly amplifies
-        # sensor noise into physically implausible spikes (seen as RoR in
-        # the hundreds of deg/min right at charge). Real roast software
-        # simply leaves RoR blank until the window is actually full.
-        if dt <= 0 or dt < window_s * 0.9:
-            continue
-        ror[i] = (temps[i] - temps[j]) / dt * 60.0
-    return ror
+    ror = rate_of_rise_series(timex, temps, span_s=window_s)
+    # Until a full span of readings exists (e.g. the first ~20s after charge)
+    # the rate is taken over a much shorter interval, so a small raw delta
+    # divided by a small dt and scaled by 60 wildly amplifies sensor noise into
+    # physically implausible spikes (seen as RoR in the hundreds of deg/min
+    # right at charge). Real roast software simply leaves RoR blank until the
+    # window is actually full.
+    start = timex[0] if timex else 0.0
+    return [
+        None if (v is None or timex[i] - start < window_s * 0.9) else v
+        for i, v in enumerate(ror)
+    ]
 
 
 # Machines that actually log Burner/Air/Drum telemetry (e.g.

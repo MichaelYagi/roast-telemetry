@@ -157,6 +157,7 @@ hidden_imports = [
     "aillio_bridge",
     "aillio_bridge.r1",
     "roast_heuristics",
+    "roast_heuristics.ror",
     "simulator",
     "alog_playback",
     "mock_device",

@@ -36,15 +36,8 @@ import uuid
 from collections import deque
 from typing import Optional
 
+from .ror import RateOfRise
 
-def _ror(history: deque) -> Optional[float]:
-    if len(history) < 2:
-        return None
-    t0, v0 = history[0]
-    t1, v1 = history[-1]
-    if t1 - t0 <= 0:
-        return None
-    return round((v1 - v0) / (t1 - t0) * 60.0, 2)
 
 
 class LiveRoastDetector:
@@ -79,6 +72,8 @@ class LiveRoastDetector:
 
         self._bt_history: deque = deque()
         self._et_history: deque = deque()
+        self._bt_ror = RateOfRise()
+        self._et_ror = RateOfRise()
         self._phase = "pre_charge"  # -> "dip" -> "post_tp"
         self._bt_min_since_charge: Optional[float] = None
         self._bt_min_time_since_charge: Optional[float] = None
@@ -91,6 +86,10 @@ class LiveRoastDetector:
             self._bt_history.append((time_s, bt))
         if et is not None:
             self._et_history.append((time_s, et))
+        # The histories below only feed milestone detection; RoR has its own
+        # smoothed calculation (roast_heuristics/ror.py).
+        ror_bt = self._bt_ror.update(time_s, bt)
+        ror_et = self._et_ror.update(time_s, et)
         cutoff = time_s - self._ror_window_s
         while self._bt_history and self._bt_history[0][0] < cutoff:
             self._bt_history.popleft()
@@ -112,8 +111,8 @@ class LiveRoastDetector:
             "time_s": round(time_s, 1),
             "bt": bt,
             "et": et,
-            "ror_bt": _ror(self._bt_history),
-            "ror_et": _ror(self._et_history),
+            "ror_bt": ror_bt,
+            "ror_et": ror_et,
         }
 
     def notify_manual_charge(self, time_s: float, bt: float) -> None:

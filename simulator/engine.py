@@ -24,10 +24,11 @@ from __future__ import annotations
 import math
 import time
 import uuid
-from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Deque, Optional
+from typing import Optional
+
+from roast_heuristics.ror import RateOfRise
 
 
 class RoastPhase(str, Enum):
@@ -58,7 +59,6 @@ class SimulatorConfig:
     drum_speed_pct: float = 50.0
     et_time_constant: float = 0.05
     bt_time_constant: float = 0.002
-    ror_window_s: float = 30.0
 
 
 def _ease_in_out(x: float) -> float:
@@ -78,8 +78,8 @@ class SimulatorEngine:
         self.heater_pct = self.config.heater_pct
         self.fan_pct = self.config.fan_pct
         self.drum_speed_pct = self.config.drum_speed_pct
-        self._bt_history: Deque[tuple] = deque()  # (time_s, bt)
-        self._et_history: Deque[tuple] = deque()
+        self._bt_ror = RateOfRise()
+        self._et_ror = RateOfRise()
         self._events_fired: set = set()
         self._event_queue: list = []
         self._cooling_started_at: Optional[float] = None
@@ -91,8 +91,8 @@ class SimulatorEngine:
         self.time_s = 0.0
         self.bt = self.config.charge_bt_c
         self.et = self.config.charge_et_c
-        self._bt_history.clear()
-        self._et_history.clear()
+        self._bt_ror.reset()
+        self._et_ror.reset()
         self._events_fired.clear()
         self._event_queue.clear()
         self._running = True
@@ -137,13 +137,8 @@ class SimulatorEngine:
             bt_k = cfg.bt_time_constant * (1 + self.drum_speed_pct / 200.0)
             self.bt += (self.et - self.bt) * bt_k * dt
 
-        self._bt_history.append((self.time_s, self.bt))
-        self._et_history.append((self.time_s, self.et))
-        window_start = self.time_s - cfg.ror_window_s
-        while self._bt_history and self._bt_history[0][0] < window_start:
-            self._bt_history.popleft()
-        while self._et_history and self._et_history[0][0] < window_start:
-            self._et_history.popleft()
+        self._bt_ror.update(self.time_s, self.bt)
+        self._et_ror.update(self.time_s, self.et)
 
         self._detect_events()
 
@@ -184,22 +179,13 @@ class SimulatorEngine:
             "value": round(value, 1),
         })
 
-    def _ror(self, history: Deque[tuple]) -> Optional[float]:
-        if len(history) < 2:
-            return None
-        t0, v0 = history[0]
-        t1, v1 = history[-1]
-        if t1 - t0 <= 0:
-            return None
-        return round((v1 - v0) / (t1 - t0) * 60.0, 2)  # degrees per minute
-
     def _sample(self) -> dict:
         return {
             "time_s": round(self.time_s, 1),
             "bt": round(self.bt, 2),
             "et": round(self.et, 2),
-            "ror_bt": self._ror(self._bt_history),
-            "ror_et": self._ror(self._et_history),
+            "ror_bt": self._bt_ror.value,
+            "ror_et": self._et_ror.value,
             "heater_pct": round(self.heater_pct, 1),
             "fan_pct": round(self.fan_pct, 1),
             "drum_speed_pct": round(self.drum_speed_pct, 1),

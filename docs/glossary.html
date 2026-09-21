@@ -338,7 +338,12 @@
       in degrees per minute — not the temperature itself, but its speed
       of change. Roasters watch this closely: a sudden crash usually
       means too little heat for where the roast currently is, a spike
-      can mean scorching risk.
+      can mean scorching risk. It is worked out the way roasting
+      software conventionally does it: the temperature now compared with
+      about 20 seconds ago (that older reading averaged with its
+      neighbours to soften noise), then lightly smoothed over the last
+      few values, so numbers are comparable with other tools' readings
+      of the same roast.
     </dd>
     <dt id="term-ror-et">RoR (ET) / &Delta;ET (Rate of Rise)</dt>
     <dd>
