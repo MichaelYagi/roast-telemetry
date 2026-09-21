@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import { useConfirm, useNotify } from "../components/DialogProvider.jsx";
@@ -38,6 +38,9 @@ export default function HistoryDashboard() {
   const [importError, setImportError] = useState(null);
   const [importing, setImporting] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState(null); // e.g. "Uploading 2 of 5…"
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [deletingSelected, setDeletingSelected] = useState(false);
   // Off by default -- each entry here is a real .alog read+parse
@@ -165,6 +168,49 @@ export default function HistoryDashboard() {
     }
   }
 
+  // Files from this computer (chosen or dropped): one request each, in order.
+  // A single file opens its roast; several stay here, and any that failed are listed.
+  async function handleUploadFiles(fileList) {
+    const files = [...fileList].filter((f) => f.name.toLowerCase().endsWith(".alog"));
+    const skipped = fileList.length - files.length;
+    if (!files.length) {
+      setImportError(skipped ? "Only .alog files can be imported." : null);
+      return;
+    }
+    setImportError(null);
+    setImporting(true);
+    const done = [];
+    const failed = [];
+    try {
+      for (let i = 0; i < files.length; i++) {
+        setUploadStatus(files.length > 1 ? `Uploading ${i + 1} of ${files.length}…` : "Uploading…");
+        try {
+          // The title box applies to a single file only -- one title can't fit several roasts.
+          done.push(await api.uploadAlog(files[i], files.length === 1 ? importTitle.trim() || undefined : undefined));
+        } catch (err) {
+          failed.push(`${files[i].name}: ${err.message}`);
+        }
+      }
+    } finally {
+      setUploadStatus(null);
+      setImporting(false);
+    }
+    if (skipped) failed.push(`${skipped} file${skipped === 1 ? " was" : "s were"} not an .alog and was skipped.`);
+    if (done.length === 1 && !failed.length) {
+      setImportTitle("");
+      navigate(`/roasts/${done[0].id}`);
+      return;
+    }
+    if (done.length) {
+      setImportTitle("");
+      refresh();
+    }
+    setImportError(failed.length ? failed.join("\n") : null);
+    if (done.length > 1 || (done.length && failed.length)) {
+      notify(`Imported ${done.length} roast${done.length === 1 ? "" : "s"}.`, { title: "Import finished" });
+    }
+  }
+
   async function handleDelete(id, title) {
     if (!(await confirm(`Delete "${title}"? This removes it from history and deletes its .alog file. This can't be undone.`))) {
       return;
@@ -267,13 +313,42 @@ export default function HistoryDashboard() {
         )}
       </div>
 
-      <form className="panel import-form" onSubmit={handleImport}>
-        <h3>Import an .alog file</h3>
-        <p className="hint">
-          Loads the whole roast straight into history — full curve and events at once, no real-time
-          replay. Path is resolved on the server (the machine running the backend).
-        </p>
-        {importError && <p className="error">{importError}</p>}
+      <form
+        className={`panel import-form${dragging ? " import-dragging" : ""}`}
+        onSubmit={handleImport}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          if (e.dataTransfer?.files?.length) handleUploadFiles(e.dataTransfer.files);
+        }}
+      >
+        <h3>Import .alog files</h3>
+        <p className="hint">Loads the whole roast straight into history — full curve and events at once, no real-time replay.</p>
+        {importError && <p className="error import-error">{importError}</p>}
+        <div className="upload-drop">
+          <span>Drop .alog files here, or</span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".alog"
+            multiple
+            hidden
+            onChange={(e) => {
+              handleUploadFiles(e.target.files);
+              e.target.value = ""; // so choosing the same file again still fires
+            }}
+          />
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            Choose files…
+          </button>
+          {uploadStatus && <span className="hint">{uploadStatus}</span>}
+        </div>
+        <p className="hint">Or use a file that is already on the server (the machine running the backend):</p>
         <div className="form-row">
           <label>
             .alog file path (server-side)
@@ -285,7 +360,7 @@ export default function HistoryDashboard() {
             </span>
           </label>
           <label>
-            Title (optional)
+            Title (optional, one file at a time)
             <input value={importTitle} onChange={(e) => setImportTitle(e.target.value)} placeholder="Defaults to the file's own title" />
           </label>
         </div>

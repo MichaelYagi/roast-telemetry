@@ -3138,3 +3138,26 @@ button.link-neutral {
   flex-basis: 100%;
   margin: 0;
 }
+
+/* Upload .alog files (History import) */
+.upload-drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.4rem 0 0.8rem;
+  padding: 0.8rem 1rem;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+}
+
+.import-dragging .upload-drop {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.import-error {
+  white-space: pre-line;
+}

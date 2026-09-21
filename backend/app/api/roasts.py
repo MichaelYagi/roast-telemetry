@@ -5,11 +5,14 @@ import asyncio
 import csv
 import io
 import json
+import os
 import re
+import tempfile
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
 from sse_starlette.sse import EventSourceResponse
 
@@ -505,6 +508,62 @@ def import_alog(path: str, http_request: Request, title: Optional[str] = None) -
         return session_manager.import_alog(path, title, created_by_username=http_request.state.user["username"])
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# An .alog is a few hundred KB at most (a long roast sampled every second); this
+# only exists so a wrong file can't fill memory or disk.
+MAX_ALOG_UPLOAD_BYTES = 25 * 1024 * 1024
+
+
+@router.post("/import-upload", response_model=RoastSummary, status_code=201)
+async def import_alog_upload(
+    request: Request, filename: Optional[str] = None, title: Optional[str] = None
+) -> RoastSummary:
+    """Imports an .alog sent from the browser's own computer (the file itself as
+    the request body), as opposed to POST /import, which reads a path on the
+    server. Same result either way: the roast is stored in history.
+
+    The body is the raw file rather than a multipart form -- one file per
+    request, no extra dependency. ``filename`` is only used for error messages;
+    it never touches the filesystem."""
+    label = os.path.basename(filename) if filename else "The file"
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_ALOG_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"{label} is too large to be an .alog file.")
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > MAX_ALOG_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"{label} is too large to be an .alog file.")
+        chunks.append(chunk)
+    data = b"".join(chunks)
+    if not data.strip():
+        raise HTTPException(status_code=400, detail=f"{label} is empty.")
+
+    # import_alog reads and copies from a path, so the upload goes through a
+    # throwaway file that is always removed afterwards.
+    fd, tmp_path = tempfile.mkstemp(suffix=".alog")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        return await run_in_threadpool(
+            session_manager.import_alog, tmp_path, title, created_by_username=request.state.user["username"]
+        )
+    except (FileNotFoundError, ValueError, SyntaxError, UnicodeDecodeError) as exc:
+        # Our own explanations (e.g. a missing required field) are worth showing;
+        # the parser's internals ("malformed node ... <ast.Name object at 0x...>") are not.
+        reason = str(exc)
+        detail = f"{label} doesn't look like a valid .alog file."
+        missing = re.search(r"missing required field ('[^']+')", reason)
+        if missing:  # (the throwaway file's path is left out of what the user sees)
+            detail = f"{label} doesn't look like a valid .alog file (it is missing the {missing.group(1)} field)."
+        raise HTTPException(status_code=400, detail=detail) from exc
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
 
 
 @router.websocket("/{roast_id}/stream")

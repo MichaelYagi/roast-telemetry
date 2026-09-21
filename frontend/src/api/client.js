@@ -75,6 +75,13 @@ export const api = {
   csvDownloadUrl: (id) => `${BASE}/roasts/${id}/csv`,
   importAlog: (path, title) =>
     request(`/roasts/import?${new URLSearchParams({ path, ...(title ? { title } : {}) })}`, { method: "POST" }),
+  // An .alog from this computer: the file itself is the request body.
+  uploadAlog: (file, title) =>
+    request(`/roasts/import-upload?${new URLSearchParams({ filename: file.name, ...(title ? { title } : {}) })}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: file,
+    }),
 
   // presets (saved roast configurations)
   listPresets: () => request("/presets"),

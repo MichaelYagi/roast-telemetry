@@ -135,6 +135,7 @@
       <tr><td>POST</td><td><code>/roasts/{id}/review</code></td><td>Kick off an AI review (Ollama) — <code>202</code>, async</td></tr>
       <tr><td>GET</td><td><code>/roasts/{id}/review</code></td><td>Poll for the review's status/result</td></tr>
       <tr><td>POST</td><td><code>/roasts/import</code></td><td>Import an existing <code>.alog</code> file as history (<code>path</code> on the server &mdash; pick it with <strong>Browse&hellip;</strong> on the History page &mdash; and optional <code>title</code>)</td></tr>
+      <tr><td>POST</td><td><code>/roasts/import-upload</code></td><td>Import an <code>.alog</code> sent from the browser's own computer &mdash; the file is the request body (optional <code>filename</code> and <code>title</code> query parameters). Used by History's drop-or-choose-files box.</td></tr>
       <tr><td>WS</td><td><code>/roasts/{id}/stream</code></td><td>Live sample/event stream (sends a <code>snapshot</code> first)</td></tr>
       <tr><td>GET</td><td><code>/roasts/{id}/stream/sse</code></td><td>Same stream over Server-Sent Events</td></tr>
       <tr><td>GET</td><td><code>/presets</code></td><td>List saved roast configurations</td></tr>
@@ -204,10 +205,12 @@
       <code>backend/app/storage.py</code>.
     </li>
     <li>
-      <strong>.alog import</strong> takes a server-side file path rather
-      than a multipart upload, to keep the skeleton simple — swap
-      <code>POST /roasts/import</code> for a multipart endpoint if the
-      frontend needs to upload files directly from a client machine.
+      <strong>.alog import</strong> works two ways:
+      <code>POST /roasts/import</code> takes a path on the server, and
+      <code>POST /roasts/import-upload</code> takes the file itself from
+      the browser's computer (as the raw request body — one file per
+      request, no multipart dependency, up to 25 MB). History's import
+      panel offers both: drop or choose files, or type/browse a server path.
     </li>
   </ul>
 
