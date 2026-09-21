@@ -16,22 +16,29 @@ def _feed(temps, step=1.0, **kw):
 def test_a_steady_climb_gives_exactly_that_rate():
     temps = [20 + 0.1 * i for i in range(120)]  # 0.1 C/s = 6 C/min
     out = _feed(temps)
-    assert out[0] is None
     assert out[-1] == pytest.approx(6.0, abs=0.01)
-    assert all(v == pytest.approx(6.0, abs=0.01) for v in out[1:])  # from the 2nd reading on
+    warmed = [v for v in out if v is not None]
+    assert warmed and all(v == pytest.approx(6.0, abs=0.01) for v in warmed)
 
 
 def test_a_steady_fall_is_negative():
     assert _feed([200 - 0.05 * i for i in range(60)])[-1] == pytest.approx(-3.0, abs=0.01)
 
 
-def test_nothing_until_two_readings_and_time_must_move_forward():
+def test_no_rate_until_most_of_a_span_has_been_recorded():
+    out = _feed([20 + 0.1 * i for i in range(40)])          # 1 s spacing, 20 s span
+    assert all(v is None for v in out[:18])                  # under 18 s (0.9 of the span): noise, so nothing
+    assert all(v is not None for v in out[18:])
+
+
+def test_time_must_move_forward():
     ror = RateOfRise()
-    assert ror.update(0.0, 100.0) is None
-    assert ror.update(1.0, 100.1) is not None
+    for i in range(30):
+        ror.update(float(i), 20 + 0.1 * i)
     last = ror.value
-    assert ror.update(1.0, 500.0) == last  # same timestamp: ignored, not a jump
-    assert ror.update(0.5, 500.0) == last  # time going backwards: ignored
+    assert last is not None
+    assert ror.update(29.0, 500.0) == last  # same timestamp: ignored, not a jump
+    assert ror.update(10.0, 500.0) == last  # time going backwards: ignored
 
 
 def test_a_missing_reading_repeats_the_last_rate():
@@ -98,7 +105,7 @@ def test_series_matches_streaming_and_leaves_gaps_as_none():
     ror = RateOfRise()
     streamed = [ror.update(t, v) for t, v in zip(times, temps)]
     assert rate_of_rise_series(times, temps) == streamed
-    assert streamed[0] is None
+    assert streamed[0] is None and streamed[-1] is not None
 
 
 def test_uneven_spacing_is_averaged_on_an_even_grid():

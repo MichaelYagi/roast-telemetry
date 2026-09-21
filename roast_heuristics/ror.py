@@ -12,7 +12,8 @@ Two steps, both standard:
 2. **Smoothing:** a weighted average of the last few raw rates (default 4),
    the newest weighted most (weights 1, 2, 3, 4).
 
-Written for this project from that description. ``RateOfRise`` works on a
+No rate is given until most of a span of readings exists, since a rate over a
+few seconds is mostly noise. Written for this project from that description. ``RateOfRise`` works on a
 stream of readings (live hardware, the simulator); ``rate_of_rise_series``
 runs the same calculation over a finished curve (imported ``.alog`` files).
 """
@@ -24,6 +25,8 @@ from typing import Optional, Sequence
 
 DEFAULT_SPAN_S = 20.0
 DEFAULT_SMOOTHING_POINTS = 4
+
+WARMUP_FRACTION = 0.9  # no rate until this fraction of a span has been recorded
 
 _KEEP = 2000  # readings remembered; far more than a span needs at any sampling rate
 
@@ -62,12 +65,14 @@ class RateOfRise:
         self._temps: deque[float] = deque(maxlen=_KEEP)
         # one more raw rate than the smoothing uses: smoothing starts once there are more than that many
         self._raw: deque[tuple[float, float]] = deque(maxlen=smoothing_points + 1)
+        self._first_time: Optional[float] = None
         self.value: Optional[float] = None  # the latest result
 
     def reset(self) -> None:
         self._times.clear()
         self._temps.clear()
         self._raw.clear()
+        self._first_time = None
         self.value = None
 
     def _interval(self) -> float:
@@ -81,6 +86,8 @@ class RateOfRise:
             return self.value
         self._times.append(time_s)
         self._temps.append(temp)
+        if self._first_time is None:
+            self._first_time = time_s
         count = len(self._times)
         if count < 2:
             return self.value
@@ -102,6 +109,13 @@ class RateOfRise:
         else:
             older = temps[-left]
         raw = (temps[-1] - older) / elapsed * 60.0
+
+        # Until most of a span of readings exists, the rate is taken over a much
+        # shorter interval, so a small change divided by a small time scaled to a
+        # minute is mostly noise (RoR in the hundreds right at Charge). Like other
+        # roasting software, give no rate yet.
+        if time_s - self._first_time < WARMUP_FRACTION * self.span_s:
+            return self.value
 
         self._raw.append((time_s, raw))
         k = self.smoothing_points

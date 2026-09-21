@@ -577,13 +577,16 @@ export default function RoastChart({
       return {
         label: s.label,
         data: points,
+        // Control channels (Burner/Air/Drum/Damper, 0-100) are drawn low on the
+        // temperature axis, in its 0-100 band, rather than on an axis of their own.
+        isControl: s.axis === "yControl",
         borderColor: s.color,
         backgroundColor: s.color,
         pointRadius: 0,
         borderWidth: seriesLineWidth(s.key, s.axis),
         borderDash: s.source === "background" ? [6, 3] : undefined,
         stepped,
-        yAxisID: s.axis,
+        yAxisID: s.axis === "yControl" ? "yTemp" : s.axis,
         tension: stepped ? 0 : 0.15,
       };
     });
@@ -687,7 +690,7 @@ export default function RoastChart({
               // Data is already converted to tempUnit at the dataset level
               // (see the `data` useMemo above) -- only the unit suffix
               // needs to reflect that here, not the value itself.
-              const suffix = item.dataset.yAxisID === "yTemp" ? unitSuffix(tempUnit) : item.dataset.yAxisID === "yRor" ? `${unitSuffix(tempUnit)}/min` : "";
+              const suffix = item.dataset.isControl ? "" : item.dataset.yAxisID === "yTemp" ? unitSuffix(tempUnit) : item.dataset.yAxisID === "yRor" ? `${unitSuffix(tempUnit)}/min` : "";
               const value = item.parsed.y;
               return ` ${item.dataset.label}: ${value == null ? "—" : `${value.toFixed(1)}${suffix}`}`;
             },
@@ -698,7 +701,7 @@ export default function RoastChart({
         axisUnitLabels: { leftUnit: showTemp ? unitSuffix(tempUnit) : null, rightUnit: showRor ? `${unitSuffix(tempUnit)}/min` : null },
         // Time-axis only (not the temp/RoR/control y-axes) -- this is a
         // time-series chart with three differently-scaled y-axes already
-        // fixed to sensible ranges (0-100 for yControl, a fixed RoR band,
+        // fixed to sensible ranges (0-100 for the control lines' band on yTemp, a fixed RoR band,
         // etc.), so zooming those too would mostly just squash or stretch
         // curves rather than reveal anything. Wheel handles both a mouse
         // wheel and a trackpad's two-finger scroll; pinch covers an
@@ -756,12 +759,12 @@ export default function RoastChart({
           position: "left",
           grid: { color: "#e7e5e4" },
           ticks: { color: "#78716c" },
-          display: showTemp,
+          display: showTemp || showControl,
           // Without an explicit floor, Chart.js auto-fits to the visible
           // data's own min (e.g. ~82C at Turning Point), starting the
           // axis mid-way up rather than at a real baseline. 32 (not 0) in
           // Fahrenheit mode -- same physical floor (0°C), converted.
-          min: tempAxisMin(tempUnit),
+          min: tempAxisMin(),
           // At least the usual 0-275 C range; a hotter roast grows it.
           suggestedMax: tempAxisSuggestedMax(tempUnit),
         },
@@ -778,25 +781,6 @@ export default function RoastChart({
           // the rest of the roast's curve into an unreadable line near zero.
           min: rorAxisRange(tempUnit).min,
           max: rorAxisRange(tempUnit).max,
-        },
-        yControl: {
-          type: "linear",
-          position: "right",
-          grid: { drawOnChartArea: false },
-          ticks: { color: "#78716c" },
-          title: { display: true, text: "ctrl", color: "#78716c" },
-          display: showControl,
-          // Heater/Damper are 0-100%; Fan/Drum are RPM but share the same
-          // 0-100 numeric range on this machine -- without a fixed range
-          // here too, Chart.js auto-fit whatever narrow slice of values
-          // was actually visible, so a ~constant 50 Drum line (say)
-          // landed at an arbitrary height instead of a real 0-100 scale.
-          // Deliberately a dedicated axis, not the temperature axis (a
-          // real 0-100 scale is more readable than a control value
-          // squashed near zero on a 350-degree axis), so don't "fix"
-          // this to plot them on the temperature axis.
-          min: 0,
-          max: 100,
         },
       },
     }),

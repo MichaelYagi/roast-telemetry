@@ -9,11 +9,13 @@ export const RATE_SCALE_F = 1.8;
 // Never lower than this, so the curve sits where people expect; a hotter roast
 // simply grows the axis (suggestedMax) instead of running off the top.
 export function tempAxisSuggestedMax(unit) {
-  return unit === "f" ? 530 : 275;
+  return unit === "f" ? 527 : 275;
 }
 
-export function tempAxisMin(unit) {
-  return unit === "f" ? 32 : 0;
+// 0 in both units: the control lines (Burner/Air/Drum/Damper, 0-100) share this
+// axis and sit in its low band, so it has to start at 0 -- not at 32 F.
+export function tempAxisMin() {
+  return 0;
 }
 
 // Fixed, like the other roasting charts' default. A brief spike (RoR is huge
