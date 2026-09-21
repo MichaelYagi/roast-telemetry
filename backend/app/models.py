@@ -545,7 +545,7 @@ class ControlSafety(BaseModel):
     fan_min_pct: float = Field(default=0, ge=0, le=100, description="While the heater is on, the fan is never below this.")
     drum_min_pct: float = Field(default=0, ge=0, le=100, description="While the heater is on, the drum is never below this.")
     safe_fan_pct: float = Field(default=100, ge=0, le=100, description="Fan level set by Emergency stop and the automatic fail-safes (heater goes to 0).")
-    client_watchdog_s: float = Field(default=120, ge=0, le=3600, description="If the heater is on and nobody has the roast open for this many seconds, go to the safe state. 0 turns it off.")
+    client_watchdog_s: float = Field(default=0, ge=0, le=3600, description="If the heater is on and nobody has the roast open in a browser for this many seconds, go to the safe state. 0 (the default) turns this off.")
 
 
 class ProgramStep(BaseModel):

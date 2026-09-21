@@ -26,7 +26,7 @@ export default function SettingsView() {
   const [verticalControlLayout, setVerticalControlLayout] = useState([]);
   const [verticalControlArrows, setVerticalControlArrows] = useState({});
   const [historyPageSize, setHistoryPageSize] = useState(100);
-  const [control, setControl] = useState({ heater_max_pct: 100, fan_min_pct: 0, drum_min_pct: 0, safe_fan_pct: 100, client_watchdog_s: 120 });
+  const [control, setControl] = useState({ heater_max_pct: 100, fan_min_pct: 0, drum_min_pct: 0, safe_fan_pct: 100, client_watchdog_s: 0 });
   const [loaded, setLoaded] = useState(false);
   const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState(null); // { connected, models, error } | null
@@ -95,6 +95,49 @@ export default function SettingsView() {
 
   return (
     <div className="settings-view">
+      <div className="panel">
+        <h2>Roaster safety</h2>
+        <p className="hint">
+          Applies to everything that changes the roaster: the sliders, alarm rules, repeating a saved roast and
+          target control. These are the app's own limits. They are not a substitute for the roaster's own
+          safety features, and they only work while the app can still reach the roaster.
+        </p>
+        <div className="form-row">
+          <label>
+            Heater never above (%)
+            <input type="number" min="0" max="100" value={control.heater_max_pct}
+              onChange={(e) => setControl({ ...control, heater_max_pct: Number(e.target.value) })} />
+          </label>
+          <label>
+            Fan never below while heating (%)
+            <input type="number" min="0" max="100" value={control.fan_min_pct}
+              onChange={(e) => setControl({ ...control, fan_min_pct: Number(e.target.value) })} />
+          </label>
+          <label>
+            Drum never below while heating (%)
+            <input type="number" min="0" max="100" value={control.drum_min_pct}
+              onChange={(e) => setControl({ ...control, drum_min_pct: Number(e.target.value) })} />
+          </label>
+        </div>
+        <div className="form-row">
+          <label>
+            Fan level in an emergency (%)
+            <input type="number" min="0" max="100" value={control.safe_fan_pct}
+              onChange={(e) => setControl({ ...control, safe_fan_pct: Number(e.target.value) })} />
+          </label>
+          <label>
+            Turn the heater off if Roast Telemetry is not open in a browser for (seconds)
+            <input type="number" min="0" max="3600" value={control.client_watchdog_s}
+              onChange={(e) => setControl({ ...control, client_watchdog_s: Number(e.target.value) })} />
+            <span className="hint">0 (the default) never turns it off for this reason.</span>
+          </label>
+        </div>
+        <p className="hint">
+          In an emergency (the Emergency stop button, a lost connection or an error during a roast) the heater goes to 0 and the fan to the level above.
+          The burner temperature setpoint can't be used while the heater limit is below 100%.
+        </p>
+      </div>
+
       <div className="panel">
         <h2>Temperature Unit</h2>
         <p className="hint">
@@ -190,48 +233,6 @@ export default function SettingsView() {
             onChange={(e) => setHistoryPageSize(Number(e.target.value) || 100)}
           />
         </label>
-      </div>
-
-      <div className="panel">
-        <h2>Roaster safety</h2>
-        <p className="hint">
-          Applies to everything that changes the roaster: the sliders, alarm rules, repeating a saved roast and
-          target control. These are the app's own limits. They are not a substitute for the roaster's own
-          safety features, and they only work while the app can still reach the roaster.
-        </p>
-        <div className="form-row">
-          <label>
-            Heater never above (%)
-            <input type="number" min="0" max="100" value={control.heater_max_pct}
-              onChange={(e) => setControl({ ...control, heater_max_pct: Number(e.target.value) })} />
-          </label>
-          <label>
-            Fan never below while heating (%)
-            <input type="number" min="0" max="100" value={control.fan_min_pct}
-              onChange={(e) => setControl({ ...control, fan_min_pct: Number(e.target.value) })} />
-          </label>
-          <label>
-            Drum never below while heating (%)
-            <input type="number" min="0" max="100" value={control.drum_min_pct}
-              onChange={(e) => setControl({ ...control, drum_min_pct: Number(e.target.value) })} />
-          </label>
-        </div>
-        <div className="form-row">
-          <label>
-            Fan level in an emergency (%)
-            <input type="number" min="0" max="100" value={control.safe_fan_pct}
-              onChange={(e) => setControl({ ...control, safe_fan_pct: Number(e.target.value) })} />
-          </label>
-          <label>
-            Heater off if nobody has the roast open for (seconds, 0 = never)
-            <input type="number" min="0" max="3600" value={control.client_watchdog_s}
-              onChange={(e) => setControl({ ...control, client_watchdog_s: Number(e.target.value) })} />
-          </label>
-        </div>
-        <p className="hint">
-          In an emergency (the Emergency stop button, a lost connection or an error during a roast) the heater goes to 0 and the fan to the level above.
-          The burner temperature setpoint can't be used while the heater limit is below 100%.
-        </p>
       </div>
 
       <div className="panel">

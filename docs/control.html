@@ -68,7 +68,7 @@
       <tr><td>Fan never below while heating (%)</td><td>0</td><td>While the heater is on, the fan can't be set (or left) below this. Turning the heater on with the fan too low raises the fan too.</td></tr>
       <tr><td>Drum never below while heating (%)</td><td>0</td><td>The same rule for the drum.</td></tr>
       <tr><td>Fan level in an emergency (%)</td><td>100</td><td>What the fan is set to by the Emergency stop and the automatic fail-safes.</td></tr>
-      <tr><td>Heater off if nobody has the roast open for (seconds)</td><td>120</td><td>See <a href="#failsafes">Automatic fail-safes</a>. 0 turns it off.</td></tr>
+      <tr><td>Turn the heater off if Roast Telemetry is not open in a browser for (seconds)</td><td>0 (off)</td><td>If the heater is on and the roast isn't open in any browser for this long, the roaster goes to the safe state. Off unless you set a number. See <a href="#failsafes">Automatic fail-safes</a>.</td></tr>
     </tbody>
   </table>
   <p class="hint">
@@ -99,7 +99,7 @@
   <table>
     <thead><tr><th>Trigger</th><th>What happens</th></tr></thead>
     <tbody>
-      <tr><td>The heater is on and no browser has the roast open for the watchdog time (default 120 s)</td><td>Safe state. Applies even while automatic control is running: an unattended heater is the case this exists for. Set it to 0 to turn it off.</td></tr>
+      <tr><td>The heater is on and no browser has the roast open for the time you set under &ldquo;Turn the heater off if Roast Telemetry is not open in a browser&rdquo; (off by default)</td><td>Safe state. Applies even while automatic control is running: an unattended heater is the case this exists for. A screen that sleeps or a closed tab counts as nobody watching, so pick a time that suits how you roast.</td></tr>
       <tr><td>An error stops the roast (for example the connection to the roaster breaks)</td><td>The app tries to switch the heater off before it lets go, then ends the roast as aborted.</td></tr>
       <tr><td>Target control loses the bean-temperature reading for more than 10 seconds</td><td>Safe state: it won't keep heating blind.</td></tr>
       <tr><td>A write during automatic control fails</td><td>Safe state.</td></tr>
