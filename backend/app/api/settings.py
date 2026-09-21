@@ -111,6 +111,12 @@ async def update_settings(settings: AppSettings) -> AppSettings:
     vertical_arrows = _filter_arrows(settings.vertical_control_arrows)
     series_visible = _filter_series_visible(settings.chart_series_visible)
     history_page_size = _clamp_history_page_size(settings.history_page_size)
+    # A client that never sends `control` (an older cached page) must not
+    # reset the saved safety limits back to the defaults.
+    if "control" in settings.model_fields_set:
+        control = settings.control
+    else:
+        control = AppSettings(**storage.get_settings()).control
     storage.set_settings(
         ollama_url=settings.ollama_url,
         ollama_model=settings.ollama_model,
@@ -122,6 +128,7 @@ async def update_settings(settings: AppSettings) -> AppSettings:
         vertical_control_arrows=vertical_arrows,
         chart_series_visible=series_visible,
         history_page_size=history_page_size,
+        control=control.model_dump(),
     )
     result = AppSettings(
         ollama_url=settings.ollama_url,
@@ -134,6 +141,7 @@ async def update_settings(settings: AppSettings) -> AppSettings:
         vertical_control_arrows=vertical_arrows,
         chart_series_visible=series_visible,
         history_page_size=history_page_size,
+        control=control,
     )
     await settings_pubsub.publish(result.model_dump_json())
     return result

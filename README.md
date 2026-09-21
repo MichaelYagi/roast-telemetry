@@ -58,6 +58,16 @@ locally.)*
   extra delay, alarm-style. Burner bindings need an extra
   explicit confirm step; a pending delayed action is cancelled, not
   fired late, if you stop the roast first.
+- **Control and safety** — drive the heater, fan and drum by hand, repeat a
+  saved roast's settings, or hold a target rate of rise or bean
+  temperature. Every command passes through limits you set (a heater cap,
+  a fan minimum while heating), there is an **Emergency stop** button, and
+  automatic fail-safes switch the heater off if nobody has the roast open,
+  the connection breaks, or the temperature reading is lost. Tested against
+  the built-in simulated FZ-94, **not yet on a real roaster**, and no
+  substitute for the roaster's own safety features: the app can't switch
+  anything off when it can't reach the roaster. Read
+  [Controlling a roast](docs/control.html) before using it on a real machine.
 - **Celsius/Fahrenheit display toggle** (Settings → Temperature Unit) —
   display only, everything is still stored and sent as Celsius.
 - **Live rate-of-rise, computed from raw BT/ET either way** — real
@@ -151,6 +161,8 @@ script does is in the docs' [Scripts
 reference](docs/getting-started.html#scripts-reference). Full docs:
 
 - [Getting started](docs/getting-started.html)
+- [Controlling a roast](docs/control.html) — safety limits, the Emergency
+  stop, fail-safes, repeating a roast, holding a target
 - [Direct Modbus Bridge](docs/modbus/index.html), and
   [FZ-94 (USB)](docs/modbus/fz-94-usb.html) specifically
 - [Real-hardware checklist](docs/modbus/real-hardware-checklist.html) —

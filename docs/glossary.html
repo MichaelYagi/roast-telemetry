@@ -15,6 +15,7 @@
   <nav>
     <a href="index.html">Docs</a>
     <a href="getting-started.html">Getting Started</a>
+    <a href="control.html">Control &amp; Safety</a>
     <a href="modbus/index.html">Direct Modbus</a>
     <a href="architecture.html">Architecture</a>
     <a href="glossary.html" aria-current="page">Glossary</a>
@@ -235,6 +236,12 @@
 
   <h2 class="glossary-letter" id="letter-e">E</h2>
   <dl class="glossary-list">
+    <dt id="term-emergency-stop">Emergency stop</dt>
+    <dd>
+      The red button on the Live Roast page. It sets the heater to 0 and the
+      fan to a safe level, stops any automatic control, and keeps the roast
+      recording. See <a href="control.html#emergency-stop">Controlling a roast</a>.
+    </dd>
     <dt id="term-et">ET (Environmental/Exhaust Temperature)</dt>
     <dd>
       How hot the air immediately around the beans is, as opposed to the
@@ -247,6 +254,14 @@
 
   <h2 class="glossary-letter" id="letter-f">F</h2>
   <dl class="glossary-list">
+    <dt id="term-fail-safe">Fail-safe (safe state)</dt>
+    <dd>
+      What the app does on its own when something goes wrong &mdash; nobody
+      has the roast open, the connection breaks, or the temperature reading
+      is lost: the heater goes to 0 and the fan to a safe level. It only
+      works while the app can still reach the roaster. See
+      <a href="control.html#failsafes">Automatic fail-safes</a>.
+    </dd>
     <dt id="term-fc-end">FC END (First Crack End)</dt>
     <dd>
       The moment the audible cracking that marked

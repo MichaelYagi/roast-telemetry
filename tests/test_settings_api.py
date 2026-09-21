@@ -21,6 +21,10 @@ def test_get_settings_defaults(client):
         "vertical_control_arrows": {},
         "chart_series_visible": {},
         "history_page_size": 100,
+        "control": {
+            "heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0,
+            "safe_fan_pct": 100, "client_watchdog_s": 120,
+        },
     }
 
 

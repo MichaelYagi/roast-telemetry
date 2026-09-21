@@ -45,7 +45,7 @@ def test_immediate_rule_fires_apply_command():
     rule = event_rule(RoastEventType.CHARGE, delay_s=0, drum_speed_pct=55.0)
     session = make_recording_session([rule])
     calls = []
-    session.apply_command = lambda cmd: calls.append(cmd)
+    session.apply_command = lambda cmd, **kwargs: calls.append(cmd)
 
     async def body():
         session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))
@@ -60,7 +60,7 @@ def test_rule_bound_to_a_different_trigger_does_not_fire():
     rule = event_rule(RoastEventType.DROP, delay_s=0, heater_pct=0.0)
     session = make_recording_session([rule])
     calls = []
-    session.apply_command = lambda cmd: calls.append(cmd)
+    session.apply_command = lambda cmd, **kwargs: calls.append(cmd)
 
     async def body():
         session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))
@@ -74,7 +74,7 @@ def test_delayed_rule_does_not_fire_immediately_but_does_after_the_delay():
     rule = event_rule(RoastEventType.DROP, delay_s=0.05, heater_pct=0.0, fan_pct=100.0)
     session = make_recording_session([rule])
     calls = []
-    session.apply_command = lambda cmd: calls.append(cmd)
+    session.apply_command = lambda cmd, **kwargs: calls.append(cmd)
 
     async def body():
         session.add_event(EventCreateRequest(type=RoastEventType.DROP, label="Drop"))
@@ -91,7 +91,7 @@ def test_abort_cancels_a_pending_delayed_rule_before_it_fires():
     rule = event_rule(RoastEventType.DROP, delay_s=5.0, heater_pct=0.0)
     session = make_recording_session([rule])
     calls = []
-    session.apply_command = lambda cmd: calls.append(cmd)
+    session.apply_command = lambda cmd, **kwargs: calls.append(cmd)
 
     async def body():
         session.add_event(EventCreateRequest(type=RoastEventType.DROP, label="Drop"))
@@ -109,7 +109,7 @@ def test_a_failing_action_does_not_break_add_event():
     rule = event_rule(RoastEventType.CHARGE, delay_s=0, heater_pct=50.0)
     session = make_recording_session([rule])
 
-    def boom(cmd):
+    def boom(cmd, **kwargs):
         raise RoastSessionError("device write failed")
 
     session.apply_command = boom
@@ -135,7 +135,7 @@ def test_multiple_rules_on_the_same_trigger_all_fire():
     ]
     session = make_recording_session(rules)
     calls = []
-    session.apply_command = lambda cmd: calls.append(cmd)
+    session.apply_command = lambda cmd, **kwargs: calls.append(cmd)
 
     async def body():
         session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))
@@ -154,7 +154,7 @@ def test_ms6514_live_never_evaluates_alarms():
     session.mode = RoastMode.MS6514_LIVE
     session.status = RoastStatus.ROASTING
     calls = []
-    session.apply_command = lambda cmd: calls.append(cmd)
+    session.apply_command = lambda cmd, **kwargs: calls.append(cmd)
 
     session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))
 
@@ -165,7 +165,7 @@ def test_temperature_rule_fires_once_threshold_is_crossed():
     rule = AlarmRule(trigger_kind=AlarmTriggerKind.TEMPERATURE, channel="bt", threshold_c=200.0, delay_s=0, fan_pct=80.0)
     session = make_recording_session([rule])
     calls = []
-    session.apply_command = lambda cmd: calls.append(cmd)
+    session.apply_command = lambda cmd, **kwargs: calls.append(cmd)
 
     async def body():
         session._evaluate_ambient_alarms({"bt": 150.0, "time_s": 1.0})
@@ -184,7 +184,7 @@ def test_ambient_rule_does_not_refire_while_condition_stays_true():
     rule = AlarmRule(trigger_kind=AlarmTriggerKind.TEMPERATURE, channel="bt", threshold_c=200.0, delay_s=0, fan_pct=80.0)
     session = make_recording_session([rule])
     calls = []
-    session.apply_command = lambda cmd: calls.append(cmd)
+    session.apply_command = lambda cmd, **kwargs: calls.append(cmd)
 
     async def body():
         session._evaluate_ambient_alarms({"bt": 205.0, "time_s": 1.0})
@@ -200,7 +200,7 @@ def test_time_rule_fires_once_elapsed_time_is_reached():
     rule = AlarmRule(trigger_kind=AlarmTriggerKind.TIME, at_time_s=300.0, delay_s=0, heater_pct=0.0)
     session = make_recording_session([rule])
     calls = []
-    session.apply_command = lambda cmd: calls.append(cmd)
+    session.apply_command = lambda cmd, **kwargs: calls.append(cmd)
 
     async def body():
         session._evaluate_ambient_alarms({"bt": 180.0, "time_s": 299.0})
@@ -217,7 +217,7 @@ def test_time_rule_fires_once_elapsed_time_is_reached():
 def test_alarm_fired_publishes_the_rules_message():
     rule = event_rule(RoastEventType.FC_START, delay_s=0, fan_pct=40.0, message="First crack -- airflow up")
     session = make_recording_session([rule])
-    session.apply_command = lambda cmd: None
+    session.apply_command = lambda cmd, **kwargs: None
 
     async def body():
         queue = pubsub.subscribe(session.id)
@@ -235,7 +235,7 @@ def test_alarm_fired_publishes_the_rules_message():
 def test_mark_milestone_auto_marks_the_target_and_publishes_it():
     rule = event_rule(RoastEventType.CHARGE, delay_s=0, mark_milestone=RoastEventType.DRY_END)
     session = make_recording_session([rule])
-    session.apply_command = lambda cmd: None
+    session.apply_command = lambda cmd, **kwargs: None
     session.profile = [{"time_s": 30.0, "bt": 150.0}]
 
     async def body():
@@ -262,7 +262,7 @@ def test_mark_milestone_out_of_sequence_silently_fails():
     # propagate out of the firing task.
     rule = event_rule(RoastEventType.FC_START, delay_s=0, mark_milestone=RoastEventType.DRY_END)
     session = make_recording_session([rule])
-    session.apply_command = lambda cmd: None
+    session.apply_command = lambda cmd, **kwargs: None
     session.events.append({"id": "x", "time_s": 10.0, "type": RoastEventType.DRY_END.value, "label": "Dry End", "value": 160.0})
 
     async def body():
@@ -277,7 +277,7 @@ def test_mark_milestone_out_of_sequence_silently_fails():
 def test_mark_milestone_works_with_a_delayed_rule_too():
     rule = event_rule(RoastEventType.CHARGE, delay_s=0.05, mark_milestone=RoastEventType.DRY_END)
     session = make_recording_session([rule])
-    session.apply_command = lambda cmd: None
+    session.apply_command = lambda cmd, **kwargs: None
 
     async def body():
         session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))
@@ -292,7 +292,7 @@ def test_disabled_event_rule_does_not_fire():
     rule = event_rule(RoastEventType.CHARGE, delay_s=0, drum_speed_pct=55.0, enabled=False)
     session = make_recording_session([rule])
     calls = []
-    session.apply_command = lambda cmd: calls.append(cmd)
+    session.apply_command = lambda cmd, **kwargs: calls.append(cmd)
 
     async def body():
         session.add_event(EventCreateRequest(type=RoastEventType.CHARGE, label="Charge"))
@@ -306,7 +306,7 @@ def test_disabled_ambient_rule_does_not_fire():
     rule = AlarmRule(trigger_kind=AlarmTriggerKind.TEMPERATURE, channel="bt", threshold_c=200.0, delay_s=0, fan_pct=80.0, enabled=False)
     session = make_recording_session([rule])
     calls = []
-    session.apply_command = lambda cmd: calls.append(cmd)
+    session.apply_command = lambda cmd, **kwargs: calls.append(cmd)
 
     async def body():
         session._evaluate_ambient_alarms({"bt": 205.0, "time_s": 1.0})
@@ -329,7 +329,7 @@ def test_delay_s_zero_still_publishes_alarm_fired():
     # frontend regardless of timing.
     rule = event_rule(RoastEventType.CHARGE, delay_s=0, drum_speed_pct=55.0)
     session = make_recording_session([rule])
-    session.apply_command = lambda cmd: None
+    session.apply_command = lambda cmd, **kwargs: None
 
     async def body():
         queue = pubsub.subscribe(session.id)

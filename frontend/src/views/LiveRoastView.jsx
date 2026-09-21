@@ -19,6 +19,8 @@ import RoastChart from "../components/RoastChart.jsx";
 import RoastStatsPanel from "../components/RoastStatsPanel.jsx";
 import WeightField from "../components/WeightField.jsx";
 import NotesPanel from "../components/NotesPanel.jsx";
+import EmergencyStop from "../components/EmergencyStop.jsx";
+import AutoControlPanel from "../components/AutoControlPanel.jsx";
 import { formatTemp } from "../tempUnits.js";
 
 const SAMPLE_ALOG_PATH = "backend/data/sample_roasts/demo_roast.alog";
@@ -1855,6 +1857,7 @@ export default function LiveRoastView() {
           {phase === "armed" && LIVE_MODES.includes(activeMode) && (
             <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} simulated={simulated} />
           )}
+          {CONTROLLABLE_MODES.includes(activeMode) && isActive && <EmergencyStop roastId={roastId} />}
           <div className="panel scope-panel">
             <div className="scope-body">
               {CONTROLLABLE_MODES.includes(activeMode) && (
@@ -2109,6 +2112,7 @@ export default function LiveRoastView() {
           )}
 
           <div className="live-grid">
+            {CONTROLLABLE_MODES.includes(activeMode) && isActive && <AutoControlPanel roastId={roastId} />}
             {activeMode === "alog_playback" && (
               <div className="panel control-panel">
                 <h3>Playback Speed</h3>

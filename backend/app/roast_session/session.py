@@ -31,6 +31,7 @@ from simulator import SimulatorEngine
 from tc4_bridge import TC4Engine
 
 from .. import storage
+from .control import RoastControl, RoastControlError
 from ..models import (
     ALWAYS_AUTO_EVENT_TYPES,
     MILESTONE_LABELS,
@@ -426,6 +427,7 @@ class RoastSession:
                 self.burner_sv_range_c = ch.sv_range_c
                 break
         self.device = MockDevice(device_id=roast_id, engine=engine)
+        self.control = RoastControl(self)
         self._task: Optional[asyncio.Task] = None
         self._stop_requested = asyncio.Event()
         # modbus_live only in practice (see add_event's own mode check --
@@ -593,10 +595,12 @@ class RoastSession:
                         "roast_id": self.id,
                         "sample": sample,
                     })
+                    await self.control.tick(sample, recording=False)
                 else:
                     self.profile.append(sample)
                     self.events.extend(events)
                     self._evaluate_ambient_alarms(sample)
+                    await self.control.tick(sample, recording=True)
 
                     await pubsub.publish(self.id, {
                         "type": "sample",
@@ -626,6 +630,9 @@ class RoastSession:
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # pragma: no cover - defensive
+            # Heater off before anything else: the app is about to stop
+            # looking at this roaster.
+            await self.control.enter_safe_state("the roast stopped because of an error")
             self.status = RoastStatus.ABORTED
             self._cancel_pending_alarms()
             if self._recorded:
@@ -652,6 +659,7 @@ class RoastSession:
         if self._task is not None and self._task is not asyncio.current_task():
             await self._task
         if self.status not in (RoastStatus.COMPLETE, RoastStatus.STOPPED, RoastStatus.ABORTED):
+            self.control.release()
             if self._recorded:
                 await self._finish(RoastStatus.STOPPED)
             else:
@@ -676,6 +684,7 @@ class RoastSession:
         self._stop_requested.set()
         self.status = status
         self.duration_s = roast_duration_s(self.profile, self.events)
+        self.control.stop_automation("the roast finished")
         await asyncio.to_thread(self.device.disconnect)
         if isinstance(self._engine, (ModbusEngine, MS6514Engine, TC4Engine)):
             self._close_engine()  # release the serial port
@@ -709,7 +718,7 @@ class RoastSession:
         await pubsub.publish(self.id, {"type": "finished", "roast_id": self.id, "status": self.status.value})
 
     # -- interaction ----------------------------------------------------
-    def apply_command(self, command: ControlCommand) -> dict:
+    def apply_command(self, command: ControlCommand, *, source: str = "operator") -> dict:
         # IDLE is included alongside ROASTING/COOLING -- for modbus_live/
         # ms6514_live specifically, it means "connected via connect(), not
         # yet recording" (see that method), not "no session at all" (which
@@ -722,7 +731,12 @@ class RoastSession:
         payload = command.model_dump(exclude_none=True)
         if "speed" in payload:
             self.playback_speed = payload["speed"]
-        return self.device.write(payload)
+        try:
+            if source == "operator":
+                return self.control.operator_command(payload)
+            return self.control.write(payload, source=source)
+        except RoastControlError as exc:
+            raise RoastSessionError(str(exc)) from exc
 
     def add_note(self, req: NoteCreateRequest) -> dict:
         note = {
@@ -869,7 +883,7 @@ class RoastSession:
         as "didn't change" rather than needing a separate channel)."""
         command = ControlCommand(heater_pct=rule.heater_pct, fan_pct=rule.fan_pct, drum_speed_pct=rule.drum_speed_pct)
         try:
-            self.apply_command(command)
+            self.apply_command(command, source="rule")
         except RoastSessionError:
             pass
 

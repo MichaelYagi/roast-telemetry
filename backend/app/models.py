@@ -537,6 +537,53 @@ BREAKOUT_PANEL_KEYS = {
 CHART_SERIES_KEYS = {"BT", "ET", "DT", "ROR_BT", "ROR_ET", "Burner", "Air", "Drum", "Damper"}
 
 
+class ControlSafety(BaseModel):
+    """Limits that apply to every command that reaches the roaster: manual
+    sliders, alarm rules, replay and feedback control alike."""
+
+    heater_max_pct: float = Field(default=100, ge=0, le=100, description="Heater/burner is never commanded above this.")
+    fan_min_pct: float = Field(default=0, ge=0, le=100, description="While the heater is on, the fan is never below this.")
+    drum_min_pct: float = Field(default=0, ge=0, le=100, description="While the heater is on, the drum is never below this.")
+    safe_fan_pct: float = Field(default=100, ge=0, le=100, description="Fan level set by Emergency stop and the automatic fail-safes (heater goes to 0).")
+    client_watchdog_s: float = Field(default=120, ge=0, le=3600, description="If the heater is on and nobody has the roast open for this many seconds, go to the safe state. 0 turns it off.")
+
+
+class ProgramStep(BaseModel):
+    """One point of a control program. `time_s` counts from Charge."""
+
+    time_s: float = Field(ge=0)
+    heater_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    fan_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    drum_speed_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    ramp: bool = Field(default=False, description="Move smoothly to this step's values from the previous step instead of jumping at time_s.")
+
+
+class ProgramRequest(BaseModel):
+    steps: list[ProgramStep] = Field(min_length=1, max_length=500)
+
+
+class ProgramFromRoastRequest(BaseModel):
+    source_roast_id: str
+
+
+class CurvePoint(BaseModel):
+    time_s: float
+    value: float
+
+
+class FeedbackRequest(BaseModel):
+    """Hold a target by adjusting the heater (PI control)."""
+
+    variable: Literal["bt", "ror_bt"] = "ror_bt"
+    setpoint: Optional[float] = Field(default=None, description="A single target, or...")
+    curve: list[CurvePoint] = Field(default_factory=list, description="...a target that changes over time (seconds from Charge), interpolated.")
+    kp: Optional[float] = Field(default=None, ge=0)
+    ki: Optional[float] = Field(default=None, ge=0)
+    output_min_pct: float = Field(default=0, ge=0, le=100)
+    output_max_pct: float = Field(default=100, ge=0, le=100)
+    max_step_pct_per_s: float = Field(default=1.0, gt=0, le=100, description="Heater never changes faster than this.")
+
+
 class AppSettings(BaseModel):
     ollama_url: Optional[str] = None
     ollama_model: Optional[str] = None
@@ -605,6 +652,8 @@ class AppSettings(BaseModel):
     # api/settings.py's update_settings -- 500 matches GET /roasts'
     # own existing `limit` query param cap.
     history_page_size: int = 100
+    # Safety limits for anything that writes to the roaster (see ControlSafety).
+    control: ControlSafety = Field(default_factory=ControlSafety)
 
 
 class OllamaStatus(BaseModel):

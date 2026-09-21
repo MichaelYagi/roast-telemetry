@@ -30,6 +30,7 @@ def test_settings_roundtrip_including_panel_list(isolated_db):
         "vertical_control_arrows": {},
         "chart_series_visible": {},
         "history_page_size": 100,
+        "control": {},
     }
 
 
@@ -81,6 +82,7 @@ def test_get_settings_defaults_on_empty_db(isolated_db):
         "vertical_control_arrows": {},
         "chart_series_visible": {},
         "history_page_size": 100,
+        "control": {},
     }
 
 

@@ -69,6 +69,12 @@ export const api = {
   addNote: (id, note) => request(`/roasts/${id}/notes`, { method: "POST", body: JSON.stringify(note) }),
   updateNote: (id, noteId, text) => request(`/roasts/${id}/notes/${noteId}`, { method: "PATCH", body: JSON.stringify({ text }) }),
   deleteNote: (id, noteId) => request(`/roasts/${id}/notes/${noteId}`, { method: "DELETE" }),
+  getControl: (id) => request(`/roasts/${id}/control`),
+  emergencyStop: (id) => request(`/roasts/${id}/emergency-stop`, { method: "POST" }),
+  startProgramFromRoast: (id, sourceRoastId) =>
+    request(`/roasts/${id}/control/program/from-roast`, { method: "POST", body: JSON.stringify({ source_roast_id: sourceRoastId }) }),
+  startFeedback: (id, config) => request(`/roasts/${id}/control/feedback`, { method: "PUT", body: JSON.stringify(config) }),
+  stopAutomation: (id) => request(`/roasts/${id}/control/automation`, { method: "DELETE" }),
   addEvent: (id, event) => request(`/roasts/${id}/events`, { method: "POST", body: JSON.stringify(event) }),
   deleteEvent: (id, eventId) => request(`/roasts/${id}/events/${eventId}`, { method: "DELETE" }),
   retimeEvent: (id, eventId, timeS) =>

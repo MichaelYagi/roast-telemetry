@@ -15,6 +15,7 @@
   <nav>
     <a href="index.html">Docs</a>
     <a href="getting-started.html">Getting Started</a>
+    <a href="control.html">Control &amp; Safety</a>
     <a href="modbus/index.html">Direct Modbus</a>
     <a href="architecture.html" aria-current="page">Architecture</a>
     <a href="glossary.html">Glossary</a>
@@ -127,6 +128,12 @@
       <tr><td>DELETE</td><td><code>/roasts/{id}</code></td><td>Delete a roast + its <code>.alog</code> file (409 if still roasting/cooling)</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/stop</code></td><td>Deliberately stop a roast (status <code>stopped</code>), persist its <code>.alog</code></td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/commands</code></td><td><code>heater_pct</code> / <code>fan_pct</code> / <code>drum_speed_pct</code> / <code>burner_sv_c</code> (modbus_live's alternate &deg;C write for the same Burner setpoint) (simulator, modbus_live) or <code>speed</code> (playback)</td></tr>
+      <tr><td>GET</td><td><code>/roasts/{id}/control</code></td><td>Automatic-control status, safety limits and any fail-safe that tripped — see <a href="control.html">Controlling a roast</a></td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/emergency-stop</code></td><td>Heater off, fan to the emergency level, automation stopped</td></tr>
+      <tr><td>PUT</td><td><code>/roasts/{id}/control/program</code></td><td>Run heater/fan/drum steps timed from Charge</td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/control/program/from-roast</code></td><td>Repeat another roast's recorded settings</td></tr>
+      <tr><td>PUT</td><td><code>/roasts/{id}/control/feedback</code></td><td>Hold a bean-temperature or rate-of-rise target by adjusting the heater</td></tr>
+      <tr><td>DELETE</td><td><code>/roasts/{id}/control/automation</code></td><td>Stop automatic control</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/notes</code></td><td>Append a timestamped note</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/events</code></td><td>Append a custom event marker</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/weight</code></td><td>Record the roasted (post-roast) weight</td></tr>

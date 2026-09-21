@@ -15,6 +15,7 @@
   <nav>
     <a href="index.html" aria-current="page">Docs</a>
     <a href="getting-started.html">Getting Started</a>
+    <a href="control.html">Control &amp; Safety</a>
     <a href="modbus/index.html">Direct Modbus</a>
     <a href="architecture.html">Architecture</a>
     <a href="glossary.html">Glossary</a>
@@ -50,6 +51,7 @@
     </li>
     <li><strong>Connect-then-record flow</strong> for every live-hardware mode — ON connects and streams live readings so you can verify a connection before committing to a roast; START begins actually recording.</li>
     <li><strong>A guided Test Connection panel</strong> for verifying a fresh Modbus connection safely — comprehensive per-channel reads, plus an optional, deliberately benign write check (a no-op round-trip on the least consequential channel) before you ever start a real roast.</li>
+    <li><strong>Control and safety</strong> — drive the heater, fan and drum by hand, repeat a saved roast's settings, or hold a target rate of rise or bean temperature. Every command passes through safety limits you set (a heater cap, a fan minimum while heating), there is an <strong>Emergency stop</strong> button, and automatic fail-safes switch the heater off if nobody has the roast open, the connection breaks, or the temperature reading is lost. Tested against the built-in simulated FZ-94, not yet on a real roaster, and no substitute for the roaster's own safety features. See <a href="control.html">Controlling a roast</a>.</li>
     <li><strong>Optional automation rules</strong> for Direct Modbus — bind a Burner/Air/Drum command, an in-app banner message, and/or auto-marking a later milestone (chaining one milestone into another, e.g. "30s after Turning Point, mark FC End") to fire automatically on a milestone, a BT/ET temperature threshold, or elapsed roast time, with an optional extra delay, alarm-style. Burner bindings need an extra explicit confirm step; a pending delayed action is cancelled, not fired late, if you stop the roast first. See <a href="modbus/index.html#milestone-automation">Direct Modbus &rarr; Automation rules</a>.</li>
     <li><strong>Celsius/Fahrenheit display toggle</strong> (Settings &rarr; Temperature Unit) — display only, everything is still stored and sent as Celsius.</li>
     <li><strong>Live rate-of-rise, computed from raw BT/ET either way</strong> — real hardware doesn't carry roast-milestone events on its own (a PLC, a thermocouple meter, or a USB roaster's own controller has no concept of Charge/Dry End/etc. as far as this app is concerned), so every milestone is a manual click for every live-hardware mode by default, with live RoR shown to help time it. Charge/Dry End/FC Start can optionally be switched to auto-detect from BT instead (opt-in, off by default — manual clicks still work as an override); Turning Point always auto-fires either way, since it's a pure observation, not a judgment call. (The Simulator source is the exception — its own thermal model auto-fires every milestone, useful as a hands-off demo.)</li>
@@ -63,6 +65,7 @@
   <h2>Where to start</h2>
   <ul>
     <li><a href="getting-started.html">Getting started</a> — install, run, the data sources, saving a roast, testing without real hardware, and a <a href="getting-started.html#scripts-reference">reference for every script</a>.</li>
+    <li><a href="control.html">Controlling a roast</a> — safety limits, the Emergency stop, automatic fail-safes, repeating a saved roast, holding a target, and what to ask a machine's maker before using it on a real roaster.</li>
     <li><a href="modbus/index.html">Direct Modbus Bridge</a> — connection basics and the register-override mechanism, for any Modbus-connected roaster.
       <ul>
         <li><a href="modbus/fz-94-usb.html">FZ-94 (USB)</a> — the specific register map, source citations, and fake-hardware test setup for this model.</li>

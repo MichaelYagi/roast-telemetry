@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controlling a roast &mdash; Roast Telemetry Docs</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="index.html"><img src="assets/icon-48x48.png" alt="" width="24" height="24"> Roast Telemetry</a>
+  <nav>
+    <a href="index.html">Docs</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="control.html" aria-current="page">Control &amp; Safety</a>
+    <a href="modbus/index.html">Direct Modbus</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="glossary.html">Glossary</a>
+    <a href="https://github.com/MichaelYagi/roast-telemetry">GitHub</a>
+  </nav>
+</header>
+<main>
+  <h1>Controlling a roast, and its safety limits</h1>
+  <p>
+    For roasters the app can write to (Direct Modbus, Aillio Bullet, TC4+
+    and the built-in simulators), you can change the heater, fan and drum
+    by hand, and the app can also do it for you: repeat a saved roast's
+    settings, or hold a target by adjusting the heater. Every one of those
+    changes passes through the same safety limits, and there is an
+    <strong>Emergency stop</strong> button on the Live Roast page.
+  </p>
+
+  <div class="callout">
+    <strong>Read this first.</strong> These are the app's own safety
+    features, and they only work while the app can still talk to the
+    roaster. They are <em>not</em> a substitute for the roaster's own
+    protection (its physical stop, over-temperature cut-offs, airflow
+    interlocks). If the cable is unplugged, the computer freezes or the
+    power drops, the app cannot switch anything off, and what happens next
+    is decided entirely by the machine. See
+    <a href="#before-real-hardware">Before you use this on a real
+    roaster</a>.
+  </div>
+
+  <h2 id="what-is-tested">What has been tested</h2>
+  <p>
+    All of this is covered by automated tests, including runs against the
+    built-in simulated FZ-94 through the real Modbus code path. It has
+    <strong>not yet been tried on a real roaster</strong>. Only the FZ-94's
+    read and write connection has been checked on real hardware. The
+    starting values for target control in particular are conservative
+    guesses, not settings tuned for any real machine.
+  </p>
+
+  <h2 id="safety-limits">Safety limits</h2>
+  <p>
+    <strong>Settings &rarr; Roaster safety.</strong> They apply to every
+    command that reaches the roaster: the sliders, alarm rules, repeating a
+    saved roast and target control alike.
+  </p>
+  <table>
+    <thead><tr><th>Limit</th><th>Default</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>Heater never above (%)</td><td>100</td><td>Any heater command above this is lowered to it.</td></tr>
+      <tr><td>Fan never below while heating (%)</td><td>0</td><td>While the heater is on, the fan can't be set (or left) below this. Turning the heater on with the fan too low raises the fan too.</td></tr>
+      <tr><td>Drum never below while heating (%)</td><td>0</td><td>The same rule for the drum.</td></tr>
+      <tr><td>Fan level in an emergency (%)</td><td>100</td><td>What the fan is set to by the Emergency stop and the automatic fail-safes.</td></tr>
+      <tr><td>Heater off if nobody has the roast open for (seconds)</td><td>120</td><td>See <a href="#failsafes">Automatic fail-safes</a>. 0 turns it off.</td></tr>
+    </tbody>
+  </table>
+  <p class="hint">
+    While a heater limit below 100% is set, the burner <em>temperature</em>
+    setpoint (the direct-&deg;C slider on machines that have one) is refused,
+    because a temperature can't be checked against a percentage cap. Use the
+    heater slider. Limits are read when a roast starts and again whenever
+    automatic control or the Emergency stop is used.
+  </p>
+
+  <h2 id="emergency-stop">Emergency stop</h2>
+  <p>
+    A red button above the chart on the Live Roast page (full width on a
+    phone). It sets the <strong>heater to 0</strong> and the
+    <strong>fan to the emergency level</strong>, stops any automatic control
+    and cancels any delayed alarm-rule actions. The drum keeps turning. The
+    roast <em>keeps recording</em> so nothing already logged is lost, and a
+    &ldquo;Safety: emergency stop&rdquo; marker is added to the chart.
+  </p>
+  <p>
+    If the app can't reach the roaster, the button says so
+    (&ldquo;Couldn't reach the roaster&rdquo;) &mdash; switch it off at the
+    machine.
+  </p>
+
+  <h2 id="failsafes">Automatic fail-safes</h2>
+  <p>Each of these puts the roaster in the same safe state as the Emergency stop (heater 0, fan at the emergency level) and leaves a &ldquo;Safety: &hellip;&rdquo; marker on the chart.</p>
+  <table>
+    <thead><tr><th>Trigger</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td>The heater is on and no browser has the roast open for the watchdog time (default 120 s)</td><td>Safe state. Applies even while automatic control is running: an unattended heater is the case this exists for. Set it to 0 to turn it off.</td></tr>
+      <tr><td>An error stops the roast (for example the connection to the roaster breaks)</td><td>The app tries to switch the heater off before it lets go, then ends the roast as aborted.</td></tr>
+      <tr><td>Target control loses the bean-temperature reading for more than 10 seconds</td><td>Safe state: it won't keep heating blind.</td></tr>
+      <tr><td>A write during automatic control fails</td><td>Safe state.</td></tr>
+      <tr><td>You end the roast (OFF) with the heater on</td><td>The heater is switched off; the fan and drum are left as they are.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    After a fail-safe the Live Roast page shows why, and the heater stays
+    off until you move a slider or start automatic control again.
+  </p>
+
+  <h3 id="what-failsafes-cannot-do">What they can't do</h3>
+  <ul>
+    <li>They can't act if the app can't reach the roaster. A written &ldquo;heater off&rdquo; never arrives over an unplugged cable, and the machine keeps doing whatever it was last told, unless it has its own timeout.</li>
+    <li>They don't run if the computer running the server crashes or loses power, or after the server process is killed.</li>
+    <li>They can't override the roaster's own panel: turning something up at the machine still works.</li>
+  </ul>
+
+  <h2 id="automatic-control">Automatic control</h2>
+  <p>
+    On the Live Roast page, the <strong>Automatic control</strong> panel.
+    Both kinds start at <strong>Charge</strong> (they wait until Charge is
+    marked), keep the current settings until then, and time everything from
+    Charge. Moving any slider by hand <strong>takes over</strong>: automatic
+    control stops. Alarm rules don't cancel it.
+  </p>
+
+  <h3 id="repeat-a-roast">Repeat a saved roast</h3>
+  <p>
+    Pick any finished roast that recorded its heater, fan or drum settings.
+    The app turns those recordings into steps timed from that roast's
+    Charge: a step is added each time a value moved by at least 2%, so small
+    wobbles don't become dozens of writes. Repeating a roast whose file has
+    no recorded controls is refused, because a file that never recorded them
+    reads back as zeros, which would switch the heater and fan off at Charge.
+    Automatic control keeps the last values after the final step. It does not
+    end the roast for you.
+  </p>
+  <p>
+    Through the API you can also send your own steps (time in seconds from
+    Charge; heater, fan and drum values; and a <code>ramp</code> flag to
+    move smoothly from the previous step instead of jumping).
+  </p>
+
+  <h3 id="hold-a-target">Hold a target</h3>
+  <p>
+    Choose <em>rate of rise</em> or <em>bean temperature</em>, a target, and a
+    heater maximum. The app adjusts the heater with a simple PI controller
+    (it reacts to how far off the target is and to how long it has been off).
+    It:
+  </p>
+  <ul>
+    <li>starts from the heater's current level, so switching it on doesn't cause a jump;</li>
+    <li>never changes the heater faster than 1% per second (adjustable through the API);</li>
+    <li>stays inside the heater minimum and maximum, and inside the safety limits;</li>
+    <li>stops by itself at <strong>Drop</strong>.</li>
+  </ul>
+  <p>
+    Rate-of-rise control needs about 18 seconds of readings after the roast
+    starts before there is a rate to act on. Through the API the target can
+    also be a curve (a list of seconds-from-Charge and value points, blended
+    in between) and the two gains can be set.
+  </p>
+  <div class="callout">
+    <strong>Tuning:</strong> the built-in gains are gentle starting values.
+    They behave well on a made-up model of a drum roaster (rate of rise
+    settles on target; bean temperature settles within a few degrees, with
+    some overshoot), but every roaster responds differently and none has
+    been tuned. Try it on a small, cheap batch with your hand near the
+    Emergency stop, and lower the heater maximum while you learn how it
+    behaves.
+  </div>
+
+  <h2 id="before-real-hardware">Before you use this on a real roaster</h2>
+  <p>
+    The most useful check is to ask the machine's maker, or an owner who
+    knows it well, what the machine does <em>without</em> the app:
+  </p>
+  <ul>
+    <li>If the controller stops sending commands, or the cable or USB link drops, does the machine keep its last heater setting, or does it have a communication timeout that switches the heater off?</li>
+    <li>What are its own limits: an over-temperature cut-off, a thermal fuse, an interlock that cuts the heater if the fan stops?</li>
+    <li>Does a command over the data link go through the same safety checks as the front panel, or can it bypass them?</li>
+    <li>What is the highest heater or setpoint value the data link accepts, and what happens when you write something outside its range?</li>
+    <li>What does it do after a power cut or restart: does it resume heating?</li>
+    <li>Does the physical stop or panel always win over a command from the data link?</li>
+  </ul>
+  <p>
+    Also worth doing: set the heater limit and the fan minimum in Settings
+    to values you're comfortable with, try the Emergency stop and each
+    fail-safe with the roaster empty first, and keep the roaster where you
+    can reach its own stop.
+  </p>
+
+  <h2 id="trying-it-without-a-roaster">Trying it without a roaster</h2>
+  <p>
+    Every control feature works on the built-in simulated devices. In the
+    Configure Roast form, pick <strong>Direct Modbus</strong> and the
+    &ldquo;Try a simulated one&rdquo; FZ-94, then press ON and START. See
+    <a href="getting-started.html">Getting started</a>.
+  </p>
+
+  <h2 id="api">API</h2>
+  <p>All under <code>/api</code>, for a live (connected) roast.</p>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/roasts/{id}/control</code></td><td>What automatic control is doing, the current limits, the last commanded heater/fan/drum values, and why a fail-safe tripped (if one did)</td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/emergency-stop</code></td><td>Heater 0, fan to the emergency level, automation stopped. Returns <code>ok: false</code> if the roaster couldn't be reached</td></tr>
+      <tr><td>PUT</td><td><code>/roasts/{id}/control/program</code></td><td>Run <code>steps</code> (<code>time_s</code> from Charge, <code>heater_pct</code>/<code>fan_pct</code>/<code>drum_speed_pct</code>, <code>ramp</code>)</td></tr>
+      <tr><td>POST</td><td><code>/roasts/{id}/control/program/from-roast</code></td><td>Repeat another roast's recorded settings (<code>source_roast_id</code>); 409 if it recorded none</td></tr>
+      <tr><td>PUT</td><td><code>/roasts/{id}/control/feedback</code></td><td>Hold a target: <code>variable</code> (<code>bt</code> or <code>ror_bt</code>), <code>setpoint</code> or <code>curve</code>, optional <code>kp</code>, <code>ki</code>, <code>output_min_pct</code>, <code>output_max_pct</code>, <code>max_step_pct_per_s</code></td></tr>
+      <tr><td>DELETE</td><td><code>/roasts/{id}/control/automation</code></td><td>Stop any automatic control; the roaster keeps its current settings</td></tr>
+      <tr><td>GET / PUT</td><td><code>/settings</code></td><td>The safety limits are the <code>control</code> object (<code>heater_max_pct</code>, <code>fan_min_pct</code>, <code>drum_min_pct</code>, <code>safe_fan_pct</code>, <code>client_watchdog_s</code>)</td></tr>
+    </tbody>
+  </table>
+  <p class="hint">
+    Read-only devices (the MS6514 thermocouple meter and .alog playback)
+    refuse all of these. A manual command to <code>/roasts/{id}/commands</code>
+    stops automatic control and is subject to the same limits.
+  </p>
+
+  <div class="page-nav"><a href="index.html">&larr; Back to docs home</a></div>
+</main>
+<script src="assets/toc.js" defer></script>
+<script src="assets/back-to-top.js" defer></script>
+</body>
+</html>

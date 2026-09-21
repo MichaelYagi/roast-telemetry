@@ -645,6 +645,10 @@ def get_settings() -> dict:
         history_page_size = int(values["history_page_size"]) if values.get("history_page_size") else 100
     except (TypeError, ValueError):
         history_page_size = 100
+    try:
+        control = json.loads(values["control"]) if values.get("control") else {}
+    except (json.JSONDecodeError, TypeError):
+        control = {}
     return {
         "ollama_url": values.get("ollama_url"),
         "ollama_model": values.get("ollama_model"),
@@ -656,6 +660,7 @@ def get_settings() -> dict:
         "vertical_control_arrows": vertical_control_arrows,
         "chart_series_visible": chart_series_visible,
         "history_page_size": history_page_size,
+        "control": control,
     }
 
 
@@ -672,6 +677,8 @@ def set_settings(**kv) -> None:
         kv["vertical_control_arrows"] = json.dumps(kv["vertical_control_arrows"])
     if "chart_series_visible" in kv:
         kv["chart_series_visible"] = json.dumps(kv["chart_series_visible"])
+    if "control" in kv:
+        kv["control"] = json.dumps(kv["control"])
     with _conn() as c:
         for key, value in kv.items():
             c.execute(

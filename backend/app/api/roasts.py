@@ -23,8 +23,11 @@ from ..models import (
     ControlCommand,
     EventCreateRequest,
     EventUpdateRequest,
+    FeedbackRequest,
     NoteCreateRequest,
     NoteUpdateRequest,
+    ProgramFromRoastRequest,
+    ProgramRequest,
     ReviewStatus,
     Roast,
     RoastCreateRequest,
@@ -36,8 +39,10 @@ from ..models import (
     TagsUpdateRequest,
     UserStatus,
 )
+from ..roast_control import program_from_profile
 from ..roast_review import build_prompt, build_summary
 from ..roast_session import RoastSessionError, session_manager
+from ..roast_session.control import RoastControlError
 from ..roast_stats import compute_roast_stats
 from ..ws_manager import pubsub
 
@@ -288,6 +293,82 @@ def send_command(roast_id: str, command: ControlCommand) -> dict:
         return session.apply_command(command)
     except RoastSessionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def _active_session(roast_id: str):
+    session = session_manager.get(roast_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found or not active")
+    return session
+
+
+@router.get("/{roast_id}/control")
+def get_control(roast_id: str) -> dict:
+    """What the roaster's automatic control is doing, the current safety
+    limits, and whether a fail-safe has stopped things."""
+    return _active_session(roast_id).control.status()
+
+
+@router.post("/{roast_id}/emergency-stop")
+async def emergency_stop(roast_id: str) -> dict:
+    """Heater off, fan to the safe level, all automation stopped. The roast
+    itself keeps recording (as cooling) so nothing already logged is lost."""
+    session = _active_session(roast_id)
+    session.control.refresh_limits()
+    written = await session.control.emergency_stop()
+    return {"ok": written, **session.control.status()}
+
+
+@router.put("/{roast_id}/control/program")
+async def start_program(roast_id: str, program: ProgramRequest) -> dict:
+    """Runs heater/fan/drum steps timed from Charge."""
+    session = _active_session(roast_id)
+    session.control.refresh_limits()
+    try:
+        session.control.start_program(program.steps, "custom program")
+    except RoastControlError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return session.control.status()
+
+
+@router.post("/{roast_id}/control/program/from-roast")
+async def start_program_from_roast(roast_id: str, body: ProgramFromRoastRequest) -> dict:
+    """Repeats another roast's heater/fan/drum settings, timed from Charge."""
+    session = _active_session(roast_id)
+    source = session_manager.get_roast_detail(body.source_roast_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail=f"roast {body.source_roast_id!r} not found")
+    charge = next((e for e in source.events if e.type.value == "CHARGE"), None)
+    profile = [p.model_dump() for p in source.profile]
+    steps = program_from_profile(profile, charge.time_s if charge else (profile[0]["time_s"] if profile else 0.0))
+    if not steps:
+        raise HTTPException(status_code=409, detail="that roast has no recorded heater, fan or drum settings to repeat")
+    session.control.refresh_limits()
+    try:
+        session.control.start_program(steps, f"repeat of {source.title}")
+    except RoastControlError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return session.control.status()
+
+
+@router.put("/{roast_id}/control/feedback")
+async def start_feedback(roast_id: str, config: FeedbackRequest) -> dict:
+    """Holds a target (bean temperature or its rate of rise) by adjusting the heater."""
+    session = _active_session(roast_id)
+    session.control.refresh_limits()
+    try:
+        session.control.start_feedback(config)
+    except RoastControlError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return session.control.status()
+
+
+@router.delete("/{roast_id}/control/automation")
+async def stop_automation(roast_id: str) -> dict:
+    """Stops any program or target control. The roaster keeps its current settings."""
+    session = _active_session(roast_id)
+    session.control.stop_automation("stopped by the operator")
+    return session.control.status()
 
 
 def _notes_message(roast_id: str) -> dict:

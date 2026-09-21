@@ -14,6 +14,10 @@ class RoastPubSub:
         self._subscribers.setdefault(roast_id, set()).add(queue)
         return queue
 
+    def subscriber_count(self, roast_id: str) -> int:
+        """How many pages currently have this roast open."""
+        return len(self._subscribers.get(roast_id, ()))
+
     def unsubscribe(self, roast_id: str, queue: asyncio.Queue) -> None:
         subs = self._subscribers.get(roast_id)
         if subs and queue in subs:
