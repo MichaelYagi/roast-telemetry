@@ -2014,21 +2014,24 @@ button:disabled {
   font-size: 0.9rem;
 }
 
-/* The Roasted weight edit row (input + "g" + Save/Cancel) has nothing
-   bounded to flex against in a plain space-between li within a narrow
-   sidebar column -- .input-suffix-group's own input{flex:1} tried to
-   fill all remaining space, shoving the buttons off the edge instead of
-   just wrapping. Fixed narrow width for the number itself, and let the
-   suffix/buttons wrap onto their own line if the column's too tight. */
+/* The weight edit row (input + "g" + Save/Cancel) stays on one line in
+   the narrow sidebar: the number box is allowed to shrink so the buttons
+   never get pushed onto a second row. */
 .kv-list .input-suffix-group {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
-  row-gap: 0.3rem;
+  min-width: 0;
 }
 
 .kv-list .input-suffix-group input {
-  flex: none;
+  flex: 0 1 4.5rem;
   width: 4.5rem;
+  min-width: 2.5rem;
+}
+
+.kv-list .input-suffix-group button {
+  flex: none;
+  white-space: nowrap;
 }
 
 .compare-body {
