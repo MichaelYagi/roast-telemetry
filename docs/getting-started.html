@@ -402,6 +402,20 @@ npm run dev</code></pre>
 
   <h2 id="testing-without-real-hardware">Testing without real hardware</h2>
   <p>
+    <strong>Simplest: pick a simulated device in the app.</strong> In
+    Configure Roast, under Device, the port (or host) field has a
+    <strong>Try a simulated one</strong> link — for the FZ-94, FZ-94 Evo,
+    MS6514 and TC4+. It fills in a <code>sim://…</code> value; connecting
+    starts a built-in fake of that machine inside the server, so there is
+    nothing to install or start, on Windows, macOS or Linux. The roast is
+    marked <strong>Simulated</strong>, tagged <code>simulated</code>
+    automatically, and left out of History's averages, so it never
+    skews your real numbers. (The Aillio Bullet has no simulated
+    device — it is a raw USB device.) The standalone fakes below are only
+    for developers who want a fake running on its own, or a real
+    virtual serial port.
+  </p>
+  <p>
     <code>simulator</code> and <code>alog_playback</code> need nothing
     extra — fully self-contained. Three of the four live-hardware modes
     (<code>modbus_live</code>, <code>ms6514_live</code>,

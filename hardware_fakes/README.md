@@ -8,6 +8,15 @@ simulator mode (`_thermal.py`, wrapping
 `simulator.SimulatorEngine`) so BT/ET behave like a real roast no
 matter which one you're using.
 
+**Most people never need these scripts.** The app can start any of these
+fakes by itself: pick "Try a simulated one" next to a port/host field in
+Configure Roast (or use a `sim://fz94`, `sim://fz94_evo`, `sim://ms6514` or
+`sim://tc4` value). `sim.py` runs the fake inside the server over a local TCP
+listener (`tcp_serial.py`), tags the roast `simulated`, and stops the fake
+when the roast ends or the server stops -- no `socat`, no WSL, nothing to
+start. The standalone scripts below are for running a fake on its own or
+testing against a real virtual serial port.
+
 | Fake | Stands in for | Protocol | Needs a virtual serial port? |
 |---|---|---|---|
 | `modbus_fz94.py` | Coffee-Tech FZ-94 (plain, not Evo) | Modbus RTU (hand-rolled framing) | Yes — one (two only for unusual wiring) |

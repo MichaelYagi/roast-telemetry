@@ -42,6 +42,14 @@ import serial as pyserial
 from roast_heuristics import LiveRoastDetector
 
 
+
+def _open_serial(port: str, **kwargs):
+    """Opens a plain device path (COM3, /dev/ttyUSB0) like pyserial.Serial,
+    and also accepts pyserial URLs such as ``socket://host:port`` -- which is
+    how a remote or simulated device is reached (Serial() alone can't)."""
+    return pyserial.serial_for_url(port, **kwargs)
+
+
 class TC4EngineError(RuntimeError):
     pass
 
@@ -71,7 +79,7 @@ class TC4Engine:
         # Opt-in -- off by default. See ModbusEngine's identical parameter
         # for the full rationale.
         detect_milestones: bool = False,
-        serial_cls=pyserial.Serial,  # injectable for testing without real hardware
+        serial_cls=None,  # injectable for testing without real hardware
     ):
         if not port:
             raise ValueError("port (e.g. 'COM5') is required to connect to the TC4+")
@@ -88,7 +96,7 @@ class TC4Engine:
         self._last_error: Optional[str] = None
 
         try:
-            self._serial = serial_cls(port=port, baudrate=baudrate, bytesize=8, parity="N", stopbits=1, timeout=timeout)
+            self._serial = (serial_cls or _open_serial)(port=port, baudrate=baudrate, bytesize=8, parity="N", stopbits=1, timeout=timeout)
             self._connected = bool(self._serial.is_open)
             if self._connected:
                 self._write_line("UNITS,C")

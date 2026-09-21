@@ -749,6 +749,8 @@ class ApiKeyIssued(BaseModel):
 class SerialPortInfo(BaseModel):
     device: str  # what actually goes in the form's Serial port field, e.g. "COM3" or "/dev/ttyUSB0"
     description: Optional[str] = None  # driver-reported label, e.g. "USB-SERIAL CH340 (COM3)" -- None if the OS has nothing better than the bare device name
+    simulated: bool = False  # a built-in simulated device ("sim://fz94"), not something the OS sees -- see hardware_fakes/sim.py
+    mode: Optional[str] = None  # simulated only: the data source (RoastMode value) it belongs to, so the form only offers it there
 
 
 class FileEntry(BaseModel):

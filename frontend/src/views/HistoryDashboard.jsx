@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import { useConfirm, useNotify } from "../components/DialogProvider.jsx";
 import ServerFileChooser from "../components/ServerFileChooser.jsx";
+import { isSimulatedRoast } from "../simulated.js";
 
 function formatDuration(seconds) {
   if (seconds == null) return "—";
@@ -104,10 +105,16 @@ export default function HistoryDashboard() {
       .finally(() => setTrendsLoading(false));
   }, [showTrends, filters, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Roasts recorded against a built-in simulated device stay in the list but
+  // never count toward any average or trend here -- fake data must not move
+  // the numbers for real roasts.
+  const simulatedIds = useMemo(() => new Set(roasts.filter(isSimulatedRoast).map((r) => r.id)), [roasts]);
+
   const trendAverages = useMemo(() => {
-    const withDry = trendStats.filter((r) => r.dry_pct != null);
-    const withDtr = trendStats.filter((r) => r.dtr_pct != null);
-    const flaggedCount = trendStats.filter(
+    const real = trendStats.filter((r) => !simulatedIds.has(r.id));
+    const withDry = real.filter((r) => r.dry_pct != null);
+    const withDtr = real.filter((r) => r.dtr_pct != null);
+    const flaggedCount = real.filter(
       (r) => r.ror_flags.crashes.length || r.ror_flags.flatlines.length || r.ror_flags.flicks.length
     ).length;
     return {
@@ -115,7 +122,7 @@ export default function HistoryDashboard() {
       avgDtrPct: withDtr.length ? withDtr.reduce((sum, r) => sum + r.dtr_pct, 0) / withDtr.length : null,
       flaggedCount,
     };
-  }, [trendStats]);
+  }, [trendStats, simulatedIds]);
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -203,15 +210,16 @@ export default function HistoryDashboard() {
   }
 
   const stats = useMemo(() => {
-    const complete = roasts.filter((r) => r.duration_s != null);
+    const real = roasts.filter((r) => !isSimulatedRoast(r));
+    const complete = real.filter((r) => r.duration_s != null);
     const avgDuration = complete.length
       ? complete.reduce((sum, r) => sum + r.duration_s, 0) / complete.length
       : null;
-    const withYield = roasts.filter((r) => r.weight_green_g && r.weight_roasted_g);
+    const withYield = real.filter((r) => r.weight_green_g && r.weight_roasted_g);
     const avgLoss = withYield.length
       ? withYield.reduce((sum, r) => sum + (1 - r.weight_roasted_g / r.weight_green_g), 0) / withYield.length
       : null;
-    return { total: roasts.length, avgDuration, avgLoss };
+    return { total: roasts.length, simulatedCount: roasts.length - real.length, avgDuration, avgLoss };
   }, [roasts]);
 
   return (
@@ -252,6 +260,11 @@ export default function HistoryDashboard() {
         <button type="button" className="link-like" onClick={() => setShowTrends((s) => !s)}>
           {showTrends ? "Hide trends" : "Show trends"}
         </button>
+        {stats.simulatedCount > 0 && (
+          <span className="hint stats-note">
+            Averages leave out {stats.simulatedCount} simulated roast{stats.simulatedCount === 1 ? "" : "s"}.
+          </span>
+        )}
       </div>
 
       <form className="panel import-form" onSubmit={handleImport}>

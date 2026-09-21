@@ -70,11 +70,13 @@ locally.)*
   auto-fires either way, since it's a pure observation, not a judgment
   call. (The Simulator source is the exception — its own thermal
   model auto-fires every milestone, useful as a hands-off demo.)
-- **Real hardware fakes** for Direct Modbus, Direct USB (thermocouple
-  meter), and TC4+, so the full connection code path is testable without
-  owning a roaster — Aillio Bullet is the one exception (a raw USB
-  device, not a serial port or TCP socket; covered instead by thorough
-  protocol-level pytest coverage).
+- **Built-in simulated devices** for Direct Modbus (FZ-94 and FZ-94 Evo),
+  Direct USB (thermocouple meter), and TC4+ — pick one in the port field
+  ("Try a simulated one") and the full connection code path runs with no
+  hardware and no setup. Simulated roasts are tagged and left out of
+  History's averages. Standalone fakes exist too for development. Aillio
+  Bullet is the one exception (a raw USB device, not a serial port or TCP
+  socket; covered instead by thorough protocol-level pytest coverage).
 - **Background Profile overlay** — load any previously recorded, finished
   roast onto the live chart as a dashed BT/ET reference to pace against.
   Both curves are already

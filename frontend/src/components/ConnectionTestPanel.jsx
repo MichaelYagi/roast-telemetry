@@ -69,7 +69,7 @@ function analyzeReadSamples(samples, channels, tempUnit) {
 // apply_command status check, which never allows writes outside
 // IDLE/ROASTING/COOLING -- there's no path from here to a write firing
 // mid-roast.
-export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = "c" }) {
+export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = "c", simulated = false }) {
   const [testMode, setTestMode] = useState(null); // null | "read" | "read_write"
   const [running, setRunning] = useState(false);
   const [readResults, setReadResults] = useState(null);
@@ -244,6 +244,12 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
   return (
     <div className="panel connection-test-panel">
       <h3>Test Connection</h3>
+      {simulated && (
+        <p className="simulated-note">
+          <span className="simulated-badge">Simulated</span> This is a built-in simulated device, so passing checks here
+          say nothing about a real machine -- nothing is sent to hardware.
+        </p>
+      )}
       <p className="hint">
         Verifies the connection is actually working, before committing to a roast -- reads every configured
         channel for a few seconds.

@@ -11,6 +11,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 from serial.tools import list_ports
 
+from hardware_fakes import sim as simulated_devices
+
 from ..models import SerialPortInfo
 
 router = APIRouter(prefix="/serial-ports", tags=["serial-ports"])
@@ -19,7 +21,16 @@ router = APIRouter(prefix="/serial-ports", tags=["serial-ports"])
 @router.get("", response_model=list[SerialPortInfo])
 def list_serial_ports() -> list[SerialPortInfo]:
     ports = list_ports.comports()
-    return [
+    real = [
         SerialPortInfo(device=p.device, description=p.description if p.description != "n/a" else None)
         for p in sorted(ports, key=lambda p: p.device)
     ]
+    # Built-in simulated devices come after the real ports (the Evo connects by
+    # host, not port, so it isn't listed here -- the form offers it beside the
+    # host field instead).
+    simulated = [
+        SerialPortInfo(device=f"{simulated_devices.PREFIX}{k.key}", description=k.label, simulated=True, mode=k.mode)
+        for k in simulated_devices.KINDS.values()
+        if k.transport == "serial"
+    ]
+    return real + simulated

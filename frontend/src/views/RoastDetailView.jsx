@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import RoastChart from "../components/RoastChart.jsx";
 import RoastReviewCard from "../components/RoastReviewCard.jsx";
+import { isSimulatedRoast } from "../simulated.js";
 import RoastStatsPanel from "../components/RoastStatsPanel.jsx";
 import WeightField from "../components/WeightField.jsx";
 import { formatTemp } from "../tempUnits.js";
@@ -175,7 +176,14 @@ export default function RoastDetailView() {
   return (
     <div className="detail-view">
       <div className="panel no-print">
-        <h2>{roast.title}</h2>
+        <h2>
+          {roast.title}
+          {isSimulatedRoast(roast) && (
+            <span className="simulated-badge" title="Recorded from a built-in simulated device">
+              Simulated
+            </span>
+          )}
+        </h2>
         <p className="sub">
           {roast.mode} · status: <strong>{roast.status}</strong> · duration:{" "}
           {roast.duration_s ? `${Math.floor(roast.duration_s / 60)}:${String(Math.round(roast.duration_s % 60)).padStart(2, "0")}` : "—"}

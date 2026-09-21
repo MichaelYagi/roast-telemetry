@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, settingsStreamUrl } from "../api/client.js";
 import { useRoastStream } from "../api/ws.js";
+import SimulatedDeviceHint from "../components/SimulatedDeviceHint.jsx";
+import { isSimulatedForm, isSimulatedRoast } from "../simulated.js";
 import RoastToolbar from "../components/RoastToolbar.jsx";
 import useConnectionHealth from "../useConnectionHealth.js";
 import BackgroundProfilePicker from "../components/BackgroundProfilePicker.jsx";
@@ -253,6 +255,10 @@ export default function LiveRoastView() {
       .then(setSerialPorts)
       .catch(() => setSerialPorts([]))
       .finally(() => setSerialPortsLoading(false));
+  }
+  // Real ports, plus the simulated devices that belong to this data source.
+  function portsFor(mode) {
+    return serialPorts.filter((p) => !p.simulated || p.mode === mode);
   }
   const [phase, setPhase] = useState("idle"); // idle | armed | roasting | cooling | finished
   const [roastId, setRoastId] = useState(null);
@@ -1093,6 +1099,10 @@ export default function LiveRoastView() {
   // device is already disconnected.
   const showConnectionDot =
     LIVE_MODES.includes(activeMode) && (phase === "armed" || phase === "roasting" || phase === "cooling");
+  // True while a simulated device is (or is about to be) behind this roast --
+  // shown as a badge on the toolbar and a note in Test Connection.
+  const simulated = roast ? isSimulatedRoast(roast) : isSimulatedForm(form);
+
   const toolbarElement = (
     <RoastToolbar
       title={roast?.title || form.title}
@@ -1105,6 +1115,7 @@ export default function LiveRoastView() {
       onStart={handleStart}
       connectionStatus={showConnectionDot ? connectionHealth.status : null}
       connectionFailedLabels={connectionHealth.failedLabels}
+      simulated={simulated}
     />
   );
 
@@ -1276,6 +1287,7 @@ export default function LiveRoastView() {
                       value={form.modbus_host}
                       onChange={(e) => setForm({ ...form, modbus_host: e.target.value })}
                     />
+                    <SimulatedDeviceHint kind="fz94_evo" value={form.modbus_host} onChange={(v) => setForm({ ...form, modbus_host: v })} />
                   </label>
                   <label>
                     TCP port
@@ -1299,7 +1311,7 @@ export default function LiveRoastView() {
                       suggestion fills in exactly what the field needs, not
                       the description text too. */}
                   <datalist id="serial-ports-list">
-                    {serialPorts.map((p) => (
+                    {portsFor("modbus_live").map((p) => (
                       <option key={p.device} value={p.device} label={p.description || undefined} />
                     ))}
                   </datalist>
@@ -1322,9 +1334,10 @@ export default function LiveRoastView() {
                         {serialPortsLoading ? "…" : "⟳"}
                       </button>
                     </span>
-                    {serialPorts.length === 0 && !serialPortsLoading && (
+                    {portsFor("modbus_live").every((p) => p.simulated) && !serialPortsLoading && (
                       <span className="hint">No serial ports detected -- plug your adapter in, then ⟳.</span>
                     )}
+                    <SimulatedDeviceHint kind="fz94" value={form.modbus_port} onChange={(v) => setForm({ ...form, modbus_port: v })} />
                   </label>
                   <label>
                     Baud rate
@@ -1647,9 +1660,16 @@ export default function LiveRoastView() {
                 Serial port
                 <input
                   placeholder="COM5"
+                  list="serial-ports-ms6514"
                   value={form.ms6514_port}
                   onChange={(e) => setForm({ ...form, ms6514_port: e.target.value })}
                 />
+                <datalist id="serial-ports-ms6514">
+                  {portsFor("ms6514_live").map((p) => (
+                    <option key={p.device} value={p.device} label={p.description || undefined} />
+                  ))}
+                </datalist>
+                <SimulatedDeviceHint kind="ms6514" value={form.ms6514_port} onChange={(v) => setForm({ ...form, ms6514_port: v })} />
               </label>
               <p className="hint">
                 Direct USB read of the Mastech MS6514 — reads straight over USB, no other software needed.
@@ -1683,9 +1703,16 @@ export default function LiveRoastView() {
                 Serial port
                 <input
                   placeholder="COM5"
+                  list="serial-ports-tc4"
                   value={form.tc4_port}
                   onChange={(e) => setForm({ ...form, tc4_port: e.target.value })}
                 />
+                <datalist id="serial-ports-tc4">
+                  {portsFor("tc4_live").map((p) => (
+                    <option key={p.device} value={p.device} label={p.description || undefined} />
+                  ))}
+                </datalist>
+                <SimulatedDeviceHint kind="tc4" value={form.tc4_port} onChange={(v) => setForm({ ...form, tc4_port: v })} />
               </label>
               <p className="hint">
                 Direct USB read/write of a TC4+ shield running the aArtisanQ (PID) firmware, 115200 baud —
@@ -1829,7 +1856,7 @@ export default function LiveRoastView() {
               itself lives in RoastToolbar (see toolbarElement below) --
               it stays visible through roasting/cooling too, not just here. */}
           {phase === "armed" && LIVE_MODES.includes(activeMode) && (
-            <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} />
+            <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} simulated={simulated} />
           )}
           <div className="panel scope-panel">
             <div className="scope-body">

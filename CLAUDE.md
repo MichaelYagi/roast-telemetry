@@ -38,3 +38,13 @@ Artisan's license as binding on every change you make.
 - **When in doubt, don't, and ask the user.** Reading Artisan's public
   source to understand a file format or protocol is fine; reproducing it is
   not.
+
+## Adding a device model
+
+A new roaster or meter model gets a fake, and the fake is wired in four places:
+the fake itself in `hardware_fakes/`, an entry in `scripts/fake-hardware.sh`, a row
+in `hardware_fakes/README.md`, and -- so it shows up as a "Try a simulated one"
+choice in the app -- an entry in `KINDS` and a starter in `hardware_fakes/sim.py`
+(`tests/test_simulated_devices.py` fails if the two fall out of step). Raw-USB
+models with no serial or TCP channel (like the Aillio Bullet) are the exception.
+

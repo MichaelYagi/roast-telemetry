@@ -68,6 +68,14 @@ SYNC0, SYNC1 = 0x65, 0x14
 TERM0, TERM1 = 0x0D, 0x0A
 
 
+
+def _open_serial(port: str, **kwargs):
+    """Opens a plain device path (COM3, /dev/ttyUSB0) like pyserial.Serial,
+    and also accepts pyserial URLs such as ``socket://host:port`` -- which is
+    how a remote or simulated device is reached (Serial() alone can't)."""
+    return pyserial.serial_for_url(port, **kwargs)
+
+
 class MS6514EngineError(RuntimeError):
     pass
 
@@ -125,7 +133,7 @@ class MS6514Engine:
         # Opt-in -- off by default. See ModbusEngine's identical parameter
         # for the full rationale.
         detect_milestones: bool = False,
-        serial_cls=pyserial.Serial,  # injectable for testing without real hardware
+        serial_cls=None,  # injectable for testing without real hardware
     ):
         if not port:
             raise ValueError("port (e.g. 'COM5') is required to connect to the MS6514")
@@ -146,7 +154,7 @@ class MS6514Engine:
         self._last_error: Optional[str] = None
 
         try:
-            self._serial = serial_cls(port=port, baudrate=baudrate, bytesize=8, parity="N", stopbits=1, timeout=timeout)
+            self._serial = (serial_cls or _open_serial)(port=port, baudrate=baudrate, bytesize=8, parity="N", stopbits=1, timeout=timeout)
             self._connected = bool(self._serial.is_open)
         except Exception as exc:  # pragma: no cover - depends on local hardware/OS
             self._serial = None

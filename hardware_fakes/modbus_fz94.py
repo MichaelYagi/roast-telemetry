@@ -127,17 +127,26 @@ class _SerialBus:
     every real setup documented for this machine (see module docstring),
     so they're always at least potentially two of these, not one."""
 
-    def __init__(self, port: str, baudrate: int, stopbits: int, name: str, log):
+    def __init__(self, port, baudrate: int, stopbits: int, name: str, log):
         self.name = name
         self._log = log
-        self.ser = pyserial.Serial(
-            port=port, baudrate=baudrate, bytesize=8, parity="N", stopbits=stopbits, timeout=0.2,
+        self._stop = threading.Event()
+        # `port` is normally a serial device path; an already-open
+        # serial-like object (see tcp_serial.TcpServerSerial) is used as-is.
+        self.ser = (
+            pyserial.Serial(port=port, baudrate=baudrate, bytesize=8, parity="N", stopbits=stopbits, timeout=0.2)
+            if isinstance(port, str)
+            else port
         )
+
+    def stop(self) -> None:
+        self._stop.set()
+        self.ser.close()
 
     def run(self, on_frame) -> None:
         buf = b""
         try:
-            while True:
+            while not self._stop.is_set():
                 chunk = self.ser.read(FRAME_LEN)
                 if not chunk:
                     continue
@@ -159,7 +168,7 @@ class _SerialBus:
 class FZ94Simulator:
     def __init__(
         self,
-        port: str,
+        port,
         bt_slave_id: int,
         et_slave_id: int,
         dt_slave_id: int,
@@ -185,6 +194,16 @@ class FZ94Simulator:
             if drive_port
             else None
         )
+
+    @classmethod
+    def with_defaults(cls, port, verbose: bool = False) -> "FZ94Simulator":
+        """The stock FZ-94 wiring (same defaults as the command line)."""
+        return cls(port, 11, 13, 12, 12, 19200, None, 2, 1, 19200, verbose=verbose)
+
+    def stop(self) -> None:
+        self.temp_bus.stop()
+        if self.drive_bus is not None:
+            self.drive_bus.stop()
 
     def _log(self, msg: str) -> None:
         if self.verbose:

@@ -21,6 +21,7 @@ export default function RoastToolbar({
   onStart,
   connectionStatus,
   connectionFailedLabels = [],
+  simulated = false,
 }) {
   const connected = phase !== "idle";
   const recording = phase === "roasting" || phase === "cooling" || phase === "finished";
@@ -53,6 +54,11 @@ export default function RoastToolbar({
               />
             )}
             {title || "Untitled roast"}
+            {simulated && (
+              <span className="simulated-badge" title="A built-in simulated device -- not a real machine">
+                Simulated
+              </span>
+            )}
             {meta && <span className="roast-toolbar-meta"> · {meta}</span>}
           </h2>
           <div className="status-line">{statusText}</div>

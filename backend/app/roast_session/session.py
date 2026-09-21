@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from aillio_bridge import AillioEngine
+from hardware_fakes import sim as simulated_devices
 from alog_playback import (
     AlogPlayer,
     alog_dict_to_points,
@@ -211,114 +212,139 @@ class RoastSession:
         if request.mode == RoastMode.TC4_LIVE:
             self.tc4_port = request.tc4_port
 
-        if request.mode == RoastMode.SIMULATOR:
-            engine = SimulatorEngine()
-        elif request.mode == RoastMode.ALOG_PLAYBACK:
-            if not request.alog_path:
-                raise RoastSessionError("Missing .alog file path -- enter the path to an .alog file on the server (Device tab, \".alog file path\") before connecting.")
-            engine = AlogPlayer(request.alog_path, speed=request.playback_speed)
-        elif request.mode == RoastMode.MODBUS_LIVE:
-            is_tcp = request.modbus_transport == "tcp"
-            if is_tcp:
-                if not request.modbus_host:
-                    raise RoastSessionError("Missing host/IP address -- enter the roaster's IP address (Device tab, \"Host / IP address\") before connecting.")
-            elif not request.modbus_port:
-                raise RoastSessionError("Missing serial port -- enter the COM port (Windows, e.g. COM5) or /dev/tty... path (Linux/macOS) your roaster is connected on (Device tab, \"Serial port\") before connecting.")
-            try:
-                if request.modbus_device_profile_id:
-                    # Profile-driven path -- see ModbusEngine.from_profile
-                    # and DeviceProfile in models.py. Takes over the whole
-                    # register map *and* connection framing (baudrate/
-                    # bytesize/parity/stopbits all come from the profile
-                    # itself, not modbus_baudrate -- that field always has
-                    # a concrete default (19200) even when the operator
-                    # never touched it, so there's no reliable way to tell
-                    # "explicitly overridden" from "just the form default"
-                    # the way the other Optional[...] fields below can).
-                    # control_port still applies -- that's about which
-                    # physical wire, not the profile's own protocol
-                    # details. The 26 flat modbus_* register-map fields
-                    # are simply not consulted when this is set (no
-                    # merging between the two -- see
-                    # RoastCreateRequest.modbus_device_profile_id's own
-                    # docstring for why that's the deliberate choice).
-                    profile_row = storage.get_device_profile_row(request.modbus_device_profile_id)
-                    if profile_row is None:
-                        raise RoastSessionError(f"device profile {request.modbus_device_profile_id!r} not found")
-                    profile = DeviceProfile.from_row(profile_row)
-                    self.modbus_device_profile_name = profile.name
-                    engine = ModbusEngine.from_profile(
-                        profile,
-                        request.modbus_port,
-                        transport=request.modbus_transport,
-                        host=request.modbus_host,
-                        tcp_port=request.modbus_tcp_port,
-                        control_port=request.modbus_control_port,
+        # A simulated device (a "sim://..." port or host) is started here and stopped
+        # with the engine -- see _start_sim below.
+        self._sim: Optional[simulated_devices.SimHandle] = None
+        self._sim_value: Optional[str] = None
+
+        # Anything that goes wrong while building the engine must not leave a
+        # simulated device (see hardware_fakes/sim.py) running behind it.
+        try:
+            if request.mode == RoastMode.SIMULATOR:
+                engine = SimulatorEngine()
+            elif request.mode == RoastMode.ALOG_PLAYBACK:
+                if not request.alog_path:
+                    raise RoastSessionError("Missing .alog file path -- enter the path to an .alog file on the server (Device tab, \".alog file path\") before connecting.")
+                engine = AlogPlayer(request.alog_path, speed=request.playback_speed)
+            elif request.mode == RoastMode.MODBUS_LIVE:
+                is_tcp = request.modbus_transport == "tcp"
+                modbus_port, modbus_host, modbus_tcp_port = request.modbus_port, request.modbus_host, request.modbus_tcp_port
+                modbus_control_port = request.modbus_control_port
+                if is_tcp and simulated_devices.is_simulated(modbus_host):
+                    handle = self._start_sim(modbus_host, RoastMode.MODBUS_LIVE)
+                    modbus_host, modbus_tcp_port = handle.host, handle.port
+                elif not is_tcp and simulated_devices.is_simulated(modbus_port):
+                    handle = self._start_sim(modbus_port, RoastMode.MODBUS_LIVE)
+                    modbus_port, modbus_control_port = handle.serial_url, None
+                if is_tcp:
+                    if not request.modbus_host:
+                        raise RoastSessionError("Missing host/IP address -- enter the roaster's IP address (Device tab, \"Host / IP address\") before connecting.")
+                elif not request.modbus_port:
+                    raise RoastSessionError("Missing serial port -- enter the COM port (Windows, e.g. COM5) or /dev/tty... path (Linux/macOS) your roaster is connected on (Device tab, \"Serial port\") before connecting.")
+                try:
+                    if request.modbus_device_profile_id:
+                        # Profile-driven path -- see ModbusEngine.from_profile
+                        # and DeviceProfile in models.py. Takes over the whole
+                        # register map *and* connection framing (baudrate/
+                        # bytesize/parity/stopbits all come from the profile
+                        # itself, not modbus_baudrate -- that field always has
+                        # a concrete default (19200) even when the operator
+                        # never touched it, so there's no reliable way to tell
+                        # "explicitly overridden" from "just the form default"
+                        # the way the other Optional[...] fields below can).
+                        # control_port still applies -- that's about which
+                        # physical wire, not the profile's own protocol
+                        # details. The 26 flat modbus_* register-map fields
+                        # are simply not consulted when this is set (no
+                        # merging between the two -- see
+                        # RoastCreateRequest.modbus_device_profile_id's own
+                        # docstring for why that's the deliberate choice).
+                        profile_row = storage.get_device_profile_row(request.modbus_device_profile_id)
+                        if profile_row is None:
+                            raise RoastSessionError(f"device profile {request.modbus_device_profile_id!r} not found")
+                        profile = DeviceProfile.from_row(profile_row)
+                        self.modbus_device_profile_name = profile.name
+                        engine = ModbusEngine.from_profile(
+                            profile,
+                            modbus_port,
+                            transport=request.modbus_transport,
+                            host=modbus_host,
+                            tcp_port=modbus_tcp_port,
+                            control_port=modbus_control_port,
+                            dry_end_c=request.dry_end_c,
+                            fc_start_c=request.fc_start_c,
+                            detect_milestones=request.auto_detect_milestones,
+                            client_cls=ModbusTcpClient if is_tcp else ModbusSerialClient,
+                        )
+                    elif is_tcp:
+                        # No sensible flat-register-override default exists for
+                        # TCP the way RTU's FZ-94 defaults do -- and nothing in
+                        # the Configure Roast form can produce this combination
+                        # (the Ethernet Data Source option always pairs with a
+                        # device profile). Guarded explicitly rather than
+                        # silently falling through to the RTU-shaped flat
+                        # constructor below.
+                        raise RoastSessionError("Ethernet Modbus needs a Device Profile -- pick one from the \"Device profile\" dropdown (Device tab); there's no flat register-override fallback for Ethernet the way USB has.")
+                    else:
+                        engine = ModbusEngine(
+                            modbus_port,
+                            baudrate=request.modbus_baudrate,
+                            control_port=modbus_control_port,
+                            control_baudrate=request.modbus_control_baudrate,
+                            dry_end_c=request.dry_end_c,
+                            fc_start_c=request.fc_start_c,
+                            detect_milestones=request.auto_detect_milestones,
+                            **_modbus_register_overrides(request),
+                        )
+                except ValueError as exc:
+                    raise RoastSessionError(str(exc)) from exc
+            elif request.mode == RoastMode.MS6514_LIVE:
+                if not request.ms6514_port:
+                    raise RoastSessionError("Missing serial port -- enter the COM port (Windows, e.g. COM5) or /dev/tty... path (Linux/macOS) the MS6514 meter is connected on (Device tab, \"Serial port\") before connecting.")
+                ms6514_port = request.ms6514_port
+                if simulated_devices.is_simulated(ms6514_port):
+                    ms6514_port = self._start_sim(ms6514_port, RoastMode.MS6514_LIVE).serial_url
+                try:
+                    engine = MS6514Engine(
+                        ms6514_port,
                         dry_end_c=request.dry_end_c,
                         fc_start_c=request.fc_start_c,
                         detect_milestones=request.auto_detect_milestones,
-                        client_cls=ModbusTcpClient if is_tcp else ModbusSerialClient,
                     )
-                elif is_tcp:
-                    # No sensible flat-register-override default exists for
-                    # TCP the way RTU's FZ-94 defaults do -- and nothing in
-                    # the Configure Roast form can produce this combination
-                    # (the Ethernet Data Source option always pairs with a
-                    # device profile). Guarded explicitly rather than
-                    # silently falling through to the RTU-shaped flat
-                    # constructor below.
-                    raise RoastSessionError("Ethernet Modbus needs a Device Profile -- pick one from the \"Device profile\" dropdown (Device tab); there's no flat register-override fallback for Ethernet the way USB has.")
-                else:
-                    engine = ModbusEngine(
-                        request.modbus_port,
-                        baudrate=request.modbus_baudrate,
-                        control_port=request.modbus_control_port,
-                        control_baudrate=request.modbus_control_baudrate,
+                except ValueError as exc:
+                    raise RoastSessionError(str(exc)) from exc
+            elif request.mode == RoastMode.AILLIO_LIVE:
+                if not request.aillio_model:
+                    raise RoastSessionError("Missing Aillio model -- select which Bullet model (Device tab, \"Model\") before connecting.")
+                try:
+                    engine = AillioEngine(
+                        request.aillio_model,
                         dry_end_c=request.dry_end_c,
                         fc_start_c=request.fc_start_c,
                         detect_milestones=request.auto_detect_milestones,
-                        **_modbus_register_overrides(request),
                     )
-            except ValueError as exc:
-                raise RoastSessionError(str(exc)) from exc
-        elif request.mode == RoastMode.MS6514_LIVE:
-            if not request.ms6514_port:
-                raise RoastSessionError("Missing serial port -- enter the COM port (Windows, e.g. COM5) or /dev/tty... path (Linux/macOS) the MS6514 meter is connected on (Device tab, \"Serial port\") before connecting.")
-            try:
-                engine = MS6514Engine(
-                    request.ms6514_port,
-                    dry_end_c=request.dry_end_c,
-                    fc_start_c=request.fc_start_c,
-                    detect_milestones=request.auto_detect_milestones,
-                )
-            except ValueError as exc:
-                raise RoastSessionError(str(exc)) from exc
-        elif request.mode == RoastMode.AILLIO_LIVE:
-            if not request.aillio_model:
-                raise RoastSessionError("Missing Aillio model -- select which Bullet model (Device tab, \"Model\") before connecting.")
-            try:
-                engine = AillioEngine(
-                    request.aillio_model,
-                    dry_end_c=request.dry_end_c,
-                    fc_start_c=request.fc_start_c,
-                    detect_milestones=request.auto_detect_milestones,
-                )
-            except ValueError as exc:
-                raise RoastSessionError(str(exc)) from exc
-        elif request.mode == RoastMode.TC4_LIVE:
-            if not request.tc4_port:
-                raise RoastSessionError("Missing serial port -- enter the COM port (Windows, e.g. COM5) or /dev/tty... path (Linux/macOS) the TC4+ shield is connected on (Device tab, \"Serial port\") before connecting.")
-            try:
-                engine = TC4Engine(
-                    request.tc4_port,
-                    dry_end_c=request.dry_end_c,
-                    fc_start_c=request.fc_start_c,
-                    detect_milestones=request.auto_detect_milestones,
-                )
-            except ValueError as exc:
-                raise RoastSessionError(str(exc)) from exc
-        else:  # pragma: no cover - guarded by enum
-            raise RoastSessionError(f"unsupported mode {request.mode}")
+                except ValueError as exc:
+                    raise RoastSessionError(str(exc)) from exc
+            elif request.mode == RoastMode.TC4_LIVE:
+                if not request.tc4_port:
+                    raise RoastSessionError("Missing serial port -- enter the COM port (Windows, e.g. COM5) or /dev/tty... path (Linux/macOS) the TC4+ shield is connected on (Device tab, \"Serial port\") before connecting.")
+                tc4_port = request.tc4_port
+                if simulated_devices.is_simulated(tc4_port):
+                    tc4_port = self._start_sim(tc4_port, RoastMode.TC4_LIVE).serial_url
+                try:
+                    engine = TC4Engine(
+                        tc4_port,
+                        dry_end_c=request.dry_end_c,
+                        fc_start_c=request.fc_start_c,
+                        detect_milestones=request.auto_detect_milestones,
+                    )
+                except ValueError as exc:
+                    raise RoastSessionError(str(exc)) from exc
+            else:  # pragma: no cover - guarded by enum
+                raise RoastSessionError(f"unsupported mode {request.mode}")
+        except BaseException:
+            self._stop_sim()
+            raise
 
         self._engine = engine
         if request.mode == RoastMode.MODBUS_LIVE:
@@ -393,6 +419,33 @@ class RoastSession:
         self._recorded = False
 
     # -- lifecycle -----------------------------------------------------
+    def _start_sim(self, value: str, mode: RoastMode) -> simulated_devices.SimHandle:
+        """Starts the simulated device a ``sim://...`` port or host names, and
+        tags this roast ``simulated`` so History can tell it from a real one."""
+        try:
+            kind = simulated_devices.kind_of(value)
+        except ValueError as exc:
+            raise RoastSessionError(str(exc)) from exc
+        if kind.mode != mode.value:
+            raise RoastSessionError(f"{kind.label} can't be used with this data source -- pick a simulated device for it, or a real port.")
+        self._sim = simulated_devices.start(value)
+        self._sim_value = value
+        if "simulated" not in self.tags:
+            self.tags.append("simulated")
+        return self._sim
+
+    def _stop_sim(self) -> None:
+        if self._sim is not None:
+            self._sim.stop()
+            self._sim = None
+
+    def _close_engine(self) -> None:
+        """Closes the live engine and, if there is one, the simulated device behind it."""
+        try:
+            self._engine.close()
+        finally:
+            self._stop_sim()
+
     def _persist_new_roast_row(self) -> None:
         storage.insert_roast({
             "id": self.id,
@@ -580,7 +633,7 @@ class RoastSession:
         self.status = RoastStatus.IDLE  # back to idle, not "stopped" -- nothing was ever actually recording
         await asyncio.to_thread(self.device.disconnect)
         if isinstance(self._engine, (ModbusEngine, MS6514Engine, TC4Engine)):
-            self._engine.close()  # release the serial port
+            self._close_engine()  # release the serial port
         await pubsub.publish(self.id, {"type": "finished", "roast_id": self.id, "status": self.status.value})
 
     async def _finish(self, status: RoastStatus) -> None:
@@ -589,7 +642,7 @@ class RoastSession:
         self.duration_s = self.profile[-1]["time_s"] if self.profile else 0.0
         await asyncio.to_thread(self.device.disconnect)
         if isinstance(self._engine, (ModbusEngine, MS6514Engine, TC4Engine)):
-            self._engine.close()  # release the serial port
+            self._close_engine()  # release the serial port
 
         # Written in the native .alog shape (Python-literal syntax
         # + timeindex/computed/specialevents), not a bespoke JSON one --
@@ -977,8 +1030,8 @@ class RoastSessionManager:
         for stale_id, stale in list(self.sessions.items()):
             if stale.mode != request.mode or stale.status != RoastStatus.IDLE or stale._recorded:
                 continue
-            if getattr(stale._engine, engine_attr, None) == port:
-                stale._engine.close()
+            if getattr(stale._engine, engine_attr, None) == port or (stale._sim_value is not None and stale._sim_value == port):
+                stale._close_engine()
                 del self.sessions[stale_id]
 
     def create(self, request: RoastCreateRequest, created_by_username: Optional[str] = None) -> RoastSession:
@@ -1002,7 +1055,7 @@ class RoastSessionManager:
             # noticing BT/ET never populate.
             engine_status = session._engine.status()
             if not engine_status.get("connected", True):
-                session._engine.close()
+                session._close_engine()
                 raise RoastSessionError(engine_status.get("last_error") or "failed to connect to the device")
         self.sessions[roast_id] = session
         return session

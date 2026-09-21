@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import threading
 
 import serial as pyserial
 
@@ -66,6 +67,15 @@ def _handle_command(line: str, driver: ThermalDriver, ser, quiet: bool) -> None:
     # UNITS/OT2/everything else -- no response needed, silently ignored
 
 
+def serve(ser, driver: ThermalDriver, quiet: bool, stop: threading.Event | None = None) -> None:
+    """Answers commands arriving on `ser` until `stop` is set (or forever)."""
+    while stop is None or not stop.is_set():
+        raw = ser.readline()
+        if not raw:
+            continue  # read timeout, no command arrived -- loop and wait again
+        _handle_command(raw.decode("ascii", errors="replace"), driver, ser, quiet)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--port", required=True, help="serial port to serve on, e.g. /tmp/ttyFAKE_TC4")
@@ -78,11 +88,7 @@ def main() -> None:
     print(f"TC4+ fake listening on {ser.port}", file=sys.stderr)
 
     try:
-        while True:
-            raw = ser.readline()
-            if not raw:
-                continue  # read timeout, no command arrived -- loop and wait again
-            _handle_command(raw.decode("ascii", errors="replace"), driver, ser, args.quiet)
+        serve(ser, driver, args.quiet)
     except KeyboardInterrupt:
         pass
     finally:

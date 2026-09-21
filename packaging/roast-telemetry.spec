@@ -137,6 +137,16 @@ hidden_imports = [
     "backend.app.api.device_profiles",
     "backend.app.api.devices",
     "backend.app.api.files",
+    # Built-in simulated devices (hardware_fakes/sim.py) run inside the server, so
+    # they ship in every build.
+    "hardware_fakes",
+    "hardware_fakes.sim",
+    "hardware_fakes._thermal",
+    "hardware_fakes.tcp_serial",
+    "hardware_fakes.modbus_fz94",
+    "hardware_fakes.modbus_fz94_evo",
+    "hardware_fakes.ms6514_device",
+    "hardware_fakes.tc4",
     "backend.app.api.presets",
     "backend.app.api.roasts",
     "backend.app.api.serial_ports",

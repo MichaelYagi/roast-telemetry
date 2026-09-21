@@ -3074,3 +3074,67 @@ button:disabled {
   flex: 1;
   min-width: 0;
 }
+
+/* Simulated devices (see simulated.js / SimulatedDeviceHint.jsx) */
+.simulated-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  color: #7c2d12;
+  background: #fed7aa;
+  border: 1px solid #fdba74;
+  border-radius: 999px;
+}
+
+:root[data-theme="dark"] .simulated-badge {
+  color: #fed7aa;
+  background: #7c2d12;
+  border-color: #9a3412;
+}
+
+.simulated-hint {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.simulated-hint .simulated-badge {
+  margin-left: 0;
+  margin-right: 0.4rem;
+}
+
+button.link-neutral {
+  padding: 0;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.simulated-note {
+  margin: 0 0 0.6rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  background: var(--accent-soft);
+  border-radius: 6px;
+}
+
+.simulated-note .simulated-badge {
+  margin-left: 0;
+  margin-right: 0.4rem;
+}
+
+.stats-note {
+  flex-basis: 100%;
+  margin: 0;
+}

@@ -119,6 +119,11 @@ class FZ94EvoSimulator:
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._sock.bind((host, port))
         self._sock.listen(1)
+        # accept() wakes regularly to notice stop() -- closing a socket from another
+        # thread doesn't reliably interrupt a blocked accept() on every OS.
+        self._sock.settimeout(0.3)
+        self.port = self._sock.getsockname()[1]  # the real port when 0 (pick any free one) was asked for
+        self._stopping = False
 
     def _log(self, msg: str) -> None:
         if self.verbose:
@@ -131,7 +136,17 @@ class FZ94EvoSimulator:
         )
         try:
             while True:
-                conn, addr = self._sock.accept()
+                try:
+                    conn, addr = self._sock.accept()
+                except socket.timeout:
+                    if self._stopping:
+                        break
+                    continue
+                except OSError:
+                    if self._stopping:
+                        break
+                    raise
+                conn.settimeout(None)
                 self._log(f"client connected: {addr}")
                 threading.Thread(target=self._serve_client, args=(conn,), daemon=True).start()
         except KeyboardInterrupt:
@@ -139,6 +154,14 @@ class FZ94EvoSimulator:
         finally:
             self.driver.stop()
             self._sock.close()
+
+    def stop(self) -> None:
+        """Ends run() (used when the server starts this fake itself)."""
+        self._stopping = True
+        try:
+            self._sock.close()
+        except OSError:
+            pass
 
     def _serve_client(self, conn: socket.socket) -> None:
         buf = bytearray()

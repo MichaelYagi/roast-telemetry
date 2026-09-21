@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import threading
 import time
 
 import serial as pyserial
@@ -57,6 +58,21 @@ def _build_frame(t1_c: float, t2_c: float) -> bytes:
     return bytes(frame)
 
 
+def stream(ser, driver: ThermalDriver, quiet: bool, stop: threading.Event | None = None) -> None:
+    """Streams frames on `ser` until `stop` is set (or forever)."""
+    while stop is None or not stop.is_set():
+        snap = driver.snapshot()
+        bt, et = snap["bt"], snap["et"]
+        if bt is not None and et is not None:
+            ser.write(_build_frame(bt, et))
+            if not quiet:
+                print(f"t={snap['time_s']:.0f}s T1(BT)={bt:.1f} T2(ET)={et:.1f}", file=sys.stderr)
+        if stop is not None:
+            stop.wait(FRAME_INTERVAL_S)
+        else:
+            time.sleep(FRAME_INTERVAL_S)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--port", required=True, help="serial port to write on, e.g. /tmp/ttyFAKE_METER")
@@ -69,14 +85,7 @@ def main() -> None:
     print(f"MS6514 fake streaming on {ser.port}", file=sys.stderr)
 
     try:
-        while True:
-            snap = driver.snapshot()
-            bt, et = snap["bt"], snap["et"]
-            if bt is not None and et is not None:
-                ser.write(_build_frame(bt, et))
-                if not args.quiet:
-                    print(f"t={snap['time_s']:.0f}s T1(BT)={bt:.1f} T2(ET)={et:.1f}", file=sys.stderr)
-            time.sleep(FRAME_INTERVAL_S)
+        stream(ser, driver, args.quiet)
     except KeyboardInterrupt:
         pass
     finally:
