@@ -92,6 +92,18 @@ def _modbus_register_overrides(request: RoastCreateRequest) -> dict:
     return overrides
 
 
+def roast_duration_s(profile: list, events: list) -> float:
+    """A roast's duration is Charge to Drop -- the same span the phase
+    percentages use, and what "roast time" means when roasting. Without
+    both markers (a roast stopped early, or one that never marked them) it
+    falls back to the length of the recording."""
+    charge = next((e for e in events if e.get("type") == "CHARGE"), None)
+    drop = next((e for e in events if e.get("type") == "DROP"), None)
+    if charge and drop and drop["time_s"] > charge["time_s"]:
+        return round(drop["time_s"] - charge["time_s"], 1)
+    return profile[-1]["time_s"] if profile else 0.0
+
+
 def _clean_note_text(text: str) -> str:
     """Notes are stored one per line in the .alog file's free-text field,
     so a note is a single line: line breaks become spaces. Blank is
@@ -663,7 +675,7 @@ class RoastSession:
     async def _finish(self, status: RoastStatus) -> None:
         self._stop_requested.set()
         self.status = status
-        self.duration_s = self.profile[-1]["time_s"] if self.profile else 0.0
+        self.duration_s = roast_duration_s(self.profile, self.events)
         await asyncio.to_thread(self.device.disconnect)
         if isinstance(self._engine, (ModbusEngine, MS6514Engine, TC4Engine)):
             self._close_engine()  # release the serial port
@@ -941,6 +953,14 @@ class RoastSession:
             )
             save_native_alog(self.alog_path, alog_dict)
 
+    def _refresh_duration(self) -> None:
+        """Moving or removing Charge/Drop changes the roast's duration --
+        but only once it's finished and saved (a live roast's duration is
+        set when it ends)."""
+        if self.status in (RoastStatus.COMPLETE, RoastStatus.STOPPED, RoastStatus.ABORTED):
+            self.duration_s = roast_duration_s(self.profile, self.events)
+            storage.update_roast(self.id, duration_s=self.duration_s)
+
     def set_weight_roasted(self, grams: Optional[float]) -> None:
         # The natural workflow is: roast finishes, beans cool, *then* get
         # weighed -- by that point _finish() has already run and this
@@ -982,6 +1002,7 @@ class RoastSession:
         it only removes this one event marker."""
         event, _ = _find_editable_milestone(self.events, event_id)
         self.events.remove(event)
+        self._refresh_duration()
         self._rewrite_alog()
 
     def retime_event(self, event_id: str, new_time_s: float) -> dict:
@@ -991,6 +1012,7 @@ class RoastSession:
         recompute logic, shared with RoastSessionManager's cold-roast
         path."""
         event = _retime_milestone(self.events, self.profile, event_id, new_time_s)
+        self._refresh_duration()
         self._rewrite_alog()
         return event
 
@@ -1210,6 +1232,7 @@ class RoastSessionManager:
         row, parsed = self._cold_roast_row_and_parsed(roast_id)
         event, _ = _find_editable_milestone(parsed["events"], event_id)
         parsed["events"].remove(event)
+        storage.update_roast(roast_id, duration_s=roast_duration_s(parsed["profile"], parsed["events"]))
         self._rewrite_cold_alog(row, parsed)
 
     def retime_event(self, roast_id: str, event_id: str, new_time_s: float) -> dict:
@@ -1218,6 +1241,7 @@ class RoastSessionManager:
             return session.retime_event(event_id, new_time_s)
         row, parsed = self._cold_roast_row_and_parsed(roast_id)
         event = _retime_milestone(parsed["events"], parsed["profile"], event_id, new_time_s)
+        storage.update_roast(roast_id, duration_s=roast_duration_s(parsed["profile"], parsed["events"]))
         self._rewrite_cold_alog(row, parsed)
         return event
 
@@ -1307,6 +1331,24 @@ class RoastSessionManager:
                 pass  # already gone, or never written (e.g. a stale/orphaned row) -- fine either way
         storage.delete_roast_row(roast_id)
 
+    def backfill_durations(self) -> None:
+        """One-time pass over roasts saved before duration meant Charge to
+        Drop: recompute it from each roast's own .alog. Runs once (tracked
+        with SQLite's user_version) and skips any file it can't read."""
+        if storage.get_schema_version() >= 1:
+            return
+        for row in storage.list_roast_rows(limit=100000):
+            if not row.get("alog_path") or not os.path.exists(row["alog_path"]):
+                continue
+            try:
+                parsed = alog_dict_to_points(load_alog(row["alog_path"]))
+                new_duration = roast_duration_s(parsed["profile"], parsed["events"])
+            except Exception:
+                continue
+            if row.get("duration_s") is None or abs(new_duration - row["duration_s"]) > 0.05:
+                storage.update_roast(row["id"], duration_s=new_duration)
+        storage.set_schema_version(1)
+
     def list_summaries(self, **filters) -> list[RoastSummary]:
         rows = storage.list_roast_rows(**filters)
         tag_map = storage.get_tags_for_roasts([r["id"] for r in rows])
@@ -1336,7 +1378,7 @@ class RoastSessionManager:
         os.makedirs(os.path.dirname(os.path.abspath(dest_path)), exist_ok=True)
         shutil.copyfile(source_path, dest_path)
         parsed = alog_dict_to_points(data)
-        duration_s = parsed["profile"][-1]["time_s"] if parsed["profile"] else 0.0
+        duration_s = roast_duration_s(parsed["profile"], parsed["events"])
         summary = {
             "id": roast_id,
             "title": title or data.get("title") or "Imported roast",

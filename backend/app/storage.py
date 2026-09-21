@@ -153,6 +153,16 @@ def _conn() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+def get_schema_version() -> int:
+    with _conn() as c:
+        return c.execute("PRAGMA user_version").fetchone()[0]
+
+
+def set_schema_version(version: int) -> None:
+    with _conn() as c:
+        c.execute(f"PRAGMA user_version = {int(version)}")
+
+
 def init_db() -> None:
     with _conn() as c:
         c.executescript(_SCHEMA)

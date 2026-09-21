@@ -13,6 +13,7 @@ from . import auth, storage
 from .api import auth as auth_api
 from .api import device_profiles, devices, files, presets, roasts, serial_ports, settings
 from .models import DeviceProfileCreateRequest, RoastCreateRequest, UserStatus
+from .roast_session import session_manager
 from .version import VERSION
 from modbus_bridge.device_profiles import BUILT_IN_PROFILES
 
@@ -71,6 +72,7 @@ async def lifespan(app: FastAPI):
     # make it permanently unreachable and unstoppable. See
     # storage.abort_stale_roasts for the full rationale.
     storage.abort_stale_roasts()
+    session_manager.backfill_durations()
     storage.seed_default_presets([
         {
             "id": p["id"],

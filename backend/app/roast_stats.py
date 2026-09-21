@@ -109,6 +109,13 @@ def weight_loss_pct(roast: Roast) -> Optional[float]:
     return None
 
 
+def _charge_to_drop_s(events: dict[str, dict]) -> Optional[float]:
+    charge, drop = events.get("CHARGE"), events.get("DROP")
+    if charge and drop and drop.time_s > charge.time_s:
+        return round(drop.time_s - charge.time_s, 1)
+    return None
+
+
 def compute_roast_stats(roast: Roast) -> RoastStats:
     events = events_by_type(roast)
     profile = [p.model_dump() for p in roast.profile]
@@ -118,7 +125,7 @@ def compute_roast_stats(roast: Roast) -> RoastStats:
     flags = ror_flags(profile, events) if "TURNING_POINT" in events else {"crashes": [], "flatlines": [], "flicks": []}
     return RoastStats(
         weight_loss_pct=weight_loss_pct(roast),
-        duration_s=roast.duration_s,
+        duration_s=_charge_to_drop_s(events) if _charge_to_drop_s(events) is not None else roast.duration_s,
         phases=phases,
         dry_pct=dry["pct_of_roast"] if dry else None,
         dtr_pct=dev["pct_of_roast"] if dev else None,
