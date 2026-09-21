@@ -2018,9 +2018,17 @@ button:disabled {
 .kv-list li {
   display: flex;
   justify-content: space-between;
+  gap: 0.75rem;
   padding: 0.3rem 0;
   border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
+}
+
+/* Values that wrap onto a second line stay against the right edge, like
+   the short ones. */
+.kv-list li > span:last-child {
+  text-align: right;
+  min-width: 0;
 }
 
 /* The weight edit row (input + "g" + Save/Cancel) stays on one line in
