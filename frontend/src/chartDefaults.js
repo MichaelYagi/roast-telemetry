@@ -6,10 +6,14 @@
 // Rates convert by scale only (no +32), temperatures by the full formula.
 export const RATE_SCALE_F = 1.8;
 
-// Never lower than this, so the curve sits where people expect; a hotter roast
-// simply grows the axis (suggestedMax) instead of running off the top.
-export function tempAxisSuggestedMax(unit) {
-  return unit === "f" ? 527 : 275;
+// The top of the temperature axis: 350 C or 527 F (the usual roasting-chart
+// defaults) unless the data gets close to it, then the next 50 up. An exact
+// number rather than a "nice" tick (Chart.js rounds a suggested max up to the
+// next tick, which turned 527 F into 600).
+export function tempAxisMax(unit, dataMax) {
+  const floor = unit === "f" ? 527 : 350;
+  if (dataMax == null || !Number.isFinite(dataMax) || dataMax <= floor - 15) return floor;
+  return Math.max(floor, Math.ceil((dataMax + 10) / 50) * 50);
 }
 
 // 0 in both units: the control lines (Burner/Air/Drum/Damper, 0-100) share this
@@ -26,8 +30,18 @@ export function rorAxisRange(unit) {
   return unit === "f" ? { min: 0, max: 45 } : { min: 0, max: 25 };
 }
 
-// Seconds. Starts 30 s before Charge; ten minutes by default, growing to fit a longer roast.
+// Seconds. While a roast is being recorded the axis starts 30 s before Charge and
+// shows ten minutes, growing to fit a longer roast. A finished or loaded roast
+// instead fills the chart: from just before Charge to the end of the recording.
 export const TIME_AXIS = { min: -30, suggestedMax: 600 };
+
+export function timeAxisFor(finished, durationS) {
+  if (finished && durationS != null && durationS > 0) {
+    const lead = Math.max(3, durationS * 0.05);
+    return { min: -lead, max: durationS * 1.01 };
+  }
+  return TIME_AXIS;
+}
 
 // m:ss, with a leading minus before Charge (-0:30).
 export function formatTime(seconds) {

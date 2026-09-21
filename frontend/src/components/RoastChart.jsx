@@ -11,7 +11,7 @@ import zoomPlugin from "chartjs-plugin-zoom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { api } from "../api/client.js";
-import { TIME_AXIS, formatTime, rorAxisRange, seriesLineWidth, tempAxisMin, tempAxisSuggestedMax } from "../chartDefaults.js";
+import { formatTime, rorAxisRange, seriesLineWidth, tempAxisMax, tempAxisMin, timeAxisFor } from "../chartDefaults.js";
 import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 import { TERM_TOOLTIPS } from "../termTooltips.js";
 
@@ -593,6 +593,17 @@ export default function RoastChart({
     return { datasets };
   }, [seriesDefs, profile, events, background, visible, endTime, tempUnit]);
 
+  // The highest temperature on the chart, so the axis can grow past its default top.
+  const tempDataMax = useMemo(() => {
+    let max = null;
+    for (const d of data.datasets) {
+      if (d.yAxisID !== "yTemp" || d.isControl) continue;
+      for (const p of d.data) if (p.y != null && (max == null || p.y > max)) max = p.y;
+    }
+    return max;
+  }, [data]);
+  const timeAxis = timeAxisFor(interactive, endTime);
+
   const showTemp = visible.BT || visible.ET;
   const showRor = visible.ROR_BT || visible.ROR_ET;
   const showControl = visible.Burner || visible.Air || visible.Drum || visible.Damper;
@@ -748,25 +759,25 @@ export default function RoastChart({
       scales: {
         x: {
           type: "linear",
-          min: TIME_AXIS.min,
-          suggestedMax: TIME_AXIS.suggestedMax,
+          min: timeAxis.min,
+          ...(timeAxis.max != null ? { max: timeAxis.max } : { suggestedMax: timeAxis.suggestedMax }),
           grid: { color: "#e7e5e4" },
           title: { display: true, text: "mins", color: "#78716c" },
-          ticks: { callback: (value) => formatTime(value), color: "#78716c", maxTicksLimit: 8 },
+          ticks: { callback: (value) => formatTime(value), color: "#78716c", maxTicksLimit: 8, includeBounds: false },
         },
         yTemp: {
           type: "linear",
           position: "left",
           grid: { color: "#e7e5e4" },
-          ticks: { color: "#78716c" },
+          ticks: { color: "#78716c", includeBounds: false },
           display: showTemp || showControl,
           // Without an explicit floor, Chart.js auto-fits to the visible
           // data's own min (e.g. ~82C at Turning Point), starting the
-          // axis mid-way up rather than at a real baseline. 32 (not 0) in
-          // Fahrenheit mode -- same physical floor (0°C), converted.
+          // axis mid-way up rather than at a real baseline. 0 in both
+          // units: the control lines (0-100) sit in the low band of this axis.
           min: tempAxisMin(),
-          // At least the usual 0-275 C range; a hotter roast grows it.
-          suggestedMax: tempAxisSuggestedMax(tempUnit),
+          // 350 C / 527 F unless the roast runs hotter (then the next 50 up).
+          max: tempAxisMax(tempUnit, tempDataMax),
         },
         yRor: {
           type: "linear",
@@ -784,7 +795,7 @@ export default function RoastChart({
         },
       },
     }),
-    [events, phases, showTemp, showRor, showControl, tempUnit, hideEventLabels, interactive, onRetimeEvent, handleDragMove, handleDragEnd]
+    [events, phases, showTemp, showRor, showControl, tempUnit, tempDataMax, timeAxis.min, timeAxis.max, hideEventLabels, interactive, onRetimeEvent, handleDragMove, handleDragEnd]
   );
 
   return (
