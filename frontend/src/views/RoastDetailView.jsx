@@ -7,6 +7,7 @@ import { isSimulatedRoast } from "../simulated.js";
 import RoastStatsPanel from "../components/RoastStatsPanel.jsx";
 import NotesPanel from "../components/NotesPanel.jsx";
 import WeightField from "../components/WeightField.jsx";
+import { formatTime } from "../chartDefaults.js";
 import { formatTemp } from "../tempUnits.js";
 
 // Mirrors the Configure Roast form's <option> labels (LiveRoastView.jsx)
@@ -385,8 +386,7 @@ export default function RoastDetailView() {
           <ul className="event-feed">
             {roast.events.map((ev) => (
               <li key={ev.id}>
-                <strong>{ev.label}</strong> @ {Math.floor(ev.time_s / 60)}:
-                {String(Math.round(ev.time_s % 60)).padStart(2, "0")}
+                <strong>{ev.label}</strong> @ {formatTime(ev.time_s)}
                 {ev.value != null && ev.channel ? ` (${ev.channel}: ${ev.value})` : ev.value != null ? ` (${formatTemp(ev.value, tempUnit)})` : ""}
               </li>
             ))}

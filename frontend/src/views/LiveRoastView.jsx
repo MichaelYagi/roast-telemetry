@@ -46,9 +46,12 @@ function defaultTitle() {
 
 function formatElapsed(seconds) {
   if (seconds == null) return "00:00";
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  // Before Charge the roast clock is negative ("-00:06"), not "-1:-6".
+  const total = Math.round(Math.abs(seconds));
+  const sign = seconds < 0 && total > 0 ? "-" : "";
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${sign}${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
 const LIVE_MODES = ["modbus_live", "ms6514_live", "aillio_live", "tc4_live"];

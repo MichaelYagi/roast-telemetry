@@ -45,8 +45,8 @@ export function timeAxisFor(finished, durationS) {
 
 // m:ss, with a leading minus before Charge (-0:30).
 export function formatTime(seconds) {
-  const sign = seconds < 0 ? "-" : "";
   const total = Math.round(Math.abs(seconds));
+  const sign = seconds < 0 && total > 0 ? "-" : "";
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${sign}${m}:${s.toString().padStart(2, "0")}`;
