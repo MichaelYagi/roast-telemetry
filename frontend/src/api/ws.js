@@ -77,7 +77,11 @@ export function useRoastStream(roastId) {
       } else if (message.type === "finished") {
         setRoast((prev) => (prev ? { ...prev, status: message.status } : prev));
       } else if (message.type === "note") {
-        setRoast((prev) => (prev ? { ...prev, notes: [...prev.notes, message.note] } : prev));
+        setRoast((prev) =>
+          prev && !prev.notes.some((n) => n.id === message.note.id) ? { ...prev, notes: [...prev.notes, message.note] } : prev
+        );
+      } else if (message.type === "notes") {
+        setRoast((prev) => (prev ? { ...prev, notes: message.notes } : prev));
       } else if (message.type === "event") {
         setRoast((prev) => (prev ? { ...prev, events: [...prev.events, message.event] } : prev));
       } else if (message.type === "event_deleted") {

@@ -67,6 +67,8 @@ export const api = {
   getRoastStats: (id) => request(`/roasts/${id}/stats`),
   getRoastStatsBatch: (params = {}) => request(`/roasts/stats-batch?${new URLSearchParams(params)}`),
   addNote: (id, note) => request(`/roasts/${id}/notes`, { method: "POST", body: JSON.stringify(note) }),
+  updateNote: (id, noteId, text) => request(`/roasts/${id}/notes/${noteId}`, { method: "PATCH", body: JSON.stringify({ text }) }),
+  deleteNote: (id, noteId) => request(`/roasts/${id}/notes/${noteId}`, { method: "DELETE" }),
   addEvent: (id, event) => request(`/roasts/${id}/events`, { method: "POST", body: JSON.stringify(event) }),
   deleteEvent: (id, eventId) => request(`/roasts/${id}/events/${eventId}`, { method: "DELETE" }),
   retimeEvent: (id, eventId, timeS) =>

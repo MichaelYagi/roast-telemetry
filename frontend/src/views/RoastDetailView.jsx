@@ -5,6 +5,7 @@ import RoastChart from "../components/RoastChart.jsx";
 import RoastReviewCard from "../components/RoastReviewCard.jsx";
 import { isSimulatedRoast } from "../simulated.js";
 import RoastStatsPanel from "../components/RoastStatsPanel.jsx";
+import NotesPanel from "../components/NotesPanel.jsx";
 import WeightField from "../components/WeightField.jsx";
 import { formatTemp } from "../tempUnits.js";
 
@@ -392,15 +393,11 @@ export default function RoastDetailView() {
           </ul>
         </div>
 
-        <div className="panel">
-          <h3>Notes</h3>
-          <ul className="note-feed">
-            {roast.notes.map((n) => (
-              <li key={n.id}>{n.text}</li>
-            ))}
-            {roast.notes.length === 0 && <li>No notes.</li>}
-          </ul>
-        </div>
+        <NotesPanel
+          roastId={roast.id}
+          notes={roast.notes}
+          onReplace={(notes) => setRoast((r) => (r ? { ...r, notes } : r))}
+        />
 
         <RoastReviewCard roastId={roast.id} roastActive={roast.status === "roasting" || roast.status === "cooling"} />
       </div>

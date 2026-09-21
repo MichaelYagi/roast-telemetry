@@ -1847,11 +1847,11 @@ button:disabled {
   font-size: 0.9rem;
 }
 
-/* On a finished roast's page nothing is still growing, so the feeds just
-   take the height they need instead of scrolling inside a fixed box. (The
-   Live Roast page keeps the cap: events pile up there while roasting.) */
-.detail-grid .event-feed,
-.detail-grid .note-feed {
+/* On a finished roast's page the Events list takes the height it needs
+   instead of scrolling inside a fixed box. Notes can keep growing, so that
+   list keeps its cap and scrolls once it gets long. (The Live Roast page
+   keeps the cap on both: events pile up there while roasting.) */
+.detail-grid .event-feed {
   max-height: none;
   overflow-y: visible;
 }
@@ -3714,4 +3714,40 @@ button.link-neutral {
   .theme-picker-label {
     display: none;
   }
+}
+
+/* Notes: each note's text with its edit/delete links underneath, left-aligned */
+.note-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.note-item .note-text {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.note-actions {
+  display: inline-flex;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.note-editing {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.note-editing textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.notes-panel .note-input textarea {
+  width: 100%;
+  box-sizing: border-box;
 }

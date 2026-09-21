@@ -24,6 +24,7 @@ from ..models import (
     EventCreateRequest,
     EventUpdateRequest,
     NoteCreateRequest,
+    NoteUpdateRequest,
     ReviewStatus,
     Roast,
     RoastCreateRequest,
@@ -289,14 +290,48 @@ def send_command(roast_id: str, command: ControlCommand) -> dict:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+def _notes_message(roast_id: str) -> dict:
+    # After an edit or delete other open pages get the whole list, so none
+    # of them is left holding an id that no longer matches.
+    roast = session_manager.get_roast_detail(roast_id)
+    return {"type": "notes", "roast_id": roast_id, "notes": roast.notes if roast else []}
+
+
 @router.post("/{roast_id}/notes")
-async def add_note(roast_id: str, note: NoteCreateRequest) -> dict:
-    session = session_manager.get(roast_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found or not active")
-    created = session.add_note(note)
+async def add_note(roast_id: str, note: NoteCreateRequest, http_request: Request) -> dict:
+    # Works during a roast and after it (a finished roast's notes are
+    # rewritten into its .alog file), same warm/cold split as the weights.
+    _require_roast_exists(roast_id)
+    if not note.author:
+        user = getattr(http_request.state, "user", None)
+        note.author = user["username"] if user else None
+    try:
+        created = session_manager.add_note(roast_id, note)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     await pubsub.publish(roast_id, {"type": "note", "roast_id": roast_id, "note": created})
     return created
+
+
+@router.patch("/{roast_id}/notes/{note_id}")
+async def update_note(roast_id: str, note_id: str, update: NoteUpdateRequest) -> dict:
+    _require_roast_exists(roast_id)
+    try:
+        updated = session_manager.update_note(roast_id, note_id, update.text)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await pubsub.publish(roast_id, _notes_message(roast_id))
+    return updated
+
+
+@router.delete("/{roast_id}/notes/{note_id}", status_code=204)
+async def delete_note(roast_id: str, note_id: str) -> None:
+    _require_roast_exists(roast_id)
+    try:
+        session_manager.delete_note(roast_id, note_id)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await pubsub.publish(roast_id, _notes_message(roast_id))
 
 
 @router.post("/{roast_id}/events")

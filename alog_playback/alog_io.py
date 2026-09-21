@@ -32,6 +32,7 @@ from __future__ import annotations
 import ast
 import bisect
 import copy
+import hashlib
 import json
 import os
 import re
@@ -345,7 +346,7 @@ def roast_to_native_alog_dict(
     # recovers them -- writing an extra `notes` key here (a shape the
     # format doesn't have) was tried first and is exactly what made
     # other readers reject the file as invalid.
-    notes_text = "\n".join(f"[{n.get('time_s', 0):.0f}s] {n.get('text', '')}" for n in notes)
+    notes_text = "\n".join(_format_note_line(n) for n in notes)
 
     # Temp axis range, sized to this roast's own temperatures. 0 as a floor (a roast chart never
     # needs to show sub-zero), max recorded temp rounded up to the next
@@ -687,7 +688,37 @@ def alog_dict_to_points(data: dict) -> dict:
     }
 
 
-_ROASTINGNOTES_LINE_RE = re.compile(r"^\[(\d+)s\] (.*)$")
+# One note per line: "[<seconds>s] text", or "[<seconds>s @<who>] text" when
+# the note has an author. Files written before authors/tenths were kept
+# hold "[<whole seconds>s] text", which this still reads.
+_ROASTINGNOTES_LINE_RE = re.compile(r"^\[(\d+(?:\.\d+)?)s(?: @([^\]]+))?\] (.*)$")
+
+
+def _format_note_line(note: dict) -> str:
+    author = re.sub(r"[\]\r\n]", "", str(note.get("author") or "")).strip()
+    who = f" @{author}" if author else ""
+    return f"[{float(note.get('time_s') or 0):.1f}s{who}] {note.get('text', '')}"
+
+
+def round_note_time(time_s: float) -> float:
+    """Notes keep tenths of a second -- what the saved line holds."""
+    return round(float(time_s), 1)
+
+
+def assign_note_ids(notes: list) -> list:
+    """Gives each note an id made from its own content (time, author, text)
+    so the same note has the same id in memory and after it's read back from
+    the file, and an id held by a stale page simply stops matching once the
+    note is edited or deleted -- it never lands on a different note. Notes
+    with identical content get a numbered suffix."""
+    seen: dict[str, int] = {}
+    for n in notes:
+        key = "\x00".join([f"{float(n.get('time_s') or 0):.1f}", str(n.get("author") or ""), str(n.get("text") or "")])
+        digest = "n" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:10]
+        count = seen.get(digest, 0)
+        seen[digest] = count + 1
+        n["id"] = digest if count == 0 else f"{digest}-{count}"
+    return notes
 
 
 def _extract_notes(data: dict) -> list[dict]:
@@ -700,10 +731,16 @@ def _extract_notes(data: dict) -> list[dict]:
     here so this app's own reader still recovers individual notes."""
     raw = data.get("notes")
     if raw:
-        return list(raw)
+        return assign_note_ids([dict(n) for n in raw])
     notes = []
-    for i, line in enumerate(str(data.get("roastingnotes") or "").splitlines()):
+    for line in str(data.get("roastingnotes") or "").splitlines():
         m = _ROASTINGNOTES_LINE_RE.match(line)
         if m:
-            notes.append({"id": f"note-{i}", "time_s": float(m.group(1)), "text": m.group(2), "author": None})
-    return notes
+            notes.append({"time_s": float(m.group(1)), "text": m.group(3), "author": m.group(2) or None})
+        elif line.strip():
+            # Free text without a "[<time>s]" prefix (e.g. an imported
+            # file's own roasting notes): keep it as a note at time 0 so
+            # it shows up and isn't dropped the next time the file is
+            # rewritten.
+            notes.append({"time_s": 0.0, "text": line.strip(), "author": None})
+    return assign_note_ids(notes)

@@ -778,6 +778,10 @@ class NoteCreateRequest(BaseModel):
     author: Optional[str] = None
 
 
+class NoteUpdateRequest(BaseModel):
+    text: str
+
+
 class EventCreateRequest(BaseModel):
     type: RoastEventType
     label: str

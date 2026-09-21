@@ -16,7 +16,9 @@ from hardware_fakes import sim as simulated_devices
 from alog_playback import (
     AlogPlayer,
     alog_dict_to_points,
+    assign_note_ids,
     load_alog,
+    round_note_time,
     roast_to_native_alog_dict,
     save_native_alog,
 )
@@ -87,6 +89,23 @@ def _modbus_register_overrides(request: RoastCreateRequest) -> dict:
     if request.modbus_burner_sv_min_c is not None and request.modbus_burner_sv_max_c is not None:
         overrides["burner_sv_range_c"] = (request.modbus_burner_sv_min_c, request.modbus_burner_sv_max_c)
     return overrides
+
+
+def _clean_note_text(text: str) -> str:
+    """Notes are stored one per line in the .alog file's free-text field,
+    so a note is a single line: line breaks become spaces. Blank is
+    rejected."""
+    cleaned = " ".join(text.split())
+    if not cleaned:
+        raise RoastSessionError("a note can't be empty")
+    return cleaned
+
+
+def _find_note(notes: list, note_id: str) -> dict:
+    note = next((n for n in notes if n["id"] == note_id), None)
+    if note is None:
+        raise RoastSessionError("That note was changed or removed elsewhere -- showing the latest notes.")
+    return note
 
 
 def _find_editable_milestone(events: list, event_id: str) -> tuple[dict, "RoastEventType"]:
@@ -694,13 +713,28 @@ class RoastSession:
 
     def add_note(self, req: NoteCreateRequest) -> dict:
         note = {
-            "id": str(uuid.uuid4()),
-            "time_s": self.profile[-1]["time_s"] if self.profile else 0.0,
-            "text": req.text,
+            "time_s": round_note_time(self.profile[-1]["time_s"] if self.profile else 0.0),
+            "text": _clean_note_text(req.text),
             "author": req.author,
         }
         self.notes.append(note)
+        assign_note_ids(self.notes)
+        # A no-op while the roast is still recording (no .alog yet -- it's
+        # written once at the end); after that it keeps the file in step.
+        self._rewrite_alog()
         return note
+
+    def update_note(self, note_id: str, text: str) -> dict:
+        note = _find_note(self.notes, note_id)
+        note["text"] = _clean_note_text(text)
+        assign_note_ids(self.notes)
+        self._rewrite_alog()
+        return note
+
+    def delete_note(self, note_id: str) -> None:
+        self.notes.remove(_find_note(self.notes, note_id))
+        assign_note_ids(self.notes)
+        self._rewrite_alog()
 
     def add_event(self, req: EventCreateRequest) -> dict:
         if req.type in MILESTONE_SEQUENCE:
@@ -1184,6 +1218,42 @@ class RoastSessionManager:
         event = _retime_milestone(parsed["events"], parsed["profile"], event_id, new_time_s)
         self._rewrite_cold_alog(row, parsed)
         return event
+
+    def add_note(self, roast_id: str, req: NoteCreateRequest) -> dict:
+        session = self.get(roast_id)
+        if session is not None:
+            return session.add_note(req)
+        row, parsed = self._cold_roast_row_and_parsed(roast_id)
+        note = {
+            "time_s": round_note_time(parsed["profile"][-1]["time_s"] if parsed["profile"] else 0.0),
+            "text": _clean_note_text(req.text),
+            "author": req.author,
+        }
+        parsed["notes"].append(note)
+        assign_note_ids(parsed["notes"])
+        self._rewrite_cold_alog(row, parsed)
+        return note
+
+    def update_note(self, roast_id: str, note_id: str, text: str) -> dict:
+        session = self.get(roast_id)
+        if session is not None:
+            return session.update_note(note_id, text)
+        row, parsed = self._cold_roast_row_and_parsed(roast_id)
+        note = _find_note(parsed["notes"], note_id)
+        note["text"] = _clean_note_text(text)
+        assign_note_ids(parsed["notes"])
+        self._rewrite_cold_alog(row, parsed)
+        return note
+
+    def delete_note(self, roast_id: str, note_id: str) -> None:
+        session = self.get(roast_id)
+        if session is not None:
+            session.delete_note(note_id)
+            return
+        row, parsed = self._cold_roast_row_and_parsed(roast_id)
+        parsed["notes"].remove(_find_note(parsed["notes"], note_id))
+        assign_note_ids(parsed["notes"])
+        self._rewrite_cold_alog(row, parsed)
 
     def set_weight_roasted(self, roast_id: str, grams: Optional[float]) -> None:
         session = self.get(roast_id)

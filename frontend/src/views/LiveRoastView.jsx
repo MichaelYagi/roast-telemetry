@@ -18,6 +18,7 @@ import EventButtonRow from "../components/EventButtonRow.jsx";
 import RoastChart from "../components/RoastChart.jsx";
 import RoastStatsPanel from "../components/RoastStatsPanel.jsx";
 import WeightField from "../components/WeightField.jsx";
+import NotesPanel from "../components/NotesPanel.jsx";
 import { formatTemp } from "../tempUnits.js";
 
 const SAMPLE_ALOG_PATH = "backend/data/sample_roasts/demo_roast.alog";
@@ -271,7 +272,6 @@ export default function LiveRoastView() {
   const [backgroundRoastId, setBackgroundRoastId] = useState(null);
   const [backgroundProfile, setBackgroundProfile] = useState([]);
   const [backgroundLabel, setBackgroundLabel] = useState(null);
-  const [noteText, setNoteText] = useState("");
   const [error, setError] = useState(null);
   const [presets, setPresets] = useState([]);
   const [selectedPresetId, setSelectedPresetId] = useState("");
@@ -340,7 +340,7 @@ export default function LiveRoastView() {
   const showBreakoutPanel = phase !== "idle" && brokenOutPanels.length > 0;
   const showSplitLayout = showBreakoutPanel && viewportWide;
 
-  const { roast, connectionStatus, latestPreview, lastError, pendingAlarms, alarmNotifications, dismissAlarmNotification } =
+  const { roast, setRoast, connectionStatus, latestPreview, lastError, pendingAlarms, alarmNotifications, dismissAlarmNotification } =
     useRoastStream(roastId);
 
   // Surfaces a server-side read/tick failure (e.g. the real serial link
@@ -980,12 +980,6 @@ export default function LiveRoastView() {
     if (!roastId) return;
     const latest = roast?.profile?.[roast.profile.length - 1];
     api.addEvent(roastId, { type, label, value: latest?.bt ?? null }).catch((err) => setError(err.message));
-  }
-
-  async function handleAddNote() {
-    if (!roastId || !noteText.trim()) return;
-    await api.addNote(roastId, { text: noteText.trim() });
-    setNoteText("");
   }
 
   // "idle" here means "connected via connect(), not yet recording" (see
@@ -2173,26 +2167,7 @@ export default function LiveRoastView() {
               </ul>
             </div>
 
-            <div className="panel">
-              <h3>Notes</h3>
-              <div className="note-input">
-                <textarea
-                  placeholder="Add a note…"
-                  rows={3}
-                  value={noteText}
-                  onChange={(e) => setNoteText(e.target.value)}
-                  disabled={!isActive}
-                />
-                <button onClick={handleAddNote} disabled={!isActive || !noteText.trim()}>
-                  Add
-                </button>
-              </div>
-              <ul className="note-feed">
-                {(roast?.notes || []).map((n) => (
-                  <li key={n.id}>{n.text}</li>
-                ))}
-              </ul>
-            </div>
+            <NotesPanel roastId={roastId} notes={roast?.notes || []} onReplace={(notes) => setRoast((r) => (r ? { ...r, notes } : r))} />
           </div>
         </div>
         {showSplitLayout && (
