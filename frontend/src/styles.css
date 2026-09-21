@@ -1847,6 +1847,15 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+/* On a finished roast's page nothing is still growing, so the feeds just
+   take the height they need instead of scrolling inside a fixed box. (The
+   Live Roast page keeps the cap: events pile up there while roasting.) */
+.detail-grid .event-feed,
+.detail-grid .note-feed {
+  max-height: none;
+  overflow-y: visible;
+}
+
 .note-input {
   display: flex;
   flex-direction: column;
