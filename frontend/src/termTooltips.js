@@ -10,6 +10,7 @@ export const TERM_TOOLTIPS = {
   "RoR (BT)": "Rate of Rise -- how fast Bean Temperature is climbing, in °/min",
   "RoR (ET)": "Rate of Rise -- how fast Exhaust Temperature is climbing, in °/min",
   "ΔBT (RoR)": "Rate of Rise -- how fast Bean Temperature is climbing, in °/min",
+  "ΔET (RoR)": "Rate of Rise -- how fast Exhaust Temperature is climbing, in °/min",
   Burner: "Heat source control",
   "Burner %": "Heat source control, as a 0-100% slider",
   SV: "Setpoint Value -- the target temperature the Burner's own controller is holding",

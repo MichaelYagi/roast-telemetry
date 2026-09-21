@@ -581,8 +581,8 @@ def get_settings() -> dict:
     except (json.JSONDecodeError, TypeError):
         breakout_panel_colors = {}
     try:
-        # Falls back to the fixed ET/BT/DT/deltaBT legend this replaced,
-        # but only when the key was truly never saved (values.get returns
+        # Falls back to ET/BT/DT/deltaBT/deltaET (the fixed legend this
+        # replaced, plus deltaET), but only when the key was truly never saved (values.get returns
         # None, not the string "[]" json.dumps([]) would have produced) --
         # an install that explicitly saves an empty Small Readout list
         # gets to keep it empty on the next load, not have this default
@@ -590,10 +590,10 @@ def get_settings() -> dict:
         small_readout_panels = (
             json.loads(values["small_readout_panels"])
             if values.get("small_readout_panels")
-            else ["et", "bt", "dt", "ror_bt"]
+            else ["et", "bt", "dt", "ror_bt", "ror_et"]
         )
     except (json.JSONDecodeError, TypeError):
-        small_readout_panels = ["et", "bt", "dt", "ror_bt"]
+        small_readout_panels = ["et", "bt", "dt", "ror_bt", "ror_et"]
     try:
         # Same never-saved-vs-explicitly-set distinction as
         # small_readout_panels above -- seeds to what the old always-on

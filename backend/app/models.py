@@ -552,10 +552,10 @@ class AppSettings(BaseModel):
     # enabled list, rendered as a compact scaled column beside the chart at
     # any width (not gated to broken_out_panels' >=1400px split-layout
     # threshold). storage.get_settings() seeds this to
-    # ["et", "bt", "dt", "ror_bt"] only the first time (key never saved
-    # before) -- matches the fixed ET/BT/DT/deltaBT legend this replaced,
-    # so existing installs see no visual change until they actually touch
-    # Settings > Small Readout.
+    # ["et", "bt", "dt", "ror_bt", "ror_et"] only the first time (key never
+    # saved before). An install that has saved its own list keeps it, so
+    # nothing changes for existing users until they touch Settings > Small
+    # Readout.
     small_readout_panels: list[str] = []
     # Display-only, "c" or "f" -- a Fahrenheit/Celsius display
     # toggle. Only affects how

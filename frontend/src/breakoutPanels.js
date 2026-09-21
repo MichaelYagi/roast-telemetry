@@ -6,7 +6,7 @@ export const BREAKOUT_PANEL_ITEMS = [
   { key: "et", label: "ET", color: "#be123c" },
   { key: "dt", label: "DT", color: "#c2410c" },
   { key: "ror_bt", label: "ΔBT (RoR)", color: "#8b5cf6" },
-  { key: "ror_et", label: "RoR (ET)", color: "#c4b5fd" },
+  { key: "ror_et", label: "ΔET (RoR)", color: "#c4b5fd" },
   { key: "time", label: "Elapsed time", color: "#334155" },
   { key: "dry_pct", label: "DRY%", color: "#0891b2" },
   { key: "maillard_pct", label: "Maillard%", color: "#d97706" },

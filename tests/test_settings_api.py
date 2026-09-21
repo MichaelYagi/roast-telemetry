@@ -16,7 +16,7 @@ def test_get_settings_defaults(client):
     assert resp.status_code == 200
     assert resp.json() == {
         "ollama_url": None, "ollama_model": None, "broken_out_panels": [], "breakout_panel_colors": {},
-        "small_readout_panels": ["et", "bt", "dt", "ror_bt"], "temperature_unit": "c",
+        "small_readout_panels": ["et", "bt", "dt", "ror_bt", "ror_et"], "temperature_unit": "c",
         "vertical_control_layout": [["drum_speed_pct"], ["fan_pct"], ["heater_pct"]],
         "vertical_control_arrows": {},
         "chart_series_visible": {},
