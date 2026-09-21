@@ -3161,3 +3161,545 @@ button.link-neutral {
 .import-error {
   white-space: pre-line;
 }
+
+/* ===================== History page ===================== */
+.history-view .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.stat-tile .stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.stat-tile .stat-label {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.history-view .stats-note {
+  margin: 0.8rem 0 0;
+}
+
+/* Import: a slim bar that opens into the form (it opens itself while a file is
+   dragged over it, uploading, or showing an error). */
+.import-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.import-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.85rem 1.25rem;
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.import-toggle:hover {
+  background: var(--accent-soft);
+}
+
+.import-toggle-title {
+  font-weight: 700;
+}
+
+.import-toggle-hint {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.import-chevron {
+  margin-left: auto;
+  color: var(--text-muted);
+}
+
+.import-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1rem 1.25rem 1.15rem;
+  border-top: 1px solid var(--border);
+}
+
+.import-body .upload-drop {
+  margin: 0;
+}
+
+.import-title-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.import-title-field input,
+.path-with-browse input {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.path-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.path-with-browse button {
+  flex: 0 0 auto;
+}
+
+/* Filters */
+.filters-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+
+.filters-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.filters-grid input,
+.filters-grid select {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.filters-clear {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* The roast list */
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table th {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.history-table td {
+  padding: 0.7rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+.history-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.history-table tbody tr:hover {
+  background: var(--accent-soft);
+}
+
+.history-table .col-select,
+.history-table .cell-select {
+  width: 2rem;
+}
+
+.history-table .cell-title {
+  min-width: 11rem;
+}
+
+.roast-link {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.roast-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.cell-sub {
+  display: block;
+  margin-top: 0.1rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.history-table .cell-mode,
+.history-table .cell-duration,
+.history-table .created-date {
+  white-space: nowrap;
+}
+
+.history-table .cell-mode {
+  color: var(--text-muted);
+}
+
+.history-table .cell-tags {
+  max-width: 15rem;
+}
+
+.history-table .cell-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.btn-sm {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn-sm:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.btn-danger-soft {
+  margin-left: 0.35rem;
+  color: #b91c1c;
+}
+
+.btn-danger-soft:hover {
+  background: rgba(185, 28, 28, 0.1);
+  border-color: #b91c1c;
+}
+
+:root[data-theme="dark"] .btn-danger-soft {
+  color: #f87171;
+}
+
+.history-table .table-message td {
+  padding: 1.5rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.select-all-mobile {
+  display: none;
+}
+
+/* ---- Tablets and phones: the table becomes a list of cards ---- */
+@media (max-width: 900px) {
+  .history-view .stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .filters-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .filters-grid .filter-search {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .select-all-mobile {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  .history-table thead {
+    display: none;
+  }
+
+  .history-table,
+  .history-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .history-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.9rem;
+    margin-bottom: 0.6rem;
+    padding: 0.75rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel);
+  }
+
+  .history-table tbody tr:hover {
+    background: var(--panel);
+  }
+
+  .history-table td,
+  .history-table .cell-select {
+    display: block;
+    width: auto;
+    padding: 0;
+    border: none;
+  }
+
+  .history-table .cell-select {
+    order: 1;
+    flex: 0 0 auto;
+  }
+
+  .history-table .cell-title {
+    order: 2;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .history-table .cell-status {
+    order: 3;
+    flex: 0 0 auto;
+  }
+
+  /* a line break: the second line holds mode, duration and date */
+  .history-table tbody tr::before {
+    content: "";
+    order: 4;
+    flex: 0 0 100%;
+    height: 0;
+  }
+
+  .history-table .cell-mode,
+  .history-table .cell-duration,
+  .history-table .cell-created {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+
+  .history-table .cell-mode {
+    order: 5;
+  }
+
+  .history-table .cell-duration {
+    order: 6;
+  }
+
+  .history-table .cell-created {
+    order: 7;
+  }
+
+  .history-table .cell-created .cell-sub {
+    display: inline;
+    margin: 0 0 0 0.35rem;
+    font-size: inherit;
+  }
+
+  .history-table .cell-tags {
+    order: 8;
+    flex: 0 0 100%;
+    max-width: none;
+  }
+
+  .history-table .cell-tags:empty {
+    display: none;
+  }
+
+  .history-table .cell-actions {
+    order: 9;
+    flex: 0 0 100%;
+    text-align: right;
+  }
+
+  .history-table .table-message {
+    display: block;
+    text-align: center;
+  }
+
+  .history-table .table-message td {
+    padding: 0.6rem;
+  }
+
+  .pagination-row {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 520px) {
+  .history-view .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-tile .stat-value {
+    font-size: 1.3rem;
+  }
+
+  .filters-grid {
+    gap: 0.6rem;
+  }
+
+  .history-view .panel {
+    padding: 0.85rem 0.9rem;
+  }
+
+  .history-view .import-panel {
+    padding: 0;
+  }
+
+  .import-toggle {
+    padding: 0.8rem 0.9rem;
+  }
+
+  .import-body {
+    padding: 0.9rem;
+  }
+
+  .path-with-browse {
+    flex-wrap: wrap;
+  }
+
+  .path-with-browse input {
+    flex: 1 1 100%;
+  }
+}
+
+/* ---- The header when it can't fit on one line: title and account on the first
+   line, the menu underneath (five links plus a title need about 930px) ---- */
+@media (max-width: 900px) {
+  .app-header-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .app-title-group {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .app-user-group {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  .app-header nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+    scrollbar-width: none;
+  }
+
+  .app-header nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-header nav a {
+    flex: 0 0 auto;
+  }
+}
+
+/* Phone: logo + title + account on one line; the theme picker joins the menu row. */
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 0 0.75rem 2rem;
+  }
+
+  .app-header {
+    padding: 0.75rem 0;
+  }
+
+  .app-header-inner {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+
+  .app-title-group {
+    display: contents;
+  }
+
+  .app-title-group .app-logo {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .app-header h1 {
+    grid-column: 2;
+    grid-row: 1;
+    overflow: hidden;
+    font-size: 1.05rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-user-group {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .app-header nav {
+    grid-column: 1 / 3;
+  }
+
+  .app-title-group .theme-picker {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+  }
+
+  .theme-picker-menu {
+    right: 0;
+    left: auto;
+  }
+
+  /* just the swatches on a phone -- more room for the menu */
+  .theme-picker-label {
+    display: none;
+  }
+}

@@ -90,7 +90,7 @@ export default function ThemePicker() {
         title="Change theme"
       >
         <Swatch colors={current.swatch} />
-        {current.label}
+        <span className="theme-picker-label">{current.label}</span>
         <span className="theme-picker-caret">▾</span>
       </button>
       {open && (

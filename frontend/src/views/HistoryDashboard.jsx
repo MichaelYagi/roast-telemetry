@@ -12,6 +12,34 @@ function formatDuration(seconds) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+const MODE_LABELS = {
+  simulator: "Simulator",
+  alog_playback: "Playback",
+  modbus_live: "Modbus",
+  ms6514_live: "MS6514",
+  aillio_live: "Aillio Bullet",
+  tc4_live: "TC4+",
+};
+
+const IMPORT_OPEN_KEY = "roastTelemetry.historyImportOpen";
+
+function readImportOpen() {
+  try {
+    return window.localStorage.getItem(IMPORT_OPEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function formatCreated(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: "—", time: "" };
+  return {
+    date: d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }),
+    time: d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
+  };
+}
+
 export default function HistoryDashboard() {
   const confirm = useConfirm();
   const notify = useNotify();
@@ -43,13 +71,12 @@ export default function HistoryDashboard() {
   const fileInputRef = useRef(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [deletingSelected, setDeletingSelected] = useState(false);
-  // Off by default -- each entry here is a real .alog read+parse
-  // server-side (see GET /roasts/stats-batch), so this is opt-in rather
-  // than fetched on every History page load. Scoped to the exact same
-  // filtered/paged set already showing in the table below.
-  const [showTrends, setShowTrends] = useState(false);
+  // Always fetched, scoped to the exact same filtered/paged set showing in the
+  // table below. Each entry is a real .alog read server-side (GET
+  // /roasts/stats-batch), so it loads after the list rather than holding it up.
   const [trendStats, setTrendStats] = useState([]);
-  const [trendsLoading, setTrendsLoading] = useState(false);
+  const [trendsLoading, setTrendsLoading] = useState(true);
+  const [importOpen, setImportOpen] = useState(readImportOpen);
   const navigate = useNavigate();
 
   function refresh() {
@@ -98,7 +125,6 @@ export default function HistoryDashboard() {
   // a tag/mode filter while trends are showing re-fetches automatically,
   // same as the table itself does.
   useEffect(() => {
-    if (!showTrends) return;
     setTrendsLoading(true);
     const filterParams = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
     const pageParams = { ...filterParams, limit: pageSize, offset: (page - 1) * pageSize };
@@ -106,7 +132,7 @@ export default function HistoryDashboard() {
       .getRoastStatsBatch(pageParams)
       .then(setTrendStats)
       .finally(() => setTrendsLoading(false));
-  }, [showTrends, filters, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Roasts recorded against a built-in simulated device stay in the list but
   // never count toward any average or trend here -- fake data must not move
@@ -268,53 +294,65 @@ export default function HistoryDashboard() {
     return { total: roasts.length, simulatedCount: roasts.length - real.length, avgDuration, avgLoss };
   }, [roasts]);
 
+  const anyFilter = Object.values(filters).some(Boolean) || Boolean(searchInput);
+  function clearFilters() {
+    setFilters({ mode: "", status: "", tag: "", created_by: "", q: "" });
+    setSearchInput("");
+    setPage(1);
+  }
+
+  // The import panel opens itself while something is happening in it.
+  const importShown = importOpen || dragging || importing || Boolean(importError);
+  function toggleImport() {
+    const next = !importOpen;
+    setImportOpen(next);
+    try {
+      window.localStorage.setItem(IMPORT_OPEN_KEY, next ? "1" : "0");
+    } catch {
+      // storage blocked -- remembering the choice is only a convenience
+    }
+  }
+
+  const pct = (v) => (trendsLoading ? "…" : v != null ? `${v.toFixed(1)}%` : "—");
+
   return (
     <div className="history-view">
-      <div className="panel stats-row">
-        <div>
-          <span className="stat-value">{stats.total}</span>
-          <span className="stat-label">Roasts</span>
+      <div className="panel">
+        <div className="stats-grid">
+          <div className="stat-tile">
+            <span className="stat-value">{stats.total}</span>
+            <span className="stat-label">Roasts</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-value">{formatDuration(stats.avgDuration)}</span>
+            <span className="stat-label">Avg duration</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-value">{stats.avgLoss != null ? `${(stats.avgLoss * 100).toFixed(1)}%` : "—"}</span>
+            <span className="stat-label">Avg roast loss</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-value">{pct(trendAverages.avgDryPct)}</span>
+            <span className="stat-label">Avg Dry %</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-value">{pct(trendAverages.avgDtrPct)}</span>
+            <span className="stat-label">Avg DTR %</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-value">{trendsLoading ? "…" : trendAverages.flaggedCount}</span>
+            <span className="stat-label">With RoR flags</span>
+          </div>
         </div>
-        <div>
-          <span className="stat-value">{formatDuration(stats.avgDuration)}</span>
-          <span className="stat-label">Avg duration</span>
-        </div>
-        <div>
-          <span className="stat-value">{stats.avgLoss != null ? `${(stats.avgLoss * 100).toFixed(1)}%` : "—"}</span>
-          <span className="stat-label">Avg roast loss</span>
-        </div>
-        {showTrends && (
-          <>
-            <div>
-              <span className="stat-value">
-                {trendsLoading ? "…" : trendAverages.avgDryPct != null ? `${trendAverages.avgDryPct.toFixed(1)}%` : "—"}
-              </span>
-              <span className="stat-label">Avg Dry %</span>
-            </div>
-            <div>
-              <span className="stat-value">
-                {trendsLoading ? "…" : trendAverages.avgDtrPct != null ? `${trendAverages.avgDtrPct.toFixed(1)}%` : "—"}
-              </span>
-              <span className="stat-label">Avg DTR %</span>
-            </div>
-            <div>
-              <span className="stat-value">{trendsLoading ? "…" : trendAverages.flaggedCount}</span>
-              <span className="stat-label">With RoR flags</span>
-            </div>
-          </>
-        )}
-        <button type="button" className="link-like" onClick={() => setShowTrends((s) => !s)}>
-          {showTrends ? "Hide trends" : "Show trends"}
-        </button>
         {stats.simulatedCount > 0 && (
-          <span className="hint stats-note">
+          <p className="hint stats-note">
             Averages leave out {stats.simulatedCount} simulated roast{stats.simulatedCount === 1 ? "" : "s"}.
-          </span>
+          </p>
         )}
       </div>
 
       <form
-        className={`panel import-form${dragging ? " import-dragging" : ""}`}
+        className={`panel import-panel${dragging ? " import-dragging" : ""}`}
         onSubmit={handleImport}
         onDragOver={(e) => {
           e.preventDefault();
@@ -327,46 +365,57 @@ export default function HistoryDashboard() {
           if (e.dataTransfer?.files?.length) handleUploadFiles(e.dataTransfer.files);
         }}
       >
-        <h3>Import .alog files</h3>
-        <p className="hint">Loads the whole roast straight into history — full curve and events at once, no real-time replay.</p>
-        {importError && <p className="error import-error">{importError}</p>}
-        <div className="upload-drop">
-          <span>Drop .alog files here, or</span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".alog"
-            multiple
-            hidden
-            onChange={(e) => {
-              handleUploadFiles(e.target.files);
-              e.target.value = ""; // so choosing the same file again still fires
-            }}
-          />
-          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}>
-            Choose files…
-          </button>
-          {uploadStatus && <span className="hint">{uploadStatus}</span>}
-        </div>
-        <p className="hint">Or use a file that is already on the server (the machine running the backend):</p>
-        <div className="form-row">
-          <label>
-            .alog file path (server-side)
-            <span className="path-with-browse">
-              <input value={importPath} onChange={(e) => setImportPath(e.target.value)} placeholder="/path/to/roast.alog" />
-              <button type="button" onClick={() => setChooserOpen(true)}>
-                Browse…
-              </button>
-            </span>
-          </label>
-          <label>
-            Title (optional, one file at a time)
-            <input value={importTitle} onChange={(e) => setImportTitle(e.target.value)} placeholder="Defaults to the file's own title" />
-          </label>
-        </div>
-        <button type="submit" disabled={importing || !importPath.trim()}>
-          {importing ? "Importing…" : "Import"}
+        <button type="button" className="import-toggle" aria-expanded={importShown} onClick={toggleImport}>
+          <span className="import-toggle-title">Import .alog files</span>
+          {!importShown && <span className="import-toggle-hint">Drop files here, or click to open</span>}
+          <span className="import-chevron" aria-hidden="true">
+            {importShown ? "▾" : "▸"}
+          </span>
         </button>
+        {importShown && (
+          <div className="import-body">
+            <label className="import-title-field">
+              Title (optional, one file at a time)
+              <input value={importTitle} onChange={(e) => setImportTitle(e.target.value)} placeholder="Defaults to the file's own title" />
+            </label>
+            {importError && <p className="error import-error">{importError}</p>}
+            <div className="upload-drop">
+              <span>Drop .alog files here, or</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".alog"
+                multiple
+                hidden
+                onChange={(e) => {
+                  handleUploadFiles(e.target.files);
+                  e.target.value = ""; // so choosing the same file again still fires
+                }}
+              />
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+                Choose files…
+              </button>
+              {uploadStatus && <span className="hint">{uploadStatus}</span>}
+            </div>
+            <div className="path-field">
+              <span className="field-label">Or use a file already on the server (the machine running the backend)</span>
+              <div className="path-with-browse">
+                <input
+                  aria-label=".alog file path (server-side)"
+                  value={importPath}
+                  onChange={(e) => setImportPath(e.target.value)}
+                  placeholder="/path/to/roast.alog"
+                />
+                <button type="button" onClick={() => setChooserOpen(true)}>
+                  Browse…
+                </button>
+                <button type="submit" disabled={importing || !importPath.trim()}>
+                  {importing ? "Importing…" : "Import"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </form>
       <ServerFileChooser
         open={chooserOpen}
@@ -375,8 +424,8 @@ export default function HistoryDashboard() {
         startPath={importPath}
       />
 
-      <div className="panel filters-row">
-        <label>
+      <div className="panel filters-grid">
+        <label className="filter-search">
           Search
           <input
             type="search"
@@ -430,89 +479,118 @@ export default function HistoryDashboard() {
             ))}
           </select>
         </label>
+        {anyFilter && (
+          <button type="button" className="filters-clear" onClick={clearFilters}>
+            Clear filters
+          </button>
+        )}
       </div>
 
       <div className="panel">
         {someSelected && (
           <div className="table-toolbar">
-            <button
-              type="button"
-              className="danger"
-              disabled={deletingSelected}
-              onClick={handleDeleteSelected}
-            >
+            <button type="button" className="danger" disabled={deletingSelected} onClick={handleDeleteSelected}>
               {deletingSelected ? "Deleting…" : `Delete selected (${selectedIds.size})`}
             </button>
           </div>
         )}
-        <table className="roast-table">
-          <thead>
-            <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  ref={(el) => el && (el.indeterminate = someSelected && !allSelected)}
-                  onChange={toggleSelectAll}
-                  disabled={roasts.length === 0}
-                />
-              </th>
-              <th>Title</th>
-              <th>Mode</th>
-              <th>Status</th>
-              <th>Duration</th>
-              <th>Beans</th>
-              <th>Tags</th>
-              <th>Created</th>
-              <th>Roasted by</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
+        <label className="select-all-mobile">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            ref={(el) => el && (el.indeterminate = someSelected && !allSelected)}
+            onChange={toggleSelectAll}
+            disabled={roasts.length === 0}
+          />
+          Select all
+        </label>
+        <div className="table-scroll">
+          <table className="roast-table history-table">
+            <thead>
               <tr>
-                <td colSpan={10}>Loading…</td>
+                <th className="col-select">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all"
+                    checked={allSelected}
+                    ref={(el) => el && (el.indeterminate = someSelected && !allSelected)}
+                    onChange={toggleSelectAll}
+                    disabled={roasts.length === 0}
+                  />
+                </th>
+                <th>Roast</th>
+                <th>Mode</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Tags</th>
+                <th>Created</th>
+                <th className="col-actions"></th>
               </tr>
-            )}
-            {!loading && roasts.length === 0 && (
-              <tr>
-                <td colSpan={10}>No roasts yet.</td>
-              </tr>
-            )}
-            {roasts.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  <input type="checkbox" checked={selectedIds.has(r.id)} onChange={() => toggleSelected(r.id)} />
-                </td>
-                <td>{r.title}</td>
-                <td>{r.mode}</td>
-                <td>
-                  <span className={`status-pill status-${r.status}`}>{r.status}</span>
-                </td>
-                <td>{formatDuration(r.duration_s)}</td>
-                <td>{r.beans || "—"}</td>
-                <td>
-                  {r.tags && r.tags.length > 0
-                    ? r.tags.map((t) => (
-                        <span key={t} className="tag-chip">
-                          {t}
-                        </span>
-                      ))
-                    : "—"}
-                </td>
-                <td>{new Date(r.created_at).toLocaleString()}</td>
-                <td>{r.created_by_username || "—"}</td>
-                <td>
-                  <Link to={`/roasts/${r.id}`}>View</Link>
-                  {" · "}
-                  <button type="button" className="danger link-like" onClick={() => handleDelete(r.id, r.title)}>
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr className="table-message">
+                  <td colSpan={8}>Loading…</td>
+                </tr>
+              )}
+              {!loading && roasts.length === 0 && (
+                <tr className="table-message">
+                  <td colSpan={8}>{anyFilter ? "No roasts match these filters." : "No roasts yet."}</td>
+                </tr>
+              )}
+              {roasts.map((r) => {
+                const created = formatCreated(r.created_at);
+                return (
+                  <tr key={r.id}>
+                    <td className="cell-select">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${r.title}`}
+                        checked={selectedIds.has(r.id)}
+                        onChange={() => toggleSelected(r.id)}
+                      />
+                    </td>
+                    <td className="cell-title">
+                      <Link className="roast-link" to={`/roasts/${r.id}`}>
+                        {r.title}
+                      </Link>
+                      {r.beans && <span className="cell-sub">{r.beans}</span>}
+                    </td>
+                    <td className="cell-mode">{MODE_LABELS[r.mode] || r.mode}</td>
+                    <td className="cell-status">
+                      <span className={`status-pill status-${r.status}`}>{r.status}</span>
+                    </td>
+                    <td className="cell-duration">{formatDuration(r.duration_s)}</td>
+                    <td className="cell-tags">
+                      {r.tags && r.tags.length > 0
+                        ? r.tags.map((t) => (
+                            <span key={t} className="tag-chip">
+                              {t}
+                            </span>
+                          ))
+                        : null}
+                    </td>
+                    <td className="cell-created">
+                      <span className="created-date">{created.date}</span>
+                      <span className="cell-sub">
+                        {created.time}
+                        {r.created_by_username ? ` · ${r.created_by_username}` : ""}
+                      </span>
+                    </td>
+                    <td className="cell-actions">
+                      <Link className="btn-sm" to={`/roasts/${r.id}`}>
+                        View
+                      </Link>
+                      <button type="button" className="btn-sm btn-danger-soft" onClick={() => handleDelete(r.id, r.title)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
         {totalCount > 0 && (
           <div className="pagination-row">
             <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
