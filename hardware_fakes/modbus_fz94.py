@@ -179,11 +179,16 @@ class FZ94Simulator:
         drum_slave_id: int,
         drive_baudrate: int,
         verbose: bool,
+        hold: bool = False,
     ):
         self.temp_slaves = {bt_slave_id: "bt", et_slave_id: "et", dt_slave_id: "dt"}
         self.burner_slave_id = burner_slave_id
         self.drive_slaves = {air_slave_id: "fan_pct", drum_slave_id: "drum_speed_pct"}
         self.verbose = verbose
+        # hold=True (used when the server runs this fake itself): the roast
+        # waits at Charge until begin_roast(), instead of starting on the
+        # first request -- see hardware_fakes/sim.py.
+        self._hold = hold
         self.driver = ThermalDriver()
         self._driver_started = False
         self._start_lock = threading.Lock()
@@ -196,9 +201,15 @@ class FZ94Simulator:
         )
 
     @classmethod
-    def with_defaults(cls, port, verbose: bool = False) -> "FZ94Simulator":
+    def with_defaults(cls, port, verbose: bool = False, hold: bool = False) -> "FZ94Simulator":
         """The stock FZ-94 wiring (same defaults as the command line)."""
-        return cls(port, 11, 13, 12, 12, 19200, None, 2, 1, 19200, verbose=verbose)
+        return cls(port, 11, 13, 12, 12, 19200, None, 2, 1, 19200, verbose=verbose, hold=hold)
+
+    def begin_roast(self) -> None:
+        """Starts the roast from Charge now (only meaningful with hold=True)."""
+        with self._start_lock:
+            self._driver_started = True
+            self.driver.begin_roast()
 
     def stop(self) -> None:
         self.temp_bus.stop()
@@ -245,7 +256,7 @@ class FZ94Simulator:
         if not self._driver_started:
             with self._start_lock:
                 if not self._driver_started:
-                    self.driver.start()
+                    self.driver.start(paused=self._hold)
                     self._driver_started = True
                     self._log("first request received (either bus) -- starting thermal clock (Charge)")
         slave_id, function = frame[0], frame[1]

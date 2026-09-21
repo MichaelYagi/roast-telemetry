@@ -16,6 +16,10 @@ listener (`tcp_serial.py`), tags the roast `simulated`, and stops the fake
 when the roast ends or the server stops -- no `socat`, no WSL, nothing to
 start. The standalone scripts below are for running a fake on its own or
 testing against a real virtual serial port.
+An in-app simulated machine waits at its Charge readings while the app is only
+connected, and its roast starts at START (`SimHandle.begin_roast()`), so time
+spent connected first never uses the simulated roast up. The standalone scripts
+start their clock on the first request instead.
 
 | Fake | Stands in for | Protocol | Needs a virtual serial port? |
 |---|---|---|---|

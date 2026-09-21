@@ -65,6 +65,14 @@ class SimHandle:
     port: int  # TCP port the fake listens on
     serial_url: Optional[str]  # socket://host:port for serial kinds, else None
     _stop: Callable[[], None]
+    _begin: Callable[[], None]
+
+    def begin_roast(self) -> None:
+        """The app started recording: start the simulated roast from Charge now.
+        Until then the device waits at its charge readings, so time spent
+        connected before START (checking the connection, configuring) never
+        uses up the simulated roast."""
+        self._begin()
 
     def stop(self) -> None:
         self._stop()
@@ -76,22 +84,22 @@ def _thread(target: Callable[[], None], name: str) -> None:
 
 def _start_fz94(kind: SimKind) -> SimHandle:
     ser = TcpServerSerial(LOCALHOST, timeout=0.2)
-    sim = FZ94Simulator.with_defaults(ser)
+    sim = FZ94Simulator.with_defaults(ser, hold=True)
     _thread(sim.run, "sim-fz94")
-    return SimHandle(kind, ser.host, ser.tcp_port, ser.url, sim.stop)
+    return SimHandle(kind, ser.host, ser.tcp_port, ser.url, sim.stop, sim.begin_roast)
 
 
 def _start_fz94_evo(kind: SimKind) -> SimHandle:
-    sim = FZ94EvoSimulator(LOCALHOST, 0, 1, verbose=False)
+    sim = FZ94EvoSimulator(LOCALHOST, 0, 1, verbose=False, hold=True)
     _thread(sim.run, "sim-fz94-evo")
-    return SimHandle(kind, LOCALHOST, sim.port, None, sim.stop)
+    return SimHandle(kind, LOCALHOST, sim.port, None, sim.stop, sim.begin_roast)
 
 
 def _start_streaming(kind: SimKind, run: Callable, timeout: float) -> SimHandle:
     """ms6514 / tc4: a thermal model driving a serve/stream loop on a TCP 'serial port'."""
     ser = TcpServerSerial(LOCALHOST, timeout=timeout)
     driver = ThermalDriver()
-    driver.start()
+    driver.start(paused=True)  # waits at Charge until the app starts recording
     stop = threading.Event()
 
     def target() -> None:
@@ -106,7 +114,7 @@ def _start_streaming(kind: SimKind, run: Callable, timeout: float) -> SimHandle:
         stop.set()
         ser.close()
 
-    return SimHandle(kind, ser.host, ser.tcp_port, ser.url, shutdown)
+    return SimHandle(kind, ser.host, ser.tcp_port, ser.url, shutdown, driver.begin_roast)
 
 
 def start(value: str) -> SimHandle:

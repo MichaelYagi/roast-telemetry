@@ -107,7 +107,11 @@ def _exception_pdu(function: int, code: int) -> bytes:
 
 
 class FZ94EvoSimulator:
-    def __init__(self, host: str, port: int, device_id: int, verbose: bool):
+    def __init__(self, host: str, port: int, device_id: int, verbose: bool, hold: bool = False):
+        # hold=True (the server runs this fake itself): the roast waits at
+        # Charge until begin_roast(), rather than starting on the first
+        # request -- see hardware_fakes/sim.py.
+        self._hold = hold
         self.host = host
         self.port = port
         self.device_id = device_id
@@ -155,6 +159,12 @@ class FZ94EvoSimulator:
             self.driver.stop()
             self._sock.close()
 
+    def begin_roast(self) -> None:
+        """Starts the roast from Charge now (only meaningful with hold=True)."""
+        with self._start_lock:
+            self._driver_started = True
+            self.driver.begin_roast()
+
     def stop(self) -> None:
         """Ends run() (used when the server starts this fake itself)."""
         self._stopping = True
@@ -181,7 +191,7 @@ class FZ94EvoSimulator:
         if not self._driver_started:
             with self._start_lock:
                 if not self._driver_started:
-                    self.driver.start()
+                    self.driver.start(paused=self._hold)
                     self._driver_started = True
                     self._log("first request received -- starting thermal clock (Charge)")
 

@@ -25,13 +25,29 @@ class ThermalDriver:
         self._engine = SimulatorEngine()
         self._lock = threading.Lock()
         self._stop = threading.Event()
+        self._paused = False
         self._thread: threading.Thread | None = None
 
-    def start(self) -> None:
+    def start(self, paused: bool = False) -> None:
+        """Starts the model. With ``paused=True`` it sits at the charge
+        readings (BT/ET as the beans go in) and does not advance until
+        ``begin_roast()`` -- what a simulated device wants while the app is
+        connected but not yet recording (see hardware_fakes/sim.py)."""
         with self._lock:
             self._engine.start()
+            self._paused = paused
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
+
+    def begin_roast(self) -> None:
+        """Restarts the roast from Charge and lets it run (a no-op start if
+        the model hasn't been started yet)."""
+        if self._thread is None:
+            self.start()
+            return
+        with self._lock:
+            self._engine.start()
+            self._paused = False
 
     def stop(self) -> None:
         self._stop.set()
@@ -51,7 +67,8 @@ class ThermalDriver:
         while not self._stop.is_set():
             time.sleep(self.tick_interval_s)
             with self._lock:
-                self._engine.tick(self.tick_interval_s)
+                if not self._paused:
+                    self._engine.tick(self.tick_interval_s)
 
     def snapshot(self) -> dict:
         """Current bt/et/heater_pct/fan_pct/drum_speed_pct/time_s."""

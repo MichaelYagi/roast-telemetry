@@ -114,6 +114,53 @@ def test_every_kind_has_a_starter():
     assert _wait_for_no_sim_threads() == []
 
 
+# ---- the simulated roast begins at START, not at ON ----------------------------
+
+def _open(kind: str):
+    """(handle, real engine connected to it) for one simulated device kind."""
+    from modbus_bridge import ModbusEngine
+    from modbus_bridge.device_profiles import COFFEETECH_FZ94_EVO
+    from ms6514_bridge.engine import MS6514Engine
+    from pymodbus.client import ModbusTcpClient
+    from tc4_bridge.engine import TC4Engine
+
+    handle = sim.start(f"sim://{kind}")
+    if kind == "fz94":
+        return handle, ModbusEngine(handle.serial_url)
+    if kind == "fz94_evo":
+        return handle, ModbusEngine.from_profile(
+            COFFEETECH_FZ94_EVO, None, transport="tcp", host=handle.host, tcp_port=handle.port, client_cls=ModbusTcpClient
+        )
+    if kind == "ms6514":
+        return handle, MS6514Engine(handle.serial_url)
+    return handle, TC4Engine(handle.serial_url)
+
+
+@pytest.mark.parametrize("kind", ["fz94", "fz94_evo", "ms6514", "tc4"])
+def test_a_simulated_device_waits_at_charge_until_the_roast_begins(kind):
+    """Regression: the simulated roast used to start running when the app connected (ON),
+    so time spent connected before START used the roast up -- start late enough and
+    the recording began mid-roast, or after it had finished (flat, straight lines)."""
+    handle, engine = _open(kind)
+    try:
+        time.sleep(0.8)
+        first = engine.tick(0.5)
+        time.sleep(2.0)
+        still = engine.tick(0.5)
+        assert abs(still["et"] - first["et"]) < 0.5, "the device moved while merely connected"
+        assert abs(still["bt"] - 96.0) < 1.5 and abs(still["et"] - 200.0) < 4.0  # the charge readings
+
+        handle.begin_roast()
+        for _ in range(6):  # read at a realistic cadence (the meter engine returns the oldest buffered frame)
+            time.sleep(0.5)
+            moving = engine.tick(0.5)
+        assert moving["et"] - still["et"] > 3.0, "the roast did not start when begin_roast() was called"
+    finally:
+        engine.close()
+        handle.stop()
+    assert _wait_for_no_sim_threads() == []
+
+
 # ---- through the HTTP API ---------------------------------------------------------
 
 def _create(client, **fields):
@@ -193,3 +240,30 @@ def test_a_failure_while_building_the_engine_does_not_leave_the_fake_running(cli
 def test_real_ports_still_work_unchanged(client):
     resp = _create(client, mode="ms6514_live", ms6514_port="/dev/nonexistent-for-tests")
     assert resp.status_code == 400  # a bad real port still fails like before, and isn't tagged or simulated
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"mode": "modbus_live", "modbus_port": "sim://fz94"},
+        {"mode": "ms6514_live", "ms6514_port": "sim://ms6514"},
+        {"mode": "tc4_live", "tc4_port": "sim://tc4"},
+        {
+            "mode": "modbus_live", "modbus_transport": "tcp", "modbus_host": "sim://fz94_evo",
+            "modbus_device_profile_id": "coffeetech-fz94-evo",
+        },
+    ],
+    ids=["fz94", "ms6514", "tc4", "fz94_evo"],
+)
+def test_the_recording_starts_at_charge_however_long_you_stay_connected_first(client, fields):
+    roast_id = _create(client, **fields).json()["id"]
+    time.sleep(4.0)  # connected, not recording -- the simulated roast must not advance meanwhile
+    assert client.post(f"/api/roasts/{roast_id}/start").status_code == 200
+    time.sleep(4.5)
+    client.post(f"/api/roasts/{roast_id}/stop")
+
+    profile = client.get(f"/api/roasts/{roast_id}").json()["profile"]
+    assert len(profile) >= 2
+    assert abs(profile[0]["bt"] - 96.0) < 1.5      # starts at Charge...
+    assert profile[0]["et"] < 207.0                # (a roast already 4 s in would read 210+)
+    assert profile[-1]["et"] > profile[0]["et"]    # ...and then really moves

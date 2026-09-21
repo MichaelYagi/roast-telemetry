@@ -516,6 +516,10 @@ class RoastSession:
         storage.update_roast(self.id, status=self.status.value)
         if hasattr(self._engine, "reset_detection"):
             self._engine.reset_detection()
+        if self._sim is not None:
+            # A simulated device waits at Charge while merely connected; its
+            # roast begins now, so the recording starts at Charge, not partway in.
+            self._sim.begin_roast()
 
     async def _run_loop(self) -> None:
         try:
