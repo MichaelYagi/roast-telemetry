@@ -11,6 +11,7 @@ import zoomPlugin from "chartjs-plugin-zoom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { api } from "../api/client.js";
+import { TIME_AXIS, formatTime, rorAxisRange, seriesLineWidth, tempAxisMin, tempAxisSuggestedMax } from "../chartDefaults.js";
 import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 import { TERM_TOOLTIPS } from "../termTooltips.js";
 
@@ -49,8 +50,8 @@ const SERIES_DEFS = [
   // doesn't have one, same as any other absent channel -- off by default
   // since most modes never populate it.
   { key: "DT", label: "DT", color: "#c2410c", axis: "yTemp", source: "profile", field: "dt", defaultOn: false },
-  { key: "ROR_BT", label: "RoR (BT)", color: "#8b5cf6", axis: "yRor", source: "profile", field: "ror_bt", defaultOn: true },
-  { key: "ROR_ET", label: "RoR (ET)", color: "#c4b5fd", axis: "yRor", source: "profile", field: "ror_et", defaultOn: false },
+  { key: "ROR_BT", label: "RoR (BT)", color: "#1d4ed8", axis: "yRor", source: "profile", field: "ror_bt", defaultOn: true },
+  { key: "ROR_ET", label: "RoR (ET)", color: "#be123c", axis: "yRor", source: "profile", field: "ror_et", defaultOn: false },
   { key: "Burner", label: "Burner", color: "#f59e0b", axis: "yControl", source: "channel", defaultOn: false },
   { key: "Air", label: "Air", color: "#0891b2", axis: "yControl", source: "channel", defaultOn: false },
   { key: "Drum", label: "Drum", color: "#16a34a", axis: "yControl", source: "channel", defaultOn: false },
@@ -103,12 +104,6 @@ const PHASE_DEFS = [
   { key: "maillard", label: "Maillard", color: "#fde68a", fromType: "DRY_END", toType: "FC_START" },
   { key: "dev", label: "Dev", color: "#fca5a5", fromType: "FC_START", toType: "DROP" },
 ];
-
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
 
 function computePhases(events) {
   const byType = Object.fromEntries(events.map((e) => [e.type, e]));
@@ -585,8 +580,8 @@ export default function RoastChart({
         borderColor: s.color,
         backgroundColor: s.color,
         pointRadius: 0,
-        borderWidth: s.axis === "yTemp" ? 2.5 : 1.5,
-        borderDash: s.source === "background" ? [6, 3] : s.axis === "yRor" ? [2, 2] : undefined,
+        borderWidth: seriesLineWidth(s.key, s.axis),
+        borderDash: s.source === "background" ? [6, 3] : undefined,
         stepped,
         yAxisID: s.axis,
         tension: stepped ? 0 : 0.15,
@@ -750,6 +745,8 @@ export default function RoastChart({
       scales: {
         x: {
           type: "linear",
+          min: TIME_AXIS.min,
+          suggestedMax: TIME_AXIS.suggestedMax,
           grid: { color: "#e7e5e4" },
           title: { display: true, text: "mins", color: "#78716c" },
           ticks: { callback: (value) => formatTime(value), color: "#78716c", maxTicksLimit: 8 },
@@ -764,7 +761,9 @@ export default function RoastChart({
           // data's own min (e.g. ~82C at Turning Point), starting the
           // axis mid-way up rather than at a real baseline. 32 (not 0) in
           // Fahrenheit mode -- same physical floor (0°C), converted.
-          min: tempUnit === "f" ? 32 : 0,
+          min: tempAxisMin(tempUnit),
+          // At least the usual 0-275 C range; a hotter roast grows it.
+          suggestedMax: tempAxisSuggestedMax(tempUnit),
         },
         yRor: {
           type: "linear",
@@ -772,14 +771,13 @@ export default function RoastChart({
           grid: { drawOnChartArea: false },
           ticks: { color: "#78716c" },
           display: showRor,
-          // Fixed range (typical RoR chart bounds) so a
-          // single transient spike -- e.g. the sharp BT dip right after
-          // charge -- can't stretch the axis and flatten the rest of the
-          // roast's curve into an unreadable line near zero. Scaled by
-          // 1.8 in Fahrenheit mode -- a rate conversion (no +32 offset),
-          // matching how the actual RoR data itself is converted above.
-          min: tempUnit === "f" ? -90 : -50,
-          max: tempUnit === "f" ? 90 : 50,
+          // Fixed 0-25 C/min (0-45 F/min -- a rate conversion, no +32 offset,
+          // matching how the RoR data itself is converted above), the usual
+          // roasting-chart default, so a single transient spike -- e.g. the
+          // huge RoR right after charge -- can't stretch the axis and flatten
+          // the rest of the roast's curve into an unreadable line near zero.
+          min: rorAxisRange(tempUnit).min,
+          max: rorAxisRange(tempUnit).max,
         },
         yControl: {
           type: "linear",
