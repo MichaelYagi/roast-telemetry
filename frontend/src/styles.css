@@ -3729,6 +3729,11 @@ button.link-neutral {
   overflow-wrap: anywhere;
 }
 
+.note-meta {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
 .note-actions {
   display: inline-flex;
   gap: 0.75rem;

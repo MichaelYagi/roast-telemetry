@@ -1,5 +1,14 @@
 import { useState } from "react";
 import { api } from "../api/client.js";
+import { formatTime } from "../chartDefaults.js";
+
+// "Sep 20, 2026, 9:41 PM" in the viewer's own time zone.
+function formatWritten(iso) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
 
 // Notes for one roast: add, edit and delete, during the roast and after it.
 // Shared by Live Roast and the roast's own page. After every change the
@@ -93,6 +102,10 @@ export default function NotesPanel({ roastId, notes, onReplace }) {
           ) : (
             <li key={n.id} className="note-item">
               <span className="note-text">{n.text}</span>
+              <span className="note-meta">
+                {n.created_at ? `${formatWritten(n.created_at)} ` : ""}@ {formatTime(n.time_s)}
+                {n.author ? ` · ${n.author}` : ""}
+              </span>
               <span className="note-actions no-print">
                 <button
                   type="button"

@@ -37,7 +37,7 @@ import json
 import os
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 from roast_heuristics.ror import DEFAULT_SPAN_S, rate_of_rise_series
 
@@ -688,16 +688,25 @@ def alog_dict_to_points(data: dict) -> dict:
     }
 
 
-# One note per line: "[<seconds>s] text", or "[<seconds>s @<who>] text" when
-# the note has an author. Files written before authors/tenths were kept
-# hold "[<whole seconds>s] text", which this still reads.
-_ROASTINGNOTES_LINE_RE = re.compile(r"^\[(\d+(?:\.\d+)?)s(?: @([^\]]+))?\] (.*)$")
+# One note per line: "[<seconds>s] text", optionally with the moment it was
+# written and who wrote it: "[<seconds>s <UTC time> @<who>] text". Files
+# written before those were kept hold "[<seconds>s] text", which this still
+# reads.
+_ROASTINGNOTES_LINE_RE = re.compile(
+    r"^\[(\d+(?:\.\d+)?)s(?: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ))?(?: @([^\]]+))?\] (.*)$"
+)
 
 
 def _format_note_line(note: dict) -> str:
     author = re.sub(r"[\]\r\n]", "", str(note.get("author") or "")).strip()
+    when = f" {note['created_at']}" if note.get("created_at") else ""
     who = f" @{author}" if author else ""
-    return f"[{float(note.get('time_s') or 0):.1f}s{who}] {note.get('text', '')}"
+    return f"[{float(note.get('time_s') or 0):.1f}s{when}{who}] {note.get('text', '')}"
+
+
+def note_timestamp() -> str:
+    """The moment a note is written, in UTC to the second."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def round_note_time(time_s: float) -> float:
@@ -713,7 +722,14 @@ def assign_note_ids(notes: list) -> list:
     with identical content get a numbered suffix."""
     seen: dict[str, int] = {}
     for n in notes:
-        key = "\x00".join([f"{float(n.get('time_s') or 0):.1f}", str(n.get("author") or ""), str(n.get("text") or "")])
+        key = "\x00".join(
+            [
+                f"{float(n.get('time_s') or 0):.1f}",
+                str(n.get("author") or ""),
+                str(n.get("created_at") or ""),
+                str(n.get("text") or ""),
+            ]
+        )
         digest = "n" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:10]
         count = seen.get(digest, 0)
         seen[digest] = count + 1
@@ -736,11 +752,13 @@ def _extract_notes(data: dict) -> list[dict]:
     for line in str(data.get("roastingnotes") or "").splitlines():
         m = _ROASTINGNOTES_LINE_RE.match(line)
         if m:
-            notes.append({"time_s": float(m.group(1)), "text": m.group(3), "author": m.group(2) or None})
+            notes.append(
+                {"time_s": float(m.group(1)), "created_at": m.group(2), "author": m.group(3) or None, "text": m.group(4)}
+            )
         elif line.strip():
             # Free text without a "[<time>s]" prefix (e.g. an imported
             # file's own roasting notes): keep it as a note at time 0 so
             # it shows up and isn't dropped the next time the file is
             # rewritten.
-            notes.append({"time_s": 0.0, "text": line.strip(), "author": None})
+            notes.append({"time_s": 0.0, "created_at": None, "text": line.strip(), "author": None})
     return assign_note_ids(notes)

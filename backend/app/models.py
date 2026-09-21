@@ -169,6 +169,9 @@ class RoastNote(BaseModel):
     time_s: float
     text: str
     author: Optional[str] = None
+    # When the note was written (UTC, "2026-09-20T21:41:00Z"); absent on notes
+    # from files that predate it.
+    created_at: Optional[str] = None
 
 
 class ModbusChannelRole(str, Enum):

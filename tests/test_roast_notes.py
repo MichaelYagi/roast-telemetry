@@ -158,3 +158,17 @@ def test_identical_notes_get_separate_ids(client):
     assert len(set(ids)) == 2
     assert client.delete(f"/api/roasts/{roast_id}/notes/{ids[1]}").status_code == 204
     assert [n["id"] for n in _notes(client, roast_id)] == [ids[0]]
+
+
+def test_note_remembers_when_it_was_written_and_keeps_it_after_edits_and_restart(client):
+    import re
+
+    roast_id = _finished_roast(client)
+    note = client.post(f"/api/roasts/{roast_id}/notes", json={"text": "hello"}).json()
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", note["created_at"])
+
+    edited = client.patch(f"/api/roasts/{roast_id}/notes/{note['id']}", json={"text": "hello again"}).json()
+    assert edited["created_at"] == note["created_at"]
+
+    session_manager.sessions.pop(roast_id, None)
+    assert _notes(client, roast_id)[0]["created_at"] == note["created_at"]

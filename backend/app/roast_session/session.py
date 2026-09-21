@@ -18,6 +18,7 @@ from alog_playback import (
     alog_dict_to_points,
     assign_note_ids,
     load_alog,
+    note_timestamp,
     round_note_time,
     roast_to_native_alog_dict,
     save_native_alog,
@@ -716,6 +717,7 @@ class RoastSession:
             "time_s": round_note_time(self.profile[-1]["time_s"] if self.profile else 0.0),
             "text": _clean_note_text(req.text),
             "author": req.author,
+            "created_at": note_timestamp(),
         }
         self.notes.append(note)
         assign_note_ids(self.notes)
@@ -1228,6 +1230,7 @@ class RoastSessionManager:
             "time_s": round_note_time(parsed["profile"][-1]["time_s"] if parsed["profile"] else 0.0),
             "text": _clean_note_text(req.text),
             "author": req.author,
+            "created_at": note_timestamp(),
         }
         parsed["notes"].append(note)
         assign_note_ids(parsed["notes"])
