@@ -8,7 +8,11 @@ from __future__ import annotations
 def test_health(client):
     resp = client.get("/api/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    body = resp.json()
+    assert body["status"] == "ok"
+    # Not pinning an exact string -- varies by whatever box the suite runs
+    # on (Linux, Linux (WSL2), macOS, Windows) -- just that it's populated.
+    assert body["platform"]
 
 
 def test_get_settings_defaults(client):

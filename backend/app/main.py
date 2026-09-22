@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -174,9 +175,29 @@ app.include_router(views.router, prefix="/api")
 app.include_router(activity.router, prefix="/api")
 
 
+def _server_platform() -> str:
+    """A short, human label for the OS the *server* is actually running on --
+    distinct from the client browser's OS, and from "Windows" vs "WSL2"
+    (same .venv-eligible Linux python.exe can't tell you which one it's
+    under without checking, since uname() alone says "Linux" either way --
+    see scripts/run-server.sh's own WSL-vs-native-Windows checks for why
+    that distinction matters for this app in particular)."""
+    system = platform.system()
+    if system == "Darwin":
+        return "macOS"
+    if system == "Linux":
+        try:
+            if "microsoft" in Path("/proc/version").read_text().lower():
+                return "Linux (WSL2)"
+        except OSError:
+            pass
+        return "Linux"
+    return system  # "Windows", or whatever else platform.system() reports
+
+
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "platform": _server_platform()}
 
 
 # Serve the built frontend (frontend/dist, from `npm run build`) from the

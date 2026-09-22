@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { api } from "./api/client.js";
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
 import AccountModal from "./components/AccountModal.jsx";
 import { DialogProvider } from "./components/DialogProvider.jsx";
@@ -27,6 +28,15 @@ export default function App() {
 function AppShell() {
   const { user, loading, logout, refresh } = useAuth();
   const [accountOpen, setAccountOpen] = useState(false);
+  // The OS the server is actually running on -- useful in the footer since
+  // this app runs self-hosted (Windows/WSL2/macOS/Linux all behave
+  // differently for hardware access), and can't be baked in at build time
+  // the way version/build already are, since the same build runs anywhere.
+  const [serverPlatform, setServerPlatform] = useState(null);
+
+  useEffect(() => {
+    api.health().then((res) => setServerPlatform(res.platform)).catch(() => {});
+  }, []);
 
   // Nothing rendered yet during the one-time /auth/me check on mount --
   // faster than a spinner for what's normally a same-machine round trip,
@@ -90,7 +100,8 @@ function AppShell() {
         </Routes>
       </main>
       <footer className="app-footer no-print">
-        v{__APP_VERSION__} · build {__APP_BUILD__} · AGPL-3.0-or-later ·{" "}
+        v{__APP_VERSION__} · build {__APP_BUILD__}
+        {serverPlatform && <> · {serverPlatform}</>} · AGPL-3.0-or-later ·{" "}
         {/* AGPL section 13: a network-served program has to offer its users
             its source -- the license's own guidance is a "Source" link in the
             interface. */}

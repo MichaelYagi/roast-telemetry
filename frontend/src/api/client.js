@@ -31,6 +31,8 @@ function cleanParams(params) {
 }
 
 export const api = {
+  health: () => request("/health"),
+
   // auth
   authStatus: () => request("/auth/status"),
   register: (username, password) => request("/auth/register", { method: "POST", body: JSON.stringify({ username, password }) }),
