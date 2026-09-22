@@ -91,11 +91,18 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-# Same check as run-server.sh -- a Windows-created .venv (Scripts/, not
-# bin/) can't run from WSL2/Linux bash at all.
+# Same checks as run-server.sh -- a Windows-created .venv (Scripts/, not
+# bin/) can't run from WSL2/Linux bash at all, and no venv means a bare
+# "No such file or directory" from deep inside this script otherwise,
+# with no hint what to actually do about it.
 if [[ -d .venv ]] && [[ ! -e .venv/bin/python ]] && [[ -e .venv/Scripts/python.exe ]]; then
   echo "$(basename "$0"): .venv was created by native Windows Python (.venv/Scripts/python.exe exists, .venv/bin/python doesn't) -- that can't run from WSL2/Linux." >&2
   echo "Rename or delete .venv, then run scripts/install.sh from this WSL2 shell to create a proper Linux one." >&2
+  exit 1
+fi
+if [[ ! -e .venv/bin/python ]]; then
+  echo "$(basename "$0"): no backend virtual environment found (.venv/bin/python missing)." >&2
+  echo "Run scripts/install.sh first -- it creates .venv and installs everything needed." >&2
   exit 1
 fi
 

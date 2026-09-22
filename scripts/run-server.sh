@@ -17,6 +17,16 @@
 # --force-build to rebuild regardless (e.g. after `npm install` changed
 # dependencies without touching package.json), --skip-build to never.
 #
+# Also runs `npm install` first, on its own equivalent staleness check
+# (package.json/package-lock.json newer than node_modules' own record of
+# the last install), whenever a build is about to happen -- otherwise a
+# `git pull` that added a new frontend dependency (without a matching
+# `npm install`) fails the build with a bare Rollup "failed to resolve
+# import" error that gives no hint what to actually do about it
+# (confirmed live: exactly this, jszip added to package.json for the PDF
+# export feature, an existing checkout that had pulled the change but
+# never run npm install).
+#
 # Usage:
 #   scripts/run-server.sh                # rebuild if stale, then port 8000, localhost only
 #   scripts/run-server.sh 7890           # a different port
@@ -25,8 +35,45 @@
 #   scripts/run-server.sh --force-build  # rebuild even if it looks current
 #   scripts/run-server.sh --lan          # reachable from other devices on your LAN
 #   scripts/run-server.sh --host 0.0.0.0 # same as --lan, spelled out
+#   scripts/run-server.sh --help         # print this, with every option
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/run-server.sh [options] [port]
+
+Options:
+  <port>              Port to listen on (default: 8000)
+  --host <address>    Bind to a specific address (default: 127.0.0.1, localhost only)
+  --lan               Same as --host 0.0.0.0 -- reachable from other devices on your LAN
+  --reload            Auto-restart the backend on code changes
+  --skip-build        Never rebuild the frontend, even if it looks stale
+  --force-build       Rebuild the frontend even if it looks current
+  -h, --help          Show this help and exit
+
+Examples:
+  scripts/run-server.sh                # rebuild if stale, then port 8000, localhost only
+  scripts/run-server.sh 7890           # a different port
+  scripts/run-server.sh --reload       # auto-restart on backend code changes
+  scripts/run-server.sh --skip-build 7890
+  scripts/run-server.sh --force-build  # rebuild even if it looks current
+  scripts/run-server.sh --lan          # reachable from other devices on your LAN
+  scripts/run-server.sh --host 0.0.0.0 # same as --lan, spelled out
+  scripts/run-server.sh --lan 7890     # combine freely: LAN-reachable, on port 7890
+EOF
+}
+
+# Checked before the .venv sanity check below (and before actually doing
+# anything) so --help always works, even on a machine with a broken/missing
+# venv -- the whole point of a help flag is to not require a working setup
+# first.
+for arg in "$@"; do
+  if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then
+    usage
+    exit 0
+  fi
+done
 
 # A .venv created by native Windows Python (install.ps1, or a manual
 # `python -m venv` from PowerShell) has .venv/Scripts/python.exe, not
@@ -38,6 +85,15 @@ cd "$(dirname "$0")/.."
 if [[ -d .venv ]] && [[ ! -e .venv/bin/python ]] && [[ -e .venv/Scripts/python.exe ]]; then
   echo "$(basename "$0"): .venv was created by native Windows Python (.venv/Scripts/python.exe exists, .venv/bin/python doesn't) -- that can't run from WSL2/Linux." >&2
   echo "Rename or delete .venv, then run scripts/install.sh from this WSL2 shell to create a proper Linux one." >&2
+  exit 1
+fi
+
+# No venv at all (a fresh clone, install.sh never run) -- without this,
+# the uvicorn invocation at the bottom fails with a bare "No such file or
+# directory" and no hint what to actually do about it.
+if [[ ! -e .venv/bin/uvicorn ]]; then
+  echo "$(basename "$0"): no backend virtual environment found (.venv/bin/uvicorn missing)." >&2
+  echo "Run scripts/install.sh first -- it creates .venv and installs everything needed." >&2
   exit 1
 fi
 
@@ -74,15 +130,42 @@ frontend_is_stale() {
   [[ -n "$newer" ]]
 }
 
-if [[ "$FORCE_BUILD" -eq 1 ]]; then
-  echo "Building frontend (--force-build)..."
-  (cd frontend && npm run build)
-elif [[ "$SKIP_BUILD" -eq 1 ]]; then
+# Same idea, for whether `npm install` itself needs to run first. npm
+# writes node_modules/.package-lock.json on every install -- a snapshot of
+# the lockfile it actually installed from -- so comparing that against
+# package.json/package-lock.json (not node_modules/ itself, which doesn't
+# change just because its contents are stale) is what catches "the
+# lockfile moved on since the last install".
+node_modules_is_stale() {
+  local marker=frontend/node_modules/.package-lock.json newer
+  [[ -d frontend/node_modules ]] || return 0
+  [[ -f "$marker" ]] || return 0
+  newer="$(find frontend/package.json frontend/package-lock.json \
+    -newer "$marker" 2>/dev/null | head -n 1)" || true
+  [[ -n "$newer" ]]
+}
+
+WILL_BUILD=0
+if [[ "$SKIP_BUILD" -eq 1 ]]; then
   echo "Skipping frontend build (--skip-build)."
+elif [[ "$FORCE_BUILD" -eq 1 ]]; then
+  WILL_BUILD=1
 elif frontend_is_stale; then
-  echo "Frontend changed since the last build (or was never built) -- rebuilding..."
+  WILL_BUILD=1
+fi
+
+if [[ "$WILL_BUILD" -eq 1 ]]; then
+  if node_modules_is_stale; then
+    echo "frontend/package.json changed since the last npm install -- installing dependencies..."
+    (cd frontend && npm install)
+  fi
+  if [[ "$FORCE_BUILD" -eq 1 ]]; then
+    echo "Building frontend (--force-build)..."
+  else
+    echo "Frontend changed since the last build (or was never built) -- rebuilding..."
+  fi
   (cd frontend && npm run build)
-else
+elif [[ "$SKIP_BUILD" -ne 1 ]]; then
   echo "Frontend build is current -- skipping rebuild (--force-build to rebuild anyway)."
 fi
 

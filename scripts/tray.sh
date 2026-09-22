@@ -19,6 +19,12 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
+if [[ ! -e .venv/bin/python ]]; then
+  echo "No virtual environment found (.venv/bin/python missing)." >&2
+  echo "Run scripts/install.sh first -- it creates it." >&2
+  exit 1
+fi
+
 if ! .venv/bin/python -c "import pystray" 2>/dev/null; then
   echo "Tray dependencies aren't installed yet. Run this once:" >&2
   echo "    .venv/bin/pip install -r scripts/tray_requirements.txt" >&2

@@ -27,6 +27,12 @@
 # (e.g. after `npm install` changed dependencies without touching
 # package.json), -SkipBuild never does.
 #
+# Also runs `npm install` first, on its own equivalent staleness check,
+# whenever a build is about to happen -- otherwise a `git pull` that added
+# a new frontend dependency (without a matching `npm install`) fails the
+# build with a bare Rollup "failed to resolve import" error that gives no
+# hint what to actually do about it. Same fix as run-server.sh.
+#
 # -Lan (or -BindHost 0.0.0.0) makes the server reachable from other
 # devices on your network, same as run-server.sh's --lan/--host. Named
 # -BindHost, not -Host: $Host is a reserved PowerShell variable. Windows
@@ -52,6 +58,16 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path $PSScriptRoot -Parent)
 . "$PSScriptRoot\venv-path.ps1"
+
+# No venv at all (a fresh clone, install.ps1 never run) -- without this,
+# the uvicorn invocation at the bottom fails with a bare "cannot find
+# path" error and no hint what to actually do about it. Same check
+# tray.ps1 already has.
+if (-not (Test-Path "$VenvDir\Scripts\python.exe")) {
+    Write-Host "No virtual environment found ($VenvDir\Scripts\python.exe missing)." -ForegroundColor Red
+    Write-Host "Run scripts\install.ps1 first -- it creates it."
+    exit 1
+}
 
 if ($Lan) { $BindHost = "0.0.0.0" }
 
@@ -84,15 +100,53 @@ function Invoke-FrontendBuild {
     }
 }
 
-if ($ForceBuild) {
-    Write-Host "Building frontend (-ForceBuild)..."
-    Invoke-FrontendBuild
-} elseif ($SkipBuild) {
+# Same idea as Test-FrontendStale, for whether `npm install` itself needs
+# to run first. npm writes node_modules\.package-lock.json on every
+# install -- a snapshot of the lockfile it actually installed from -- so
+# comparing that against package.json/package-lock.json (not
+# node_modules\ itself, which doesn't change just because its contents
+# are stale) is what catches "the lockfile moved on since the last install".
+function Test-NodeModulesStale {
+    $marker = "frontend\node_modules\.package-lock.json"
+    if (-not (Test-Path "frontend\node_modules")) { return $true }
+    if (-not (Test-Path $marker)) { return $true }
+    $markerTime = (Get-Item $marker).LastWriteTime
+    foreach ($f in @("frontend\package.json", "frontend\package-lock.json")) {
+        if ((Test-Path $f) -and ((Get-Item $f).LastWriteTime -gt $markerTime)) { return $true }
+    }
+    return $false
+}
+
+function Invoke-NpmInstall {
+    Write-Host "frontend\package.json changed since the last npm install -- installing dependencies..."
+    Push-Location frontend
+    npm install
+    $code = $LASTEXITCODE
+    Pop-Location
+    if ($code -ne 0) {
+        Write-Host "npm install failed -- not starting the server." -ForegroundColor Red
+        exit 1
+    }
+}
+
+$willBuild = $false
+if ($SkipBuild) {
     Write-Host "Skipping frontend build (-SkipBuild)."
+} elseif ($ForceBuild) {
+    $willBuild = $true
 } elseif (Test-FrontendStale) {
-    Write-Host "Frontend changed since the last build (or was never built) -- rebuilding..."
+    $willBuild = $true
+}
+
+if ($willBuild) {
+    if (Test-NodeModulesStale) { Invoke-NpmInstall }
+    if ($ForceBuild) {
+        Write-Host "Building frontend (-ForceBuild)..."
+    } else {
+        Write-Host "Frontend changed since the last build (or was never built) -- rebuilding..."
+    }
     Invoke-FrontendBuild
-} else {
+} elseif (-not $SkipBuild) {
     Write-Host "Frontend build is current -- skipping rebuild (-ForceBuild to rebuild anyway)."
 }
 
