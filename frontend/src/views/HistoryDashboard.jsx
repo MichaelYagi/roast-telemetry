@@ -141,6 +141,22 @@ export default function HistoryDashboard() {
     setTimeout(() => comparePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
 
+  // The top totals tiles (Total, Avg duration/loss/dry%/DTR%, Flagged) --
+  // "every finished roast the filters match, across all pages" per
+  // docs/analysis.html, so paging alone never needs this (see the
+  // [filters]-only effect below), but an add/delete does: refresh() alone
+  // only re-fetches the current page's rows and the page count, so without
+  // this the tiles would keep showing pre-delete/pre-import numbers until
+  // a filter was touched.
+  function refreshTrends() {
+    setTrendsLoading(true);
+    return api
+      .getAnalysisSummary(filters)
+      .then((result) => setSummary(result))
+      .catch(() => setSummary(null))
+      .finally(() => setTrendsLoading(false));
+  }
+
   function refresh() {
     setLoading(true);
     const filterParams = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
@@ -306,6 +322,7 @@ export default function HistoryDashboard() {
     if (done.length) {
       setImportTitle("");
       refresh();
+      refreshTrends();
     }
     setImportError(failed.length ? failed.join("\n") : null);
     if (done.length > 1 || (done.length && failed.length)) {
@@ -325,6 +342,7 @@ export default function HistoryDashboard() {
         return next;
       });
       refresh();
+      refreshTrends();
     } catch (err) {
       notify(err.message, { title: "Delete failed" });
     }
@@ -345,6 +363,7 @@ export default function HistoryDashboard() {
         .filter(Boolean);
       setSelectedIds(new Set());
       refresh();
+      refreshTrends();
       if (failed.length) {
         const titles = failed.map((f) => {
           const roast = roasts.find((r) => r.id === f.id);
