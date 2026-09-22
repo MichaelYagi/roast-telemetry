@@ -90,10 +90,13 @@ class RoastControl:
         "feedback"; everything except the safe-state write itself passes
         through the safety limits."""
         payload = dict(payload)
-        if self.limits.heater_max_pct < 100 and payload.get("burner_sv_c") is not None:
-            # A temperature setpoint can't be checked against a percentage cap.
-            raise RoastControlError("the burner temperature setpoint can't be used while a heater limit is set -- use the heater slider")
-        limited = apply_limits(payload, self.limits, self.current())
+        if self.limits.safety_disabled:
+            limited = payload
+        else:
+            if self.limits.heater_max_pct < 100 and payload.get("burner_sv_c") is not None:
+                # A temperature setpoint can't be checked against a percentage cap.
+                raise RoastControlError("the burner temperature setpoint can't be used while a heater limit is set -- use the heater slider")
+            limited = apply_limits(payload, self.limits, self.current())
         result = self.session.device.write(limited)
         for key in CONTROL_KEYS:
             if limited.get(key) is not None:
@@ -119,7 +122,16 @@ class RoastControl:
         so this is also the one place that needs to log an activity_log
         entry for any of them. `username` is only ever set for the manual
         button (an HTTP request is in flight); every fail-safe passes
-        nothing, since it fires on its own, not because anyone acted."""
+        nothing, since it fires on its own, not because anyone acted.
+
+        Gating this one function is what makes safety_disabled a genuine
+        kill switch for the whole category in one place: every caller
+        listed above funnels through here, so a single early return -- no
+        write, no chart marker, no activity_log entry -- turns all of them
+        into no-ops at once, exactly matching that setting's own
+        docstring (nothing about a suppressed trip is recorded anywhere)."""
+        if self.limits.safety_disabled:
+            return False
         self.stop_automation(reason)
         self.session._cancel_pending_alarms()
         self.tripped_reason = reason

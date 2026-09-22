@@ -270,6 +270,56 @@ def test_emergency_stop_reports_when_it_could_not_reach_the_roaster():
     assert any("couldn't reach" in e["label"] for e in session.events)
 
 
+# -- safety_disabled: the master kill switch -----------------------------------------
+
+
+def test_safety_disabled_makes_emergency_stop_a_no_op(isolated_db):
+    session = make_session()
+    session.control.limits = ControlSafety(safety_disabled=True)
+    feed(session, 0)
+    mark_charge(session)
+    session.control.start_program([ProgramStep(time_s=0, heater_pct=80)], "test")
+
+    async def body():
+        return await session.control.emergency_stop()
+
+    assert asyncio.run(body()) is False
+    assert session.device.writes == []  # nothing written at all, not even a failed attempt
+    assert session.control.tripped_reason is None
+    assert session.control.automation_active()  # not stopped either -- this is a full no-op
+    assert not any(e["label"].startswith("Safety:") for e in session.events)  # no chart marker
+    assert isolated_db.count_activity() == 0  # and no activity_log entry
+
+
+def test_safety_disabled_makes_fail_safe_trips_a_no_op_too():
+    """Same chokepoint as emergency_stop -- one test standing in for all
+    three fail-safe callers (watchdog/lost-reading/tick-error), since they
+    all funnel through the same enter_safe_state()."""
+    session = make_session()
+    session.control.limits = ControlSafety(safety_disabled=True)
+
+    async def body():
+        return await session.control.enter_safe_state("nobody has had the roast open for 60 s")
+
+    assert asyncio.run(body()) is False
+    assert session.device.writes == []
+    assert session.control.tripped_reason is None
+
+
+def test_safety_disabled_skips_the_limit_clamp():
+    session = make_session()
+    session.control.limits = ControlSafety(heater_max_pct=10, fan_min_pct=50, safety_disabled=True)
+    session.apply_command(ControlCommand(heater_pct=100, fan_pct=0))
+    assert session.device.writes[-1] == {"heater_pct": 100.0, "fan_pct": 0.0}
+
+
+def test_safety_disabled_skips_the_burner_setpoint_refusal():
+    session = make_session()
+    session.control.limits = ControlSafety(heater_max_pct=70, safety_disabled=True)
+    session.apply_command(ControlCommand(burner_sv_c=250))  # would normally raise -- see the test above without safety_disabled
+    assert session.device.writes[-1] == {"burner_sv_c": 250.0}
+
+
 def test_program_waits_for_charge_then_runs():
     session = make_session()
     session.control.start_program([ProgramStep(time_s=0, heater_pct=80), ProgramStep(time_s=30, heater_pct=50)], "test")
@@ -426,6 +476,30 @@ def test_emergency_stop_and_status_through_the_api(client):
     stopped = client.post(f"/api/roasts/{roast_id}/emergency-stop").json()
     assert stopped["tripped_reason"] == "emergency stop"
     assert client.get(f"/api/roasts/{roast_id}/control").json()["tripped_reason"] == "emergency stop"
+    client.post(f"/api/roasts/{roast_id}/stop")
+
+
+def test_get_control_picks_up_a_settings_change_made_after_the_roast_started(client):
+    """Regression test: GET /control used to return whatever ControlSafety
+    the session loaded at connect time, cached in memory until something
+    else (starting automation, an emergency-stop attempt) happened to
+    refresh it as a side effect -- so a page that only ever polls GET
+    /control for display (the Live Roast page's own Emergency Stop button
+    and Automatic control panel) could show a roast as still safety-on
+    for as long as it stayed connected, even well after Settings said
+    otherwise. GET /control now refreshes the limits itself before
+    returning them."""
+    roast_id = client.post("/api/roasts", json={"title": "Stale Limits", "mode": "simulator"}).json()["id"]
+    assert client.get(f"/api/roasts/{roast_id}/control").json()["limits"]["safety_disabled"] is False
+
+    client.put("/api/settings", json={
+        "ollama_url": None, "ollama_model": None,
+        "control": {"heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0, "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": True},
+    })
+
+    # No emergency-stop attempt, no automation start -- a plain status poll
+    # (exactly what the frontend's own 2s timer does) must see the change.
+    assert client.get(f"/api/roasts/{roast_id}/control").json()["limits"]["safety_disabled"] is True
     client.post(f"/api/roasts/{roast_id}/stop")
 
 

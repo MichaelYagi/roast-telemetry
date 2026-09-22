@@ -26,7 +26,9 @@ export default function SettingsView() {
   const [verticalControlLayout, setVerticalControlLayout] = useState([]);
   const [verticalControlArrows, setVerticalControlArrows] = useState({});
   const [historyPageSize, setHistoryPageSize] = useState(100);
-  const [control, setControl] = useState({ heater_max_pct: 100, fan_min_pct: 0, drum_min_pct: 0, safe_fan_pct: 100, client_watchdog_s: 0 });
+  const [control, setControl] = useState({
+    heater_max_pct: 100, fan_min_pct: 0, drum_min_pct: 0, safe_fan_pct: 100, client_watchdog_s: 0, safety_disabled: false,
+  });
   const [loaded, setLoaded] = useState(false);
   const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState(null); // { connected, models, error } | null
@@ -136,6 +138,22 @@ export default function SettingsView() {
           In an emergency (the Emergency stop button, a lost connection or an error during a roast) the heater goes to 0 and the fan to the level above.
           The burner temperature setpoint can't be used while the heater limit is below 100%.
         </p>
+
+        <div className="form-row">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={control.safety_disabled}
+              onChange={(e) => setControl({ ...control, safety_disabled: e.target.checked })}
+            />
+            Disable all of the above
+          </label>
+        </div>
+        {control.safety_disabled && (
+          <p className="error">
+            Turns off the limits above, Emergency Stop and every fail-safe. Nothing is recorded while this is on.
+          </p>
+        )}
       </div>
 
       <div className="panel">

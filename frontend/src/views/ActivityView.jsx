@@ -6,6 +6,7 @@ const ACTIONS = [
   "create", "import", "delete", "set_tags", "set_weight", "set_outcome", "set_beans",
   "add_note", "update_note", "delete_note", "delete_event", "retime_event",
   "safe_state", "automation_started", "automation_stopped", "automation_rule_fired",
+  "safety_disabled", "safety_enabled",
 ];
 
 function formatWhen(iso) {
@@ -109,9 +110,16 @@ export default function ActivityView() {
       </div>
 
       <div className="panel">
-        <p className="hint">Every roast delete/edit and safety-critical control event -- kept up to the newest 5000 entries.</p>
-        <div className="table-toolbar">
-          <span>
+        {/* A dedicated row, not the shared .table-toolbar (that one's
+            justify-content: flex-end, meant for a single right-aligned
+            item elsewhere -- with two items of very different lengths it
+            mashed the hint text straight into "Download" with no gap).
+            space-between plus wrap keeps them on one line when there's
+            room and drops Download to its own line on a narrow phone
+            instead of squeezing both into overlapping text. */}
+        <div className="activity-toolbar">
+          <p className="hint">Every roast delete/edit and safety-critical control event -- kept up to the newest 5000 entries.</p>
+          <span className="activity-download">
             Download{" "}
             {totalCount > 0 ? (
               <>

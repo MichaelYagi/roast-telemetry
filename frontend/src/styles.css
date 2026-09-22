@@ -513,6 +513,19 @@ body.breakout-split-active .app-header-inner {
   min-width: 160px;
 }
 
+/* AutoControlPanel's "Repeat a saved roast" select -- a plain flex child
+   (not wrapped in a label like the fields above, which is what gives them
+   their own shrinkable width) defaults to min-width: auto, i.e. never
+   narrower than its widest <option> text (a roast title + date). Fine
+   full-width, but this panel now sits in a 3-column row beside Events/
+   Notes, and at that width a long title pushed the select past the
+   panel's own edge. min-width: 0 lets it shrink and clip its own text
+   like every other input already does, instead of overflowing. */
+.past-roast-select {
+  flex: 1;
+  min-width: 0;
+}
+
 /* A single field on its own, outside a .form-row/.filters-row (so
    there's no sibling to share a row with, and no need for those rules'
    own flex:1/min-width:160px, which would stretch the input to the
@@ -1925,8 +1938,29 @@ button:disabled {
   margin-bottom: 0.75rem;
 }
 
-/* ActivityView's Download CSV/JSON, greyed out when there's nothing to
-   export -- see the "no real disabled state on <a>" comment there. */
+/* ActivityView's hint + Download CSV/JSON row -- same line when there's
+   room, wraps to its own line on a narrow phone instead of squeezing or
+   overlapping (see the comment where this class is used). */
+.activity-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.4rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.activity-toolbar .hint {
+  margin: 0;
+  flex: 1 1 260px;
+}
+
+.activity-download {
+  white-space: nowrap;
+}
+
+/* Greyed out when there's nothing to export -- see the "no real disabled
+   state on <a>" comment where this class is used. */
 .download-disabled {
   color: var(--text-muted);
 }
@@ -2264,6 +2298,11 @@ button:disabled {
   margin-top: 0.2rem;
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+.status-line-danger {
+  color: #b91c1c;
+  font-weight: 700;
 }
 
 /* --- Scope (chart + live readouts + event buttons) ---------------------- */
@@ -3806,30 +3845,17 @@ button.link-neutral {
   box-sizing: border-box;
 }
 
-/* Emergency stop and automatic control */
-.emergency-stop-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.75rem;
-}
-
+/* Emergency stop (now in the roast toolbar beside ON/OFF/START, see
+   RoastToolbar.jsx/EmergencyStop.jsx) and automatic control */
 .emergency-stop {
   background: #b91c1c;
   border-color: #991b1b;
   color: #fff;
-  font-weight: 700;
   letter-spacing: 0.02em;
-  padding: 0.6rem 1.4rem;
 }
 
 .emergency-stop:hover:not(:disabled) {
   background: #991b1b;
-}
-
-.emergency-stop-message {
-  font-size: 0.9rem;
 }
 
 .auto-control-panel h4 {

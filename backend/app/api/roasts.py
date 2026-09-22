@@ -329,8 +329,21 @@ def _active_session(roast_id: str):
 @router.get("/{roast_id}/control")
 def get_control(roast_id: str) -> dict:
     """What the roaster's automatic control is doing, the current safety
-    limits, and whether a fail-safe has stopped things."""
-    return _active_session(roast_id).control.status()
+    limits, and whether a fail-safe has stopped things.
+
+    Refreshes the limits from Settings before returning them -- a
+    RoastControl only re-reads Settings on specific actions otherwise
+    (starting automation, an emergency-stop attempt), so a roast that's
+    been connected since before a Settings change would otherwise keep
+    showing this poll's stale, in-memory copy indefinitely. This is the
+    endpoint the Live Roast page's own display polls (AutoControlPanel,
+    EmergencyStop) every few seconds specifically so a change made in
+    Settings -- most importantly safety_disabled -- shows up there
+    promptly, not just the next time something else happens to call
+    refresh_limits() as a side effect."""
+    session = _active_session(roast_id)
+    session.control.refresh_limits()
+    return session.control.status()
 
 
 @router.post("/{roast_id}/emergency-stop")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from sse_starlette.sse import EventSourceResponse
 
 from .. import ollama_client, storage
@@ -88,7 +88,7 @@ async def stream_settings() -> EventSourceResponse:
 
 
 @router.put("", response_model=AppSettings)
-async def update_settings(settings: AppSettings) -> AppSettings:
+async def update_settings(settings: AppSettings, http_request: Request) -> AppSettings:
     # Silently drop unknown keys/malformed values rather than error --
     # keeps this forward compatible if a stale frontend build sends a key
     # an older/newer backend doesn't know about, instead of failing the
@@ -113,6 +113,7 @@ async def update_settings(settings: AppSettings) -> AppSettings:
     history_page_size = _clamp_history_page_size(settings.history_page_size)
     # A client that never sends `control` (an older cached page) must not
     # reset the saved safety limits back to the defaults.
+    was_safety_disabled = AppSettings(**storage.get_settings()).control.safety_disabled
     if "control" in settings.model_fields_set:
         control = settings.control
     else:
@@ -130,6 +131,21 @@ async def update_settings(settings: AppSettings) -> AppSettings:
         history_page_size=history_page_size,
         control=control.model_dump(),
     )
+    # Not what tripped while it was off (see enter_safe_state's own
+    # docstring -- nothing about that is recorded anywhere), just the
+    # on/off moment itself, so an incident can at least be traced back to
+    # "safety was off starting at this time" -- the one thing worth being
+    # able to reconstruct after the fact.
+    if control.safety_disabled != was_safety_disabled:
+        user = getattr(http_request.state, "user", None)
+        storage.log_activity(
+            "safety",
+            "safety_disabled" if control.safety_disabled else "safety_enabled",
+            username=user["username"] if user else None,
+            message="Roaster safety disabled -- Emergency Stop, fail-safes and command limits are all off"
+            if control.safety_disabled
+            else "Roaster safety re-enabled",
+        )
     result = AppSettings(
         ollama_url=settings.ollama_url,
         ollama_model=settings.ollama_model,

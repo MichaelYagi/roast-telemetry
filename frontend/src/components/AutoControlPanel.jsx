@@ -67,6 +67,12 @@ export default function AutoControlPanel({ roastId }) {
         leaving it to run, and keep your hand near the Emergency stop.
       </p>
 
+      {status.limits?.safety_disabled && (
+        <p className="error" role="alert">
+          Roaster safety is disabled in Settings -- Emergency Stop and every fail-safe are no-ops right now.
+        </p>
+      )}
+
       {tripped && (
         <p className="error" role="alert">
           Stopped for safety: {tripped}. The heater is off. Move a slider or start control again to continue.
@@ -94,7 +100,7 @@ export default function AutoControlPanel({ roastId }) {
 
       <h4>Repeat a saved roast</h4>
       <div className="form-row">
-        <select value={pastId} onChange={(e) => setPastId(e.target.value)}>
+        <select className="past-roast-select" value={pastId} onChange={(e) => setPastId(e.target.value)}>
           <option value="">Choose a roast…</option>
           {past.map((r) => (
             <option key={r.id} value={r.id}>

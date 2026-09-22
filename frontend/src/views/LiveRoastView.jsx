@@ -20,7 +20,6 @@ import RoastStatsPanel from "../components/RoastStatsPanel.jsx";
 import WeightField from "../components/WeightField.jsx";
 import NotesPanel from "../components/NotesPanel.jsx";
 import BeansField from "../components/BeansField.jsx";
-import EmergencyStop from "../components/EmergencyStop.jsx";
 import AutoControlPanel from "../components/AutoControlPanel.jsx";
 import { formatTemp } from "../tempUnits.js";
 
@@ -1116,6 +1115,8 @@ export default function LiveRoastView() {
       connectionStatus={showConnectionDot ? connectionHealth.status : null}
       connectionFailedLabels={connectionHealth.failedLabels}
       simulated={simulated}
+      roastId={roastId}
+      showEmergencyStop={CONTROLLABLE_MODES.includes(activeMode)}
     />
   );
 
@@ -1855,7 +1856,6 @@ export default function LiveRoastView() {
           {phase === "armed" && LIVE_MODES.includes(activeMode) && (
             <ConnectionTestPanel roastId={roastId} latest={latest} mode={activeMode} tempUnit={tempUnit} simulated={simulated} />
           )}
-          {CONTROLLABLE_MODES.includes(activeMode) && isActive && <EmergencyStop roastId={roastId} />}
           <div className="panel scope-panel">
             <div className="scope-body">
               {CONTROLLABLE_MODES.includes(activeMode) && (
@@ -2125,19 +2125,6 @@ export default function LiveRoastView() {
                 />
               </div>
             )}
-            {activeMode === "modbus_live" && (
-              <p className="hint" style={{ gridColumn: "1 / -1" }}>
-                The controls beside the chart read and write directly over{" "}
-                {form.modbus_transport === "tcp" ? form.modbus_host || "the configured host" : form.modbus_port || "the serial port"}:
-                Burner is a drum-temperature setpoint (register 5, default 100–250°C — not a power %, shown as
-                both a % slider and a direct °C slider that move each other), Air and Drum are VFD drives
-                (run/stop + frequency registers 8192/8193, default 0–100%/0–70%), each with its own feedback
-                register (8451) reporting the drive's actual current speed. Out-of-range values are clamped to
-                the configured range. See "Advanced Modbus register map" above to override any of these for
-                your own unit. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual click — mark
-                them yourself as the roast happens.
-              </p>
-            )}
             {activeMode === "ms6514_live" && (
               <div className="panel control-panel">
                 <h3>Mastech MS6514</h3>
@@ -2147,16 +2134,6 @@ export default function LiveRoastView() {
                   End, FC Start, Drop, etc.) is a manual click — mark them yourself below.
                 </p>
               </div>
-            )}
-            {activeMode === "tc4_live" && (
-              <p className="hint" style={{ gridColumn: "1 / -1" }}>
-                Reading/writing {form.tc4_port || "the serial port"} directly (115200 baud, aArtisanQ/PID
-                firmware) — no other software needed. The Heater/Fan sliders beside the chart send real OT1/
-                DCFAN commands; there's no Drum output on TC4, so that slider doesn't do anything here.
-                Heater/Fan readouts stay blank — TC4's own READ command only reports temperature channels, not
-                its current output duty. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual
-                click — mark them yourself as the roast happens.
-              </p>
             )}
             <div className="panel">
               <h3>Events</h3>
@@ -2173,6 +2150,38 @@ export default function LiveRoastView() {
             </div>
 
             <NotesPanel roastId={roastId} notes={roast?.notes || []} onReplace={(notes) => setRoast((r) => (r ? { ...r, notes } : r))} />
+
+            {/* Full-width (gridColumn: 1/-1) and deliberately last in this
+                grid -- placed anywhere earlier, it forces a row break right
+                after it, stranding whatever narrow panel came just before
+                it (AutoControlPanel) alone in a row with empty grid tracks
+                beside it (those tracks stay alive/non-collapsed because
+                Events/NotesPanel use them lower down). Last item has
+                nothing after it to misalign, so AutoControlPanel/Events/
+                Notes can pair up normally above it instead. */}
+            {activeMode === "modbus_live" && (
+              <p className="hint" style={{ gridColumn: "1 / -1" }}>
+                The controls beside the chart read and write directly over{" "}
+                {form.modbus_transport === "tcp" ? form.modbus_host || "the configured host" : form.modbus_port || "the serial port"}:
+                Burner is a drum-temperature setpoint (register 5, default 100–250°C — not a power %, shown as
+                both a % slider and a direct °C slider that move each other), Air and Drum are VFD drives
+                (run/stop + frequency registers 8192/8193, default 0–100%/0–70%), each with its own feedback
+                register (8451) reporting the drive's actual current speed. Out-of-range values are clamped to
+                the configured range. See "Advanced Modbus register map" above to override any of these for
+                your own unit. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual click — mark
+                them yourself as the roast happens.
+              </p>
+            )}
+            {activeMode === "tc4_live" && (
+              <p className="hint" style={{ gridColumn: "1 / -1" }}>
+                Reading/writing {form.tc4_port || "the serial port"} directly (115200 baud, aArtisanQ/PID
+                firmware) — no other software needed. The Heater/Fan sliders beside the chart send real OT1/
+                DCFAN commands; there's no Drum output on TC4, so that slider doesn't do anything here.
+                Heater/Fan readouts stay blank — TC4's own READ command only reports temperature channels, not
+                its current output duty. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual
+                click — mark them yourself as the roast happens.
+              </p>
+            )}
           </div>
         </div>
         {showSplitLayout && (
