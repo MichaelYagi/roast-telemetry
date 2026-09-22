@@ -109,19 +109,28 @@ export default function ActivityView() {
       </div>
 
       <div className="panel">
+        <p className="hint">Every roast delete/edit and safety-critical control event -- kept up to the newest 5000 entries.</p>
         <div className="table-toolbar">
-          <span className="hint">
-            Every roast delete/edit and safety-critical control event -- kept up to the newest 5000 entries.
-          </span>
           <span>
             Download{" "}
-            <a href={api.activityExportUrl("csv", filters)} download>
-              CSV
-            </a>{" "}
-            ·{" "}
-            <a href={api.activityExportUrl("json", filters)} download>
-              JSON
-            </a>
+            {totalCount > 0 ? (
+              <>
+                <a href={api.activityExportUrl("csv", filters)} download>
+                  CSV
+                </a>{" "}
+                ·{" "}
+                <a href={api.activityExportUrl("json", filters)} download>
+                  JSON
+                </a>
+              </>
+            ) : (
+              // Nothing to export -- plain greyed-out text, not disabled
+              // links (an <a> has no real disabled state, and this avoids
+              // a dead click/keyboard-focus target for an empty download).
+              <span className="download-disabled" aria-disabled="true">
+                CSV · JSON
+              </span>
+            )}
           </span>
         </div>
         {error && <p className="error">{error}</p>}

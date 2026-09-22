@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
 import AccountModal from "./components/AccountModal.jsx";
 import { DialogProvider } from "./components/DialogProvider.jsx";
@@ -44,8 +44,10 @@ function AppShell() {
             (non-split) layout is unaffected either way. */}
         <div className="app-header-inner">
           <div className="app-title-group">
-            <img className="app-logo" src="/icon-48x48.png" alt="" width="28" height="28" />
-            <h1>Roast Telemetry</h1>
+            <Link to="/" className="app-title-link">
+              <img className="app-logo" src="/icon-48x48.png" alt="" width="28" height="28" />
+              <h1>Roast Telemetry</h1>
+            </Link>
             <ThemePicker />
           </div>
           <nav>
