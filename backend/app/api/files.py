@@ -1,4 +1,4 @@
-"""Lists folders and ``.alog`` files on the machine running the server --
+"""Lists folders and roast log files on the machine running the server --
 backs the History page's "Browse..." button next to the import path field.
 
 The import endpoint (POST /api/roasts/import) already reads whatever
@@ -7,10 +7,12 @@ an account can reach: it only saves typing the path. Every /api route,
 this one included, already sits behind the login gate in main.py, and each
 allowed account has full access to everything else too (see the README).
 
-It lists folder names and ``.alog`` files only -- never file contents, and
-no other file types -- and skips names starting with a dot. If the server
-is reachable from other devices (--lan), anyone signed in can see its
-folder names through this, the same trust the rest of the app assumes."""
+It lists folder names and files with a roast-log extension only (.alog,
+.json, .csv, .tsv, .xlsx -- see alog_playback/roastlog.py for what the last
+three hold) -- never file contents, and no other file types -- and skips
+names starting with a dot. If the server is reachable from other devices
+(--lan), anyone signed in can see its folder names through this, the same
+trust the rest of the app assumes."""
 from __future__ import annotations
 
 import os
@@ -25,7 +27,8 @@ from ..models import FileEntry, FileListing, FileShortcut
 router = APIRouter(prefix="/files", tags=["files"])
 
 _MAX_ENTRIES = 2000
-_ALOG_SUFFIX = ".alog"
+# Kept in sync with IMPORTABLE_EXTENSIONS in frontend/src/views/HistoryDashboard.jsx.
+_IMPORTABLE_SUFFIXES = (".alog", ".json", ".csv", ".tsv", ".xlsx")
 
 
 def _windows_drives() -> list[str]:
@@ -52,7 +55,7 @@ def _shortcuts() -> list[FileShortcut]:
 
 @router.get("", response_model=FileListing)
 def list_files(path: Optional[str] = None) -> FileListing:
-    """Folders (first) and ``.alog`` files in ``path``; the user's home
+    """Folders (first) and roast-log files in ``path``; the user's home
     folder when ``path`` is omitted."""
     target = os.path.abspath(os.path.expanduser(path)) if path and path.strip() else os.path.expanduser("~")
     if not os.path.exists(target):
@@ -71,7 +74,7 @@ def list_files(path: Optional[str] = None) -> FileListing:
                 try:
                     if entry.is_dir():
                         dirs.append(FileEntry(name=entry.name, path=entry.path, kind="dir"))
-                    elif entry.name.lower().endswith(_ALOG_SUFFIX) and entry.is_file():
+                    elif entry.name.lower().endswith(_IMPORTABLE_SUFFIXES) and entry.is_file():
                         files.append(FileEntry(name=entry.name, path=entry.path, kind="file", size=entry.stat().st_size))
                 except OSError:
                     continue  # a broken link or a vanished entry -- just leave it out

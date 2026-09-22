@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comparing and analysing roasts &mdash; Roast Telemetry Docs</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="index.html"><img src="assets/icon-48x48.png" alt="" width="24" height="24"> Roast Telemetry</a>
+  <nav>
+    <a href="index.html">Docs</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="control.html">Control &amp; Safety</a>
+    <a href="analysis.html" aria-current="page">Analysis</a>
+    <a href="modbus/index.html">Direct Modbus</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="glossary.html">Glossary</a>
+    <a href="https://github.com/MichaelYagi/roast-telemetry">GitHub</a>
+  </nav>
+</header>
+<main>
+  <h1>Comparing and analysing roasts</h1>
+  <p>
+    Every roast, whether you recorded it from a roaster or uploaded a log file, boils down to one row of numbers:
+    temperatures and times at each milestone, phase times, rate of rise, weights, and how it turned out. Those
+    rows are what the comparison on the History page, the Analysis page, the History totals and the downloads are all built on.
+  </p>
+
+  <h2 id="uploaded-logs">Analysing uploaded logs</h2>
+  <p>
+    Roasts uploaded from <code>.alog</code> files on the History page (drop them on the Import bar, or point
+    at files on the server) are analysed exactly like roasts recorded here. What the app reads from a log:
+  </p>
+  <ul>
+    <li><strong>The curve and milestones.</strong> Charge, Dry End, First Crack, Drop and the rest. A log that never marked Drop gets no Drop numbers, and simply has gaps in those columns.</li>
+    <li><strong>Temperatures in Celsius or Fahrenheit.</strong> A log saved in &deg;F is converted to &deg;C on the way in, so every roast lines up.</li>
+    <li><strong>The roast date.</strong> Read from the file's own timestamp, so uploaded roasts sort and filter by the date they were roasted. Roasts uploaded with older versions get their dates repaired once, the next time the server starts.</li>
+    <li><strong>Weights and notes</strong>, when the file has them.</li>
+  </ul>
+  <p>
+    Roasts made by <em>replaying</em> a saved log on Live Roast just repeat that log's data, so the Analysis page
+    leaves them out unless you choose &ldquo;Replayed logs&rdquo; under <em>Data from</em>. Roasts on a built-in
+    simulated device are left out too, unless you tick <em>Include simulated</em>.
+  </p>
+
+  <h2 id="numbers">The numbers for each roast</h2>
+  <p>Times are counted from Charge. Temperatures show in the unit chosen under Settings.</p>
+  <table>
+    <thead><tr><th>Number</th><th>Unit</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><th colspan="3">Temperatures</th></tr>
+      <tr><td>Charge temperature</td><td>°C</td><td>Bean temperature at Charge.</td></tr>
+      <tr><td>Turning point temperature</td><td>°C</td><td></td></tr>
+      <tr><td>Dry End temperature</td><td>°C</td><td></td></tr>
+      <tr><td>First Crack temperature</td><td>°C</td><td></td></tr>
+      <tr><td>First Crack End temperature</td><td>°C</td><td></td></tr>
+      <tr><td>Drop temperature</td><td>°C</td><td></td></tr>
+      <tr><th colspan="3">Timing</th></tr>
+      <tr><td>Turning point time</td><td>s</td><td>Milestone times count from Charge.</td></tr>
+      <tr><td>Dry End time</td><td>s</td><td></td></tr>
+      <tr><td>First Crack time</td><td>s</td><td></td></tr>
+      <tr><td>First Crack End time</td><td>s</td><td></td></tr>
+      <tr><td>Drop time</td><td>s</td><td></td></tr>
+      <tr><td>Roast duration (Charge to Drop)</td><td>s</td><td>Charge to Drop, the same span the phase percentages use.</td></tr>
+      <tr><th colspan="3">Phases</th></tr>
+      <tr><td>Dry phase time</td><td>s</td><td></td></tr>
+      <tr><td>Maillard phase time</td><td>s</td><td></td></tr>
+      <tr><td>Development time</td><td>s</td><td></td></tr>
+      <tr><td>Dry %</td><td>%</td><td></td></tr>
+      <tr><td>Maillard %</td><td>%</td><td></td></tr>
+      <tr><td>Development % (DTR)</td><td>%</td><td></td></tr>
+      <tr><th colspan="3">Rate of rise</th></tr>
+      <tr><td>Peak rate of rise</td><td>°C/min</td><td>Highest rate of rise after the turning point.</td></tr>
+      <tr><td>Rate of rise at First Crack</td><td>°C/min</td><td></td></tr>
+      <tr><td>Rate of rise at Drop</td><td>°C/min</td><td></td></tr>
+      <tr><td>Rate-of-rise crashes</td><td>&mdash;</td><td>Counts of rate-of-rise problems (a sharp drop, a long flat stretch, a sudden rise).</td></tr>
+      <tr><td>Rate-of-rise flatlines</td><td>&mdash;</td><td></td></tr>
+      <tr><td>Rate-of-rise flicks</td><td>&mdash;</td><td></td></tr>
+      <tr><th colspan="3">Weights</th></tr>
+      <tr><td>Green weight</td><td>g</td><td></td></tr>
+      <tr><td>Roasted weight</td><td>g</td><td></td></tr>
+      <tr><td>Weight loss</td><td>%</td><td>From green and roasted weights.</td></tr>
+      <tr><th colspan="3">Outcome</th></tr>
+      <tr><td>Color (Agtron)</td><td>&mdash;</td><td>Filled in by you on the roast&#x27;s page.</td></tr>
+      <tr><td>Cupping score</td><td>&mdash;</td><td>Filled in by you.</td></tr>
+      <tr><td>Rating</td><td>/5</td><td>Filled in by you (1 to 5 stars).</td></tr>
+      <tr><th colspan="3">Beans</th></tr>
+      <tr><td>Bean density</td><td>g/L</td><td>From the saved beans the roast is linked to.</td></tr>
+      <tr><td>Bean moisture</td><td>%</td><td></td></tr>
+      <tr><td>Bean altitude</td><td>m</td><td></td></tr>
+    </tbody>
+  </table>
+  <p class="hint">
+    A number is left blank when the roast doesn't have what it needs, for example no Drop marked. They appear on
+    each roast's own page under <strong>Numbers</strong>, as rows in the comparison table, as chart axes on the Analysis
+    page, and as columns in the downloads.
+  </p>
+
+  <h2 id="history">History: totals and downloads</h2>
+  <p>
+    The tiles at the top of History cover <strong>every finished roast the filters match, across all pages</strong>,
+    not just the page of the table you're looking at. Simulated roasts are left out. Beside them:
+  </p>
+  <ul>
+    <li><strong>Download all (.zip)</strong> &mdash; every matching roast's <code>.alog</code> file in an <code>alog/</code> folder. A small <strong>&#9656;</strong> beside it opens a choice of extra formats to include too &mdash; JSON, the roast-log CSV, Excel, PDF &mdash; each in its own folder in the same zip. Roasts with the same title get their ID added to the file name so none overwrite each other.</li>
+    <li><strong>Analyse these</strong> &mdash; opens the Analysis page.</li>
+  </ul>
+  <p>The zip follows whatever filters are set on History or Analysis.</p>
+  <p class="hint">
+    The PDF report is built in the browser, one roast at a time (a chart image plus the same tables as the roast's
+    own page), so it's capped at 150 roasts per zip &mdash; narrow the filters first for a larger history. The other
+    three formats have no such limit; they're built on the server.
+  </p>
+
+  <h2 id="compare">Comparing roasts</h2>
+  <p>
+    Comparing is done from the <strong>History</strong> page. Tick two or more roasts in the table and press
+    <strong>Compare</strong>. A comparison panel opens at the top of History, and <strong>Close comparison</strong>
+    puts you back to the plain list, with your ticks kept. You can compare up to 20 roasts at once.
+  </p>
+  <p>
+    <strong>The comparison is the ticked roasts.</strong> Tick another roast and it joins the comparison; untick one
+    and it leaves. The ticks stay when you change page or filters. A bar above the table says how many roasts are
+    selected, including any on other pages, next to <strong>Compare</strong>, <strong>Delete</strong> and
+    <strong>Clear selection</strong>, so it's always clear what a delete would remove. With nothing selected, the same
+    place has an <em>Open a saved comparison</em> box.
+  </p>
+  <ul>
+    <li><strong>Curves overlaid</strong> for bean temperature, environment temperature or rate of rise. <em>Line up on Charge</em> (on by default) lines every curve up at its own Charge, so roasts that were recorded starting at different moments still overlay properly. Untick it to see raw roast time. Past eight roasts the line colours repeat, so the line style changes (dashed, then dotted) to keep them apart.</li>
+    <li><strong>Hide from graph</strong> on a roast's row takes its line off the graph only. The roast stays ticked, and stays in the table (dimmed). Click <em>Show on graph</em> to bring it back.</li>
+    <li><strong>One row per roast</strong> in the Numbers table, with a colour dot matching its line and the roast's name fixed on the left while you scroll sideways. The numbers are in groups: <em>Temperatures</em>, <em>Timing</em> and <em>Phases</em> start open, the rest (rate of rise, weights, outcome, beans) start closed. Click a group name to open or close it.</li>
+    <li><strong>Sort</strong> by clicking a number's heading: smallest first, then largest first, then back to the selection order. Roasts without that number go last.</li>
+    <li><strong>Baseline</strong> &mdash; choose one roast as the baseline. It moves to the top, and each other roast shows how far it is from it in each cell, for example <em>+0:12</em> or <em>&minus;3.5</em>.</li>
+    <li><strong>Saved views</strong> keep the roasts, curve, alignment, baseline and hidden roasts under a name. It's one field: pick a saved view from the suggestions to load it, or type a name and press Save. Saving under a name that already exists updates that view.</li>
+    <li>The roasts being compared are kept in the page address (<code>/history?compare=&hellip;</code>), so a comparison survives a reload and can be bookmarked or shared. The old <code>/compare</code> address goes to History.</li>
+    <li>A roast with no saved recording (interrupted before anything was saved) has no curve to compare. It's left out with a note saying which.</li>
+  </ul>
+
+  <h2 id="analysis-page">Analysis</h2>
+  <p>
+    The place for questions across many roasts. Set the filters (search, beans, tag, where the data came from, date
+    range, simulated roasts) and press <strong>Apply filters</strong> (or Enter). Nothing reloads while you're still
+    choosing, and a note reminds you when the filters have changed but not been applied. Then choose:
+  </p>
+  <ul>
+    <li><strong>Across (X)</strong> and <strong>Up (Y)</strong> &mdash; any two numbers, or <em>Date</em> to see one number over time. Each roast is a point; click a point to open that roast in a new tab.</li>
+    <li><strong>Colour by</strong> &mdash; beans, origin, process, tag, month, who roasted it, or where the data came from.</li>
+  </ul>
+  <p>Below the chart:</p>
+  <ul>
+    <li><strong>How consistent</strong> &mdash; for each group, the average and the spread (standard deviation) of the numbers that matter most for repeatability, plus your chosen Y. A smaller spread means more repeatable roasts. A group with a single roast has no spread.</li>
+    <li><strong>Roasts that stand out</strong> &mdash; roasts more than two standard deviations from the rest of their group on the chosen Y, for groups of five or more roasts.</li>
+    <li><strong>Saved views</strong> &mdash; keep the filters, both axes and the grouping under a name, the same one-field way as in a comparison.</li>
+    <li><strong>Download all</strong> &mdash; the same zip as History, for the current filters.</li>
+  </ul>
+  <p class="hint">
+    Only finished roasts count. If more than 2000 match, the newest 2000 are used. With few roasts the averages
+    and spreads mean little, so treat them as tentative.
+  </p>
+
+  <h3 id="ai">Asking the AI</h3>
+  <p>
+    If a local Ollama server is set up (a URL and a model under Settings &rarr; AI Roast Review), an
+    <strong>Ask the AI</strong> panel appears on the Analysis page. It sends the model this page's summary numbers
+    (per-group averages and spreads, and the twenty most recent roasts' key figures), never whole curves, plus an
+    optional question you type, and shows what it makes of them. It follows the current filters and grouping. Nothing
+    leaves your network unless your Ollama URL points elsewhere. Without Ollama configured the panel simply isn't
+    shown.
+  </p>
+  <p class="hint">
+    A local model can take a minute or two; the page waits and shows the answer when it arrives. The request asks for
+    an 8192-token context window so the summary isn't cut off. AI comments can be wrong, so check them against the
+    numbers on the page.
+  </p>
+
+  <h2 id="outcomes">How it turned out</h2>
+  <p>
+    On a roast's own page, <strong>How it turned out</strong> records what the roast was like once you've tasted it:
+    colour (Agtron), a cupping score (0&ndash;100), a rating (1&ndash;5 stars) and tasting notes. They become numbers you
+    can compare, chart and group, and columns in every downloaded format. They are saved in the app's database, not in
+    the roast's <code>.alog</code> file.
+  </p>
+
+  <h2 id="beans">Beans</h2>
+  <p>
+    A roast has one <strong>Beans</strong> field, on its own page and when configuring it on Live Roast. Type any
+    name, or pick from your saved beans as you type. A name that matches a saved beans record (ignoring capital
+    letters) links to that record automatically, using the saved spelling. A name that isn't in the list yet is
+    <strong>added to it automatically</strong> as a record with just that name, so the Beans page always shows every
+    name in use. Names already typed on your roasts, and names in uploaded logs, are added the same way.
+  </p>
+  <p>
+    Some programs save a whole description in a log's beans field, with the line breaks and accented letters written
+    as escape codes (for example <code>Caturra\nEthiopia\nFarm: &hellip;\nProcess Natural&hellip;</code>). Those are
+    decoded and split up when the log is uploaded. The name is the first line, followed by the origin when there is one
+    (for example <em>Caturra &middot; Ethiopia</em>). The origin, process, variety, altitude and farm are filled in from
+    the lines that say so. <strong>The whole description is kept in the record's Notes, one line each</strong>, so
+    nothing is lost. On the roast's own page a <strong>Beans</strong> card shows those lines as they were written.
+    Records already in your list that look like this are tidied the same way once, when the server starts, and
+    duplicates are merged. Edit a record on the Beans page to change any of it.
+  </p>
+  <p>
+    The <strong>Beans</strong> page keeps the fuller record for each green bean you roast: name, origin, process,
+    variety, altitude, density, moisture, supplier and notes. A roast linked to one can be grouped and filtered by
+    beans, origin and process, and adds the beans' density, moisture and altitude as numbers. Deleting a record keeps
+    the name on the roasts that used it and only removes the link (typing that name again adds it back).
+  </p>
+
+  <h2 id="api">API</h2>
+  <p>All under <code>/api</code>. The filters below are the same on every analysis endpoint.</p>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/analysis/metrics</code></td><td>Every number, with its label, unit and group</td></tr>
+      <tr><td>GET</td><td><code>/analysis/table</code></td><td>One row per finished roast with all its numbers</td></tr>
+      <tr><td>GET</td><td><code>/analysis/summary</code></td><td>Count, mean, standard deviation, min and max per group; <code>group_by</code> is <code>none</code>, <code>beans</code>, <code>origin</code>, <code>process</code>, <code>tag</code>, <code>month</code>, <code>roaster</code>, <code>mode</code> or <code>source</code></td></tr>
+      <tr><td>GET</td><td><code>/analysis/roasts/{id}</code></td><td>The same record for a single roast</td></tr>
+      <tr><td>GET</td><td><code>/analysis/export.zip</code></td><td>Every matching <code>.alog</code>, plus <code>formats</code> (comma-separated: <code>json</code>, <code>roastlog_csv</code>, <code>xlsx</code>) for extra folders in the same zip</td></tr>
+      <tr><td>POST</td><td><code>/analysis/insights</code></td><td>Ask the configured Ollama model to comment on the matching roasts (<code>202</code>; 400 if Ollama isn't set up)</td></tr>
+      <tr><td>GET</td><td><code>/analysis/insights/{id}</code></td><td>Poll a request: <code>pending</code>, <code>ready</code> (with <code>text</code>) or <code>failed</code></td></tr>
+      <tr><td>PUT</td><td><code>/roasts/{id}/outcome</code></td><td>Colour, cupping score, rating, tasting notes. A field left out is unchanged; <code>null</code> clears it</td></tr>
+      <tr><td>PUT</td><td><code>/roasts/{id}/beans</code></td><td>Set the roast's beans by <code>name</code>: a name matching a saved record (ignoring case) links to it, any other name is added to the Beans list and linked, blank clears it</td></tr>
+      <tr><td>GET / POST</td><td><code>/beans</code></td><td>List or create saved beans</td></tr>
+      <tr><td>PUT / DELETE</td><td><code>/beans/{id}</code></td><td>Edit or delete saved beans</td></tr>
+      <tr><td>GET / POST</td><td><code>/views</code></td><td>List (<code>?kind=compare</code> or <code>analysis</code>) or save a named view; saving under an existing name updates it</td></tr>
+      <tr><td>DELETE</td><td><code>/views/{id}</code></td><td>Delete a saved view</td></tr>
+    </tbody>
+  </table>
+  <p class="hint">
+    Filters for the analysis endpoints: <code>q</code>, <code>tag</code>, <code>bean_id</code>, <code>mode</code>,
+    <code>status</code>, <code>created_by</code>, <code>created_from</code>, <code>created_to</code> (a bare date means
+    the whole day), <code>source</code> (<code>recorded</code>, <code>uploaded</code> or <code>replay</code>),
+    <code>include_simulated</code> and <code>include_replays</code>.
+  </p>
+
+  <div class="page-nav"><a href="index.html">&larr; Back to docs home</a></div>
+</main>
+<script src="assets/toc.js" defer></script>
+<script src="assets/back-to-top.js" defer></script>
+</body>
+</html>

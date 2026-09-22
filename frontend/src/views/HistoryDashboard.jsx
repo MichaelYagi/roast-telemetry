@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
+import BulkZipDownload from "../components/BulkZipDownload.jsx";
+import ComparisonPanel from "../components/ComparisonPanel.jsx";
+import SavedViews from "../components/SavedViews.jsx";
 import { useConfirm, useNotify } from "../components/DialogProvider.jsx";
 import ServerFileChooser from "../components/ServerFileChooser.jsx";
-import { isSimulatedRoast } from "../simulated.js";
+
+// Comparing more than this at once makes the chart unreadable.
+const MAX_COMPARE = 20;
 
 function formatDuration(seconds) {
   if (seconds == null) return "—";
@@ -11,6 +16,11 @@ function formatDuration(seconds) {
   const s = Math.round(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
+
+// What the Import box accepts, and (for the browser file picker) the "accept"
+// list -- .alog and .json go through the native reader, .csv/.tsv/.xlsx
+// through the roast-log table reader. See alog_playback/roastlog.py.
+const IMPORTABLE_EXTENSIONS = [".alog", ".json", ".csv", ".tsv", ".xlsx"];
 
 const MODE_LABELS = {
   simulator: "Simulator",
@@ -69,15 +79,67 @@ export default function HistoryDashboard() {
   const [uploadStatus, setUploadStatus] = useState(null); // e.g. "Uploading 2 of 5…"
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef(null);
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  // The ticked roasts. A comparison in the address (?compare=id,id,...) starts them
+  // off ticked, so a reload or a shared link brings the same comparison back.
+  const [selectedIds, setSelectedIds] = useState(
+    () => new Set((new URLSearchParams(window.location.search).get("compare") || "").split(",").filter(Boolean))
+  );
+  const [compareOpen, setCompareOpen] = useState(() => Boolean(new URLSearchParams(window.location.search).get("compare")));
   const [deletingSelected, setDeletingSelected] = useState(false);
-  // Always fetched, scoped to the exact same filtered/paged set showing in the
-  // table below. Each entry is a real .alog read server-side (GET
-  // /roasts/stats-batch), so it loads after the list rather than holding it up.
-  const [trendStats, setTrendStats] = useState([]);
+  // Totals over every roast that matches the filters (all pages), from
+  // GET /analysis/summary -- not just the page of the table below.
+  const [summary, setSummary] = useState(null);
   const [trendsLoading, setTrendsLoading] = useState(true);
   const [importOpen, setImportOpen] = useState(readImportOpen);
+  const [tempUnit, setTempUnit] = useState("c"); // display only -- needed for a bulk PDF export's charts/tables
   const navigate = useNavigate();
+
+  const [, setSearchParams] = useSearchParams();
+  const comparePanelRef = useRef(null);
+  // What's known about every roast seen so far (across pages), so a message can
+  // name a roast by its title instead of an ID.
+  const knownRoasts = useRef(new Map());
+  const [compareNote, setCompareNote] = useState(null);
+  const [pendingConfig, setPendingConfig] = useState(null); // a saved comparison opened from here
+  const titleFor = (id) => knownRoasts.current.get(id)?.label;
+  const hasNoRecording = (id) => knownRoasts.current.get(id) && !knownRoasts.current.get(id).hasRecording;
+
+  // The comparison IS the ticked roasts: tick one and it joins, untick it and it
+  // leaves. (A roast with no saved recording has no curve, so it's left out.)
+  const ticked = [...selectedIds];
+  const leftOut = ticked.filter(hasNoRecording);
+  const compareIds = compareOpen ? ticked.filter((id) => !hasNoRecording(id)).slice(0, MAX_COMPARE) : [];
+
+  // Keep the address in step with the comparison, and close it when nothing is left to compare.
+  useEffect(() => {
+    if (compareOpen && compareIds.length === 0) {
+      setCompareOpen(false);
+      return;
+    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (compareOpen) next.set("compare", compareIds.join(","));
+        else next.delete("compare");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [compareOpen, compareIds.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function startCompare() {
+    if (!compareOpen) {
+      const usable = ticked.filter((id) => !hasNoRecording(id));
+      if (usable.length < 2) {
+        const names = leftOut.map((id) => `"${titleFor(id)}"`).join(", ");
+        setCompareNote(`Not enough to compare: ${names || "the selection"} ${leftOut.length === 1 ? "has" : "have"} no recording.`);
+        return;
+      }
+      setCompareNote(null);
+      setCompareOpen(true);
+    }
+    setTimeout(() => comparePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
 
   function refresh() {
     setLoading(true);
@@ -85,6 +147,13 @@ export default function HistoryDashboard() {
     const pageParams = { ...filterParams, limit: pageSize, offset: (page - 1) * pageSize };
     return Promise.all([api.listRoasts(pageParams), api.countRoasts(filterParams)])
       .then(([roastsPage, count]) => {
+        roastsPage.forEach((r) =>
+          knownRoasts.current.set(r.id, {
+            // Many roasts share a title, so the date helps tell them apart.
+            label: `${r.title}, ${new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+            hasRecording: Boolean(r.alog_path),
+          })
+        );
         setRoasts(roastsPage);
         setTotalCount(count.total);
       })
@@ -102,6 +171,7 @@ export default function HistoryDashboard() {
 
   const allSelected = roasts.length > 0 && roasts.every((r) => selectedIds.has(r.id));
   const someSelected = roasts.some((r) => selectedIds.has(r.id));
+  const offPageSelected = [...selectedIds].filter((id) => !roasts.some((r) => r.id === id)).length;
 
   function toggleSelectAll() {
     setSelectedIds((prev) => {
@@ -120,38 +190,44 @@ export default function HistoryDashboard() {
     refresh();
   }, [filters, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Same filters/page/pageSize as the table above, so "trends" always
-  // means "trends for exactly what I'm looking at right now" -- picking
-  // a tag/mode filter while trends are showing re-fetches automatically,
-  // same as the table itself does.
+  useEffect(() => {
+    api.getSettings().then((s) => setTempUnit(s.temperature_unit || "c"));
+  }, []);
+
+  // Same filters as the table above (but not the page), so the numbers
+  // always describe everything the filters match.
   useEffect(() => {
     setTrendsLoading(true);
-    const filterParams = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
-    const pageParams = { ...filterParams, limit: pageSize, offset: (page - 1) * pageSize };
+    let cancelled = false;
     api
-      .getRoastStatsBatch(pageParams)
-      .then(setTrendStats)
-      .finally(() => setTrendsLoading(false));
-  }, [filters, page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Roasts recorded against a built-in simulated device stay in the list but
-  // never count toward any average or trend here -- fake data must not move
-  // the numbers for real roasts.
-  const simulatedIds = useMemo(() => new Set(roasts.filter(isSimulatedRoast).map((r) => r.id)), [roasts]);
-
-  const trendAverages = useMemo(() => {
-    const real = trendStats.filter((r) => !simulatedIds.has(r.id));
-    const withDry = real.filter((r) => r.dry_pct != null);
-    const withDtr = real.filter((r) => r.dtr_pct != null);
-    const flaggedCount = real.filter(
-      (r) => r.ror_flags.crashes.length || r.ror_flags.flatlines.length || r.ror_flags.flicks.length
-    ).length;
-    return {
-      avgDryPct: withDry.length ? withDry.reduce((sum, r) => sum + r.dry_pct, 0) / withDry.length : null,
-      avgDtrPct: withDtr.length ? withDtr.reduce((sum, r) => sum + r.dtr_pct, 0) / withDtr.length : null,
-      flaggedCount,
+      .getAnalysisSummary(filters)
+      .then((result) => {
+        if (!cancelled) setSummary(result);
+      })
+      .catch(() => {
+        if (!cancelled) setSummary(null);
+      })
+      .finally(() => {
+        if (!cancelled) setTrendsLoading(false);
+      });
+    return () => {
+      cancelled = true;
     };
-  }, [trendStats, simulatedIds]);
+  }, [filters]);
+
+  const totals = useMemo(() => {
+    const group = summary?.groups?.[0];
+    const mean = (key) => group?.metrics?.[key]?.mean ?? null;
+    return {
+      total: summary?.total ?? 0,
+      simulatedCount: summary?.simulated_excluded ?? 0,
+      avgDuration: mean("duration_s"),
+      avgLoss: mean("weight_loss_pct"),
+      avgDryPct: mean("dry_pct"),
+      avgDtrPct: mean("dtr_pct"),
+      flaggedCount: group?.flagged_ror ?? 0,
+    };
+  }, [summary]);
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -197,10 +273,10 @@ export default function HistoryDashboard() {
   // Files from this computer (chosen or dropped): one request each, in order.
   // A single file opens its roast; several stay here, and any that failed are listed.
   async function handleUploadFiles(fileList) {
-    const files = [...fileList].filter((f) => f.name.toLowerCase().endsWith(".alog"));
+    const files = [...fileList].filter((f) => IMPORTABLE_EXTENSIONS.some((ext) => f.name.toLowerCase().endsWith(ext)));
     const skipped = fileList.length - files.length;
     if (!files.length) {
-      setImportError(skipped ? "Only .alog files can be imported." : null);
+      setImportError(skipped ? `Only ${IMPORTABLE_EXTENSIONS.join(", ")} files can be imported.` : null);
       return;
     }
     setImportError(null);
@@ -221,7 +297,7 @@ export default function HistoryDashboard() {
       setUploadStatus(null);
       setImporting(false);
     }
-    if (skipped) failed.push(`${skipped} file${skipped === 1 ? " was" : "s were"} not an .alog and was skipped.`);
+    if (skipped) failed.push(`${skipped} file${skipped === 1 ? " was" : "s were"} not a supported format and was skipped.`);
     if (done.length === 1 && !failed.length) {
       setImportTitle("");
       navigate(`/roasts/${done[0].id}`);
@@ -281,19 +357,6 @@ export default function HistoryDashboard() {
     }
   }
 
-  const stats = useMemo(() => {
-    const real = roasts.filter((r) => !isSimulatedRoast(r));
-    const complete = real.filter((r) => r.duration_s != null);
-    const avgDuration = complete.length
-      ? complete.reduce((sum, r) => sum + r.duration_s, 0) / complete.length
-      : null;
-    const withYield = real.filter((r) => r.weight_green_g && r.weight_roasted_g);
-    const avgLoss = withYield.length
-      ? withYield.reduce((sum, r) => sum + (1 - r.weight_roasted_g / r.weight_green_g), 0) / withYield.length
-      : null;
-    return { total: roasts.length, simulatedCount: roasts.length - real.length, avgDuration, avgLoss };
-  }, [roasts]);
-
   const anyFilter = Object.values(filters).some(Boolean) || Boolean(searchInput);
   function clearFilters() {
     setFilters({ mode: "", status: "", tag: "", created_by: "", q: "" });
@@ -314,41 +377,72 @@ export default function HistoryDashboard() {
   }
 
   const pct = (v) => (trendsLoading ? "…" : v != null ? `${v.toFixed(1)}%` : "—");
+  const shown = (v) => (trendsLoading ? "…" : v);
+  const exportParams = { ...filters };
 
   return (
     <div className="history-view">
+      {compareIds.length > 0 && (
+        <div ref={comparePanelRef}>
+          <ComparisonPanel
+            ids={compareIds}
+            onRemoveId={(id) =>
+              setSelectedIds((prev) => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+              })
+            }
+            onLoadIds={(ids) => setSelectedIds(new Set(ids))}
+            onClose={() => {
+              setCompareOpen(false);
+              setPendingConfig(null);
+            }}
+            titleFor={titleFor}
+            initialConfig={pendingConfig}
+          />
+        </div>
+      )}
+
       <div className="panel">
         <div className="stats-grid">
           <div className="stat-tile">
-            <span className="stat-value">{stats.total}</span>
-            <span className="stat-label">Roasts</span>
+            <span className="stat-value">{shown(totals.total)}</span>
+            <span className="stat-label">Finished roasts</span>
           </div>
           <div className="stat-tile">
-            <span className="stat-value">{formatDuration(stats.avgDuration)}</span>
+            <span className="stat-value">{trendsLoading ? "…" : formatDuration(totals.avgDuration)}</span>
             <span className="stat-label">Avg duration</span>
           </div>
           <div className="stat-tile">
-            <span className="stat-value">{stats.avgLoss != null ? `${(stats.avgLoss * 100).toFixed(1)}%` : "—"}</span>
+            <span className="stat-value">{pct(totals.avgLoss)}</span>
             <span className="stat-label">Avg roast loss</span>
           </div>
           <div className="stat-tile">
-            <span className="stat-value">{pct(trendAverages.avgDryPct)}</span>
+            <span className="stat-value">{pct(totals.avgDryPct)}</span>
             <span className="stat-label">Avg Dry %</span>
           </div>
           <div className="stat-tile">
-            <span className="stat-value">{pct(trendAverages.avgDtrPct)}</span>
+            <span className="stat-value">{pct(totals.avgDtrPct)}</span>
             <span className="stat-label">Avg DTR %</span>
           </div>
           <div className="stat-tile">
-            <span className="stat-value">{trendsLoading ? "…" : trendAverages.flaggedCount}</span>
+            <span className="stat-value">{shown(totals.flaggedCount)}</span>
             <span className="stat-label">With RoR flags</span>
           </div>
         </div>
-        {stats.simulatedCount > 0 && (
-          <p className="hint stats-note">
-            Averages leave out {stats.simulatedCount} simulated roast{stats.simulatedCount === 1 ? "" : "s"}.
-          </p>
-        )}
+        <p className="hint stats-note">
+          Covers every finished roast the filters match, across all pages
+          {totals.simulatedCount > 0
+            ? `, leaving out ${totals.simulatedCount} simulated roast${totals.simulatedCount === 1 ? "" : "s"}`
+            : ""}
+          {summary?.missing_recording
+            ? `, and ${summary.missing_recording} whose recording file is missing or unreadable`
+            : ""}
+          .{" "}
+          <BulkZipDownload params={exportParams} tempUnit={tempUnit} />{" "}
+          · <Link to="/analysis">Analyse these</Link>
+        </p>
       </div>
 
       <form
@@ -366,7 +460,7 @@ export default function HistoryDashboard() {
         }}
       >
         <button type="button" className="import-toggle" aria-expanded={importShown} onClick={toggleImport}>
-          <span className="import-toggle-title">Import .alog files</span>
+          <span className="import-toggle-title">Import roast logs</span>
           {!importShown && <span className="import-toggle-hint">Drop files here, or click to open</span>}
           <span className="import-chevron" aria-hidden="true">
             {importShown ? "▾" : "▸"}
@@ -380,11 +474,11 @@ export default function HistoryDashboard() {
             </label>
             {importError && <p className="error import-error">{importError}</p>}
             <div className="upload-drop">
-              <span>Drop .alog files here, or</span>
+              <span>Drop {IMPORTABLE_EXTENSIONS.join(", ")} files here, or</span>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".alog"
+                accept={IMPORTABLE_EXTENSIONS.join(",")}
                 multiple
                 hidden
                 onChange={(e) => {
@@ -401,7 +495,7 @@ export default function HistoryDashboard() {
               <span className="field-label">Or use a file already on the server (the machine running the backend)</span>
               <div className="path-with-browse">
                 <input
-                  aria-label=".alog file path (server-side)"
+                  aria-label="Roast log file path (server-side)"
                   value={importPath}
                   onChange={(e) => setImportPath(e.target.value)}
                   placeholder="/path/to/roast.alog"
@@ -487,11 +581,47 @@ export default function HistoryDashboard() {
       </div>
 
       <div className="panel">
-        {someSelected && (
+        {selectedIds.size === 0 && !compareOpen && (
           <div className="table-toolbar">
-            <button type="button" className="danger" disabled={deletingSelected} onClick={handleDeleteSelected}>
-              {deletingSelected ? "Deleting…" : `Delete selected (${selectedIds.size})`}
+            <SavedViews
+              kind="compare"
+              loadOnly
+              placeholder="Open a saved comparison"
+              getConfig={() => ({})}
+              onLoad={(config) => {
+                setSelectedIds(new Set(Array.isArray(config.ids) ? config.ids : []));
+                setPendingConfig(config);
+                setCompareOpen(true);
+              }}
+            />
+          </div>
+        )}
+        {selectedIds.size > 0 && (
+          <div className="table-toolbar selection-bar">
+            <span>
+              <strong>{selectedIds.size}</strong> selected
+              {offPageSelected > 0 ? ` (${offPageSelected} on other pages)` : ""}
+            </span>
+            <button
+              type="button"
+              onClick={startCompare}
+              disabled={!compareOpen && (selectedIds.size < 2 || selectedIds.size > MAX_COMPARE)}
+              title={selectedIds.size < 2 && !compareOpen ? "Select at least two roasts to compare" : `Compare up to ${MAX_COMPARE} roasts`}
+            >
+              Compare
             </button>
+            <button type="button" className="danger" disabled={deletingSelected} onClick={handleDeleteSelected}>
+              {deletingSelected ? "Deleting…" : "Delete"}
+            </button>
+            <button type="button" className="link-like" onClick={() => { setSelectedIds(new Set()); setCompareNote(null); }}>
+              Clear selection
+            </button>
+            {selectedIds.size === 1 && <span className="hint">Tick at least one more roast to compare.</span>}
+            {compareNote && !compareOpen && <span className="error">{compareNote}</span>}
+            {compareOpen && leftOut.length > 0 && (
+              <span className="error">Left out {leftOut.map((id) => `"${titleFor(id)}"`).join(", ")}: no recording.</span>
+            )}
+            {selectedIds.size > MAX_COMPARE && <span className="hint">Compare works with up to {MAX_COMPARE} roasts.</span>}
           </div>
         )}
         <label className="select-all-mobile">
@@ -556,7 +686,7 @@ export default function HistoryDashboard() {
                       </Link>
                       {r.beans && <span className="cell-sub">{r.beans}</span>}
                     </td>
-                    <td className="cell-mode">{MODE_LABELS[r.mode] || r.mode}</td>
+                    <td className="cell-mode">{r.mode === "alog_playback" && !r.source_alog_path ? "Uploaded log" : MODE_LABELS[r.mode] || r.mode}</td>
                     <td className="cell-status">
                       <span className={`status-pill status-${r.status}`}>{r.status}</span>
                     </td>

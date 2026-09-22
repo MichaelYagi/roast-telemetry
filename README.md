@@ -58,6 +58,18 @@ locally.)*
   extra delay, alarm-style. Burner bindings need an extra
   explicit confirm step; a pending delayed action is cancelled, not
   fired late, if you stop the roast first.
+- **Compare and analyse many roasts** — every roast, recorded or uploaded
+  from an `.alog` log (Fahrenheit logs are converted), becomes one row of
+  numbers: charge and drop temperatures, milestone times, phase times, rate
+  of rise, weight loss and how it turned out (colour, cupping score,
+  rating). Chart any number against another or over time, group by beans,
+  tag or month, see how consistent each group is and which roasts stand
+  out, tick roasts on History and compare them against a baseline, save views, and download
+  everything as a zip of logs, with JSON, spreadsheet CSV, Excel or PDF
+  reports added in per roast. Save each green bean
+  once and link roasts to it. With Ollama set up, ask a local AI model to
+  comment on what the numbers show. See
+  [Comparing and analysing roasts](docs/analysis.html).
 - **Control and safety** — drive the heater, fan and drum by hand, repeat a
   saved roast's settings, or hold a target rate of rise or bean
   temperature. Every command passes through limits you set (a heater cap,
@@ -93,11 +105,12 @@ locally.)*
   measured from their own Charge event, so no realignment is needed —
   purely a visual overlay picked per session; it never reads from or
   affects the live roast's own recording, automation, or control state.
-- **CSV export and a printable roast report** — every roast (finished or
-  still recording) has a spreadsheet-friendly CSV download alongside the
-  native `.alog` one, plus a "Print report" button using the
-  browser's own print-to-PDF (no extra dependency) for a clean, chart-
-  included summary sheet.
+- **Export, import, and a native PDF report** — every roast (finished or
+  still recording) can be downloaded as its native `.alog`, a
+  spreadsheet-friendly CSV, JSON, Excel, or a chart-included PDF report;
+  logs in any of those formats (from this app or elsewhere) can be
+  uploaded back in. "Print report" builds that same PDF and opens the
+  print dialog on it, so printing and downloading always match.
 - **Login, with the first registrant becoming admin.** No built-in
   default account — the first person to register gets immediate admin
   access; everyone after that is pending until the admin allows them
@@ -161,6 +174,8 @@ script does is in the docs' [Scripts
 reference](docs/getting-started.html#scripts-reference). Full docs:
 
 - [Getting started](docs/getting-started.html)
+- [Comparing and analysing roasts](docs/analysis.html) — the numbers for each
+  roast, uploaded logs, downloads, comparing roasts, the Analysis page, saved beans
 - [Controlling a roast](docs/control.html) — safety limits, the Emergency
   stop, fail-safes, repeating a roast, holding a target
 - [Direct Modbus Bridge](docs/modbus/index.html), and

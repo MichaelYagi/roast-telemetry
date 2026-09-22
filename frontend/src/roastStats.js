@@ -3,7 +3,7 @@
 // canonical list of {key, label} rows, and a formatter that looks up
 // each row's value from a given roast's stats. Used by both
 // RoastStatsPanel.jsx (one roast, one column of values) and
-// RoastComparisonView.jsx's numeric table (one roast per column) --
+// ComparisonPanel.jsx's numeric table (one roast per column) --
 // a fixed key list rather than just iterating `stats.phases` directly
 // is what lets the table's rows line up correctly across roasts that
 // have different phases present (e.g. one roast never got Dry End

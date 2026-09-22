@@ -16,6 +16,7 @@
     <a href="index.html">Docs</a>
     <a href="getting-started.html">Getting Started</a>
     <a href="control.html">Control &amp; Safety</a>
+    <a href="analysis.html">Analysis</a>
     <a href="modbus/index.html">Direct Modbus</a>
     <a href="architecture.html" aria-current="page">Architecture</a>
     <a href="glossary.html">Glossary</a>
@@ -58,7 +59,9 @@
   <table>
     <thead><tr><th>Table</th><th>Holds</th></tr></thead>
     <tbody>
-      <tr><td><code>roasts</code></td><td>Per-roast metadata: title, mode, status, beans, weights, duration, playback speed, and the path to its <code>.alog</code> file. The full per-second profile/events/notes live in that <code>.alog</code> file on disk (<code>backend/data/roasts/&lt;id&gt;.alog</code>), not in SQLite — this table just indexes it for fast history listing/filtering.</td></tr>
+      <tr><td><code>roasts</code></td><td>Per-roast metadata: title, mode, status, beans (and the saved beans it links to), weights, duration (Charge to Drop), colour, cupping score, rating, tasting notes, playback speed, and the path to its <code>.alog</code> file. The full per-second profile/events/notes live in that <code>.alog</code> file on disk (<code>backend/data/roasts/&lt;id&gt;.alog</code>), not in SQLite — this table just indexes it for fast history listing/filtering.</td></tr>
+      <tr><td><code>beans</code></td><td>Saved green beans (name, origin, process, variety, altitude, density, moisture, supplier, notes). A roast points at one with <code>roasts.bean_id</code>.</td></tr>
+      <tr><td><code>saved_views</code></td><td>Saved comparisons and analyses: a name and the page's own settings as JSON.</td></tr>
       <tr><td><code>roast_presets</code></td><td>"Load saved config" entries — the full Configure Roast form plus its starting Burner/Air/Drum values.</td></tr>
       <tr><td><code>settings</code></td><td>Ollama URL/model (AI Roast Review); which panels are enabled/ordered in the Big Readout Panel / Small Readout column; the vertical control panel's stack layout and which sliders show +/- buttons; display temperature unit (&deg;C/&deg;F).</td></tr>
       <tr><td><code>roast_reviews</code></td><td>The latest AI-generated review per roast (one row each, overwritten on regenerate).</td></tr>
@@ -134,6 +137,12 @@
       <tr><td>POST</td><td><code>/roasts/{id}/control/program/from-roast</code></td><td>Repeat another roast's recorded settings</td></tr>
       <tr><td>PUT</td><td><code>/roasts/{id}/control/feedback</code></td><td>Hold a bean-temperature or rate-of-rise target by adjusting the heater</td></tr>
       <tr><td>DELETE</td><td><code>/roasts/{id}/control/automation</code></td><td>Stop automatic control</td></tr>
+      <tr><td>PUT</td><td><code>/roasts/{id}/outcome</code></td><td>Colour, cupping score, rating and tasting notes — see <a href="analysis.html#outcomes">Analysis</a></td></tr>
+      <tr><td>PUT</td><td><code>/roasts/{id}/beans</code></td><td>Set a roast's beans by name (links to the saved record, adding one if the name is new)</td></tr>
+      <tr><td>GET</td><td><code>/analysis/{metrics,table,summary,roasts/{id},export.zip}</code></td><td>Numbers per roast, grouped summaries and bulk export — see <a href="analysis.html#api">Analysis → API</a></td></tr>
+      <tr><td>POST / GET</td><td><code>/analysis/insights</code>, <code>/analysis/insights/{id}</code></td><td>AI comment on a set of roasts (only with Ollama configured)</td></tr>
+      <tr><td>GET / POST / PUT / DELETE</td><td><code>/beans</code>, <code>/beans/{id}</code></td><td>Saved beans</td></tr>
+      <tr><td>GET / POST / DELETE</td><td><code>/views</code>, <code>/views/{id}</code></td><td>Saved comparisons and analyses</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/notes</code></td><td>Append a timestamped note</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/events</code></td><td>Append a custom event marker</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/weight</code></td><td>Record the roasted (post-roast) weight</td></tr>

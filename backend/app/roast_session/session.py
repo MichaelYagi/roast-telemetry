@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -16,6 +17,7 @@ from hardware_fakes import sim as simulated_devices
 from alog_playback import (
     AlogPlayer,
     alog_dict_to_points,
+    alog_created_at,
     assign_note_ids,
     load_alog,
     note_timestamp,
@@ -31,6 +33,7 @@ from simulator import SimulatorEngine
 from tc4_bridge import TC4Engine
 
 from .. import storage
+from ..beans_text import parse_beans_description
 from .control import RoastControl, RoastControlError
 from ..models import (
     ALWAYS_AUTO_EVENT_TYPES,
@@ -91,6 +94,10 @@ def _modbus_register_overrides(request: RoastCreateRequest) -> dict:
     if request.modbus_burner_sv_min_c is not None and request.modbus_burner_sv_max_c is not None:
         overrides["burner_sv_range_c"] = (request.modbus_burner_sv_min_c, request.modbus_burner_sv_max_c)
     return overrides
+
+
+# Columns edited after the roast, straight in the database.
+OUTCOME_KEYS = ("color_agtron", "cupping_score", "rating", "tasting_notes", "bean_id")
 
 
 def roast_duration_s(profile: list, events: list) -> float:
@@ -181,6 +188,13 @@ class RoastSession:
         self.title = request.title
         self.mode = request.mode
         self.beans = request.beans
+        self.bean_id = request.bean_id
+        saved = storage.get_bean(self.bean_id) if self.bean_id else storage.find_bean_by_name(self.beans)
+        if saved is None:
+            self.bean_id = None  # an unknown id, or a name that isn't a saved one yet
+        else:
+            self.bean_id = saved["id"]
+            self.beans = saved["name"]  # the saved spelling, so roasts of the same beans group together
         self.tags = list(request.tags or [])
         self.weight_green_g = request.weight_green_g
         # Exposed via summary()/to_roast() so a client that only has the
@@ -481,6 +495,11 @@ class RoastSession:
             self._stop_sim()
 
     def _persist_new_roast_row(self) -> None:
+        if self.beans and not self.bean_id:
+            # A name typed on the roast joins the Beans list.
+            created = storage.ensure_bean(self.beans)
+            if created:
+                self.bean_id, self.beans = created["id"], created["name"]
         storage.insert_roast({
             "id": self.id,
             "title": self.title,
@@ -488,6 +507,7 @@ class RoastSession:
             "status": self.status.value,
             "created_at": self.created_at,
             "beans": self.beans,
+            "bean_id": self.bean_id,
             "weight_green_g": self.weight_green_g,
             "weight_roasted_g": None,
             "duration_s": None,
@@ -1039,6 +1059,7 @@ class RoastSession:
             status=self.status,
             created_at=self.created_at,
             beans=self.beans,
+            bean_id=self.bean_id,
             tags=self.tags,
             weight_green_g=self.weight_green_g,
             weight_roasted_g=self.weight_roasted_g,
@@ -1179,12 +1200,18 @@ class RoastSessionManager:
     def get_roast_detail(self, roast_id: str) -> Optional[Roast]:
         session = self.get(roast_id)
         if session is not None:
-            return session.to_roast()
+            roast = session.to_roast()
+            # Outcomes and the beans link are edited straight in the database.
+            row = storage.get_roast_row(roast_id)
+            if row is not None:
+                for key in OUTCOME_KEYS:
+                    setattr(roast, key, row.get(key))
+            return roast
 
         row = storage.get_roast_row(roast_id)
         if row is None or not row.get("alog_path"):
             return None
-        parsed = alog_dict_to_points(load_alog(row["alog_path"]))
+        parsed = self._read_recording(row)
         return Roast(
             id=row["id"],
             title=row["title"],
@@ -1198,6 +1225,7 @@ class RoastSessionManager:
             duration_s=row["duration_s"],
             alog_path=row["alog_path"],
             created_by_username=row.get("created_by_username"),
+            **{key: row.get(key) for key in OUTCOME_KEYS},
             source_alog_path=row.get("source_alog_path"),
             playback_speed=row.get("playback_speed"),
             modbus_transport=row.get("modbus_transport"),
@@ -1213,6 +1241,20 @@ class RoastSessionManager:
             notes=parsed["notes"],
         )
 
+    @staticmethod
+    def _read_recording(row: dict) -> dict:
+        """Reads a saved roast's .alog file, turning a missing or unreadable
+        file into a RoastSessionError that says what's wrong."""
+        path = row["alog_path"]
+        if not os.path.exists(path):
+            raise RoastSessionError(
+                f"the recording file for this roast is missing from the data folder ({os.path.basename(path)})"
+            )
+        try:
+            return alog_dict_to_points(load_alog(path))
+        except Exception as exc:  # noqa: BLE001 -- any parse failure should read as a message, not a crash
+            raise RoastSessionError(f"the recording file for this roast couldn't be read ({exc})") from exc
+
     def _cold_roast_row_and_parsed(self, roast_id: str) -> tuple[dict, dict]:
         """Loads a roast with no live session purely from storage+.alog --
         same read path get_roast_detail's own cold branch above uses.
@@ -1222,8 +1264,7 @@ class RoastSessionManager:
         row = storage.get_roast_row(roast_id)
         if row is None or not row.get("alog_path"):
             raise RoastSessionError(f"unknown roast {roast_id}")
-        parsed = alog_dict_to_points(load_alog(row["alog_path"]))
-        return row, parsed
+        return row, self._read_recording(row)
 
     def _rewrite_cold_alog(self, row: dict, parsed: dict) -> None:
         alog_dict = roast_to_native_alog_dict(
@@ -1363,6 +1404,53 @@ class RoastSessionManager:
                 storage.update_roast(row["id"], duration_s=new_duration)
         storage.set_schema_version(1)
 
+    def backfill_beans(self) -> None:
+        """One-time: roasts that have a beans name typed on them but no Beans
+        record get one (matched by name, ignoring case), so the Beans list
+        includes every name already in use."""
+        if storage.get_schema_version() >= 3:
+            return
+        for row in storage.list_roast_rows(limit=100000):
+            if row.get("bean_id") or not (row.get("beans") or "").strip():
+                continue
+            bean = storage.ensure_bean(row["beans"])
+            if bean:
+                storage.update_roast(row["id"], bean_id=bean["id"], beans=bean["name"])
+        storage.set_schema_version(3)
+
+    def clean_bean_records(self) -> None:
+        """One-time: beans records whose name is really a whole description, or
+        carries escape codes for line breaks and accents (from an uploaded log),
+        are split into a proper name and details."""
+        if storage.get_schema_version() >= 4:
+            return
+        for bean in storage.list_beans():
+            parsed = parse_beans_description(bean["name"])
+            if parsed["name"] and (parsed["name"] != bean["name"] or "notes" in parsed):
+                storage.rewrite_bean_from_description(bean["id"], parsed)
+        storage.set_schema_version(4)
+
+    def backfill_dates(self) -> None:
+        """One-time repair for roasts imported before dates were read
+        properly: their created_at held text like "Sun Mar 01 2026", which
+        sorts and filters wrongly. Re-reads it from each roast's own file
+        and skips any it can't."""
+        if storage.get_schema_version() >= 2:
+            return
+        for row in storage.list_roast_rows(limit=100000):
+            created = row.get("created_at") or ""
+            if re.match(r"^\d{4}-\d{2}-\d{2}", created):
+                continue
+            if not row.get("alog_path") or not os.path.exists(row["alog_path"]):
+                continue
+            try:
+                fixed = alog_created_at(load_alog(row["alog_path"]))
+            except Exception:
+                continue
+            if fixed:
+                storage.update_roast(row["id"], created_at=fixed)
+        storage.set_schema_version(2)
+
     def list_summaries(self, **filters) -> list[RoastSummary]:
         rows = storage.list_roast_rows(**filters)
         tag_map = storage.get_tags_for_roasts([r["id"] for r in rows])
@@ -1374,6 +1462,7 @@ class RoastSessionManager:
                 weight_green_g=r["weight_green_g"], weight_roasted_g=r["weight_roasted_g"],
                 duration_s=r["duration_s"], alog_path=r["alog_path"],
                 created_by_username=r.get("created_by_username"),
+                **{key: r.get(key) for key in OUTCOME_KEYS},
             )
             for r in rows
         ]
@@ -1393,16 +1482,67 @@ class RoastSessionManager:
         shutil.copyfile(source_path, dest_path)
         parsed = alog_dict_to_points(data)
         duration_s = roast_duration_s(parsed["profile"], parsed["events"])
+        bean = storage.ensure_bean(parsed["beans"])
         summary = {
             "id": roast_id,
             "title": title or data.get("title") or "Imported roast",
             "mode": RoastMode.ALOG_PLAYBACK.value,
             "status": RoastStatus.COMPLETE.value,
-            "created_at": data.get("roastdate") or datetime.now(timezone.utc).isoformat(),
-            "beans": parsed["beans"],
+            "created_at": alog_created_at(data) or datetime.now(timezone.utc).isoformat(),
+            "beans": (bean or {}).get("name") or parsed["beans"],
+            "bean_id": (bean or {}).get("id"),
             "weight_green_g": parsed["weight_green_g"],
             "weight_roasted_g": parsed["weight_roasted_g"],
             "duration_s": duration_s,
+            "alog_path": dest_path,
+            "created_by_username": created_by_username,
+        }
+        storage.insert_roast(summary)
+        return RoastSummary(**{k: v for k, v in summary.items() if k in RoastSummary.model_fields})
+
+    def import_table(
+        self, *, parsed: dict, title: Optional[str] = None, created_by_username: Optional[str] = None
+    ) -> RoastSummary:
+        """Imports a roast log table (a parsed CSV/TSV or Excel file -- see
+        alog_playback/roastlog.py) that has no title, beans or weights of its
+        own -- unlike import_alog, this builds a fresh .alog file (via
+        roast_to_native_alog_dict) rather than copying the source, since the
+        source isn't that shape in the first place.
+
+        roast_to_native_alog_dict assumes its caller's first profile sample is
+        essentially at Charge (true for every roast this app records itself --
+        see its own Charge-index comment), which a real-world log's genuine
+        pre-charge history is not. So Charge, when the file has one, is made
+        the new zero here first: earlier samples are dropped and every
+        remaining time is shifted, matching how every roast recorded by this
+        app already starts -- a real-world file's own pre-charge minutes have
+        nowhere else to go in this app's model."""
+        roast_id = str(uuid.uuid4())
+        dest_path = storage.alog_path_for(roast_id)
+        profile, events = parsed["profile"], parsed["events"]
+        charge = next((e for e in events if e["type"] == "CHARGE"), None)
+        if charge is not None:
+            charge_t = charge["time_s"]
+            profile = [p for p in profile if p["time_s"] >= charge_t]
+            profile = [{**p, "time_s": round(p["time_s"] - charge_t, 2)} for p in profile]
+            events = [{**e, "time_s": round(e["time_s"] - charge_t, 2)} for e in events]
+        alog_dict = roast_to_native_alog_dict(
+            title=title or "Imported roast", profile=profile, events=events, notes=[], beans=None,
+            weight_green_g=None, weight_roasted_g=None, roastdate=datetime.now(timezone.utc).isoformat(),
+        )
+        os.makedirs(os.path.dirname(os.path.abspath(dest_path)), exist_ok=True)
+        save_native_alog(dest_path, alog_dict)
+        summary = {
+            "id": roast_id,
+            "title": title or "Imported roast",
+            "mode": RoastMode.ALOG_PLAYBACK.value,
+            "status": RoastStatus.COMPLETE.value,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "beans": None,
+            "bean_id": None,
+            "weight_green_g": None,
+            "weight_roasted_g": None,
+            "duration_s": roast_duration_s(profile, events),
             "alog_path": dest_path,
             "created_by_username": created_by_username,
         }

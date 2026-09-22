@@ -7,16 +7,13 @@ import asyncio
 
 import pytest
 
-from backend.app import roast_control
 from backend.app.models import (
     ControlCommand,
     ControlSafety,
     CurvePoint,
-    EventCreateRequest,
     FeedbackRequest,
     ProgramStep,
     RoastCreateRequest,
-    RoastEventType,
     RoastMode,
     RoastStatus,
 )

@@ -8,12 +8,16 @@ from backend.app import storage
 
 
 @pytest.fixture
-def isolated_db(tmp_path, monkeypatch):
+def isolated_db(tmp_path, tmp_path_factory, monkeypatch):
     """Points backend.app.storage at a throwaway SQLite file for the
     duration of one test, instead of the real dev DB -- storage.DB_PATH is
     read fresh inside `_conn()` on every call, so monkeypatching the module
     attribute is enough; no connection-pooling/caching to worry about."""
     monkeypatch.setattr(storage, "DB_PATH", tmp_path / "test-roasts.db")
+    # The roasts folder too: without this every test that records or imports a
+    # roast leaves its .alog file behind in the real data folder.
+    # (Outside tmp_path itself, which some tests list.)
+    monkeypatch.setattr(storage, "ROASTS_DIR", tmp_path_factory.mktemp("roasts"))
     storage.init_db()
     return storage
 

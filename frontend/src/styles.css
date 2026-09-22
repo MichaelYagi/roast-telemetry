@@ -3812,3 +3812,536 @@ button.link-neutral {
     font-size: 1.05rem;
   }
 }
+
+/* Analysis, coffees, outcomes, saved views */
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.saved-views {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.saved-views input {
+  width: 17rem;
+  max-width: 100%;
+}
+
+.analysis-filters {
+  margin-top: 0.5rem;
+}
+
+.analysis-pickers,
+.compare-controls {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.analysis-pickers label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 0.2rem;
+  min-width: 12rem;
+}
+
+.analysis-chart {
+  position: relative;
+  height: 420px;
+}
+
+.analysis-count {
+  margin-top: 0.5rem;
+}
+
+.analysis-table td,
+.analysis-table th {
+  white-space: nowrap;
+}
+
+.outlier-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.outlier-list li {
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.insights-question {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 0.2rem;
+  margin-bottom: 0.6rem;
+}
+
+.insights-question input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.insights-panel .review-text {
+  margin-top: 0.75rem;
+}
+
+.numbers-groups h4 {
+  margin: 0.8rem 0 0.2rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.numbers-groups h4:first-child {
+  margin-top: 0;
+}
+
+.outcome-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.outcome-grid label,
+.outcome-notes {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 0.2rem;
+}
+
+.outcome-grid input,
+.outcome-grid select,
+.outcome-notes textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.outcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.bean-picker select {
+  max-width: 11rem;
+}
+
+.beans-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.bean-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.6rem;
+  margin: 0.75rem 0 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.bean-form label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 0.2rem;
+}
+
+.bean-form input,
+.bean-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bean-notes,
+.bean-form-actions {
+  grid-column: 1 / -1;
+}
+
+.bean-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.beans-table {
+  width: 100%;
+}
+
+.picker-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.4rem;
+}
+
+.compare-group-row th {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding-top: 0.9rem;
+}
+
+.compare-delta {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+.compare-baseline {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 900px) {
+  .beans-table thead {
+    display: none;
+  }
+
+  .beans-table,
+  .beans-table tbody,
+  .beans-table tr,
+  .beans-table td {
+    display: block;
+  }
+
+  .beans-table tr {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .beans-table td[data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  .analysis-chart {
+    height: 320px;
+  }
+
+  .saved-views input {
+    width: 100%;
+  }
+}
+
+/* Panels on a roast's page keep their own height instead of stretching to the tallest. */
+.detail-grid {
+  align-items: start;
+}
+
+/* One Beans field: the input, and a line under it saying whether it matches saved beans */
+.beans-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.beans-field label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.beans-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.beans-field-status {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.form-row .beans-field {
+  flex: 1;
+  min-width: 140px;
+}
+
+.kv-list .beans-row {
+  align-items: flex-start;
+}
+
+.kv-list .beans-row .beans-field {
+  align-items: flex-end;
+}
+
+.kv-list .beans-row .beans-field input {
+  text-align: right;
+  min-width: 9rem;
+}
+
+/* Analysis filters: Search / Beans / Tag on one row, Data from / From / To on the next, then the extras */
+.filters-grid.analysis-filters {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.analysis-filters .filter-search {
+  grid-column: auto;
+}
+
+.analysis-filter-extras {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.analysis-filter-extras .checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+@media (max-width: 900px) {
+  .filters-grid.analysis-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .filters-grid.analysis-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.analysis-filter-extras input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.analysis-filter-extras .checkbox-label {
+  white-space: nowrap;
+}
+
+/* "Apply filters" is plain until the filters have changed */
+.button-quiet {
+  background: var(--panel, #fff);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.analysis-caption {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* Compare from History */
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.compare-panel {
+  margin-bottom: 1rem;
+}
+
+.compare-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.compare-chart {
+  position: relative;
+  height: 400px;
+  margin-bottom: 1rem;
+}
+
+.compare-remove {
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .compare-chart {
+    height: 320px;
+  }
+}
+
+/* Comparison table: one row per roast */
+.compare-table .compare-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel, #fff);
+  text-align: left;
+  min-width: 11rem;
+  max-width: 14rem;
+  vertical-align: top;
+  box-shadow: 1px 0 0 var(--border);
+}
+
+.compare-table th.compare-group-head {
+  text-align: left;
+  border-left: 1px solid var(--border);
+}
+
+.compare-table th.compare-group-head button {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: var(--text-muted);
+}
+
+.compare-table th.compare-metric-head {
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 5.5rem;
+  vertical-align: bottom;
+}
+
+.compare-table th.compare-metric-head button {
+  text-decoration: none;
+  color: inherit;
+  font-weight: 600;
+  text-align: left;
+}
+
+.compare-table td {
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.compare-table .compare-closed-cell {
+  min-width: 2rem;
+  background: var(--table-stripe, rgba(0, 0, 0, 0.03));
+}
+
+.compare-roast-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+}
+
+.compare-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  flex: none;
+}
+
+.compare-row-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.compare-table .compare-row-actions .compare-baseline {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+
+.compare-table tr.compare-row-hidden td,
+.compare-table tr.compare-row-hidden .compare-roast-cell > div:not(.compare-row-actions) {
+  opacity: 0.45;
+}
+
+.compare-table tr.compare-row-base > * {
+  background: var(--table-stripe, rgba(0, 0, 0, 0.04));
+}
+
+.compare-hidden-note {
+  font-weight: 400;
+  font-size: 0.8rem;
+}
+
+/* Cards on a roast's page: a long one scrolls inside itself instead of stretching the page. */
+.detail-grid > .panel {
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+@media print {
+  .detail-grid > .panel {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* Beans table: a long name wraps inside its column; Edit and Delete stay together on the right */
+@media (min-width: 901px) {
+  .beans-table {
+    table-layout: auto;
+  }
+
+  .beans-table td:first-child,
+  .beans-table th:first-child {
+    width: 40%;
+    max-width: 28rem;
+    overflow-wrap: anywhere;
+  }
+
+  .beans-table td.row-actions {
+    white-space: nowrap;
+    text-align: right;
+    width: 1%;
+  }
+}
+
+/* The beans description, one line each */
+.beans-card-text {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Bulk zip download: a small collapsible row of extra-format checkboxes */
+.bulk-zip {
+  display: inline;
+}
+
+.bulk-zip-toggle {
+  text-decoration: none;
+}
+
+.bulk-zip-formats {
+  display: inline-flex;
+  gap: 0.75rem;
+  margin-left: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.bulk-zip-formats .checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.3rem;
+}

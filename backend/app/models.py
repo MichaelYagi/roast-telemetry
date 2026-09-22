@@ -164,6 +164,54 @@ class RoastEvent(BaseModel):
     channel: Optional[str] = None
 
 
+class OutcomeUpdate(BaseModel):
+    """What the roast turned out like. A field left out is unchanged; send
+    null to clear it."""
+
+    color_agtron: Optional[float] = Field(default=None, ge=0, le=250)
+    cupping_score: Optional[float] = Field(default=None, ge=0, le=100)
+    rating: Optional[int] = Field(default=None, ge=1, le=5)
+    tasting_notes: Optional[str] = Field(default=None, max_length=2000)
+
+
+class BeanFields(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    origin: Optional[str] = None
+    process: Optional[str] = None
+    variety: Optional[str] = None
+    altitude_m: Optional[float] = Field(default=None, ge=0)
+    density_g_l: Optional[float] = Field(default=None, ge=0)
+    moisture_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    supplier: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=2000)
+
+
+class Bean(BeanFields):
+    id: str
+    created_at: str
+    roast_count: int = 0
+
+
+class RoastBeansUpdate(BaseModel):
+    """The roast's beans, as one field: a name. It links to the saved beans
+    record of that name (ignoring case), which is created if there isn't one.
+    Null or blank clears it."""
+
+    name: Optional[str] = Field(default=None, max_length=200)
+
+
+class SavedViewCreate(BaseModel):
+    kind: Literal["compare", "analysis"]
+    name: str = Field(min_length=1, max_length=120)
+    config: dict
+
+
+class SavedView(SavedViewCreate):
+    id: str
+    created_at: str
+    created_by_username: Optional[str] = None
+
+
 class RoastNote(BaseModel):
     id: str
     time_s: float
@@ -360,6 +408,7 @@ class RoastCreateRequest(BaseModel):
     title: str
     mode: RoastMode
     beans: Optional[str] = None
+    bean_id: Optional[str] = Field(default=None, description="A saved beans record (see /beans). Optional: a `beans` name that matches a saved record links to it by itself.")
     tags: list[str] = Field(default=[], description="Optional tags, freely editable later via PUT /roasts/{id}/tags -- see RoastDetailView.jsx.")
     weight_green_g: Optional[float] = None
     alog_path: Optional[str] = Field(default=None, description="Required when mode=alog_playback")
@@ -436,6 +485,13 @@ class RoastSummary(BaseModel):
     # is later deleted (see storage.py's migration comment). None for any
     # roast recorded before this field existed.
     created_by_username: Optional[str] = None
+    # What came out of the roast, filled in afterwards (PUT /roasts/{id}/outcome),
+    # and the saved beans it used (PUT /roasts/{id}/beans).
+    color_agtron: Optional[float] = None
+    cupping_score: Optional[float] = None
+    rating: Optional[int] = None
+    tasting_notes: Optional[str] = None
+    bean_id: Optional[str] = None
     # alog_playback mode only: the server-side file being replayed (distinct
     # from `alog_path`, which is where *this* roast's own recording gets
     # saved) and the speed it was started at.

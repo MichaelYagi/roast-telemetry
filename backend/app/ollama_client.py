@@ -26,12 +26,16 @@ async def check_connection(url: str) -> dict:
         return {"connected": False, "models": [], "error": str(exc)}
 
 
-async def generate(url: str, model: str, prompt: str) -> str:
+async def generate(url: str, model: str, prompt: str, options: Optional[dict] = None) -> str:
     """Blocking (from the caller's perspective) call to Ollama's /api/generate
-    with streaming off -- returns the full response text, or raises."""
+    with streaming off -- returns the full response text, or raises.
+    `options` are Ollama model options, e.g. {"num_ctx": 8192}."""
     url = url.rstrip("/")
+    body: dict = {"model": model, "prompt": prompt, "stream": False}
+    if options:
+        body["options"] = options
     async with httpx.AsyncClient(timeout=GENERATE_TIMEOUT_S) as client:
-        resp = await client.post(f"{url}/api/generate", json={"model": model, "prompt": prompt, "stream": False})
+        resp = await client.post(f"{url}/api/generate", json=body)
         resp.raise_for_status()
         data = resp.json()
     text = data.get("response")

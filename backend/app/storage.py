@@ -10,9 +10,13 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from datetime import datetime, timezone
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Optional
+
+from .beans_text import parse_beans_description
 
 # Defaults to the source-tree-relative path every dev/CI usage has
 # always used (zero behavior change there -- this env var is never set
@@ -139,6 +143,32 @@ CREATE TABLE IF NOT EXISTS roast_tags (
     PRIMARY KEY (roast_id, tag)
 );
 CREATE INDEX IF NOT EXISTS idx_roast_tags_tag ON roast_tags(tag);
+
+-- Green-coffee records. A roast points at one by roasts.bean_id; the roast's
+-- own free-text `beans` stays for roasts without one.
+CREATE TABLE IF NOT EXISTS beans (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    origin TEXT,
+    process TEXT,
+    variety TEXT,
+    altitude_m REAL,
+    density_g_l REAL,
+    moisture_pct REAL,
+    supplier TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL
+);
+
+-- A saved comparison or analysis: the page's own settings as JSON.
+CREATE TABLE IF NOT EXISTS saved_views (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    created_by_username TEXT
+);
 """
 
 
@@ -204,6 +234,16 @@ def init_db() -> None:
             c.execute("ALTER TABLE roasts ADD COLUMN aillio_model TEXT")
         if "tc4_port" not in existing_cols:
             c.execute("ALTER TABLE roasts ADD COLUMN tc4_port TEXT")
+        # What came out of the roast, and which saved beans it used.
+        for col, decl in (
+            ("color_agtron", "REAL"),
+            ("cupping_score", "REAL"),
+            ("rating", "INTEGER"),
+            ("tasting_notes", "TEXT"),
+            ("bean_id", "TEXT"),
+        ):
+            if col not in existing_cols:
+                c.execute(f"ALTER TABLE roasts ADD COLUMN {col} {decl}")
         # Idempotent migration for DBs created before roast_presets carried
         # control-channel starting values.
         preset_cols = {row[1] for row in c.execute("PRAGMA table_info(roast_presets)")}
@@ -239,15 +279,16 @@ def insert_roast(summary: dict) -> None:
                (id, title, mode, status, created_at, beans,
                 weight_green_g, weight_roasted_g, duration_s, alog_path, source_alog_path, playback_speed,
                 created_by_username, modbus_transport, modbus_port, modbus_host, modbus_tcp_port,
-                modbus_device_profile_name, ms6514_port, aillio_model, tc4_port)
+                modbus_device_profile_name, ms6514_port, aillio_model, tc4_port, bean_id)
                VALUES (:id, :title, :mode, :status, :created_at, :beans,
                        :weight_green_g, :weight_roasted_g, :duration_s, :alog_path, :source_alog_path,
                        :playback_speed, :created_by_username, :modbus_transport, :modbus_port, :modbus_host,
-                       :modbus_tcp_port, :modbus_device_profile_name, :ms6514_port, :aillio_model, :tc4_port)""",
+                       :modbus_tcp_port, :modbus_device_profile_name, :ms6514_port, :aillio_model, :tc4_port, :bean_id)""",
             {
                 "source_alog_path": None, "playback_speed": None, "created_by_username": None,
                 "modbus_transport": None, "modbus_port": None, "modbus_host": None, "modbus_tcp_port": None,
-                "modbus_device_profile_name": None, "ms6514_port": None, "aillio_model": None, "tc4_port": None, **summary,
+                "modbus_device_profile_name": None, "ms6514_port": None, "aillio_model": None, "tc4_port": None,
+                "bean_id": None, **summary,
             },
         )
 
@@ -260,10 +301,25 @@ def update_roast(roast_id: str, **fields) -> None:
         c.execute(f"UPDATE roasts SET {set_clause} WHERE id = :id", {**fields, "id": roast_id})
 
 
+def _locate_alog(row: dict) -> dict:
+    """A roast's recording is stored under its ID in the roasts folder, but the
+    database remembers the full path it was saved at. That path stops working
+    when the same data folder is used from another system (a roast recorded under
+    WSL has "/mnt/c/..." and one recorded on Windows has "C:\\..."), or when the
+    folder is moved. If the stored path isn't there, use the ID's file in this
+    system's roasts folder."""
+    path = row.get("alog_path")
+    if path and not os.path.exists(path):
+        candidate = ROASTS_DIR / f"{row['id']}.alog"
+        if candidate.exists():
+            row["alog_path"] = str(candidate)
+    return row
+
+
 def get_roast_row(roast_id: str) -> Optional[dict]:
     with _conn() as c:
         row = c.execute("SELECT * FROM roasts WHERE id = ?", (roast_id,)).fetchone()
-        return dict(row) if row else None
+        return _locate_alog(dict(row)) if row else None
 
 
 def _roast_filter_clauses(
@@ -273,6 +329,10 @@ def _roast_filter_clauses(
     tag: Optional[str],
     q: Optional[str],
     created_by: Optional[str] = None,
+    created_from: Optional[str] = None,
+    created_to: Optional[str] = None,
+    bean_id: Optional[str] = None,
+    exclude_tag: Optional[str] = None,
 ) -> tuple[list[str], dict]:
     """Shared between list_roast_rows and count_roast_rows -- the page
     of results and the total count behind it must always agree on
@@ -291,6 +351,19 @@ def _roast_filter_clauses(
     if created_by:
         clauses.append("r.created_by_username = :created_by")
         params["created_by"] = created_by
+    if created_from:
+        clauses.append("r.created_at >= :created_from")
+        params["created_from"] = created_from
+    if created_to:
+        # A bare date means "through the end of that day".
+        clauses.append("r.created_at <= :created_to")
+        params["created_to"] = created_to + "T23:59:59.999999" if len(created_to) == 10 else created_to
+    if bean_id:
+        clauses.append("r.bean_id = :bean_id")
+        params["bean_id"] = bean_id
+    if exclude_tag:
+        clauses.append("NOT EXISTS (SELECT 1 FROM roast_tags x WHERE x.roast_id = r.id AND x.tag = :exclude_tag)")
+        params["exclude_tag"] = exclude_tag
     if q:
         # title/beans/tags only -- per-timestamp roast notes live inside
         # each roast's own .alog file, not a DB column, so searching
@@ -310,10 +383,17 @@ def list_roast_rows(
     tag: Optional[str] = None,
     q: Optional[str] = None,
     created_by: Optional[str] = None,
+    created_from: Optional[str] = None,
+    created_to: Optional[str] = None,
+    bean_id: Optional[str] = None,
+    exclude_tag: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict]:
-    clauses, params = _roast_filter_clauses(mode=mode, status=status, tag=tag, q=q, created_by=created_by)
+    clauses, params = _roast_filter_clauses(
+        mode=mode, status=status, tag=tag, q=q, created_by=created_by,
+        created_from=created_from, created_to=created_to, bean_id=bean_id, exclude_tag=exclude_tag,
+    )
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     params["limit"] = limit
     params["offset"] = offset
@@ -325,7 +405,7 @@ def list_roast_rows(
                 ORDER BY r.created_at DESC LIMIT :limit OFFSET :offset""",
             params,
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_locate_alog(dict(r)) for r in rows]
 
 
 def count_roast_rows(
@@ -335,6 +415,10 @@ def count_roast_rows(
     tag: Optional[str] = None,
     q: Optional[str] = None,
     created_by: Optional[str] = None,
+    created_from: Optional[str] = None,
+    created_to: Optional[str] = None,
+    bean_id: Optional[str] = None,
+    exclude_tag: Optional[str] = None,
 ) -> int:
     """Total matching rows regardless of limit/offset -- backs
     HistoryDashboard.jsx's page count, since GET /roasts itself stays a
@@ -342,7 +426,10 @@ def count_roast_rows(
     RoastComparisonView.jsx, LiveRoastView.jsx's active-roast check --
     already depend on that exact shape and would break if it became
     {items, total})."""
-    clauses, params = _roast_filter_clauses(mode=mode, status=status, tag=tag, q=q, created_by=created_by)
+    clauses, params = _roast_filter_clauses(
+        mode=mode, status=status, tag=tag, q=q, created_by=created_by,
+        created_from=created_from, created_to=created_to, bean_id=bean_id, exclude_tag=exclude_tag,
+    )
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     with _conn() as c:
         row = c.execute(
@@ -860,3 +947,144 @@ def get_session_user(token: str) -> Optional[dict]:
 def delete_session(token: str) -> None:
     with _conn() as c:
         c.execute("DELETE FROM sessions WHERE token = ?", (token,))
+
+
+# -- bean records -----------------------------------------------------------------
+
+BEAN_FIELDS = ("name", "origin", "process", "variety", "altitude_m", "density_g_l", "moisture_pct", "supplier", "notes")
+
+
+def list_beans() -> list[dict]:
+    with _conn() as c:
+        rows = c.execute(
+            """SELECT b.*, (SELECT COUNT(*) FROM roasts r WHERE r.bean_id = b.id) AS roast_count
+               FROM beans b ORDER BY LOWER(b.name)"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def find_bean_by_name(name: Optional[str]) -> Optional[dict]:
+    """The saved beans whose name matches `name`, ignoring case and stray spaces."""
+    name = (name or "").strip()
+    if not name:
+        return None
+    with _conn() as c:
+        row = c.execute("SELECT * FROM beans WHERE LOWER(TRIM(name)) = LOWER(?) LIMIT 1", (name,)).fetchone()
+        return dict(row) if row else None
+
+
+def ensure_bean(name: Optional[str]) -> Optional[dict]:
+    """The beans record for `name`, creating one if there isn't one yet. Names
+    typed on a roast, and the beans text in uploaded logs, go through this, so
+    the Beans list always includes every name in use. A description spread over
+    several lines (as some logs carry) is split into a name and its details --
+    see beans_text.py. Blank names give None."""
+    parsed = parse_beans_description(name)
+    if not parsed["name"]:
+        return None
+    found = find_bean_by_name(parsed["name"])
+    if found:
+        return found
+    record = {**parsed, "id": str(uuid.uuid4()), "created_at": datetime.now(timezone.utc).isoformat()}
+    insert_bean(record)
+    return get_bean(record["id"])
+
+
+def rewrite_bean_from_description(bean_id: str, parsed: dict) -> None:
+    """Replaces a beans record's messy name with the cleaned-up one from
+    `parse_beans_description`. If a record with the clean name already exists
+    the two are merged (roasts move to it); otherwise this record is renamed and
+    its empty fields are filled in from the description. Roasts keep pointing at
+    the record, and their beans name follows it."""
+    with _conn() as c:
+        other = c.execute(
+            "SELECT id, name FROM beans WHERE id != ? AND LOWER(TRIM(name)) = LOWER(?) LIMIT 1",
+            (bean_id, parsed["name"]),
+        ).fetchone()
+        if other:
+            c.execute("UPDATE roasts SET bean_id = ?, beans = ? WHERE bean_id = ?", (other["id"], other["name"], bean_id))
+            c.execute("DELETE FROM beans WHERE id = ?", (bean_id,))
+            return
+        current = c.execute("SELECT * FROM beans WHERE id = ?", (bean_id,)).fetchone()
+        fields = {"name": parsed["name"]}
+        for key in ("origin", "process", "variety", "supplier", "altitude_m", "notes"):
+            if parsed.get(key) is not None and current[key] in (None, ""):
+                fields[key] = parsed[key]
+        set_clause = ", ".join(f"{k} = :{k}" for k in fields)
+        c.execute(f"UPDATE beans SET {set_clause} WHERE id = :id", {**fields, "id": bean_id})
+        c.execute("UPDATE roasts SET beans = ? WHERE bean_id = ?", (parsed["name"], bean_id))
+
+
+def get_bean(bean_id: str) -> Optional[dict]:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM beans WHERE id = ?", (bean_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def insert_bean(bean: dict) -> None:
+    with _conn() as c:
+        c.execute(
+            """INSERT INTO beans (id, name, origin, process, variety, altitude_m, density_g_l,
+                                  moisture_pct, supplier, notes, created_at)
+               VALUES (:id, :name, :origin, :process, :variety, :altitude_m, :density_g_l,
+                       :moisture_pct, :supplier, :notes, :created_at)""",
+            {k: None for k in BEAN_FIELDS} | bean,
+        )
+
+
+def update_bean(bean_id: str, fields: dict) -> None:
+    fields = {k: v for k, v in fields.items() if k in BEAN_FIELDS}
+    if not fields:
+        return
+    with _conn() as c:
+        set_clause = ", ".join(f"{k} = :{k}" for k in fields)
+        c.execute(f"UPDATE beans SET {set_clause} WHERE id = :id", {**fields, "id": bean_id})
+
+
+def delete_bean(bean_id: str) -> None:
+    """Removes the record; roasts that used it keep their own free-text
+    beans name and just lose the link."""
+    with _conn() as c:
+        c.execute("UPDATE roasts SET bean_id = NULL WHERE bean_id = ?", (bean_id,))
+        c.execute("DELETE FROM beans WHERE id = ?", (bean_id,))
+
+
+# -- saved views --------------------------------------------------------------------
+
+
+def list_saved_views(kind: Optional[str] = None) -> list[dict]:
+    with _conn() as c:
+        if kind:
+            rows = c.execute("SELECT * FROM saved_views WHERE kind = ? ORDER BY created_at DESC", (kind,)).fetchall()
+        else:
+            rows = c.execute("SELECT * FROM saved_views ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def find_saved_view(kind: str, name: str) -> Optional[dict]:
+    """A saved view of this kind with this name, ignoring case and stray spaces."""
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM saved_views WHERE kind = ? AND LOWER(TRIM(name)) = LOWER(?) LIMIT 1", (kind, name.strip())
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def update_saved_view(view_id: str, config_json: str) -> None:
+    with _conn() as c:
+        c.execute("UPDATE saved_views SET config_json = ? WHERE id = ?", (config_json, view_id))
+
+
+def insert_saved_view(view: dict) -> None:
+    with _conn() as c:
+        c.execute(
+            """INSERT INTO saved_views (id, kind, name, config_json, created_at, created_by_username)
+               VALUES (:id, :kind, :name, :config_json, :created_at, :created_by_username)""",
+            {"created_by_username": None, **view},
+        )
+
+
+def delete_saved_view(view_id: str) -> bool:
+    with _conn() as c:
+        cursor = c.execute("DELETE FROM saved_views WHERE id = ?", (view_id,))
+        return cursor.rowcount > 0

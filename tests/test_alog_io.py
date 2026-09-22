@@ -323,3 +323,29 @@ def test_alog_dict_to_points_prefers_continuous_channels_over_control_log():
     }
     points = alog_dict_to_points(data)
     assert [p["heater_pct"] for p in points["profile"]] == [80.0, 90.0]
+
+
+def test_a_fahrenheit_log_is_read_as_celsius():
+    from alog_playback.alog_io import alog_dict_to_points
+
+    data = {
+        "mode": "F",
+        "timex": [0.0, 10.0, 20.0],
+        "temp1": [392.0, 401.0, -1],  # ET, with one "no reading"
+        "temp2": [212.0, 230.0, 248.0],  # BT
+        "ror_bt": [None, 18.0, 18.0],
+        "specialevents": [], "notes": [], "control": [],
+    }
+    points = alog_dict_to_points(data)["profile"]
+    assert points[0]["bt"] == 100.0 and points[0]["et"] == 200.0
+    assert abs(points[2]["bt"] - 120.0) < 1e-9
+    assert points[2]["et"] == -1  # the "no reading" marker is left alone
+    assert abs(points[1]["ror_bt"] - 10.0) < 1e-9  # a rate converts by scale only
+
+
+def test_a_celsius_or_unmarked_log_is_left_alone():
+    from alog_playback.alog_io import alog_dict_to_points
+
+    for mode in ({"mode": "C"}, {}):
+        data = {**mode, "timex": [0.0], "temp1": [200.0], "temp2": [100.0], "specialevents": [], "notes": [], "control": []}
+        assert alog_dict_to_points(data)["profile"][0]["bt"] == 100.0

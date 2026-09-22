@@ -8,7 +8,7 @@ import {
   Tooltip,
 } from "chart.js";
 import zoomPlugin from "chartjs-plugin-zoom";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { api } from "../api/client.js";
 import { formatTime, rorAxisRange, seriesLineWidth, tempAxisMax, tempAxisMin, timeAxisFor } from "../chartDefaults.js";
@@ -363,7 +363,10 @@ function hitTestMarker(chart, events, x, y, tempUnit) {
   return best;
 }
 
-export default function RoastChart({
+// forwardRef so a parent (the PDF report -- see RoastDetailView.jsx) can pull
+// a flat image of the current chart via ref.current.toImage() without this
+// component's own internal Chart.js/menu/drag refs leaking out.
+const RoastChart = forwardRef(function RoastChart({
   profile = [],
   events = [],
   background = [],
@@ -386,7 +389,7 @@ export default function RoastChart({
   // today, but keeps this component honest about being usable that way).
   onDeleteEvent,
   onRetimeEvent,
-}) {
+}, ref) {
   // Cheap to recompute every tick (profile grows every second during a
   // live roast anyway, same cost the data/availability useMemos below
   // already pay) but stable in *output* -- a sorted, joined string only
@@ -443,6 +446,7 @@ export default function RoastChart({
   // (for CSS positioning), or null when closed.
   const [contextMenu, setContextMenu] = useState(null);
   const chartRef = useRef(null);
+  useImperativeHandle(ref, () => ({ toImage: () => chartRef.current?.toBase64Image() }), []);
   const menuRef = useRef(null);
   const contextMenuRef = useRef(null);
   // Drag-to-retime state lives in a ref, not React state -- the
@@ -869,4 +873,6 @@ export default function RoastChart({
       </div>
     </div>
   );
-}
+});
+
+export default RoastChart;

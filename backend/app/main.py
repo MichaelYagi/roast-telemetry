@@ -11,9 +11,9 @@ from fastapi.staticfiles import StaticFiles
 
 from . import auth, storage
 from .api import auth as auth_api
-from .api import device_profiles, devices, files, presets, roasts, serial_ports, settings
+from .api import analysis, beans, device_profiles, devices, files, presets, roasts, serial_ports, settings, views
 from .models import DeviceProfileCreateRequest, RoastCreateRequest, UserStatus
-from .roast_session import session_manager
+from .roast_session import RoastSessionError, session_manager
 from .version import VERSION
 from modbus_bridge.device_profiles import BUILT_IN_PROFILES
 
@@ -73,6 +73,9 @@ async def lifespan(app: FastAPI):
     # storage.abort_stale_roasts for the full rationale.
     storage.abort_stale_roasts()
     session_manager.backfill_durations()
+    session_manager.backfill_dates()
+    session_manager.backfill_beans()
+    session_manager.clean_bean_records()
     storage.seed_default_presets([
         {
             "id": p["id"],
@@ -105,6 +108,13 @@ app = FastAPI(
     version=VERSION,
     lifespan=lifespan,
 )
+
+@app.exception_handler(RoastSessionError)
+async def roast_session_error_handler(request: Request, exc: RoastSessionError) -> JSONResponse:
+    """Backstop for a roast problem no endpoint handled itself (a missing
+    recording file, say): a readable message instead of a bare 500."""
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -158,6 +168,9 @@ app.include_router(device_profiles.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 app.include_router(serial_ports.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
+app.include_router(analysis.router, prefix="/api")
+app.include_router(beans.router, prefix="/api")
+app.include_router(views.router, prefix="/api")
 
 
 @app.get("/api/health")

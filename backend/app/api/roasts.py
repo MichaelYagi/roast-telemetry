@@ -16,7 +16,8 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
 from sse_starlette.sse import EventSourceResponse
 
-from alog_playback.alog_io import _nearest_index
+from alog_playback.alog_io import _nearest_index, load_alog
+from alog_playback.roastlog import RoastlogParseError, parse_roastlog_csv, parse_roastlog_xlsx, roast_to_json, save_roastlog_csv, save_roastlog_xlsx
 
 from .. import auth, ollama_client, storage
 from ..models import (
@@ -26,6 +27,8 @@ from ..models import (
     FeedbackRequest,
     NoteCreateRequest,
     NoteUpdateRequest,
+    OutcomeUpdate,
+    RoastBeansUpdate,
     ProgramFromRoastRequest,
     ProgramRequest,
     ReviewStatus,
@@ -207,7 +210,10 @@ def stats_batch(
     )
     results = []
     for s in summaries:
-        roast = session_manager.get_roast_detail(s.id)
+        try:
+            roast = session_manager.get_roast_detail(s.id)
+        except RoastSessionError:
+            continue  # a roast whose recording file is gone is left out, not a reason to fail the whole batch
         if roast is None:
             continue
         stats = compute_roast_stats(roast)
@@ -249,8 +255,14 @@ async def begin_recording(roast_id: str) -> RoastSummary:
 
 @router.get("/{roast_id}", response_model=Roast)
 def get_roast(roast_id: str) -> Roast:
-    roast = session_manager.get_roast_detail(roast_id)
+    try:
+        roast = session_manager.get_roast_detail(roast_id)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     if roast is None:
+        if storage.get_roast_row(roast_id) is not None:
+            # In the list, but nothing was ever saved for it (the server stopped mid-roast, say).
+            raise HTTPException(status_code=404, detail="this roast has no recording: it was interrupted before anything was saved. You can delete it from History")
         raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
     return roast
 
@@ -506,6 +518,37 @@ def delete_weight_green(roast_id: str) -> dict:
     return {"ok": True, "weight_green_g": None}
 
 
+@router.put("/{roast_id}/outcome")
+def set_outcome(roast_id: str, update: OutcomeUpdate) -> dict:
+    """What the roast turned out like: color (Agtron), cupping score, a 1-5
+    rating, tasting notes. A field left out is unchanged; null clears it."""
+    if storage.get_roast_row(roast_id) is None:
+        raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
+    fields = {k: getattr(update, k) for k in update.model_fields_set}
+    if "tasting_notes" in fields and fields["tasting_notes"] is not None:
+        fields["tasting_notes"] = fields["tasting_notes"].strip() or None
+    storage.update_roast(roast_id, **fields)
+    row = storage.get_roast_row(roast_id)
+    return {k: row.get(k) for k in ("color_agtron", "cupping_score", "rating", "tasting_notes")}
+
+
+@router.put("/{roast_id}/beans")
+def set_beans(roast_id: str, update: RoastBeansUpdate) -> dict:
+    """Sets the roast's beans. A name that matches a saved beans record
+    (ignoring case) links the roast to it; any other name is added to the
+    Beans list and linked; null or blank clears both."""
+    if storage.get_roast_row(roast_id) is None:
+        raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
+    name = (update.name or "").strip() or None
+    saved = storage.ensure_bean(name)
+    fields = {"beans": saved["name"] if saved else None, "bean_id": saved["id"] if saved else None}
+    storage.update_roast(roast_id, **fields)
+    session = session_manager.get(roast_id)
+    if session is not None:
+        session.beans, session.bean_id = fields["beans"], fields["bean_id"]
+    return fields
+
+
 @router.put("/{roast_id}/tags")
 def set_tags(roast_id: str, update: TagsUpdateRequest) -> dict:
     try:
@@ -544,6 +587,86 @@ def download_csv(roast_id: str) -> Response:
         content=roast_to_csv(roast),
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{csv_filename(roast.title, roast.created_at)}"'},
+    )
+
+
+def json_filename(title: str, created_at: str) -> str:
+    safe_title = _UNSAFE_FILENAME_CHARS.sub("_", title).strip() or "roast"
+    timestamp = created_at[:16].replace("T", "_").replace(":", "")
+    return f"{safe_title}_{timestamp}.json"
+
+
+def roastlog_csv_filename(title: str, created_at: str) -> str:
+    """The same convention, distinguishing this from csv_filename's own
+    (different-shaped) CSV download so a browser's download list never shows
+    two files with the same name."""
+    safe_title = _UNSAFE_FILENAME_CHARS.sub("_", title).strip() or "roast"
+    timestamp = created_at[:16].replace("T", "_").replace(":", "")
+    return f"{safe_title}_{timestamp}_log.csv"
+
+
+def xlsx_filename(title: str, created_at: str) -> str:
+    safe_title = _UNSAFE_FILENAME_CHARS.sub("_", title).strip() or "roast"
+    timestamp = created_at[:16].replace("T", "_").replace(":", "")
+    return f"{safe_title}_{timestamp}.xlsx"
+
+
+@router.get("/{roast_id}/json")
+def download_json(roast_id: str) -> Response:
+    """The same data as the .alog download, as valid JSON instead of that
+    file's Python-literal syntax -- opens the same way in this app (see
+    load_alog), and in other software that accepts JSON for this shape.
+
+    Reads and re-serializes the roast's own saved .alog file directly, rather
+    than rebuilding it from roast.profile/events through
+    roast_to_native_alog_dict -- that function's own Charge-index handling
+    assumes its input starts right at Charge (true for a roast as this app
+    first records it, no longer true once roast.profile already carries a
+    once-added synthetic lead-in sample read back from disk); rebuilding from
+    it a second time would silently shift Charge by a tick."""
+    roast = session_manager.get_roast_detail(roast_id)
+    if roast is None or not roast.alog_path:
+        raise HTTPException(status_code=404, detail="not available (roast still in progress or not found)")
+    return Response(
+        content=roast_to_json(load_alog(roast.alog_path)),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{json_filename(roast.title, roast.created_at)}"'},
+    )
+
+
+@router.get("/{roast_id}/roastlog.csv")
+def download_roastlog_csv(roast_id: str) -> Response:
+    """A second, table-shaped export -- Time1/Time2/ET/BT/.../Heater columns,
+    tab-separated (kept as a .csv extension, matching real-world files of
+    this shape). See alog_playback/roastlog.py."""
+    roast = session_manager.get_roast_detail(roast_id)
+    if roast is None:
+        raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
+    unit = storage.get_settings().get("temperature_unit") or "c"
+    content = save_roastlog_csv(
+        profile=[p.model_dump() for p in roast.profile], events=[e.model_dump() for e in roast.events], temperature_unit=unit
+    )
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{roastlog_csv_filename(roast.title, roast.created_at)}"'},
+    )
+
+
+@router.get("/{roast_id}/xlsx")
+def download_xlsx(roast_id: str) -> Response:
+    """The same table as an Excel workbook."""
+    roast = session_manager.get_roast_detail(roast_id)
+    if roast is None:
+        raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
+    unit = storage.get_settings().get("temperature_unit") or "c"
+    content = save_roastlog_xlsx(
+        profile=[p.model_dump() for p in roast.profile], events=[e.model_dump() for e in roast.events], temperature_unit=unit
+    )
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{xlsx_filename(roast.title, roast.created_at)}"'},
     )
 
 
@@ -620,9 +743,22 @@ def get_review(roast_id: str) -> RoastReview:
 
 @router.post("/import", response_model=RoastSummary, status_code=201)
 def import_alog(path: str, http_request: Request, title: Optional[str] = None) -> RoastSummary:
+    """A path on the server's own computer -- the file extension picks the
+    reader: .alog/.json go through the native reader (see load_alog), .csv/
+    .tsv/.xlsx through the roast-log table reader (see alog_playback/roastlog.py)."""
+    user = http_request.state.user["username"]
+    ext = os.path.splitext(path)[1].lower()
     try:
-        return session_manager.import_alog(path, title, created_by_username=http_request.state.user["username"])
-    except (FileNotFoundError, ValueError) as exc:
+        if ext == ".xlsx":
+            with open(path, "rb") as f:
+                parsed = parse_roastlog_xlsx(f.read())
+            return session_manager.import_table(parsed=parsed, title=title, created_by_username=user)
+        if ext in (".csv", ".tsv"):
+            with open(path, "r", encoding="utf-8-sig") as f:
+                parsed = parse_roastlog_csv(f.read())
+            return session_manager.import_table(parsed=parsed, title=title, created_by_username=user)
+        return session_manager.import_alog(path, title, created_by_username=user)
+    except (FileNotFoundError, ValueError, RoastlogParseError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -631,46 +767,43 @@ def import_alog(path: str, http_request: Request, title: Optional[str] = None) -
 MAX_ALOG_UPLOAD_BYTES = 25 * 1024 * 1024
 
 
-@router.post("/import-upload", response_model=RoastSummary, status_code=201)
-async def import_alog_upload(
-    request: Request, filename: Optional[str] = None, title: Optional[str] = None
-) -> RoastSummary:
-    """Imports an .alog sent from the browser's own computer (the file itself as
-    the request body), as opposed to POST /import, which reads a path on the
-    server. Same result either way: the roast is stored in history.
-
-    The body is the raw file rather than a multipart form -- one file per
-    request, no extra dependency. ``filename`` is only used for error messages;
-    it never touches the filesystem."""
+def _import_uploaded_bytes(data: bytes, *, filename: Optional[str], title: Optional[str], created_by_username: str) -> RoastSummary:
+    """The shared tail of import-upload, run in a worker thread: picks a reader
+    by the uploaded file's own extension (falling back to content for a missing
+    or unrecognized one), same split as the server-path /import above."""
     label = os.path.basename(filename) if filename else "The file"
-    declared = request.headers.get("content-length")
-    if declared and declared.isdigit() and int(declared) > MAX_ALOG_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail=f"{label} is too large to be an .alog file.")
-    chunks: list[bytes] = []
-    size = 0
-    async for chunk in request.stream():
-        size += len(chunk)
-        if size > MAX_ALOG_UPLOAD_BYTES:
-            raise HTTPException(status_code=413, detail=f"{label} is too large to be an .alog file.")
-        chunks.append(chunk)
-    data = b"".join(chunks)
-    if not data.strip():
-        raise HTTPException(status_code=400, detail=f"{label} is empty.")
+    ext = os.path.splitext(filename or "")[1].lower()
 
-    # import_alog reads and copies from a path, so the upload goes through a
-    # throwaway file that is always removed afterwards.
+    if ext == ".xlsx" or (not ext and data[:2] == b"PK"):
+        try:
+            parsed = parse_roastlog_xlsx(data)
+        except RoastlogParseError as exc:
+            raise HTTPException(status_code=400, detail=f"{label} doesn't look like a roast log spreadsheet ({exc}).") from exc
+        return session_manager.import_table(parsed=parsed, title=title, created_by_username=created_by_username)
+
+    if ext in (".csv", ".tsv"):
+        try:
+            text = data.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise HTTPException(status_code=400, detail=f"{label} isn't readable text.") from exc
+        try:
+            parsed = parse_roastlog_csv(text)
+        except RoastlogParseError as exc:
+            raise HTTPException(status_code=400, detail=f"{label} doesn't look like a roast log table ({exc}).") from exc
+        return session_manager.import_table(parsed=parsed, title=title, created_by_username=created_by_username)
+
+    # .alog, .json, or an extension-less/unrecognized file -- the native
+    # reader accepts either syntax (see load_alog), so try that.
     fd, tmp_path = tempfile.mkstemp(suffix=".alog")
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(data)
-        return await run_in_threadpool(
-            session_manager.import_alog, tmp_path, title, created_by_username=request.state.user["username"]
-        )
+        return session_manager.import_alog(tmp_path, title, created_by_username=created_by_username)
     except (FileNotFoundError, ValueError, SyntaxError, UnicodeDecodeError) as exc:
         # Our own explanations (e.g. a missing required field) are worth showing;
         # the parser's internals ("malformed node ... <ast.Name object at 0x...>") are not.
         reason = str(exc)
-        detail = f"{label} doesn't look like a valid .alog file."
+        detail = f"{label} doesn't look like a valid .alog or .json file."
         missing = re.search(r"missing required field ('[^']+')", reason)
         if missing:  # (the throwaway file's path is left out of what the user sees)
             detail = f"{label} doesn't look like a valid .alog file (it is missing the {missing.group(1)} field)."
@@ -680,6 +813,37 @@ async def import_alog_upload(
             os.remove(tmp_path)
         except OSError:
             pass
+
+
+@router.post("/import-upload", response_model=RoastSummary, status_code=201)
+async def import_alog_upload(
+    request: Request, filename: Optional[str] = None, title: Optional[str] = None
+) -> RoastSummary:
+    """Imports a roast log sent from the browser's own computer (the file
+    itself as the request body), as opposed to POST /import, which reads a
+    path on the server. Accepts .alog, .json, .csv, .tsv and .xlsx -- picked
+    by ``filename``'s own extension (see _import_uploaded_bytes).
+
+    The body is the raw file rather than a multipart form -- one file per
+    request, no extra dependency. ``filename`` also names the format and
+    appears in error messages; it never touches the filesystem."""
+    label = os.path.basename(filename) if filename else "The file"
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_ALOG_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"{label} is too large to import.")
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > MAX_ALOG_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"{label} is too large to import.")
+        chunks.append(chunk)
+    data = b"".join(chunks)
+    if not data.strip():
+        raise HTTPException(status_code=400, detail=f"{label} is empty.")
+    return await run_in_threadpool(
+        _import_uploaded_bytes, data, filename=filename, title=title, created_by_username=request.state.user["username"]
+    )
 
 
 @router.websocket("/{roast_id}/stream")

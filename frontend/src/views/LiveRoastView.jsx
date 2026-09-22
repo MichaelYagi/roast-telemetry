@@ -19,6 +19,7 @@ import RoastChart from "../components/RoastChart.jsx";
 import RoastStatsPanel from "../components/RoastStatsPanel.jsx";
 import WeightField from "../components/WeightField.jsx";
 import NotesPanel from "../components/NotesPanel.jsx";
+import BeansField from "../components/BeansField.jsx";
 import EmergencyStop from "../components/EmergencyStop.jsx";
 import AutoControlPanel from "../components/AutoControlPanel.jsx";
 import { formatTemp } from "../tempUnits.js";
@@ -1242,10 +1243,7 @@ export default function LiveRoastView() {
                 </label>
               </div>
               <div className="form-row">
-                <label>
-                  Beans
-                  <input value={form.beans} onChange={(e) => setForm({ ...form, beans: e.target.value })} />
-                </label>
+                <BeansField className="form-field" value={form.beans} onChange={(text) => setForm({ ...form, beans: text })} />
                 <label>
                   Green weight (g)
                   <input
@@ -1260,7 +1258,7 @@ export default function LiveRoastView() {
           {activeTab === "device" && form.mode === "alog_playback" && (
             <div className="form-row">
               <label>
-                .alog file path (server-side)
+                .alog or .json file path (server-side)
                 <input value={form.alog_path} onChange={(e) => setForm({ ...form, alog_path: e.target.value })} />
               </label>
               <label>

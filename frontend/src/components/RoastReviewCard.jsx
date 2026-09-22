@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client.js";
+import { formatMessage } from "../lib/mdToHtml.js";
 
-// formatMessage is loaded globally via index.html's script tag pointing at
-// https://michaelyagi.github.io/js/md_to_html.js
-/* global formatMessage */
 
 const POLL_INTERVAL_MS = 3000;
 

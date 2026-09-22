@@ -1,5 +1,14 @@
 const BASE = "/api";
 
+// FastAPI sends a plain string for most errors, but a list of {loc, msg}
+// objects when a request fails validation -- show those as readable text.
+function errorText(detail) {
+  if (Array.isArray(detail)) {
+    return detail.map((d) => (d && d.msg ? `${(d.loc || []).slice(1).join(".") || "request"}: ${d.msg}` : String(d))).join("; ");
+  }
+  return typeof detail === "string" ? detail : detail ? JSON.stringify(detail) : "";
+}
+
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -7,13 +16,18 @@ async function request(path, options = {}) {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const err = new Error(body.detail || `${res.status} ${res.statusText}`);
+    const err = new Error(errorText(body.detail) || `${res.status} ${res.statusText}`);
     err.status = res.status; // lets callers distinguish e.g. 404 ("doesn't exist yet") from real failures
     throw err;
   }
   if (res.status === 204) return null; // no body -- DELETE endpoints, e.g. -- don't try to parse it
   const contentType = res.headers.get("content-type") || "";
   return contentType.includes("application/json") ? res.json() : res.text();
+}
+
+// Drops empty values so blank filters aren't sent as "tag=".
+function cleanParams(params) {
+  return Object.fromEntries(Object.entries(params).filter(([, v]) => v !== "" && v != null && v !== false));
 }
 
 export const api = {
@@ -69,6 +83,23 @@ export const api = {
   addNote: (id, note) => request(`/roasts/${id}/notes`, { method: "POST", body: JSON.stringify(note) }),
   updateNote: (id, noteId, text) => request(`/roasts/${id}/notes/${noteId}`, { method: "PATCH", body: JSON.stringify({ text }) }),
   deleteNote: (id, noteId) => request(`/roasts/${id}/notes/${noteId}`, { method: "DELETE" }),
+  setOutcome: (id, outcome) => request(`/roasts/${id}/outcome`, { method: "PUT", body: JSON.stringify(outcome) }),
+  setRoastBeans: (id, name) => request(`/roasts/${id}/beans`, { method: "PUT", body: JSON.stringify({ name }) }),
+  listBeans: () => request("/beans"),
+  createBean: (bean) => request("/beans", { method: "POST", body: JSON.stringify(bean) }),
+  updateBean: (id, bean) => request(`/beans/${id}`, { method: "PUT", body: JSON.stringify(bean) }),
+  deleteBean: (id) => request(`/beans/${id}`, { method: "DELETE" }),
+  listViews: (kind) => request(`/views?${new URLSearchParams(kind ? { kind } : {})}`),
+  saveView: (kind, name, config) => request("/views", { method: "POST", body: JSON.stringify({ kind, name, config }) }),
+  deleteView: (id) => request(`/views/${id}`, { method: "DELETE" }),
+  getAnalysisMetrics: () => request("/analysis/metrics"),
+  getAnalysisTable: (params = {}) => request(`/analysis/table?${new URLSearchParams(cleanParams(params))}`),
+  getAnalysisSummary: (params = {}) => request(`/analysis/summary?${new URLSearchParams(cleanParams(params))}`),
+  getRoastNumbers: (id) => request(`/analysis/roasts/${id}`),
+  analysisExportUrl: (kind, params = {}) => `/api/analysis/export.${kind}?${new URLSearchParams(cleanParams(params))}`,
+  requestInsight: (body) =>
+    request("/analysis/insights", { method: "POST", body: JSON.stringify(Object.fromEntries(Object.entries(body).filter(([, v]) => v !== "" && v != null))) }),
+  getInsight: (jobId) => request(`/analysis/insights/${jobId}`),
   getControl: (id) => request(`/roasts/${id}/control`),
   emergencyStop: (id) => request(`/roasts/${id}/emergency-stop`, { method: "POST" }),
   startProgramFromRoast: (id, sourceRoastId) =>
@@ -81,6 +112,9 @@ export const api = {
     request(`/roasts/${id}/events/${eventId}`, { method: "PATCH", body: JSON.stringify({ time_s: timeS }) }),
   alogDownloadUrl: (id) => `${BASE}/roasts/${id}/alog`,
   csvDownloadUrl: (id) => `${BASE}/roasts/${id}/csv`,
+  jsonDownloadUrl: (id) => `${BASE}/roasts/${id}/json`,
+  roastlogCsvDownloadUrl: (id) => `${BASE}/roasts/${id}/roastlog.csv`,
+  xlsxDownloadUrl: (id) => `${BASE}/roasts/${id}/xlsx`,
   importAlog: (path, title) =>
     request(`/roasts/import?${new URLSearchParams({ path, ...(title ? { title } : {}) })}`, { method: "POST" }),
   // An .alog from this computer: the file itself is the request body.

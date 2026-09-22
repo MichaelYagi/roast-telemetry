@@ -1,14 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import RoastChart from "../components/RoastChart.jsx";
 import RoastReviewCard from "../components/RoastReviewCard.jsx";
 import { isSimulatedRoast } from "../simulated.js";
 import RoastStatsPanel from "../components/RoastStatsPanel.jsx";
+import RoastNumbers from "../components/RoastNumbers.jsx";
+import OutcomePanel from "../components/OutcomePanel.jsx";
+import BeansCard from "../components/BeansCard.jsx";
+import BeansField from "../components/BeansField.jsx";
 import NotesPanel from "../components/NotesPanel.jsx";
 import WeightField from "../components/WeightField.jsx";
 import { formatTime } from "../chartDefaults.js";
+import { formatEventValue } from "../lib/eventFormat.js";
 import { formatTemp } from "../tempUnits.js";
+import { downloadRoastPdf, printRoastPdf } from "../lib/roastPdf.js";
 
 // Mirrors the Configure Roast form's <option> labels (LiveRoastView.jsx)
 // so history shows the same human-readable name, not the raw mode enum.
@@ -54,10 +60,22 @@ function csvFilename(title, createdAt) {
   return `${safeTitle}_${timestamp}.csv`;
 }
 
+// Same convention, one per other download format.
+// `ext` includes its own leading "." (or, for the roast-log CSV, "_log.csv") so
+// this can produce a name distinct from csvFilename's own (different-shaped)
+// .csv -- matching backend/app/api/roasts.py's roastlog_csv_filename.
+function otherFilename(title, createdAt, ext) {
+  const safeTitle = title.replace(UNSAFE_FILENAME_CHARS, "_").trim() || "roast";
+  const timestamp = createdAt.slice(0, 16).replace("T", "_").replace(":", "");
+  return `${safeTitle}_${timestamp}${ext.startsWith("_") ? ext : `.${ext}`}`;
+}
+
 export default function RoastDetailView() {
   const { id } = useParams();
   const [roast, setRoast] = useState(null);
   const [error, setError] = useState(null);
+  const [numbersKey, setNumbersKey] = useState(0);
+  const [beansText, setBeansText] = useState("");
   const [tempUnit, setTempUnit] = useState("c"); // display only, see Settings > Temperature Unit
   // Deliberately separate from `error` above -- that one *replaces the
   // whole page* (see the early-return a few lines down), which is right
@@ -67,11 +85,17 @@ export default function RoastDetailView() {
   const [newTagInput, setNewTagInput] = useState("");
   const [tagsError, setTagsError] = useState(null);
   const [allTags, setAllTags] = useState([]); // feeds the <datalist> below -- existing tags to autocomplete against
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState(null);
+  const chartRef = useRef(null); // gives the PDF button a toImage() of exactly what's on screen
 
   useEffect(() => {
     api
       .getRoast(id)
-      .then(setRoast)
+      .then((r) => {
+        setRoast(r);
+        setBeansText(r.beans || "");
+      })
       .catch((err) => setError(err.message));
   }, [id]);
 
@@ -82,24 +106,43 @@ export default function RoastDetailView() {
     api.listTags().then(setAllTags);
   }, []);
 
+  // The Beans field saves when it's left, on Enter, or when a suggestion is
+  // picked -- only if the name actually changed.
+  async function saveBeans(text) {
+    const next = text.trim();
+    if (next === (roast.beans || "")) return;
+    try {
+      const saved = await api.setRoastBeans(id, next || null);
+      setRoast((r) => (r ? { ...r, beans: saved.beans, bean_id: saved.bean_id } : r));
+      setBeansText(saved.beans || "");
+      setNumbersKey((k) => k + 1);
+    } catch (err) {
+      setMilestoneError(err.message);
+    }
+  }
+
   async function handleSaveGreenWeight(grams) {
     await api.setWeightGreen(id, grams);
     setRoast((r) => (r ? { ...r, weight_green_g: grams } : r));
+    setNumbersKey((k) => k + 1);
   }
 
   async function handleDeleteGreenWeight() {
     await api.deleteWeightGreen(id);
     setRoast((r) => (r ? { ...r, weight_green_g: null } : r));
+    setNumbersKey((k) => k + 1);
   }
 
   async function handleSaveRoastedWeight(grams) {
     await api.setWeightRoasted(id, grams);
     setRoast((r) => (r ? { ...r, weight_roasted_g: grams } : r));
+    setNumbersKey((k) => k + 1);
   }
 
   async function handleDeleteRoastedWeight() {
     await api.deleteWeightRoasted(id);
     setRoast((r) => (r ? { ...r, weight_roasted_g: null } : r));
+    setNumbersKey((k) => k + 1);
   }
 
   // Both add and remove go through this one function -- always PUTting
@@ -155,6 +198,53 @@ export default function RoastDetailView() {
     }
   }
 
+  // Pulls the same numbers the Roast Stats/Numbers panels below already
+  // show (they're separate GETs, not part of the Roast object itself),
+  // grabs a snapshot of the on-screen chart, and hands it all to the PDF
+  // builder. Errors here (e.g. no numbers yet for a roast with no Charge
+  // marked) still produce a PDF -- buildDoc just skips whatever's missing.
+  // Shared by both Download PDF and Print report, so they always build
+  // from the exact same data.
+  async function loadPdfExtra() {
+    const [stats, numbersRow, metricsMeta] = await Promise.all([
+      api.getRoastStats(id).catch(() => null),
+      api.getRoastNumbers(id).catch(() => null),
+      api.getAnalysisMetrics().catch(() => []),
+    ]);
+    return { stats, numbersRow, metricsMeta };
+  }
+
+  async function handleDownloadPdf() {
+    setPdfError(null);
+    setPdfBusy(true);
+    try {
+      const extra = await loadPdfExtra();
+      const chartImage = chartRef.current?.toImage() || null;
+      downloadRoastPdf(roast, tempUnit, chartImage, extra);
+    } catch (err) {
+      setPdfError(err.message || "Couldn't build the PDF.");
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
+  // "Print report": the same document as Download PDF, opened in a new tab
+  // with its print dialog already up -- see lib/roastPdf.js's printRoastPdf
+  // for why this isn't a separate, page-CSS-driven print instead.
+  async function handlePrint() {
+    setPdfError(null);
+    setPdfBusy(true);
+    try {
+      const extra = await loadPdfExtra();
+      const chartImage = chartRef.current?.toImage() || null;
+      printRoastPdf(roast, tempUnit, chartImage, extra);
+    } catch (err) {
+      setPdfError(err.message || "Couldn't build the PDF.");
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   // "Weight loss" convention (a negative percentage,
   // e.g. "-13.2%") -- roast_review.py computes the same ratio but as a
   // positive "percent lost" for the AI review prompt; this is purely a
@@ -206,16 +296,24 @@ export default function RoastDetailView() {
             Download <a href={api.csvDownloadUrl(roast.id)}>{csvFilename(roast.title, roast.created_at)}</a>
           </p>
           <p>
-            {/* Browser-native print-to-PDF rather than a generated file --
-                no new dependency, and "Save as PDF" in the print dialog is
-                already a real PDF export. The report itself is just this
-                page with .no-print-marked chrome (this whole block, nav
-                controls elsewhere on the page) hidden via the @media print
-                rules in styles.css -- see those for what stays visible. */}
-            <button type="button" className="link-like" onClick={() => window.print()}>
-              Print report
+            Download <a href={api.jsonDownloadUrl(roast.id)}>{otherFilename(roast.title, roast.created_at, "json")}</a>
+          </p>
+          <p>
+            Download <a href={api.roastlogCsvDownloadUrl(roast.id)}>{otherFilename(roast.title, roast.created_at, "_log.csv")}</a> (spreadsheet, tab-separated)
+          </p>
+          <p>
+            Download <a href={api.xlsxDownloadUrl(roast.id)}>{otherFilename(roast.title, roast.created_at, "xlsx")}</a>
+          </p>
+          <p>
+            <button type="button" className="link-like" onClick={handleDownloadPdf} disabled={pdfBusy}>
+              {pdfBusy ? "Building PDF…" : "Download PDF"}
+            </button>
+            {" · "}
+            <button type="button" className="link-like" onClick={handlePrint} disabled={pdfBusy}>
+              {pdfBusy ? "Building PDF…" : "Print report"}
             </button>
           </p>
+          {pdfError && <p className="error no-print">{pdfError}</p>}
         </div>
       </div>
 
@@ -232,6 +330,7 @@ export default function RoastDetailView() {
 
       <div className="panel">
         <RoastChart
+          ref={chartRef}
           profile={roast.profile}
           events={roast.events}
           tempUnit={tempUnit}
@@ -303,9 +402,16 @@ export default function RoastDetailView() {
 
           <h3>Batch</h3>
           <ul className="kv-list">
-            <li>
+            <li className="beans-row">
               <span>Beans</span>
-              <span>{roast.beans || "—"}</span>
+              <span>
+                <BeansField
+                  label=""
+                  value={beansText}
+                  onChange={setBeansText}
+                  onCommit={saveBeans}
+                />
+              </span>
             </li>
             <li>
               <span>Tags</span>
@@ -376,10 +482,25 @@ export default function RoastDetailView() {
           </ul>
         </div>
 
+        <BeansCard beanId={roast.bean_id} refreshKey={numbersKey} />
+
         <div className="panel">
           <h3>Roast Stats</h3>
           <RoastStatsPanel roastId={roast.id} />
         </div>
+
+        <div className="panel">
+          <h3>Numbers</h3>
+          <RoastNumbers roastId={roast.id} tempUnit={tempUnit} refreshKey={numbersKey} />
+        </div>
+
+        <OutcomePanel
+          roast={roast}
+          onSaved={(saved) => {
+            setRoast((r) => (r ? { ...r, ...saved } : r));
+            setNumbersKey((k) => k + 1);
+          }}
+        />
 
         <div className="panel">
           <h3>Events</h3>
@@ -387,7 +508,7 @@ export default function RoastDetailView() {
             {roast.events.map((ev) => (
               <li key={ev.id}>
                 <strong>{ev.label}</strong> @ {formatTime(ev.time_s)}
-                {ev.value != null && ev.channel ? ` (${ev.channel}: ${ev.value})` : ev.value != null ? ` (${formatTemp(ev.value, tempUnit)})` : ""}
+                {formatEventValue(ev, formatTemp, tempUnit)}
               </li>
             ))}
           </ul>

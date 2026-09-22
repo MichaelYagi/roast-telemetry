@@ -63,7 +63,7 @@ def test_an_empty_file_is_refused(client, data):
 def test_something_that_is_not_an_alog_is_refused_and_nothing_is_stored(client, data):
     resp = _upload(client, data, filename="notes.txt")
     assert resp.status_code == 400
-    assert "notes.txt doesn't look like a valid .alog file" in resp.json()["detail"]
+    assert "notes.txt doesn't look like a valid .alog or .json file" in resp.json()["detail"]
     assert client.get("/api/roasts").json() == []
 
 
@@ -114,7 +114,7 @@ def test_the_shipped_sample_roast_uploads_too(client):
 
 def test_the_error_for_a_bad_file_is_plain_english(client):
     detail = _upload(client, b"hello there", filename="notes.txt").json()["detail"]
-    assert detail == "notes.txt doesn't look like a valid .alog file."
+    assert detail == "notes.txt doesn't look like a valid .alog or .json file."
     assert "ast" not in detail.lower() and "0x" not in detail
 
 

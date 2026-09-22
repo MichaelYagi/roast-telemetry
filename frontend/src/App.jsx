@@ -7,7 +7,8 @@ import ThemePicker from "./components/ThemePicker.jsx";
 import HistoryDashboard from "./views/HistoryDashboard.jsx";
 import LiveRoastView from "./views/LiveRoastView.jsx";
 import LoginView from "./views/LoginView.jsx";
-import RoastComparisonView from "./views/RoastComparisonView.jsx";
+import AnalysisView from "./views/AnalysisView.jsx";
+import BeansView from "./views/BeansView.jsx";
 import RoastDetailView from "./views/RoastDetailView.jsx";
 import SettingsView from "./views/SettingsView.jsx";
 import UsersView from "./views/UsersView.jsx";
@@ -51,7 +52,8 @@ function AppShell() {
               Live Roast
             </NavLink>
             <NavLink to="/history">History</NavLink>
-            <NavLink to="/compare">Compare</NavLink>
+            <NavLink to="/analysis">Analysis</NavLink>
+            <NavLink to="/beans">Beans</NavLink>
             <NavLink to="/settings">Settings</NavLink>
             {user.role === "admin" && <NavLink to="/users">Manage Access</NavLink>}
           </nav>
@@ -74,7 +76,10 @@ function AppShell() {
           <Route path="/" element={<LiveRoastView />} />
           <Route path="/history" element={<HistoryDashboard />} />
           <Route path="/roasts/:id" element={<RoastDetailView />} />
-          <Route path="/compare" element={<RoastComparisonView />} />
+          {/* Comparing is now done from History: select roasts there and press Compare. */}
+          <Route path="/compare" element={<Navigate to="/history" replace />} />
+          <Route path="/analysis" element={<AnalysisView />} />
+          <Route path="/beans" element={<BeansView />} />
           <Route path="/settings" element={<SettingsView />} />
           <Route path="/users" element={user.role === "admin" ? <UsersView /> : <Navigate to="/" replace />} />
         </Routes>

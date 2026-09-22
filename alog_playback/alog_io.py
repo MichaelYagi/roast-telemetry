@@ -526,6 +526,34 @@ def _extract_machine(data: dict) -> dict:
     return {"brand": None, "model": roastertype} if roastertype else {}
 
 
+def alog_created_at(data: dict) -> Optional[str]:
+    """When a roast file says it was roasted, as a proper ISO date-time (UTC),
+    or None if it says nothing usable. Files carry the moment several ways: a
+    Unix timestamp, an ISO date plus a time, and a human-readable string
+    ("Sat Mar 01 2025") -- tried in that order."""
+    epoch = data.get("roastepoch")
+    if isinstance(epoch, (int, float)) and epoch > 0:
+        try:
+            return datetime.fromtimestamp(epoch, timezone.utc).isoformat()
+        except (OverflowError, OSError, ValueError):
+            pass
+    iso_date, roast_time = data.get("roastisodate"), data.get("roasttime")
+    if iso_date:
+        try:
+            when = datetime.fromisoformat(f"{iso_date}T{roast_time or '00:00:00'}")
+            return when.replace(tzinfo=timezone.utc).isoformat()
+        except ValueError:
+            pass
+    text = data.get("roastdate")
+    if text:
+        for fmt in ("%a %b %d %Y", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(str(text), fmt).replace(tzinfo=timezone.utc).isoformat()
+            except ValueError:
+                continue
+    return None
+
+
 def _extract_roastdate(data: dict) -> Optional[str]:
     iso_date, roast_time = data.get("roastisodate"), data.get("roasttime")
     if iso_date and roast_time:
@@ -637,8 +665,33 @@ def _extract_continuous_channels(data: dict, timex: list) -> dict[str, list]:
     return result
 
 
+def _f_to_c(value):
+    # -1 is the format's "no reading" marker, not a temperature.
+    if not isinstance(value, (int, float)) or value == -1:
+        return value
+    return (value - 32.0) * 5.0 / 9.0
+
+
+def _fahrenheit_file_to_celsius(data: dict) -> dict:
+    """A copy of `data` with every temperature (and rate of rise) converted
+    from Fahrenheit to Celsius. Files record which unit they use in `mode`;
+    everything in this app is Celsius."""
+    out = dict(data)
+    for key in ("temp1", "temp2"):
+        out[key] = [_f_to_c(v) for v in data.get(key) or []]
+    for key in ("extratemp1", "extratemp2"):
+        if data.get(key):
+            out[key] = [[_f_to_c(v) for v in series] if isinstance(series, list) else series for series in data[key]]
+    for key in ("ror_bt", "ror_et"):
+        if data.get(key):
+            out[key] = [None if v is None else (v * 5.0 / 9.0 if isinstance(v, (int, float)) else v) for v in data[key]]
+    return out
+
+
 def alog_dict_to_points(data: dict) -> dict:
     """Flatten an .alog dict back into profile/events/notes lists."""
+    if str(data.get("mode", "C")).upper() == "F":
+        data = _fahrenheit_file_to_celsius(data)
     timex = data["timex"]
     temp1 = data["temp1"]
     temp2 = data["temp2"]

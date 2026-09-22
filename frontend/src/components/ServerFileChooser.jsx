@@ -28,13 +28,15 @@ function formatSize(bytes) {
 }
 
 // Browses folders on the machine running the server (GET /api/files) and
-// hands back the full path of the .alog file the user clicks -- the same
-// path the import/playback path fields take, so nobody has to type it. The
+// hands back the full path of the roast log file the user clicks -- the
+// same path the import path field takes, so nobody has to type it. The
 // browser's own file picker can't help here: it hides real paths and only
 // sees the browser's computer, not the server's.
 //
 // Opens at `startPath` if it is a real folder (or the folder a file path
 // sits in), else the last folder used, else the server's home folder.
+// GET /api/files itself only ever lists .alog/.json/.csv/.tsv/.xlsx -- the
+// server never has a reason to show anything else through this picker.
 export default function ServerFileChooser({ open, onClose, onSelect, startPath = "" }) {
   const [listing, setListing] = useState(null);
   const [pathInput, setPathInput] = useState("");
@@ -114,8 +116,8 @@ export default function ServerFileChooser({ open, onClose, onSelect, startPath =
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Choose an .alog file" wide>
-      <p className="hint">Folders on the machine running the server. Click a folder to open it, or an .alog file to choose it.</p>
+    <Modal open={open} onClose={onClose} title="Choose a roast log file" wide>
+      <p className="hint">Folders on the machine running the server. Click a folder to open it, or a file (.alog, .json, .csv, .tsv, .xlsx) to choose it.</p>
 
       <form className="file-chooser-pathbar" onSubmit={handleGo}>
         <button type="button" onClick={() => listing?.parent && go(listing.parent)} disabled={!listing?.parent || loading} aria-label="Up one folder">
@@ -140,7 +142,7 @@ export default function ServerFileChooser({ open, onClose, onSelect, startPath =
       {error && <p className="error">{error}</p>}
 
       <ul className="file-chooser-list" aria-busy={loading}>
-        {listing && listing.entries.length === 0 && !error && <li className="file-chooser-empty">No folders or .alog files here.</li>}
+        {listing && listing.entries.length === 0 && !error && <li className="file-chooser-empty">No folders or roast log files here.</li>}
         {listing?.entries.map((entry) => (
           <li key={entry.path}>
             <button type="button" className={`file-chooser-entry file-chooser-${entry.kind}`} onClick={() => handleEntry(entry)}>
