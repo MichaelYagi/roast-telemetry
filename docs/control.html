@@ -119,6 +119,19 @@
     <li>They can't override the roaster's own panel: turning something up at the machine still works.</li>
   </ul>
 
+  <h2 id="activity-log">Activity log</h2>
+  <p>
+    Every Emergency stop, fail-safe trip, and automatic control rule firing
+    is recorded &mdash; along with every roast delete and edit (tags,
+    weight, outcome, notes, milestones) &mdash; on the
+    <strong>Activity</strong> page, with who did it (blank for a fail-safe
+    or rule, since those fire on their own) and when. It's a log, not an
+    undo: a deleted roast's file is really gone, the entry just says it
+    happened. The table keeps the newest 5000 entries; older ones drop off,
+    so download it as CSV or JSON from the same page if you want to keep a
+    longer record.
+  </p>
+
   <h2 id="automatic-control">Automatic control</h2>
   <p>
     On the Live Roast page, the <strong>Automatic control</strong> panel.

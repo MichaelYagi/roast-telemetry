@@ -2004,6 +2004,19 @@ button:disabled {
   color: #155e75;
 }
 
+/* ActivityView's category pills -- "roast" edits are routine (same blue as
+   status-stopped), "safety" events (Emergency Stop, fail-safes, automation)
+   get the same red as status-aborted since they're the higher-stakes ones. */
+.status-roast {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-safety {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .status-idle {
   background: #e2e8f0;
   color: #334155;

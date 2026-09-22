@@ -108,10 +108,18 @@ class RoastControl:
         return self.write(payload, source="operator")
 
     # -- safe state -----------------------------------------------------------
-    async def enter_safe_state(self, reason: str) -> bool:
+    async def enter_safe_state(self, reason: str, *, username: Optional[str] = None) -> bool:
         """Heater off, fan to the safe level, automation stopped. Also used by
         the emergency stop. Never raises: it's called when things are already
-        going wrong, so a failed write is logged and reported, not thrown."""
+        going wrong, so a failed write is logged and reported, not thrown.
+
+        The single chokepoint for every safety trip -- the manual Emergency
+        Stop button and all of this session's fail-safes (the no-viewer
+        watchdog, a lost temperature reading, a tick error) all land here,
+        so this is also the one place that needs to log an activity_log
+        entry for any of them. `username` is only ever set for the manual
+        button (an HTTP request is in flight); every fail-safe passes
+        nothing, since it fires on its own, not because anyone acted."""
         self.stop_automation(reason)
         self.session._cancel_pending_alarms()
         self.tripped_reason = reason
@@ -125,6 +133,10 @@ class RoastControl:
         except Exception:
             logger.exception("safe-state write failed (%s)", reason)
         await self._mark(f"Safety: {reason}" + ("" if written else " (couldn't reach the roaster)"))
+        storage.log_activity(
+            "safety", "safe_state", username=username, roast_id=self.session.id, roast_title=self.session.title,
+            message=f'Safety stop on "{self.session.title}": {reason}',
+        )
         return written
 
     def release(self) -> None:
@@ -140,8 +152,8 @@ class RoastControl:
             except Exception:
                 logger.exception("couldn't turn the heater off when the roast ended")
 
-    async def emergency_stop(self) -> bool:
-        return await self.enter_safe_state("emergency stop")
+    async def emergency_stop(self, *, username: Optional[str] = None) -> bool:
+        return await self.enter_safe_state("emergency stop", username=username)
 
     def clear_trip(self) -> None:
         self.tripped_reason = None

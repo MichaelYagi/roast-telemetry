@@ -212,6 +212,21 @@ class SavedView(SavedViewCreate):
     created_by_username: Optional[str] = None
 
 
+class ActivityLogEntry(BaseModel):
+    """One row of GET /activity -- see storage.py's activity_log table and
+    log_activity() for how these are written."""
+
+    id: str
+    created_at: str
+    category: Literal["roast", "safety"]
+    action: str
+    username: Optional[str] = None
+    roast_id: Optional[str] = None
+    roast_title: Optional[str] = None
+    message: str
+    detail: Optional[dict] = None
+
+
 class RoastNote(BaseModel):
     id: str
     time_s: float

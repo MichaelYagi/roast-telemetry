@@ -78,7 +78,9 @@ locally.)*
   the connection breaks, or the temperature reading is lost. Tested against
   the built-in simulated FZ-94, **not yet on a real roaster**, and no
   substitute for the roaster's own safety features: the app can't switch
-  anything off when it can't reach the roaster. Read
+  anything off when it can't reach the roaster. Every stop, fail-safe and
+  automation rule firing is recorded on the **Activity** page, alongside
+  every roast delete and edit — downloadable as CSV/JSON. Read
   [Controlling a roast](docs/control.html) before using it on a real machine.
 - **Celsius/Fahrenheit display toggle** (Settings → Temperature Unit) —
   display only, everything is still stored and sent as Celsius.

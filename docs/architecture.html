@@ -62,6 +62,7 @@
       <tr><td><code>roasts</code></td><td>Per-roast metadata: title, mode, status, beans (and the saved beans it links to), weights, duration (Charge to Drop), colour, cupping score, rating, tasting notes, playback speed, and the path to its <code>.alog</code> file. The full per-second profile/events/notes live in that <code>.alog</code> file on disk (<code>backend/data/roasts/&lt;id&gt;.alog</code>), not in SQLite — this table just indexes it for fast history listing/filtering.</td></tr>
       <tr><td><code>beans</code></td><td>Saved green beans (name, origin, process, variety, altitude, density, moisture, supplier, notes). A roast points at one with <code>roasts.bean_id</code>.</td></tr>
       <tr><td><code>saved_views</code></td><td>Saved comparisons and analyses: a name and the page's own settings as JSON.</td></tr>
+      <tr><td><code>activity_log</code></td><td>Who did what, when: roast deletes/edits and safety/control events (Emergency stop, fail-safe trips, automation rules) — see <a href="control.html#activity-log">Controlling a roast</a>. Capped at the newest 5000 rows; older ones are trimmed on write.</td></tr>
       <tr><td><code>roast_presets</code></td><td>"Load saved config" entries — the full Configure Roast form plus its starting Burner/Air/Drum values.</td></tr>
       <tr><td><code>settings</code></td><td>Ollama URL/model (AI Roast Review); which panels are enabled/ordered in the Big Readout Panel / Small Readout column; the vertical control panel's stack layout and which sliders show +/- buttons; display temperature unit (&deg;C/&deg;F).</td></tr>
       <tr><td><code>roast_reviews</code></td><td>The latest AI-generated review per roast (one row each, overwritten on regenerate).</td></tr>
@@ -143,6 +144,7 @@
       <tr><td>POST / GET</td><td><code>/analysis/insights</code>, <code>/analysis/insights/{id}</code></td><td>AI comment on a set of roasts (only with Ollama configured)</td></tr>
       <tr><td>GET / POST / PUT / DELETE</td><td><code>/beans</code>, <code>/beans/{id}</code></td><td>Saved beans</td></tr>
       <tr><td>GET / POST / DELETE</td><td><code>/views</code>, <code>/views/{id}</code></td><td>Saved comparisons and analyses</td></tr>
+      <tr><td>GET</td><td><code>/activity</code>, <code>/activity/count</code>, <code>/activity/export.{csv,json}</code></td><td>Who did what, when — see <a href="control.html#activity-log">Controlling a roast → Activity log</a></td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/notes</code></td><td>Append a timestamped note</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/events</code></td><td>Append a custom event marker</td></tr>
       <tr><td>POST</td><td><code>/roasts/{id}/weight</code></td><td>Record the roasted (post-roast) weight</td></tr>

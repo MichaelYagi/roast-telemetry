@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import auth, storage
 from .api import auth as auth_api
-from .api import analysis, beans, device_profiles, devices, files, presets, roasts, serial_ports, settings, views
+from .api import activity, analysis, beans, device_profiles, devices, files, presets, roasts, serial_ports, settings, views
 from .models import DeviceProfileCreateRequest, RoastCreateRequest, UserStatus
 from .roast_session import RoastSessionError, session_manager
 from .version import VERSION
@@ -171,6 +171,7 @@ app.include_router(files.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
 app.include_router(beans.router, prefix="/api")
 app.include_router(views.router, prefix="/api")
+app.include_router(activity.router, prefix="/api")
 
 
 @app.get("/api/health")

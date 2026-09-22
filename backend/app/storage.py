@@ -8,6 +8,7 @@ matter of changing the connection + a couple of ``?`` placeholders.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 from datetime import datetime, timezone
@@ -169,7 +170,34 @@ CREATE TABLE IF NOT EXISTS saved_views (
     created_at TEXT NOT NULL,
     created_by_username TEXT
 );
+
+-- Who did what, when: roast deletes/edits and safety-critical control
+-- events (Emergency Stop, fail-safe trips, automation start/stop/fire).
+-- roast_title is a snapshot taken at write time, not a join -- a row stays
+-- meaningful after the roast itself is deleted. username is NULL for
+-- autonomous events (a fail-safe or automation rule firing on its own, not
+-- from an HTTP request); no FK on either, same reasoning as
+-- roasts.created_by_username below. See log_activity()'s own docstring for
+-- the retention trim.
+CREATE TABLE IF NOT EXISTS activity_log (
+    id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    category TEXT NOT NULL,
+    action TEXT NOT NULL,
+    username TEXT,
+    roast_id TEXT,
+    roast_title TEXT,
+    message TEXT NOT NULL,
+    detail_json TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_activity_log_roast_id ON activity_log(roast_id);
 """
+
+# How many of the newest activity_log rows survive each write -- trimmed in
+# log_activity() itself. A module constant so tests can lower it instead of
+# inserting thousands of real rows to exercise the trim.
+ACTIVITY_LOG_MAX_ROWS = 5000
 
 
 @contextmanager
@@ -1088,3 +1116,92 @@ def delete_saved_view(view_id: str) -> bool:
     with _conn() as c:
         cursor = c.execute("DELETE FROM saved_views WHERE id = ?", (view_id,))
         return cursor.rowcount > 0
+
+
+# -- activity log --------------------------------------------------------------------
+
+
+def log_activity(
+    category: str,
+    action: str,
+    *,
+    username: Optional[str] = None,
+    roast_id: Optional[str] = None,
+    roast_title: Optional[str] = None,
+    message: str,
+    detail: Optional[dict] = None,
+) -> None:
+    """Fire-and-forget: never raises. A logging failure must never break the
+    mutation it's attached to (e.g. deleting a roast must still succeed even
+    if this insert fails), so every call site is a plain one-liner and the
+    try/except lives here once, not at each of the ~15 call sites."""
+    try:
+        with _conn() as c:
+            c.execute(
+                """INSERT INTO activity_log
+                   (id, created_at, category, action, username, roast_id, roast_title, message, detail_json)
+                   VALUES (:id, :created_at, :category, :action, :username, :roast_id, :roast_title, :message, :detail_json)""",
+                {
+                    "id": str(uuid.uuid4()),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "category": category,
+                    "action": action,
+                    "username": username,
+                    "roast_id": roast_id,
+                    "roast_title": roast_title,
+                    "message": message,
+                    "detail_json": json.dumps(detail) if detail is not None else None,
+                },
+            )
+            c.execute(
+                "DELETE FROM activity_log WHERE id NOT IN "
+                "(SELECT id FROM activity_log ORDER BY created_at DESC LIMIT ?)",
+                (ACTIVITY_LOG_MAX_ROWS,),
+            )
+    except Exception:
+        logging.getLogger(__name__).exception("activity log insert failed (%s/%s)", category, action)
+
+
+def _activity_where(
+    category: Optional[str], action: Optional[str], roast_id: Optional[str], q: Optional[str]
+) -> tuple[str, list]:
+    clauses, params = [], []
+    if category:
+        clauses.append("category = ?")
+        params.append(category)
+    if action:
+        clauses.append("action = ?")
+        params.append(action)
+    if roast_id:
+        clauses.append("roast_id = ?")
+        params.append(roast_id)
+    if q:
+        clauses.append("(LOWER(message) LIKE ? OR LOWER(roast_title) LIKE ?)")
+        term = f"%{q.strip().lower()}%"
+        params.extend([term, term])
+    return (" WHERE " + " AND ".join(clauses)) if clauses else "", params
+
+
+def list_activity(
+    category: Optional[str] = None,
+    action: Optional[str] = None,
+    roast_id: Optional[str] = None,
+    q: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict]:
+    where, params = _activity_where(category, action, roast_id, q)
+    with _conn() as c:
+        rows = c.execute(
+            f"SELECT * FROM activity_log{where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def count_activity(
+    category: Optional[str] = None, action: Optional[str] = None, roast_id: Optional[str] = None, q: Optional[str] = None
+) -> int:
+    where, params = _activity_where(category, action, roast_id, q)
+    with _conn() as c:
+        return c.execute(f"SELECT COUNT(*) FROM activity_log{where}", params).fetchone()[0]

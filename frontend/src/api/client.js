@@ -92,6 +92,11 @@ export const api = {
   listViews: (kind) => request(`/views?${new URLSearchParams(kind ? { kind } : {})}`),
   saveView: (kind, name, config) => request("/views", { method: "POST", body: JSON.stringify({ kind, name, config }) }),
   deleteView: (id) => request(`/views/${id}`, { method: "DELETE" }),
+
+  // activity log (roast deletes/edits, safety/control events -- see backend/app/storage.py's activity_log table)
+  listActivity: (params = {}) => request(`/activity?${new URLSearchParams(cleanParams(params))}`),
+  countActivity: (params = {}) => request(`/activity/count?${new URLSearchParams(cleanParams(params))}`),
+  activityExportUrl: (kind, params = {}) => `/api/activity/export.${kind}?${new URLSearchParams(cleanParams(params))}`,
   getAnalysisMetrics: () => request("/analysis/metrics"),
   getAnalysisTable: (params = {}) => request(`/analysis/table?${new URLSearchParams(cleanParams(params))}`),
   getAnalysisSummary: (params = {}) => request(`/analysis/summary?${new URLSearchParams(cleanParams(params))}`),

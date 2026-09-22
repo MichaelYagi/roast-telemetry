@@ -959,6 +959,13 @@ class RoastSession:
             # timing, so immediate rules are no longer silent the way
             # they were before notifications existed.
             await pubsub.publish(self.id, {"type": "alarm_fired", "roast_id": self.id, "rule_id": rule.id, "message": rule.message})
+            # Autonomous -- no HTTP request in flight, so no username (same
+            # as the fail-safe trips in control.py's enter_safe_state).
+            storage.log_activity(
+                "safety", "automation_rule_fired", roast_id=self.id, roast_title=self.title,
+                message=f'Automation rule fired on "{self.title}" ({self._trigger_label(rule)})'
+                + (f": {rule.message}" if rule.message else ""),
+            )
         finally:
             # Needed on the normal-completion path too, not just when
             # abort()/the exception handler cancel it -- otherwise a long

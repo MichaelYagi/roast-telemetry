@@ -8,6 +8,7 @@ import HistoryDashboard from "./views/HistoryDashboard.jsx";
 import LiveRoastView from "./views/LiveRoastView.jsx";
 import LoginView from "./views/LoginView.jsx";
 import AnalysisView from "./views/AnalysisView.jsx";
+import ActivityView from "./views/ActivityView.jsx";
 import BeansView from "./views/BeansView.jsx";
 import RoastDetailView from "./views/RoastDetailView.jsx";
 import SettingsView from "./views/SettingsView.jsx";
@@ -54,6 +55,7 @@ function AppShell() {
             <NavLink to="/history">History</NavLink>
             <NavLink to="/analysis">Analysis</NavLink>
             <NavLink to="/beans">Beans</NavLink>
+            <NavLink to="/activity">Activity</NavLink>
             <NavLink to="/settings">Settings</NavLink>
             {user.role === "admin" && <NavLink to="/users">Manage Access</NavLink>}
           </nav>
@@ -80,6 +82,7 @@ function AppShell() {
           <Route path="/compare" element={<Navigate to="/history" replace />} />
           <Route path="/analysis" element={<AnalysisView />} />
           <Route path="/beans" element={<BeansView />} />
+          <Route path="/activity" element={<ActivityView />} />
           <Route path="/settings" element={<SettingsView />} />
           <Route path="/users" element={user.role === "admin" ? <UsersView /> : <Navigate to="/" replace />} />
         </Routes>
