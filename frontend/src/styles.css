@@ -126,7 +126,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 0.75rem;
   width: 100%;
 }
@@ -200,13 +199,29 @@ body.breakout-split-active .app-header-inner {
   margin: 0;
 }
 
+/* flex: 1 1 auto + min-width: 0 is what lets this shrink below its own
+   content width when the title/user groups on either side need their
+   full space -- the min-width is required, a flex item's default is
+   auto (= "never shrink narrower than my content"), which is exactly
+   what used to force the whole header onto a second line (dragging the
+   breakout-split divider narrows .app-header-inner without the viewport
+   itself getting narrower, so none of the @media breakpoints below ever
+   fired to catch it). overflow-x scrolls whatever doesn't fit instead. */
 .app-header nav {
   display: flex;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
   gap: 0.5rem 1rem;
+  scrollbar-width: none;
+}
+
+.app-header nav::-webkit-scrollbar {
+  display: none;
 }
 
 .app-header nav a {
+  flex: 0 0 auto;
   color: var(--text-muted);
   text-decoration: none;
   font-weight: 600;
@@ -237,6 +252,7 @@ body.breakout-split-active .app-header-inner {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  flex-shrink: 0;
 }
 
 /* Wraps the icon + "Roast Telemetry" only (not the theme picker) so they
@@ -2814,6 +2830,7 @@ button:disabled {
   align-items: center;
   gap: 0.6rem;
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* Now a <button> (opens the Account modal -- see App.jsx/AccountModal.jsx),
