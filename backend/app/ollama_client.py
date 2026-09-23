@@ -20,6 +20,18 @@ CONNECT_TIMEOUT_S = 3.0
 GENERATE_TIMEOUT_S = 1800.0
 
 
+def _is_prompt_to_text(model: dict) -> bool:
+    """Excludes embedding-only (and any other non-completion) models from
+    the Settings dropdown -- generateReview/requestInsight both send a plain
+    text prompt to /api/generate, which an embedding model can't answer.
+    /api/tags reports each model's `capabilities` (e.g. ["completion",
+    "vision"]) on any reasonably current Ollama server; an older server that
+    doesn't report it at all gets the benefit of the doubt (kept, not
+    hidden) rather than guessed at some other way."""
+    capabilities = model.get("capabilities")
+    return capabilities is None or "completion" in capabilities
+
+
 async def check_connection(url: str) -> dict:
     """Returns {"connected": bool, "models": [str], "error": str|None}."""
     url = url.rstrip("/")
@@ -28,7 +40,7 @@ async def check_connection(url: str) -> dict:
             resp = await client.get(f"{url}/api/tags")
             resp.raise_for_status()
             data = resp.json()
-        models = sorted(m["name"] for m in data.get("models", []) if "name" in m)
+        models = sorted(m["name"] for m in data.get("models", []) if "name" in m and _is_prompt_to_text(m))
         return {"connected": True, "models": models, "error": None}
     except Exception as exc:  # noqa: BLE001 -- deliberately broad, this is a reachability probe
         return {"connected": False, "models": [], "error": str(exc)}
