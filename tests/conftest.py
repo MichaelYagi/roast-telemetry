@@ -72,5 +72,5 @@ def client(anon_client):
     existing call through `client` stays authenticated exactly like a
     real logged-in browser, without every one of those tests needing its
     own login boilerplate."""
-    anon_client.post("/api/auth/register", json={"username": "test-admin", "password": "test-password-1"})
+    anon_client.post("/api/v1/auth/register", json={"username": "test-admin", "password": "test-password-1"})
     return anon_client

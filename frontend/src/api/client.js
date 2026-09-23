@@ -1,4 +1,4 @@
-const BASE = "/api";
+const BASE = "/api/v1";
 
 // FastAPI sends a plain string for most errors, but a list of {loc, msg}
 // objects when a request fails validation -- show those as readable text.
@@ -98,12 +98,12 @@ export const api = {
   // activity log (roast deletes/edits, safety/control events -- see backend/app/storage.py's activity_log table)
   listActivity: (params = {}) => request(`/activity?${new URLSearchParams(cleanParams(params))}`),
   countActivity: (params = {}) => request(`/activity/count?${new URLSearchParams(cleanParams(params))}`),
-  activityExportUrl: (kind, params = {}) => `/api/activity/export.${kind}?${new URLSearchParams(cleanParams(params))}`,
+  activityExportUrl: (kind, params = {}) => `${BASE}/activity/export.${kind}?${new URLSearchParams(cleanParams(params))}`,
   getAnalysisMetrics: () => request("/analysis/metrics"),
   getAnalysisTable: (params = {}) => request(`/analysis/table?${new URLSearchParams(cleanParams(params))}`),
   getAnalysisSummary: (params = {}) => request(`/analysis/summary?${new URLSearchParams(cleanParams(params))}`),
   getRoastNumbers: (id) => request(`/analysis/roasts/${id}`),
-  analysisExportUrl: (kind, params = {}) => `/api/analysis/export.${kind}?${new URLSearchParams(cleanParams(params))}`,
+  analysisExportUrl: (kind, params = {}) => `${BASE}/analysis/export.${kind}?${new URLSearchParams(cleanParams(params))}`,
   requestInsight: (body) =>
     request("/analysis/insights", { method: "POST", body: JSON.stringify(Object.fromEntries(Object.entries(body).filter(([, v]) => v !== "" && v != null))) }),
   getInsight: (jobId) => request(`/analysis/insights/${jobId}`),

@@ -1,4 +1,4 @@
-"""POST /api/roasts/import-upload -- an .alog sent from the browser's computer
+"""POST /api/v1/roasts/import-upload -- an .alog sent from the browser's computer
 (the raw file as the request body), the counterpart of POST /import, which reads
 a path on the server."""
 from __future__ import annotations
@@ -19,7 +19,7 @@ def _alog_bytes(title="Uploaded roast", n=40) -> bytes:
 
 
 def _upload(client, data, **params):
-    return client.post("/api/roasts/import-upload", params=params, content=data, headers={"Content-Type": "application/octet-stream"})
+    return client.post("/api/v1/roasts/import-upload", params=params, content=data, headers={"Content-Type": "application/octet-stream"})
 
 
 def test_upload_imports_the_roast_into_history(client):
@@ -28,12 +28,12 @@ def test_upload_imports_the_roast_into_history(client):
     body = resp.json()
     assert body["title"] == "Uploaded roast" and body["mode"] == "alog_playback" and body["status"] == "complete"
 
-    listed = client.get("/api/roasts").json()
+    listed = client.get("/api/v1/roasts").json()
     assert [r["id"] for r in listed] == [body["id"]]
     # It is a real, readable roast: the detail page and the .alog download both work.
-    detail = client.get(f"/api/roasts/{body['id']}").json()
+    detail = client.get(f"/api/v1/roasts/{body['id']}").json()
     assert len(detail["profile"]) >= 40 and detail["beans"] == "Test beans"
-    assert client.get(f"/api/roasts/{body['id']}/alog").status_code == 200
+    assert client.get(f"/api/v1/roasts/{body['id']}/alog").status_code == 200
 
 
 def test_a_title_given_wins_over_the_files_own(client):
@@ -49,7 +49,7 @@ def test_the_upload_is_recorded_against_the_signed_in_user(client):
 def test_the_same_file_can_be_uploaded_twice_as_two_roasts(client):
     a = _upload(client, _alog_bytes(), filename="roast.alog").json()["id"]
     b = _upload(client, _alog_bytes(), filename="roast.alog").json()["id"]
-    assert a != b and len(client.get("/api/roasts").json()) == 2
+    assert a != b and len(client.get("/api/v1/roasts").json()) == 2
 
 
 @pytest.mark.parametrize("data", [b"", b"   \n  "], ids=["empty", "blank"])
@@ -64,7 +64,7 @@ def test_something_that_is_not_an_alog_is_refused_and_nothing_is_stored(client, 
     resp = _upload(client, data, filename="notes.txt")
     assert resp.status_code == 400
     assert "notes.txt doesn't look like a valid .alog or .json file" in resp.json()["detail"]
-    assert client.get("/api/roasts").json() == []
+    assert client.get("/api/v1/roasts").json() == []
 
 
 def test_a_huge_upload_is_refused(client, monkeypatch):
@@ -73,7 +73,7 @@ def test_a_huge_upload_is_refused(client, monkeypatch):
     monkeypatch.setattr(roasts_api, "MAX_ALOG_UPLOAD_BYTES", 1000)
     resp = _upload(client, b"x" * 5000, filename="big.alog")
     assert resp.status_code == 413
-    assert client.get("/api/roasts").json() == []
+    assert client.get("/api/v1/roasts").json() == []
 
 
 def test_the_filename_is_only_a_label_never_a_path(client):
@@ -109,7 +109,7 @@ def test_the_shipped_sample_roast_uploads_too(client):
     sample = Path(__file__).resolve().parent.parent / "backend" / "data" / "sample_roasts" / "demo_roast.alog"
     resp = _upload(client, sample.read_bytes(), filename=sample.name)
     assert resp.status_code == 201, resp.text
-    assert client.get(f"/api/roasts/{resp.json()['id']}").json()["profile"]
+    assert client.get(f"/api/v1/roasts/{resp.json()['id']}").json()["profile"]
 
 
 def test_the_error_for_a_bad_file_is_plain_english(client):

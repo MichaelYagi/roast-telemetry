@@ -11,7 +11,7 @@ def _minimal_payload(name="My Config"):
 
 
 def test_built_in_presets_are_seeded_and_listed(client):
-    resp = client.get("/api/presets")
+    resp = client.get("/api/v1/presets")
     assert resp.status_code == 200
     ids = {p["id"] for p in resp.json()}
     assert "default-fz94-usb" in ids
@@ -25,42 +25,42 @@ def test_built_in_presets_are_seeded_and_listed(client):
 
 
 def test_create_get_update_delete_a_custom_preset(client):
-    created = client.post("/api/presets", json=_minimal_payload()).json()
+    created = client.post("/api/v1/presets", json=_minimal_payload()).json()
     assert created["built_in"] is False
     assert created["name"] == "My Config"
 
-    fetched = client.get(f"/api/presets/{created['id']}").json()
+    fetched = client.get(f"/api/v1/presets/{created['id']}").json()
     assert fetched["id"] == created["id"]
 
-    updated = client.put(f"/api/presets/{created['id']}", json=_minimal_payload(name="Renamed")).json()
+    updated = client.put(f"/api/v1/presets/{created['id']}", json=_minimal_payload(name="Renamed")).json()
     assert updated["name"] == "Renamed"
 
-    del_resp = client.delete(f"/api/presets/{created['id']}")
+    del_resp = client.delete(f"/api/v1/presets/{created['id']}")
     assert del_resp.status_code == 204
-    assert client.get(f"/api/presets/{created['id']}").status_code == 404
+    assert client.get(f"/api/v1/presets/{created['id']}").status_code == 404
 
 
 def test_get_update_delete_unknown_preset_returns_404(client):
-    assert client.get("/api/presets/does-not-exist").status_code == 404
-    assert client.put("/api/presets/does-not-exist", json=_minimal_payload()).status_code == 404
-    assert client.delete("/api/presets/does-not-exist").status_code == 404
+    assert client.get("/api/v1/presets/does-not-exist").status_code == 404
+    assert client.put("/api/v1/presets/does-not-exist", json=_minimal_payload()).status_code == 404
+    assert client.delete("/api/v1/presets/does-not-exist").status_code == 404
 
 
 def test_built_in_preset_rejects_update_and_delete(client):
-    put_resp = client.put("/api/presets/default-fz94-evo", json=_minimal_payload(name="Hacked"))
+    put_resp = client.put("/api/v1/presets/default-fz94-evo", json=_minimal_payload(name="Hacked"))
     assert put_resp.status_code == 403
 
-    del_resp = client.delete("/api/presets/default-fz94-evo")
+    del_resp = client.delete("/api/v1/presets/default-fz94-evo")
     assert del_resp.status_code == 403
 
-    still_there = client.get("/api/presets/default-fz94-evo").json()
+    still_there = client.get("/api/v1/presets/default-fz94-evo").json()
     assert still_there["name"] != "Hacked"
 
 
 def test_manufacturer_round_trips_on_a_custom_preset(client):
     payload = {**_minimal_payload(), "manufacturer": "Behmor"}
-    created = client.post("/api/presets", json=payload).json()
+    created = client.post("/api/v1/presets", json=payload).json()
     assert created["manufacturer"] == "Behmor"
 
-    fetched = client.get(f"/api/presets/{created['id']}").json()
+    fetched = client.get(f"/api/v1/presets/{created['id']}").json()
     assert fetched["manufacturer"] == "Behmor"

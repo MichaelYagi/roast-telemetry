@@ -132,11 +132,11 @@ app.add_middleware(
 # extra restriction is auth_api's own /auth/users* endpoints, which check
 # admin role for themselves via auth.require_admin.
 _PUBLIC_API_PATHS = {
-    "/api/health",
-    "/api/auth/status",
-    "/api/auth/register",
-    "/api/auth/login",
-    "/api/auth/logout",
+    "/api/v1/health",
+    "/api/v1/auth/status",
+    "/api/v1/auth/register",
+    "/api/v1/auth/login",
+    "/api/v1/auth/logout",
 }
 
 
@@ -161,18 +161,18 @@ async def require_login(request: Request, call_next):
     return await call_next(request)
 
 
-app.include_router(auth_api.router, prefix="/api")
-app.include_router(roasts.router, prefix="/api")
-app.include_router(devices.router, prefix="/api")
-app.include_router(presets.router, prefix="/api")
-app.include_router(device_profiles.router, prefix="/api")
-app.include_router(settings.router, prefix="/api")
-app.include_router(serial_ports.router, prefix="/api")
-app.include_router(files.router, prefix="/api")
-app.include_router(analysis.router, prefix="/api")
-app.include_router(beans.router, prefix="/api")
-app.include_router(views.router, prefix="/api")
-app.include_router(activity.router, prefix="/api")
+app.include_router(auth_api.router, prefix="/api/v1")
+app.include_router(roasts.router, prefix="/api/v1")
+app.include_router(devices.router, prefix="/api/v1")
+app.include_router(presets.router, prefix="/api/v1")
+app.include_router(device_profiles.router, prefix="/api/v1")
+app.include_router(settings.router, prefix="/api/v1")
+app.include_router(serial_ports.router, prefix="/api/v1")
+app.include_router(files.router, prefix="/api/v1")
+app.include_router(analysis.router, prefix="/api/v1")
+app.include_router(beans.router, prefix="/api/v1")
+app.include_router(views.router, prefix="/api/v1")
+app.include_router(activity.router, prefix="/api/v1")
 
 
 def _server_platform() -> str:
@@ -195,7 +195,7 @@ def _server_platform() -> str:
     return system  # "Windows", or whatever else platform.system() reports
 
 
-@app.get("/api/health")
+@app.get("/api/v1/health")
 def health() -> dict:
     return {"status": "ok", "platform": _server_platform()}
 

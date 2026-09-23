@@ -174,7 +174,7 @@ def test_tc4_live_create_roast_connects_without_recording(client):
     master_fd, slave_fd = pty.openpty()
     try:
         port = os.ttyname(slave_fd)
-        resp = client.post("/api/roasts", json={"title": "TC4 Connect Test", "mode": "tc4_live", "tc4_port": port})
+        resp = client.post("/api/v1/roasts", json={"title": "TC4 Connect Test", "mode": "tc4_live", "tc4_port": port})
         assert resp.status_code == 201
         assert resp.json()["status"] == "idle"
     finally:

@@ -168,7 +168,7 @@ def test_retime_event_allowed_between_neighbors():
 
 
 def _create_and_mark(client, event_type: str = "DRY_END") -> tuple[str, str]:
-    resp = client.post("/api/roasts", json={"title": "Editable Roast", "mode": "simulator"})
+    resp = client.post("/api/v1/roasts", json={"title": "Editable Roast", "mode": "simulator"})
     roast_id = resp.json()["id"]
     # Real wait, not mocked -- marking immediately on connect (no tick
     # elapsed yet) lands this milestone at the exact same profile sample
@@ -181,7 +181,7 @@ def _create_and_mark(client, event_type: str = "DRY_END") -> tuple[str, str]:
     # (see alog_io.py's own milestone_idx comment) -- once that was
     # fixed, Charge legitimately competed for the same timestamp here.
     time.sleep(2.2)
-    resp = client.post(f"/api/roasts/{roast_id}/events", json={"type": event_type, "label": event_type})
+    resp = client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": event_type, "label": event_type})
     event_id = resp.json()["id"]
     return roast_id, event_id
 
@@ -189,32 +189,32 @@ def _create_and_mark(client, event_type: str = "DRY_END") -> tuple[str, str]:
 def test_delete_event_via_api_warm(client):
     roast_id, event_id = _create_and_mark(client)
 
-    resp = client.delete(f"/api/roasts/{roast_id}/events/{event_id}")
+    resp = client.delete(f"/api/v1/roasts/{roast_id}/events/{event_id}")
     assert resp.status_code == 204
 
     # Not asserting events == [] -- the simulator auto-detects its own
     # CHARGE independently of this manually-marked DRY_END, so it's
     # legitimately still present; just confirm the deleted one is gone.
-    resp = client.get(f"/api/roasts/{roast_id}")
+    resp = client.get(f"/api/v1/roasts/{roast_id}")
     assert event_id not in [e["id"] for e in resp.json()["events"]]
 
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_retime_event_via_api_warm(client):
     roast_id, event_id = _create_and_mark(client)
-    resp = client.get(f"/api/roasts/{roast_id}")
+    resp = client.get(f"/api/v1/roasts/{roast_id}")
     # Retiming to its own current time_s is trivially valid (already
     # passed add_event's own sequencing rule) regardless of how far the
     # simulator's background tick has actually gotten by the time this
     # runs -- avoids a flaky hardcoded target time.
     current_time_s = next(e for e in resp.json()["events"] if e["id"] == event_id)["time_s"]
 
-    resp = client.patch(f"/api/roasts/{roast_id}/events/{event_id}", json={"time_s": current_time_s})
+    resp = client.patch(f"/api/v1/roasts/{roast_id}/events/{event_id}", json={"time_s": current_time_s})
     assert resp.status_code == 200
     assert resp.json()["time_s"] == current_time_s
 
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_delete_event_via_api_cold(client):
@@ -229,49 +229,49 @@ def test_delete_event_via_api_cold(client):
     # client viewing a historical roast page would, rather than reusing
     # the stale pre-pop UUID.
     roast_id, event_id = _create_and_mark(client)
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
     session_manager.sessions.pop(roast_id, None)
-    resp = client.get(f"/api/roasts/{roast_id}")
+    resp = client.get(f"/api/v1/roasts/{roast_id}")
     cold_event_id = next(e for e in resp.json()["events"] if e["type"] == "DRY_END")["id"]
     assert cold_event_id != event_id  # confirms this test is actually exercising the id-remap, not a no-op
 
-    resp = client.delete(f"/api/roasts/{roast_id}/events/{cold_event_id}")
+    resp = client.delete(f"/api/v1/roasts/{roast_id}/events/{cold_event_id}")
     assert resp.status_code == 204
 
-    resp = client.get(f"/api/roasts/{roast_id}")
+    resp = client.get(f"/api/v1/roasts/{roast_id}")
     assert cold_event_id not in [e["id"] for e in resp.json()["events"]]
 
 
 def test_retime_event_via_api_cold(client):
     roast_id, event_id = _create_and_mark(client)
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
     session_manager.sessions.pop(roast_id, None)
-    resp = client.get(f"/api/roasts/{roast_id}")
+    resp = client.get(f"/api/v1/roasts/{roast_id}")
     cold_event = next(e for e in resp.json()["events"] if e["type"] == "DRY_END")
 
-    resp = client.patch(f"/api/roasts/{roast_id}/events/{cold_event['id']}", json={"time_s": cold_event["time_s"]})
+    resp = client.patch(f"/api/v1/roasts/{roast_id}/events/{cold_event['id']}", json={"time_s": cold_event["time_s"]})
     assert resp.status_code == 200
 
-    resp = client.get(f"/api/roasts/{roast_id}")
+    resp = client.get(f"/api/v1/roasts/{roast_id}")
     updated = next(e for e in resp.json()["events"] if e["id"] == cold_event["id"])
     assert updated["time_s"] == cold_event["time_s"]
 
 
 def test_delete_event_via_api_rejects_turning_point(client):
-    resp = client.post("/api/roasts", json={"title": "TP Roast", "mode": "simulator"})
+    resp = client.post("/api/v1/roasts", json={"title": "TP Roast", "mode": "simulator"})
     roast_id = resp.json()["id"]
     session = session_manager.get(roast_id)
     mark_auto(session, RoastEventType.TURNING_POINT)
 
-    resp = client.delete(f"/api/roasts/{roast_id}/events/TURNING_POINT")
+    resp = client.delete(f"/api/v1/roasts/{roast_id}/events/TURNING_POINT")
     assert resp.status_code == 409
 
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_events_endpoints_404_for_unknown_roast(client):
-    resp = client.delete("/api/roasts/does-not-exist/events/also-does-not-exist")
+    resp = client.delete("/api/v1/roasts/does-not-exist/events/also-does-not-exist")
     assert resp.status_code == 404
 
-    resp = client.patch("/api/roasts/does-not-exist/events/also-does-not-exist", json={"time_s": 0.0})
+    resp = client.patch("/api/v1/roasts/does-not-exist/events/also-does-not-exist", json={"time_s": 0.0})
     assert resp.status_code == 404

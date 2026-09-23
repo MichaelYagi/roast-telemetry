@@ -15,7 +15,7 @@ def _create_roast(client, title="Tagged Roast", beans=None, mode="simulator") ->
     payload = {"title": title, "mode": mode}
     if beans is not None:
         payload["beans"] = beans
-    resp = client.post("/api/roasts", json=payload)
+    resp = client.post("/api/v1/roasts", json=payload)
     return resp.json()["id"]
 
 
@@ -63,45 +63,45 @@ def test_list_distinct_tags_orders_by_count_then_alpha(isolated_db):
 def test_set_tags_via_api_warm(client):
     roast_id = _create_roast(client)
 
-    resp = client.put(f"/api/roasts/{roast_id}/tags", json={"tags": ["espresso", "light"]})
+    resp = client.put(f"/api/v1/roasts/{roast_id}/tags", json={"tags": ["espresso", "light"]})
     assert resp.status_code == 200
     assert resp.json()["tags"] == ["espresso", "light"]
 
-    resp = client.get(f"/api/roasts/{roast_id}")
+    resp = client.get(f"/api/v1/roasts/{roast_id}")
     assert resp.json()["tags"] == ["espresso", "light"]
 
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_set_tags_via_api_cold(client):
     roast_id = _create_roast(client)
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
     session_manager.sessions.pop(roast_id, None)
 
-    resp = client.put(f"/api/roasts/{roast_id}/tags", json={"tags": ["dark"]})
+    resp = client.put(f"/api/v1/roasts/{roast_id}/tags", json={"tags": ["dark"]})
     assert resp.status_code == 200
 
-    resp = client.get(f"/api/roasts/{roast_id}")
+    resp = client.get(f"/api/v1/roasts/{roast_id}")
     assert resp.json()["tags"] == ["dark"]
 
 
 def test_set_tags_404_for_unknown_roast(client):
-    resp = client.put("/api/roasts/does-not-exist/tags", json={"tags": ["x"]})
+    resp = client.put("/api/v1/roasts/does-not-exist/tags", json={"tags": ["x"]})
     assert resp.status_code == 404
 
 
 def test_create_roast_with_upfront_tags(client):
-    resp = client.post("/api/roasts", json={"title": "Upfront", "mode": "simulator", "tags": ["single-origin"]})
+    resp = client.post("/api/v1/roasts", json={"title": "Upfront", "mode": "simulator", "tags": ["single-origin"]})
     assert resp.json()["tags"] == ["single-origin"]
-    client.post(f"/api/roasts/{resp.json()['id']}/stop")
+    client.post(f"/api/v1/roasts/{resp.json()['id']}/stop")
 
 
 def test_list_roasts_endpoint_exposes_distinct_tags(client):
     roast_id = _create_roast(client)
-    client.put(f"/api/roasts/{roast_id}/tags", json={"tags": ["espresso"]})
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.put(f"/api/v1/roasts/{roast_id}/tags", json={"tags": ["espresso"]})
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
-    resp = client.get("/api/roasts/tags")
+    resp = client.get("/api/v1/roasts/tags")
     assert resp.status_code == 200
     assert {"tag": "espresso", "count": 1} in resp.json()
 
@@ -112,12 +112,12 @@ def test_list_roasts_endpoint_exposes_distinct_tags(client):
 def test_list_roasts_filters_by_tag(client):
     a = _create_roast(client, title="Roast A")
     b = _create_roast(client, title="Roast B")
-    client.put(f"/api/roasts/{a}/tags", json={"tags": ["espresso"]})
-    client.put(f"/api/roasts/{b}/tags", json={"tags": ["filter"]})
-    client.post(f"/api/roasts/{a}/stop")
-    client.post(f"/api/roasts/{b}/stop")
+    client.put(f"/api/v1/roasts/{a}/tags", json={"tags": ["espresso"]})
+    client.put(f"/api/v1/roasts/{b}/tags", json={"tags": ["filter"]})
+    client.post(f"/api/v1/roasts/{a}/stop")
+    client.post(f"/api/v1/roasts/{b}/stop")
 
-    resp = client.get("/api/roasts", params={"tag": "espresso"})
+    resp = client.get("/api/v1/roasts", params={"tag": "espresso"})
     ids = [r["id"] for r in resp.json()]
     assert a in ids
     assert b not in ids
@@ -126,10 +126,10 @@ def test_list_roasts_filters_by_tag(client):
 def test_list_roasts_search_matches_title(client):
     a = _create_roast(client, title="Ethiopia Yirgacheffe")
     b = _create_roast(client, title="Colombia Supremo")
-    client.post(f"/api/roasts/{a}/stop")
-    client.post(f"/api/roasts/{b}/stop")
+    client.post(f"/api/v1/roasts/{a}/stop")
+    client.post(f"/api/v1/roasts/{b}/stop")
 
-    resp = client.get("/api/roasts", params={"q": "Yirgacheffe"})
+    resp = client.get("/api/v1/roasts", params={"q": "Yirgacheffe"})
     ids = [r["id"] for r in resp.json()]
     assert a in ids
     assert b not in ids
@@ -138,10 +138,10 @@ def test_list_roasts_search_matches_title(client):
 def test_list_roasts_search_matches_beans(client):
     a = _create_roast(client, title="Roast A", beans="Ethiopia Guji")
     b = _create_roast(client, title="Roast B", beans="Brazil Cerrado")
-    client.post(f"/api/roasts/{a}/stop")
-    client.post(f"/api/roasts/{b}/stop")
+    client.post(f"/api/v1/roasts/{a}/stop")
+    client.post(f"/api/v1/roasts/{b}/stop")
 
-    resp = client.get("/api/roasts", params={"q": "Guji"})
+    resp = client.get("/api/v1/roasts", params={"q": "Guji"})
     ids = [r["id"] for r in resp.json()]
     assert a in ids
     assert b not in ids
@@ -150,11 +150,11 @@ def test_list_roasts_search_matches_beans(client):
 def test_list_roasts_search_matches_tags(client):
     a = _create_roast(client, title="Roast A")
     b = _create_roast(client, title="Roast B")
-    client.put(f"/api/roasts/{a}/tags", json={"tags": ["competition-prep"]})
-    client.post(f"/api/roasts/{a}/stop")
-    client.post(f"/api/roasts/{b}/stop")
+    client.put(f"/api/v1/roasts/{a}/tags", json={"tags": ["competition-prep"]})
+    client.post(f"/api/v1/roasts/{a}/stop")
+    client.post(f"/api/v1/roasts/{b}/stop")
 
-    resp = client.get("/api/roasts", params={"q": "competition"})
+    resp = client.get("/api/v1/roasts", params={"q": "competition"})
     ids = [r["id"] for r in resp.json()]
     assert a in ids
     assert b not in ids
@@ -164,10 +164,10 @@ def test_list_roasts_search_does_not_duplicate_multi_tag_roasts(client):
     # Regression check for the LEFT JOIN -- a roast matching more than one
     # tag row must still appear exactly once (SELECT DISTINCT r.*).
     a = _create_roast(client, title="Multi Tag Roast")
-    client.put(f"/api/roasts/{a}/tags", json={"tags": ["espresso", "light", "competition"]})
-    client.post(f"/api/roasts/{a}/stop")
+    client.put(f"/api/v1/roasts/{a}/tags", json={"tags": ["espresso", "light", "competition"]})
+    client.post(f"/api/v1/roasts/{a}/stop")
 
-    resp = client.get("/api/roasts", params={"q": "Multi Tag"})
+    resp = client.get("/api/v1/roasts", params={"q": "Multi Tag"})
     ids = [r["id"] for r in resp.json()]
     assert ids.count(a) == 1
 
@@ -179,19 +179,19 @@ def test_count_roasts_matches_list_length_unfiltered(client):
     _create_roast(client, title="Count A")
     _create_roast(client, title="Count B")
 
-    total = client.get("/api/roasts/count").json()["total"]
-    listed = len(client.get("/api/roasts").json())
+    total = client.get("/api/v1/roasts/count").json()["total"]
+    listed = len(client.get("/api/v1/roasts").json())
     assert total == listed
 
 
 def test_count_roasts_respects_filters(client):
     a = _create_roast(client, title="Filtered Count A")
     b = _create_roast(client, title="Filtered Count B")
-    client.put(f"/api/roasts/{a}/tags", json={"tags": ["decaf"]})
-    client.post(f"/api/roasts/{a}/stop")
-    client.post(f"/api/roasts/{b}/stop")
+    client.put(f"/api/v1/roasts/{a}/tags", json={"tags": ["decaf"]})
+    client.post(f"/api/v1/roasts/{a}/stop")
+    client.post(f"/api/v1/roasts/{b}/stop")
 
-    resp = client.get("/api/roasts/count", params={"tag": "decaf"})
+    resp = client.get("/api/v1/roasts/count", params={"tag": "decaf"})
     assert resp.json()["total"] == 1
 
 
@@ -203,9 +203,9 @@ def test_count_roasts_not_capped_by_list_limit(client):
     for i in range(3):
         _create_roast(client, title=f"Uncapped {i}")
 
-    total = client.get("/api/roasts/count").json()["total"]
+    total = client.get("/api/v1/roasts/count").json()["total"]
     assert total == 3
-    capped_list = client.get("/api/roasts", params={"limit": 1}).json()
+    capped_list = client.get("/api/v1/roasts", params={"limit": 1}).json()
     assert len(capped_list) == 1
     assert total > len(capped_list)
 
@@ -216,15 +216,15 @@ def test_count_roasts_not_capped_by_list_limit(client):
 def test_list_roasts_filters_by_created_by(client):
     a = _create_roast(client, title="Roaster A's Roast")
     b = _create_roast(client, title="Roaster B's Roast")
-    client.post(f"/api/roasts/{a}/stop")
-    client.post(f"/api/roasts/{b}/stop")
+    client.post(f"/api/v1/roasts/{a}/stop")
+    client.post(f"/api/v1/roasts/{b}/stop")
     # Simulates a roast created by a different account -- simplest way to
     # get a second distinct created_by_username without a full second
     # register/login flow, same direct-storage-manipulation precedent
     # test_roasts_lifecycle_api.py's own attribution tests already use.
     storage.update_roast(b, created_by_username="someone-else")
 
-    resp = client.get("/api/roasts", params={"created_by": "someone-else"})
+    resp = client.get("/api/v1/roasts", params={"created_by": "someone-else"})
     ids = [r["id"] for r in resp.json()]
     assert b in ids
     assert a not in ids
@@ -233,22 +233,22 @@ def test_list_roasts_filters_by_created_by(client):
 def test_count_roasts_filters_by_created_by(client):
     a = _create_roast(client, title="Count Roaster A")
     b = _create_roast(client, title="Count Roaster B")
-    client.post(f"/api/roasts/{a}/stop")
-    client.post(f"/api/roasts/{b}/stop")
+    client.post(f"/api/v1/roasts/{a}/stop")
+    client.post(f"/api/v1/roasts/{b}/stop")
     storage.update_roast(b, created_by_username="someone-else")
 
-    resp = client.get("/api/roasts/count", params={"created_by": "someone-else"})
+    resp = client.get("/api/v1/roasts/count", params={"created_by": "someone-else"})
     assert resp.json()["total"] == 1
 
 
 def test_list_roasters_endpoint(client):
     a = _create_roast(client, title="Roaster List A")
     b = _create_roast(client, title="Roaster List B")
-    client.post(f"/api/roasts/{a}/stop")
-    client.post(f"/api/roasts/{b}/stop")
+    client.post(f"/api/v1/roasts/{a}/stop")
+    client.post(f"/api/v1/roasts/{b}/stop")
     storage.update_roast(b, created_by_username="someone-else")
 
-    resp = client.get("/api/roasts/roasters")
+    resp = client.get("/api/v1/roasts/roasters")
     assert resp.status_code == 200
     roasters = {r["created_by_username"]: r["count"] for r in resp.json()}
     assert roasters == {"test-admin": 1, "someone-else": 1}

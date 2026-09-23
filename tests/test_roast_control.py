@@ -464,19 +464,19 @@ def test_a_failing_write_during_automation_trips_the_fail_safe():
 
 
 def test_control_endpoints_404_for_an_unknown_roast(client):
-    assert client.get("/api/roasts/nope/control").status_code == 404
-    assert client.post("/api/roasts/nope/emergency-stop").status_code == 404
+    assert client.get("/api/v1/roasts/nope/control").status_code == 404
+    assert client.post("/api/v1/roasts/nope/emergency-stop").status_code == 404
 
 
 def test_emergency_stop_and_status_through_the_api(client):
-    roast_id = client.post("/api/roasts", json={"title": "E-stop", "mode": "simulator"}).json()["id"]
-    status = client.get(f"/api/roasts/{roast_id}/control").json()
+    roast_id = client.post("/api/v1/roasts", json={"title": "E-stop", "mode": "simulator"}).json()["id"]
+    status = client.get(f"/api/v1/roasts/{roast_id}/control").json()
     assert status["can_write"] is True and status["program"] is None and status["tripped_reason"] is None
 
-    stopped = client.post(f"/api/roasts/{roast_id}/emergency-stop").json()
+    stopped = client.post(f"/api/v1/roasts/{roast_id}/emergency-stop").json()
     assert stopped["tripped_reason"] == "emergency stop"
-    assert client.get(f"/api/roasts/{roast_id}/control").json()["tripped_reason"] == "emergency stop"
-    client.post(f"/api/roasts/{roast_id}/stop")
+    assert client.get(f"/api/v1/roasts/{roast_id}/control").json()["tripped_reason"] == "emergency stop"
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_get_control_picks_up_a_settings_change_made_after_the_roast_started(client):
@@ -489,33 +489,33 @@ def test_get_control_picks_up_a_settings_change_made_after_the_roast_started(cli
     for as long as it stayed connected, even well after Settings said
     otherwise. GET /control now refreshes the limits itself before
     returning them."""
-    roast_id = client.post("/api/roasts", json={"title": "Stale Limits", "mode": "simulator"}).json()["id"]
-    assert client.get(f"/api/roasts/{roast_id}/control").json()["limits"]["safety_disabled"] is False
+    roast_id = client.post("/api/v1/roasts", json={"title": "Stale Limits", "mode": "simulator"}).json()["id"]
+    assert client.get(f"/api/v1/roasts/{roast_id}/control").json()["limits"]["safety_disabled"] is False
 
-    client.put("/api/settings", json={
+    client.put("/api/v1/settings", json={
         "ollama_url": None, "ollama_model": None,
         "control": {"heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0, "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": True},
     })
 
     # No emergency-stop attempt, no automation start -- a plain status poll
     # (exactly what the frontend's own 2s timer does) must see the change.
-    assert client.get(f"/api/roasts/{roast_id}/control").json()["limits"]["safety_disabled"] is True
-    client.post(f"/api/roasts/{roast_id}/stop")
+    assert client.get(f"/api/v1/roasts/{roast_id}/control").json()["limits"]["safety_disabled"] is True
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_program_and_feedback_through_the_api(client):
-    roast_id = client.post("/api/roasts", json={"title": "Auto", "mode": "simulator"}).json()["id"]
-    started = client.put(f"/api/roasts/{roast_id}/control/program", json={"steps": [{"time_s": 0, "heater_pct": 60}]})
+    roast_id = client.post("/api/v1/roasts", json={"title": "Auto", "mode": "simulator"}).json()["id"]
+    started = client.put(f"/api/v1/roasts/{roast_id}/control/program", json={"steps": [{"time_s": 0, "heater_pct": 60}]})
     assert started.status_code == 200 and started.json()["program"]["steps"] == 1
 
-    fb = client.put(f"/api/roasts/{roast_id}/control/feedback", json={"variable": "ror_bt", "setpoint": 8})
+    fb = client.put(f"/api/v1/roasts/{roast_id}/control/feedback", json={"variable": "ror_bt", "setpoint": 8})
     assert fb.status_code == 200
     assert fb.json()["feedback"]["setpoint"] == 8 and fb.json()["program"] is None  # target control replaced the program
 
-    assert client.put(f"/api/roasts/{roast_id}/control/feedback", json={"variable": "bt"}).status_code == 409  # no target
-    stopped = client.delete(f"/api/roasts/{roast_id}/control/automation").json()
+    assert client.put(f"/api/v1/roasts/{roast_id}/control/feedback", json={"variable": "bt"}).status_code == 409  # no target
+    stopped = client.delete(f"/api/v1/roasts/{roast_id}/control/automation").json()
     assert stopped["feedback"] is None
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_repeating_a_roast_with_no_control_data_is_refused(client, tmp_path):
@@ -527,28 +527,28 @@ def test_repeating_a_roast_with_no_control_data_is_refused(client, tmp_path):
     )
     path = tmp_path / "plain.alog"
     save_native_alog(str(path), data)
-    source_id = client.post("/api/roasts/import", params={"path": str(path)}).json()["id"]
+    source_id = client.post("/api/v1/roasts/import", params={"path": str(path)}).json()["id"]
 
-    roast_id = client.post("/api/roasts", json={"title": "Target", "mode": "simulator"}).json()["id"]
-    resp = client.post(f"/api/roasts/{roast_id}/control/program/from-roast", json={"source_roast_id": source_id})
+    roast_id = client.post("/api/v1/roasts", json={"title": "Target", "mode": "simulator"}).json()["id"]
+    resp = client.post(f"/api/v1/roasts/{roast_id}/control/program/from-roast", json={"source_roast_id": source_id})
     assert resp.status_code == 409
-    assert client.post(f"/api/roasts/{roast_id}/control/program/from-roast", json={"source_roast_id": "nope"}).status_code == 404
-    client.post(f"/api/roasts/{roast_id}/stop")
+    assert client.post(f"/api/v1/roasts/{roast_id}/control/program/from-roast", json={"source_roast_id": "nope"}).status_code == 404
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_safety_limits_are_saved_and_survive_a_settings_save_that_omits_them(client):
     saved = client.put(
-        "/api/settings",
+        "/api/v1/settings",
         json={"ollama_url": None, "ollama_model": None, "control": {"heater_max_pct": 85, "fan_min_pct": 20, "client_watchdog_s": 60}},
     ).json()
     assert saved["control"]["heater_max_pct"] == 85
 
     # A page that doesn't know about the field must not reset it.
-    again = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "history_page_size": 50}).json()
+    again = client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "history_page_size": 50}).json()
     assert again["control"]["heater_max_pct"] == 85
-    assert client.get("/api/settings").json()["control"]["fan_min_pct"] == 20
+    assert client.get("/api/v1/settings").json()["control"]["fan_min_pct"] == 20
 
 
 def test_safety_limits_reject_nonsense(client):
-    resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "control": {"heater_max_pct": 150}})
+    resp = client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": {"heater_max_pct": 150}})
     assert resp.status_code == 422

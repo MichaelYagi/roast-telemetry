@@ -1,4 +1,4 @@
-"""Who did what, when -- storage.py's activity_log table, GET /api/activity
+"""Who did what, when -- storage.py's activity_log table, GET /api/v1/activity
 and its CSV/JSON exports, and a representative mutation from each category
 (not every single call site -- see backend/app/storage.py's log_activity()
 and the callers in api/roasts.py, roast_session/control.py and
@@ -68,14 +68,14 @@ def test_retention_trims_to_the_newest_rows(isolated_db, monkeypatch):
 
 
 def test_activity_endpoints_start_empty(client):
-    assert client.get("/api/activity").json() == []
-    assert client.get("/api/activity/count").json() == {"total": 0}
+    assert client.get("/api/v1/activity").json() == []
+    assert client.get("/api/v1/activity/count").json() == {"total": 0}
 
 
 def test_export_csv_and_json(isolated_db, client):
     storage.log_activity("roast", "delete", username="test-admin", roast_id="r1", roast_title="Ethiopia #4", message='Deleted "Ethiopia #4"')
 
-    csv_res = client.get("/api/activity/export.csv")
+    csv_res = client.get("/api/v1/activity/export.csv")
     assert csv_res.status_code == 200
     assert "text/csv" in csv_res.headers["content-type"]
     assert "attachment" in csv_res.headers["content-disposition"]
@@ -83,7 +83,7 @@ def test_export_csv_and_json(isolated_db, client):
     assert len(rows) == 1
     assert rows[0]["roast_title"] == "Ethiopia #4"
 
-    json_res = client.get("/api/activity/export.json")
+    json_res = client.get("/api/v1/activity/export.json")
     assert json_res.status_code == 200
     assert "application/json" in json_res.headers["content-type"]
     assert "attachment" in json_res.headers["content-disposition"]
@@ -96,13 +96,13 @@ def test_export_csv_and_json(isolated_db, client):
 
 
 def test_deleting_a_roast_logs_it_and_the_snapshot_survives(client):
-    roast_id = client.post("/api/roasts", json={"title": "To Delete", "mode": "simulator"}).json()["id"]
-    client.post(f"/api/roasts/{roast_id}/stop")
+    roast_id = client.post("/api/v1/roasts", json={"title": "To Delete", "mode": "simulator"}).json()["id"]
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
-    res = client.delete(f"/api/roasts/{roast_id}")
+    res = client.delete(f"/api/v1/roasts/{roast_id}")
     assert res.status_code == 204
 
-    entries = client.get("/api/activity", params={"category": "roast", "action": "delete"}).json()
+    entries = client.get("/api/v1/activity", params={"category": "roast", "action": "delete"}).json()
     assert len(entries) == 1
     entry = entries[0]
     assert entry["roast_id"] == roast_id
@@ -111,14 +111,14 @@ def test_deleting_a_roast_logs_it_and_the_snapshot_survives(client):
     assert "To Delete" in entry["message"]
 
     # The roast itself really is gone -- the log entry doesn't keep it alive.
-    assert client.get(f"/api/roasts/{roast_id}").status_code == 404
+    assert client.get(f"/api/v1/roasts/{roast_id}").status_code == 404
 
 
 def test_emergency_stop_logs_a_safety_entry(client):
-    roast_id = client.post("/api/roasts", json={"title": "E-stop Test", "mode": "simulator"}).json()["id"]
-    client.post(f"/api/roasts/{roast_id}/emergency-stop")
+    roast_id = client.post("/api/v1/roasts", json={"title": "E-stop Test", "mode": "simulator"}).json()["id"]
+    client.post(f"/api/v1/roasts/{roast_id}/emergency-stop")
 
-    entries = client.get("/api/activity", params={"category": "safety", "action": "safe_state"}).json()
+    entries = client.get("/api/v1/activity", params={"category": "safety", "action": "safe_state"}).json()
     assert len(entries) == 1
     entry = entries[0]
     assert entry["roast_id"] == roast_id
@@ -127,12 +127,12 @@ def test_emergency_stop_logs_a_safety_entry(client):
 
 
 def test_activity_log_filters_by_category(client):
-    roast_id = client.post("/api/roasts", json={"title": "Mixed", "mode": "simulator"}).json()["id"]
-    client.post(f"/api/roasts/{roast_id}/emergency-stop")
-    client.put(f"/api/roasts/{roast_id}/tags", json={"tags": ["espresso"]})
+    roast_id = client.post("/api/v1/roasts", json={"title": "Mixed", "mode": "simulator"}).json()["id"]
+    client.post(f"/api/v1/roasts/{roast_id}/emergency-stop")
+    client.put(f"/api/v1/roasts/{roast_id}/tags", json={"tags": ["espresso"]})
 
-    roast_entries = client.get("/api/activity", params={"category": "roast"}).json()
-    safety_entries = client.get("/api/activity", params={"category": "safety"}).json()
+    roast_entries = client.get("/api/v1/activity", params={"category": "roast"}).json()
+    safety_entries = client.get("/api/v1/activity", params={"category": "safety"}).json()
     assert any(e["action"] == "set_tags" for e in roast_entries)
     assert any(e["action"] == "safe_state" for e in safety_entries)
     assert not any(e["category"] == "safety" for e in roast_entries)

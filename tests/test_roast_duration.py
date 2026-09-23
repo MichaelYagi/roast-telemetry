@@ -38,21 +38,21 @@ def _write_alog(path, drop_at):
 def test_import_uses_charge_to_drop(client, tmp_path):
     path = tmp_path / "r.alog"
     _write_alog(path, drop_at=40.0)
-    summary = client.post("/api/roasts/import", params={"path": str(path)}).json()
+    summary = client.post("/api/v1/roasts/import", params={"path": str(path)}).json()
     assert summary["duration_s"] == 40.0  # not the 60 s recording
 
 
 def test_stats_panel_duration_matches_phases(client, tmp_path):
     path = tmp_path / "r.alog"
     _write_alog(path, drop_at=40.0)
-    roast_id = client.post("/api/roasts/import", params={"path": str(path)}).json()["id"]
-    assert client.get(f"/api/roasts/{roast_id}/stats").json()["duration_s"] == 40.0
+    roast_id = client.post("/api/v1/roasts/import", params={"path": str(path)}).json()["id"]
+    assert client.get(f"/api/v1/roasts/{roast_id}/stats").json()["duration_s"] == 40.0
 
 
 def test_backfill_fixes_old_rows_once(client, tmp_path):
     path = tmp_path / "r.alog"
     _write_alog(path, drop_at=40.0)
-    roast_id = client.post("/api/roasts/import", params={"path": str(path)}).json()["id"]
+    roast_id = client.post("/api/v1/roasts/import", params={"path": str(path)}).json()["id"]
     storage.update_roast(roast_id, duration_s=60.0)  # how an old roast was stored
     storage.set_schema_version(0)
 
@@ -68,8 +68,8 @@ def test_backfill_fixes_old_rows_once(client, tmp_path):
 def test_moving_drop_updates_the_saved_duration(client, tmp_path):
     path = tmp_path / "r.alog"
     _write_alog(path, drop_at=40.0)
-    roast_id = client.post("/api/roasts/import", params={"path": str(path)}).json()["id"]
-    events = client.get(f"/api/roasts/{roast_id}").json()["events"]
+    roast_id = client.post("/api/v1/roasts/import", params={"path": str(path)}).json()["id"]
+    events = client.get(f"/api/v1/roasts/{roast_id}").json()["events"]
     drop = next(e for e in events if e["type"] == "DROP")
-    assert client.patch(f"/api/roasts/{roast_id}/events/{drop['id']}", json={"time_s": 50.0}).status_code == 200
+    assert client.patch(f"/api/v1/roasts/{roast_id}/events/{drop['id']}", json={"time_s": 50.0}).status_code == 200
     assert storage.get_roast_row(roast_id)["duration_s"] == 50.0

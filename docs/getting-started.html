@@ -198,7 +198,7 @@ cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first ti
 
   <p>
     Whichever platform: open <code>http://localhost:8000</code> — one
-    process, one port. The API lives under <code>/api/*</code> on the
+    process, one port. The API lives under <code>/api/v1/*</code> on the
     same port (docs still at <code>/docs</code>), and any other path
     falls back to the React app's <code>index.html</code> so
     client-side routing (<code>/roasts/:id</code>, <code>/compare</code>,
@@ -259,7 +259,7 @@ npm install
 npm run dev</code></pre>
   <p>
     Opens on <code>http://localhost:5173</code> and proxies
-    <code>/api/*</code> (including WebSockets) to the backend on port
+    <code>/api/v1/*</code> (including WebSockets) to the backend on port
     8000 — see <code>frontend/vite.config.js</code>. Same on every
     platform.
   </p>

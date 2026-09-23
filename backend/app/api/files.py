@@ -1,7 +1,7 @@
 """Lists folders and roast log files on the machine running the server --
 backs the History page's "Browse..." button next to the import path field.
 
-The import endpoint (POST /api/roasts/import) already reads whatever
+The import endpoint (POST /api/v1/roasts/import) already reads whatever
 server-side path a logged-in account gives it, so this doesn't widen what
 an account can reach: it only saves typing the path. Every /api route,
 this one included, already sits behind the login gate in main.py, and each

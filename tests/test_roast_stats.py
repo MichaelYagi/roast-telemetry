@@ -156,43 +156,43 @@ def test_compute_roast_stats_handles_a_roast_with_no_milestones():
 
 
 def _create_roast(client, **payload) -> str:
-    resp = client.post("/api/roasts", json={"title": "Stats Roast", "mode": "simulator", **payload})
+    resp = client.post("/api/v1/roasts", json={"title": "Stats Roast", "mode": "simulator", **payload})
     return resp.json()["id"]
 
 
 def test_get_roast_stats_404_for_unknown_roast(client):
-    resp = client.get("/api/roasts/does-not-exist/stats")
+    resp = client.get("/api/v1/roasts/does-not-exist/stats")
     assert resp.status_code == 404
 
 
 def test_get_roast_stats_via_api_warm(client):
     roast_id = _create_roast(client)
-    resp = client.get(f"/api/roasts/{roast_id}/stats")
+    resp = client.get(f"/api/v1/roasts/{roast_id}/stats")
     assert resp.status_code == 200
     body = resp.json()
     assert body["phases"] == []  # no CHARGE/DROP marked yet in this fast-running test
     assert body["weight_loss_pct"] is None
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_get_roast_stats_reflects_weight_once_set(client):
     roast_id = _create_roast(client)
-    client.post(f"/api/roasts/{roast_id}/weight-green", params={"grams": 200.0})
-    client.post(f"/api/roasts/{roast_id}/weight", params={"grams": 170.0})
+    client.post(f"/api/v1/roasts/{roast_id}/weight-green", params={"grams": 200.0})
+    client.post(f"/api/v1/roasts/{roast_id}/weight", params={"grams": 170.0})
 
-    resp = client.get(f"/api/roasts/{roast_id}/stats")
+    resp = client.get(f"/api/v1/roasts/{roast_id}/stats")
     assert resp.json()["weight_loss_pct"] == 15.0
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_get_roast_stats_via_api_cold(client):
     roast_id = _create_roast(client)
-    client.post(f"/api/roasts/{roast_id}/weight-green", params={"grams": 200.0})
-    client.post(f"/api/roasts/{roast_id}/weight", params={"grams": 180.0})
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/weight-green", params={"grams": 200.0})
+    client.post(f"/api/v1/roasts/{roast_id}/weight", params={"grams": 180.0})
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
     session_manager.sessions.pop(roast_id, None)
 
-    resp = client.get(f"/api/roasts/{roast_id}/stats")
+    resp = client.get(f"/api/v1/roasts/{roast_id}/stats")
     assert resp.status_code == 200
     assert resp.json()["weight_loss_pct"] == 10.0
 
@@ -200,11 +200,11 @@ def test_get_roast_stats_via_api_cold(client):
 def test_stats_batch_respects_filters(client):
     a = _create_roast(client, title="Batch A")
     b = _create_roast(client, title="Batch B")
-    client.put(f"/api/roasts/{a}/tags", json={"tags": ["decaf"]})
-    client.post(f"/api/roasts/{a}/stop")
-    client.post(f"/api/roasts/{b}/stop")
+    client.put(f"/api/v1/roasts/{a}/tags", json={"tags": ["decaf"]})
+    client.post(f"/api/v1/roasts/{a}/stop")
+    client.post(f"/api/v1/roasts/{b}/stop")
 
-    resp = client.get("/api/roasts/stats-batch", params={"tag": "decaf"})
+    resp = client.get("/api/v1/roasts/stats-batch", params={"tag": "decaf"})
     assert resp.status_code == 200
     ids = [r["id"] for r in resp.json()]
     assert a in ids
@@ -213,11 +213,11 @@ def test_stats_batch_respects_filters(client):
 
 def test_stats_batch_entries_have_stats_fields(client):
     roast_id = _create_roast(client)
-    client.post(f"/api/roasts/{roast_id}/weight-green", params={"grams": 200.0})
-    client.post(f"/api/roasts/{roast_id}/weight", params={"grams": 150.0})
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/weight-green", params={"grams": 200.0})
+    client.post(f"/api/v1/roasts/{roast_id}/weight", params={"grams": 150.0})
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
-    resp = client.get("/api/roasts/stats-batch")
+    resp = client.get("/api/v1/roasts/stats-batch")
     entry = next(r for r in resp.json() if r["id"] == roast_id)
     assert entry["weight_loss_pct"] == 25.0
     assert "dtr_pct" in entry

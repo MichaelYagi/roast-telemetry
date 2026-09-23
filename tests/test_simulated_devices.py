@@ -164,11 +164,11 @@ def test_a_simulated_device_waits_at_charge_until_the_roast_begins(kind):
 # ---- through the HTTP API ---------------------------------------------------------
 
 def _create(client, **fields):
-    return client.post("/api/roasts", json={"title": "Sim roast", **fields})
+    return client.post("/api/v1/roasts", json={"title": "Sim roast", **fields})
 
 
 def _tags(client, roast_id):
-    return next(r for r in client.get("/api/roasts").json() if r["id"] == roast_id)["tags"]
+    return next(r for r in client.get("/api/v1/roasts").json() if r["id"] == roast_id)["tags"]
 
 
 @pytest.mark.parametrize(
@@ -191,15 +191,15 @@ def test_roast_on_a_simulated_device_records_tags_and_cleans_up(client, fields):
     session = session_manager.get(roast_id)
     assert session._sim is not None  # the fake is running behind the connection
 
-    assert client.post(f"/api/roasts/{roast_id}/start").status_code == 200
+    assert client.post(f"/api/v1/roasts/{roast_id}/start").status_code == 200
     time.sleep(1.2)
-    assert client.post(f"/api/roasts/{roast_id}/stop").status_code == 200
+    assert client.post(f"/api/v1/roasts/{roast_id}/stop").status_code == 200
 
     assert "simulated" in _tags(client, roast_id)
     assert session._sim is None  # stopped with the roast
     assert _wait_for_no_sim_threads() == []
     # ...and the port the roast recorded is the sim:// value, not the throwaway socket URL
-    detail = client.get(f"/api/roasts/{roast_id}").json()
+    detail = client.get(f"/api/v1/roasts/{roast_id}").json()
     recorded = detail.get("modbus_port") or detail.get("modbus_host") or detail.get("ms6514_port") or detail.get("tc4_port")
     assert recorded.startswith("sim://")
 
@@ -209,10 +209,10 @@ def test_turning_a_simulated_device_off_before_recording_stops_it_and_saves_noth
     roast_id = resp.json()["id"]
     assert session_manager.get(roast_id)._sim is not None
 
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
     assert _wait_for_no_sim_threads() == []
-    assert client.get("/api/roasts").json() == []  # nothing was ever recorded
+    assert client.get("/api/v1/roasts").json() == []  # nothing was ever recorded
 
 
 def test_a_simulated_device_for_another_data_source_is_refused(client):
@@ -258,11 +258,11 @@ def test_real_ports_still_work_unchanged(client):
 def test_the_recording_starts_at_charge_however_long_you_stay_connected_first(client, fields):
     roast_id = _create(client, **fields).json()["id"]
     time.sleep(4.0)  # connected, not recording -- the simulated roast must not advance meanwhile
-    assert client.post(f"/api/roasts/{roast_id}/start").status_code == 200
+    assert client.post(f"/api/v1/roasts/{roast_id}/start").status_code == 200
     time.sleep(4.5)
-    client.post(f"/api/roasts/{roast_id}/stop")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
 
-    profile = client.get(f"/api/roasts/{roast_id}").json()["profile"]
+    profile = client.get(f"/api/v1/roasts/{roast_id}").json()["profile"]
     assert len(profile) >= 2
     assert abs(profile[0]["bt"] - 96.0) < 1.5      # starts at Charge...
     assert profile[0]["et"] < 207.0                # (a roast already 4 s in would read 210+)

@@ -21,7 +21,7 @@ def make_roast(client, tmp_path, title="Roast", drop_at=600):
     events = [_ev("CHARGE", 0), _ev("TURNING_POINT", 60), _ev("DRY_END", 240), _ev("FC_START", 480), _ev("DROP", drop_at)]
     path = tmp_path / "r.alog"
     save_native_alog(str(path), roast_to_native_alog_dict(title=title, profile=profile, events=events, notes=[], beans="Beans", weight_green_g=500, weight_roasted_g=430, roastdate="2026-03-01T10:00:00+00:00"))
-    return client.post("/api/roasts/import", params={"path": str(path), "title": title}).json()["id"]
+    return client.post("/api/v1/roasts/import", params={"path": str(path), "title": title}).json()["id"]
 
 
 # -- JSON ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ def make_roast(client, tmp_path, title="Roast", drop_at=600):
 
 def test_json_download_is_the_same_data_as_alog_as_valid_json(client, tmp_path):
     roast_id = make_roast(client, tmp_path)
-    resp = client.get(f"/api/roasts/{roast_id}/json")
+    resp = client.get(f"/api/v1/roasts/{roast_id}/json")
     assert resp.status_code == 200 and resp.headers["content-type"] == "application/json"
     data = json.loads(resp.content)  # must be strict JSON, not the .alog Python-literal syntax
     assert data["title"] == "Roast" and data["temp2"][0] == 100.0 and len(data["timex"]) > 500
@@ -38,11 +38,11 @@ def test_json_download_is_the_same_data_as_alog_as_valid_json(client, tmp_path):
 
 def test_a_downloaded_json_file_imports_back_to_the_same_roast(client, tmp_path):
     roast_id = make_roast(client, tmp_path, title="Round trip")
-    body = client.get(f"/api/roasts/{roast_id}/json").content
-    reimported = client.post("/api/roasts/import-upload", params={"filename": "roast.json"}, content=body)
+    body = client.get(f"/api/v1/roasts/{roast_id}/json").content
+    reimported = client.post("/api/v1/roasts/import-upload", params={"filename": "roast.json"}, content=body)
     assert reimported.status_code == 201, reimported.text
-    detail = client.get(f"/api/roasts/{reimported.json()['id']}").json()
-    original = client.get(f"/api/roasts/{roast_id}").json()
+    detail = client.get(f"/api/v1/roasts/{reimported.json()['id']}").json()
+    original = client.get(f"/api/v1/roasts/{roast_id}").json()
     assert detail["title"] == "Round trip" and detail["beans"] == "Beans"
     assert len(detail["profile"]) == len(original["profile"])  # the raw stored file is re-served, not rebuilt
     assert [e["type"] for e in detail["events"]] == [e["type"] for e in original["events"]]
@@ -59,9 +59,9 @@ def test_the_users_own_real_json_export_imports_correctly(client):
         import pytest
 
         pytest.skip("the real example file isn't present in this environment")
-    resp = client.post("/api/roasts/import-upload", params={"filename": "test.json"}, content=path.read_bytes())
+    resp = client.post("/api/v1/roasts/import-upload", params={"filename": "test.json"}, content=path.read_bytes())
     assert resp.status_code == 201, resp.text
-    detail = client.get(f"/api/roasts/{resp.json()['id']}").json()
+    detail = client.get(f"/api/v1/roasts/{resp.json()['id']}").json()
     assert len(detail["profile"]) == 1037
     types = [e["type"] for e in detail["events"]]
     for milestone in ("CHARGE", "TURNING_POINT", "DRY_END", "FC_START", "DROP"):
@@ -74,7 +74,7 @@ def test_the_users_own_real_json_export_imports_correctly(client):
 
 def test_csv_download_is_tab_separated_with_a_metadata_line(client, tmp_path):
     roast_id = make_roast(client, tmp_path)
-    resp = client.get(f"/api/roasts/{roast_id}/roastlog.csv")
+    resp = client.get(f"/api/v1/roasts/{roast_id}/roastlog.csv")
     assert resp.status_code == 200
     lines = resp.content.decode("utf-8").splitlines()
     assert lines[0].startswith("Date:") and "CHARGE:" in lines[0] and "\t" in lines[0]
@@ -84,10 +84,10 @@ def test_csv_download_is_tab_separated_with_a_metadata_line(client, tmp_path):
 
 def test_a_downloaded_csv_imports_back_with_milestones_and_readings_intact(client, tmp_path):
     roast_id = make_roast(client, tmp_path, title="CSV roast", drop_at=500)
-    body = client.get(f"/api/roasts/{roast_id}/roastlog.csv").content
-    reimported = client.post("/api/roasts/import-upload", params={"filename": "roast.csv"}, content=body)
+    body = client.get(f"/api/v1/roasts/{roast_id}/roastlog.csv").content
+    reimported = client.post("/api/v1/roasts/import-upload", params={"filename": "roast.csv"}, content=body)
     assert reimported.status_code == 201, reimported.text
-    detail = client.get(f"/api/roasts/{reimported.json()['id']}").json()
+    detail = client.get(f"/api/v1/roasts/{reimported.json()['id']}").json()
     assert len(detail["profile"]) > 500
     types = {e["type"] for e in detail["events"]}
     assert {"CHARGE", "TURNING_POINT", "DRY_END", "FC_START", "DROP"} <= types
@@ -99,14 +99,14 @@ def test_a_downloaded_csv_imports_back_with_milestones_and_readings_intact(clien
 
 def test_a_tsv_extension_is_accepted_the_same_way(client):
     text = "Date:01.01.2026\tUnit:C\tCHARGE:00:00\tTP:\tDRYe:\tFCs:\tFCe:\tSCs:\tSCe:\tDROP:\tCOOL:\tTime:00:10\nTime1\tTime2\tET\tBT\tEvent\nName" "\n00:00\t00:00\t150\t100\tCHARGE\n00:05\t00:05\t152\t110\t\n00:10\t00:10\t154\t120\t\n"
-    resp = client.post("/api/roasts/import-upload", params={"filename": "roast.tsv"}, content=text.encode())
+    resp = client.post("/api/v1/roasts/import-upload", params={"filename": "roast.tsv"}, content=text.encode())
     assert resp.status_code == 201, resp.text
-    assert len(client.get(f"/api/roasts/{resp.json()['id']}").json()["profile"]) in (3, 4)
+    assert len(client.get(f"/api/v1/roasts/{resp.json()['id']}").json()["profile"]) in (3, 4)
 
 
 def test_a_comma_csv_is_also_accepted(client):
     text = "Date:01.01.2026,Unit:C,CHARGE:00:00,Time:00:10\nTime1,Time2,ET,BT,Event\n00:00,00:00,150,100,CHARGE\n00:05,00:05,152,110,\n"
-    resp = client.post("/api/roasts/import-upload", params={"filename": "roast.csv"}, content=text.encode())
+    resp = client.post("/api/v1/roasts/import-upload", params={"filename": "roast.csv"}, content=text.encode())
     assert resp.status_code == 201, resp.text
 
 
@@ -118,9 +118,9 @@ def test_the_users_own_real_csv_export_imports_correctly(client):
         import pytest
 
         pytest.skip("the real example file isn't present in this environment")
-    resp = client.post("/api/roasts/import-upload", params={"filename": "test.csv"}, content=path.read_bytes())
+    resp = client.post("/api/v1/roasts/import-upload", params={"filename": "test.csv"}, content=path.read_bytes())
     assert resp.status_code == 201, resp.text
-    detail = client.get(f"/api/roasts/{resp.json()['id']}").json()
+    detail = client.get(f"/api/v1/roasts/{resp.json()['id']}").json()
     # Trimmed to Charge (this app's own convention -- see import_table's own
     # docstring): the file's ~786 s of real pre-charge history isn't kept.
     assert 500 <= len(detail["profile"]) <= 600
@@ -133,7 +133,7 @@ def test_the_users_own_real_csv_export_imports_correctly(client):
 
 
 def test_a_file_with_no_recognizable_columns_is_refused_plainly(client):
-    resp = client.post("/api/roasts/import-upload", params={"filename": "spreadsheet.csv"}, content=b"a,b,c\n1,2,3\n")
+    resp = client.post("/api/v1/roasts/import-upload", params={"filename": "spreadsheet.csv"}, content=b"a,b,c\n1,2,3\n")
     assert resp.status_code == 400
     assert "roast log table" in resp.json()["detail"]
 
@@ -143,14 +143,14 @@ def test_a_file_with_no_recognizable_columns_is_refused_plainly(client):
 
 def test_xlsx_download_and_round_trip(client, tmp_path):
     roast_id = make_roast(client, tmp_path, title="Excel roast", drop_at=400)
-    resp = client.get(f"/api/roasts/{roast_id}/xlsx")
+    resp = client.get(f"/api/v1/roasts/{roast_id}/xlsx")
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     assert ".xlsx" in resp.headers["content-disposition"]
 
-    reimported = client.post("/api/roasts/import-upload", params={"filename": "roast.xlsx"}, content=resp.content)
+    reimported = client.post("/api/v1/roasts/import-upload", params={"filename": "roast.xlsx"}, content=resp.content)
     assert reimported.status_code == 201, reimported.text
-    detail = client.get(f"/api/roasts/{reimported.json()['id']}").json()
+    detail = client.get(f"/api/v1/roasts/{reimported.json()['id']}").json()
     assert len(detail["profile"]) > 400
     assert {"CHARGE", "TURNING_POINT", "DRY_END", "FC_START", "DROP"} <= {e["type"] for e in detail["events"]}
 
@@ -162,7 +162,7 @@ def test_an_xlsx_with_no_recognizable_sheet_is_refused_plainly(client):
     wb.active.append(["some", "other", "spreadsheet"])
     buf = io.BytesIO()
     wb.save(buf)
-    resp = client.post("/api/roasts/import-upload", params={"filename": "unrelated.xlsx"}, content=buf.getvalue())
+    resp = client.post("/api/v1/roasts/import-upload", params={"filename": "unrelated.xlsx"}, content=buf.getvalue())
     assert resp.status_code == 400
     assert "spreadsheet" in resp.json()["detail"]
 
@@ -175,9 +175,9 @@ def test_the_users_own_real_xlsx_export_imports_correctly(client):
         import pytest
 
         pytest.skip("the real example file isn't present in this environment")
-    resp = client.post("/api/roasts/import-upload", params={"filename": "test.xlsx"}, content=path.read_bytes())
+    resp = client.post("/api/v1/roasts/import-upload", params={"filename": "test.xlsx"}, content=path.read_bytes())
     assert resp.status_code == 201, resp.text
-    detail = client.get(f"/api/roasts/{resp.json()['id']}").json()
+    detail = client.get(f"/api/v1/roasts/{resp.json()['id']}").json()
     assert len(detail["profile"]) > 100
 
 
@@ -187,12 +187,12 @@ def test_the_users_own_real_xlsx_export_imports_correctly(client):
 def test_server_path_import_dispatches_by_extension(client, tmp_path):
     roast_id = make_roast(client, tmp_path)
     for suffix, getter in ((".json", "json"), ("_log.csv", "roastlog.csv"), (".xlsx", "xlsx")):
-        body = client.get(f"/api/roasts/{roast_id}/{getter}").content
+        body = client.get(f"/api/v1/roasts/{roast_id}/{getter}").content
         path = tmp_path / f"exported{suffix}"
         path.write_bytes(body)
-        resp = client.post("/api/roasts/import", params={"path": str(path)})
+        resp = client.post("/api/v1/roasts/import", params={"path": str(path)})
         assert resp.status_code == 201, (suffix, resp.text)
-        assert len(client.get(f"/api/roasts/{resp.json()['id']}").json()["profile"]) > 500
+        assert len(client.get(f"/api/v1/roasts/{resp.json()['id']}").json()["profile"]) > 500
 
 
 # -- roast_formats module directly (no server needed) -----------------------------------
@@ -222,7 +222,7 @@ def test_module_round_trip_preserves_every_reading():
 def test_zip_export_can_include_extra_formats(client, tmp_path):
     make_roast(client, tmp_path, title="one")
     make_roast(client, tmp_path, title="two")
-    resp = client.get("/api/analysis/export.zip", params={"formats": "json,roastlog_csv,xlsx"})
+    resp = client.get("/api/v1/analysis/export.zip", params={"formats": "json,roastlog_csv,xlsx"})
     assert resp.status_code == 200
     names = zipfile.ZipFile(io.BytesIO(resp.content)).namelist()
     assert "summary.csv" not in names
@@ -233,7 +233,7 @@ def test_zip_export_can_include_extra_formats(client, tmp_path):
 
 def test_zip_export_without_formats_is_unchanged(client, tmp_path):
     make_roast(client, tmp_path, title="one")
-    names = zipfile.ZipFile(io.BytesIO(client.get("/api/analysis/export.zip").content)).namelist()
+    names = zipfile.ZipFile(io.BytesIO(client.get("/api/v1/analysis/export.zip").content)).namelist()
     assert "summary.csv" not in names
     assert any(n.startswith("alog/") for n in names)
     assert not any(n.startswith(("json/", "roastlog_csv/", "xlsx/")) for n in names)
@@ -241,15 +241,15 @@ def test_zip_export_without_formats_is_unchanged(client, tmp_path):
 
 def test_zip_export_rejects_an_unknown_format(client, tmp_path):
     make_roast(client, tmp_path)
-    resp = client.get("/api/analysis/export.zip", params={"formats": "pdf"})
+    resp = client.get("/api/v1/analysis/export.zip", params={"formats": "pdf"})
     assert resp.status_code == 422 and "pdf" in resp.json()["detail"]
 
 
 def test_zip_export_extra_formats_open_correctly(client, tmp_path):
     make_roast(client, tmp_path, title="round trip", drop_at=400)
-    resp = client.get("/api/analysis/export.zip", params={"formats": "xlsx"})
+    resp = client.get("/api/v1/analysis/export.zip", params={"formats": "xlsx"})
     zf = zipfile.ZipFile(io.BytesIO(resp.content))
     xlsx_name = next(n for n in zf.namelist() if n.startswith("xlsx/"))
-    reimported = client.post("/api/roasts/import-upload", params={"filename": "r.xlsx"}, content=zf.read(xlsx_name))
+    reimported = client.post("/api/v1/roasts/import-upload", params={"filename": "r.xlsx"}, content=zf.read(xlsx_name))
     assert reimported.status_code == 201, reimported.text
-    assert len(client.get(f"/api/roasts/{reimported.json()['id']}").json()["profile"]) > 400
+    assert len(client.get(f"/api/v1/roasts/{reimported.json()['id']}").json()["profile"]) > 400
