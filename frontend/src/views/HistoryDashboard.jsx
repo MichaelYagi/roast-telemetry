@@ -7,9 +7,6 @@ import SavedViews from "../components/SavedViews.jsx";
 import { useConfirm, useNotify } from "../components/DialogProvider.jsx";
 import ServerFileChooser from "../components/ServerFileChooser.jsx";
 
-// Comparing more than this at once makes the chart unreadable.
-const MAX_COMPARE = 20;
-
 function formatDuration(seconds) {
   if (seconds == null) return "—";
   const m = Math.floor(seconds / 60);
@@ -69,6 +66,9 @@ export default function HistoryDashboard() {
   // it" ask this was built for.
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
+  // Configurable in Settings > History -- must stay > 2 there (clamped
+  // server-side too), otherwise "compare" stops meaning anything.
+  const [maxCompare, setMaxCompare] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [importPath, setImportPath] = useState("");
@@ -115,7 +115,7 @@ export default function HistoryDashboard() {
   // leaves. (A roast with no saved recording has no curve, so it's left out.)
   const ticked = [...selectedIds];
   const leftOut = ticked.filter(hasNoRecording);
-  const compareIds = compareOpen ? ticked.filter((id) => !hasNoRecording(id)).slice(0, MAX_COMPARE) : [];
+  const compareIds = compareOpen ? ticked.filter((id) => !hasNoRecording(id)).slice(0, maxCompare) : [];
 
   // Keep the address in step with the comparison, and close it when nothing is left to compare.
   useEffect(() => {
@@ -266,7 +266,10 @@ export default function HistoryDashboard() {
   useEffect(() => {
     api.listTags().then(setAllTags);
     api.listRoasters().then(setAllRoasters);
-    api.getSettings().then((s) => setPageSize(s.history_page_size || 100));
+    api.getSettings().then((s) => {
+      setPageSize(s.history_page_size || 100);
+      setMaxCompare(s.max_compare || 20);
+    });
   }, []);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -461,9 +464,7 @@ export default function HistoryDashboard() {
           {summary?.missing_recording
             ? `, and ${summary.missing_recording} whose recording file is missing or unreadable`
             : ""}
-          .{" "}
-          <BulkZipDownload params={exportParams} tempUnit={tempUnit} />{" "}
-          · <Link to="/analysis">Analyse these</Link>
+          . <Link to="/analysis">Analyse these</Link>
         </p>
       </div>
 
@@ -606,49 +607,54 @@ export default function HistoryDashboard() {
       </div>
 
       <div className="panel">
-        {selectedIds.size === 0 && !compareOpen && (
-          <div className="table-toolbar">
-            <SavedViews
-              kind="compare"
-              loadOnly
-              placeholder="Open a saved comparison"
-              getConfig={() => ({})}
-              onLoad={(config) => {
-                setSelectedIds(new Set(Array.isArray(config.ids) ? config.ids : []));
-                setPendingConfig(config);
-                setCompareOpen(true);
-              }}
+        <div className="table-toolbar-row">
+          {totalCount > 0 && (
+            <BulkZipDownload
+              params={selectedIds.size > 0 ? { ids: [...selectedIds].join(",") } : exportParams}
+              tempUnit={tempUnit}
             />
-          </div>
-        )}
-        {selectedIds.size > 0 && (
-          <div className="table-toolbar selection-bar">
-            <span>
-              <strong>{selectedIds.size}</strong> selected
-              {offPageSelected > 0 ? ` (${offPageSelected} on other pages)` : ""}
-            </span>
-            <button
-              type="button"
-              onClick={startCompare}
-              disabled={!compareOpen && (selectedIds.size < 2 || selectedIds.size > MAX_COMPARE)}
-              title={selectedIds.size < 2 && !compareOpen ? "Select at least two roasts to compare" : `Compare up to ${MAX_COMPARE} roasts`}
-            >
-              Compare
-            </button>
-            <button type="button" className="danger" disabled={deletingSelected} onClick={handleDeleteSelected}>
-              {deletingSelected ? "Deleting…" : "Delete"}
-            </button>
-            <button type="button" className="link-like" onClick={() => { setSelectedIds(new Set()); setCompareNote(null); }}>
-              Clear selection
-            </button>
-            {selectedIds.size === 1 && <span className="hint">Tick at least one more roast to compare.</span>}
-            {compareNote && !compareOpen && <span className="error">{compareNote}</span>}
-            {compareOpen && leftOut.length > 0 && (
-              <span className="error">Left out {leftOut.map((id) => `"${titleFor(id)}"`).join(", ")}: no recording.</span>
-            )}
-            {selectedIds.size > MAX_COMPARE && <span className="hint">Compare works with up to {MAX_COMPARE} roasts.</span>}
-          </div>
-        )}
+          )}
+          {selectedIds.size === 0 && !compareOpen && (
+            <div className="table-toolbar">
+              <SavedViews
+                kind="compare"
+                loadOnly
+                placeholder="Open a saved comparison"
+                getConfig={() => ({})}
+                onLoad={(config) => {
+                  setSelectedIds(new Set(Array.isArray(config.ids) ? config.ids : []));
+                  setPendingConfig(config);
+                  setCompareOpen(true);
+                }}
+              />
+            </div>
+          )}
+          {selectedIds.size > 0 && (
+            <div className="table-toolbar selection-bar">
+              <span>
+                <strong>{selectedIds.size}</strong> selected
+                {offPageSelected > 0 ? ` (${offPageSelected} on other pages)` : ""}
+              </span>
+              {selectedIds.size > maxCompare && <span className="hint">Compare works with up to {maxCompare} roasts.</span>}
+              <button
+                type="button"
+                onClick={startCompare}
+                disabled={!compareOpen && (selectedIds.size < 2 || selectedIds.size > maxCompare)}
+                title={selectedIds.size < 2 && !compareOpen ? "Select at least two roasts to compare" : `Compare up to ${maxCompare} roasts`}
+              >
+                Compare
+              </button>
+              <button type="button" className="danger" disabled={deletingSelected} onClick={handleDeleteSelected}>
+                {deletingSelected ? "Deleting…" : "Delete"}
+              </button>
+              {selectedIds.size === 1 && <span className="hint">Tick at least one more roast to compare.</span>}
+              {compareNote && !compareOpen && <span className="error">{compareNote}</span>}
+              {compareOpen && leftOut.length > 0 && (
+                <span className="error">Left out {leftOut.map((id) => `"${titleFor(id)}"`).join(", ")}: no recording.</span>
+              )}
+            </div>
+          )}
+        </div>
         <label className="select-all-mobile">
           <input
             type="checkbox"

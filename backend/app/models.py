@@ -733,6 +733,12 @@ class AppSettings(BaseModel):
     # api/settings.py's update_settings -- 500 matches GET /roasts'
     # own existing `limit` query param cap.
     history_page_size: int = 100
+    # How many ticked roasts HistoryDashboard.jsx's Compare button will
+    # actually open at once (the rest are left out, see LeftOut). Clamped
+    # server-side in api/settings.py's update_settings to 3-100000 -- under
+    # 3 and "compare" stops meaning anything, and the ceiling is just a
+    # sanity backstop against a typo, not a real expected value.
+    max_compare: int = 20
     # Safety limits for anything that writes to the roaster (see ControlSafety).
     control: ControlSafety = Field(default_factory=ControlSafety)
 

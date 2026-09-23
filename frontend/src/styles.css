@@ -1948,10 +1948,22 @@ button:disabled {
   margin-bottom: 1rem;
 }
 
+/* Holds the (always-visible-when-there-are-roasts) bulk Download control on
+   the left and whichever .table-toolbar variant is currently showing
+   (SavedViews, or the selection-bar once something's ticked) on the right. */
+.table-toolbar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
 .table-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 0.75rem;
+  flex: 1 1 auto;
 }
 
 /* ActivityView's hint + Download CSV/JSON row -- same line when there's

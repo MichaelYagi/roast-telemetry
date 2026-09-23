@@ -72,14 +72,34 @@ def _rows(
     include_simulated: bool,
     include_replays: bool = False,
     source: Optional[str] = None,
+    ids: Optional[list[str]] = None,
 ) -> dict:
-    db_rows = storage.list_roast_rows(
-        mode=mode, status=status, tag=tag, q=q, created_by=created_by,
-        created_from=created_from, created_to=created_to, bean_id=bean_id,
-        limit=100000,
-    )
-    if not status:
-        db_rows = [r for r in db_rows if r["status"] in FINISHED]
+    if ids:
+        # An explicit selection (History's row checkboxes), not a filter
+        # match -- every other filter is ignored, including the
+        # simulated/replay defaults: a roast the user hand-picked by
+        # ticking it should never be silently left out the way a broad
+        # filtered export drops those by default.
+        include_simulated = True
+        include_replays = True
+        source = None
+        seen: set[str] = set()
+        db_rows = []
+        for rid in ids:
+            if rid in seen:
+                continue
+            seen.add(rid)
+            row = storage.get_roast_row(rid)
+            if row:
+                db_rows.append(row)
+    else:
+        db_rows = storage.list_roast_rows(
+            mode=mode, status=status, tag=tag, q=q, created_by=created_by,
+            created_from=created_from, created_to=created_to, bean_id=bean_id,
+            limit=100000,
+        )
+        if not status:
+            db_rows = [r for r in db_rows if r["status"] in FINISHED]
     tag_map = storage.get_tags_for_roasts([r["id"] for r in db_rows])
     beans = {b["id"]: b for b in storage.list_beans()}
 
@@ -152,9 +172,12 @@ def one_roast(roast_id: str) -> dict:
 
 
 @router.get("/table")
-def table(filters: dict = Depends(_filters)) -> dict:
+def table(
+    ids: Optional[str] = Query(default=None, description="Comma-separated roast IDs -- returns exactly these, ignoring every other filter"),
+    filters: dict = Depends(_filters),
+) -> dict:
     """One row per finished roast: who/what/when plus every metric."""
-    return _rows(**filters)
+    return _rows(**filters, ids=[i.strip() for i in ids.split(",") if i.strip()] if ids else None)
 
 
 # -- summaries ---------------------------------------------------------------------
@@ -262,6 +285,7 @@ _EXTRA_FORMATS = {
 @router.get("/export.zip")
 def export_zip(
     formats: str = Query(default="", description="Extra formats to include besides .alog: json, roastlog_csv, xlsx (comma-separated)"),
+    ids: Optional[str] = Query(default=None, description="Comma-separated roast IDs -- exports exactly these, ignoring every other filter (used by History's per-selection download)"),
     filters: dict = Depends(_filters),
 ) -> FileResponse:
     """Every matching roast's .alog file, in one zip. `formats` adds a
@@ -270,9 +294,27 @@ def export_zip(
     unknown = [f for f in extra if f not in _EXTRA_FORMATS]
     if unknown:
         raise HTTPException(status_code=422, detail=f"unknown format(s): {', '.join(unknown)} -- choose from {', '.join(_EXTRA_FORMATS)}")
-    data = _rows(**filters)
+    if ids:
+        # Explicit selection, not a filter match -- skips _rows' curve-metrics
+        # computation entirely (nothing here needs derived numbers, just
+        # id/title/created_at), and doesn't exclude simulated/replay roasts
+        # the way the filtered path does: a roast the user hand-picked should
+        # always be included. A roast with no readable recording is still
+        # silently skipped below, same as the filtered path.
+        seen: set[str] = set()
+        rows = []
+        for rid in (i.strip() for i in ids.split(",")):
+            if not rid or rid in seen:
+                continue
+            seen.add(rid)
+            row = storage.get_roast_row(rid)
+            if row:
+                rows.append({"id": row["id"], "title": row["title"], "created_at": row["created_at"]})
+        data = {"rows": rows}
+    else:
+        data = _rows(**filters)
     if not data["rows"]:
-        raise HTTPException(status_code=404, detail="no roasts match those filters")
+        raise HTTPException(status_code=404, detail="none of the selected roasts could be found" if ids else "no roasts match those filters")
     unit = storage.get_settings().get("temperature_unit") or "c"
     handle = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
     handle.close()

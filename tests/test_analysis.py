@@ -169,6 +169,29 @@ def test_zip_export_respects_filters_and_404s_when_empty(client, tmp_path):
     assert client.get("/api/analysis/export.zip", params={"tag": "nothing"}).status_code == 404
 
 
+def test_zip_export_by_ids_ignores_other_filters_and_includes_simulated(client, tmp_path):
+    # An explicit selection (History's row checkboxes) -- picking exactly
+    # these two, one of them simulated, must not silently drop the
+    # simulated one or apply the (irrelevant, unset) tag filter.
+    keep = import_roast(client, tmp_path, "keep", tags=["x"])
+    sim = import_roast(client, tmp_path, "sim", tags=["simulated"])
+    import_roast(client, tmp_path, "left_out", tags=["x"])
+    names = zipfile.ZipFile(
+        io.BytesIO(client.get("/api/analysis/export.zip", params={"ids": f"{keep},{sim}"}).content)
+    ).namelist()
+    assert len([n for n in names if n.startswith("alog/")]) == 2
+
+    assert client.get("/api/analysis/export.zip", params={"ids": "not-a-real-id"}).status_code == 404
+
+
+def test_table_by_ids_ignores_other_filters_and_includes_simulated(client, tmp_path):
+    a = import_roast(client, tmp_path, "a")
+    sim = import_roast(client, tmp_path, "b", tags=["simulated"])
+    import_roast(client, tmp_path, "c")
+    result_ids = {r["id"] for r in rows(client, ids=f"{a},{sim},not-a-real-id")}
+    assert result_ids == {a, sim}
+
+
 # -- outcomes ----------------------------------------------------------------------------
 
 

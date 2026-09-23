@@ -761,6 +761,10 @@ def get_settings() -> dict:
     except (TypeError, ValueError):
         history_page_size = 100
     try:
+        max_compare = int(values["max_compare"]) if values.get("max_compare") else 20
+    except (TypeError, ValueError):
+        max_compare = 20
+    try:
         control = json.loads(values["control"]) if values.get("control") else {}
     except (json.JSONDecodeError, TypeError):
         control = {}
@@ -775,6 +779,7 @@ def get_settings() -> dict:
         "vertical_control_arrows": vertical_control_arrows,
         "chart_series_visible": chart_series_visible,
         "history_page_size": history_page_size,
+        "max_compare": max_compare,
         "control": control,
     }
 

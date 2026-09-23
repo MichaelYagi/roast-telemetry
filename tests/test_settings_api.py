@@ -25,6 +25,7 @@ def test_get_settings_defaults(client):
         "vertical_control_arrows": {},
         "chart_series_visible": {},
         "history_page_size": 100,
+        "max_compare": 20,
         "control": {
             "heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0,
             "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": False,
@@ -139,6 +140,20 @@ def test_put_settings_clamps_history_page_size(client):
 
     resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "history_page_size": 9999})
     assert resp.json()["history_page_size"] == 500
+
+
+def test_put_settings_saves_max_compare(client):
+    resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "max_compare": 500})
+    assert resp.json()["max_compare"] == 500
+    assert client.get("/api/settings").json()["max_compare"] == 500
+
+
+def test_put_settings_clamps_max_compare(client):
+    resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "max_compare": 2})
+    assert resp.json()["max_compare"] == 3
+
+    resp = client.put("/api/settings", json={"ollama_url": None, "ollama_model": None, "max_compare": 10**9})
+    assert resp.json()["max_compare"] == 100000
 
 
 def test_put_settings_drops_unknown_vertical_control_keys(client):

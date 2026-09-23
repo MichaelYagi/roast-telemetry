@@ -26,6 +26,7 @@ export default function SettingsView() {
   const [verticalControlLayout, setVerticalControlLayout] = useState([]);
   const [verticalControlArrows, setVerticalControlArrows] = useState({});
   const [historyPageSize, setHistoryPageSize] = useState(100);
+  const [maxCompare, setMaxCompare] = useState(20);
   const [control, setControl] = useState({
     heater_max_pct: 100, fan_min_pct: 0, drum_min_pct: 0, safe_fan_pct: 100, client_watchdog_s: 0, safety_disabled: false,
   });
@@ -46,6 +47,7 @@ export default function SettingsView() {
       setVerticalControlLayout(s.vertical_control_layout || []);
       setVerticalControlArrows(s.vertical_control_arrows || {});
       setHistoryPageSize(s.history_page_size || 100);
+      setMaxCompare(s.max_compare || 20);
       if (s.control) setControl(s.control);
       setLoaded(true);
     });
@@ -84,6 +86,7 @@ export default function SettingsView() {
         vertical_control_layout: verticalControlLayout,
         vertical_control_arrows: verticalControlArrows,
         history_page_size: historyPageSize,
+        max_compare: maxCompare,
         control,
       });
       setSaveFeedback("Saved.");
@@ -249,6 +252,16 @@ export default function SettingsView() {
             max="500"
             value={historyPageSize}
             onChange={(e) => setHistoryPageSize(Number(e.target.value) || 100)}
+          />
+        </label>
+        <label>
+          Max roasts to compare at once
+          <input
+            type="number"
+            min="3"
+            max="100000"
+            value={maxCompare}
+            onChange={(e) => setMaxCompare(Number(e.target.value) || 20)}
           />
         </label>
       </div>
