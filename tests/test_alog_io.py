@@ -6,8 +6,10 @@ from __future__ import annotations
 import pytest
 
 from alog_playback.alog_io import (
+    _celsius_dict_to_fahrenheit,
     _compute_ror,
     _extract_continuous_channels,
+    _fahrenheit_file_to_celsius,
     _step_hold_align,
     alog_dict_to_points,
     load_alog,
@@ -349,3 +351,38 @@ def test_a_celsius_or_unmarked_log_is_left_alone():
     for mode in ({"mode": "C"}, {}):
         data = {**mode, "timex": [0.0], "temp1": [200.0], "temp2": [100.0], "specialevents": [], "notes": [], "control": []}
         assert alog_dict_to_points(data)["profile"][0]["bt"] == 100.0
+
+
+def test_celsius_dict_to_fahrenheit_converts_real_temps_but_not_percentages():
+    # extraname1's "{3}"/"{0}"/"{1}" are this app's own Burner/Air/Drum
+    # PERCENTAGE channels (see roast_to_native_alog_dict) -- must never be
+    # run through a temperature conversion. extraname2's DT is a genuine
+    # third probe -- must be converted like temp1/temp2.
+    data = {
+        "mode": "C",
+        "temp1": [200.0, -1],
+        "temp2": [100.0, 120.0],
+        "etypes": ["Air", "Drum", "Damper", "Burner", "--"],
+        "extraname1": ["{3}", "{0}", "{1}"],
+        "extratemp1": [[70.0, 75.0], [20.0, 25.0], [50.0, 55.0]],
+        "extraname2": ["DT"],
+        "extratemp2": [[90.0, 95.0]],
+        "computed": {"CHARGE_BT": 100.0, "DROP_BT": 200.0, "DROP_time": 600.0},
+        "ymin": 0, "ymax": 225,
+    }
+    converted = _celsius_dict_to_fahrenheit(data)
+    assert converted["mode"] == "F"
+    assert converted["temp2"] == [212.0, 248.0]  # 100C, 120C
+    assert converted["temp1"][1] == -1  # "no reading" sentinel untouched
+    assert converted["extratemp1"] == data["extratemp1"]  # percentages, byte-identical
+    assert converted["extratemp2"] == [[194.0, 203.0]]  # DT: 90C, 95C
+    assert converted["computed"]["CHARGE_BT"] == 212.0 and converted["computed"]["DROP_BT"] == 392.0
+    assert converted["computed"]["DROP_time"] == 600.0  # not a temperature, untouched
+    assert converted["ymin"] == 32.0 and converted["ymax"] == 437.0
+
+    # And the full round trip lands back on the exact original values --
+    # the real proof this doesn't corrupt Burner/Air/Drum on reimport.
+    back = _fahrenheit_file_to_celsius(converted)
+    assert back["temp2"] == data["temp2"]
+    assert back["extratemp1"] == data["extratemp1"]
+    assert back["extratemp2"] == data["extratemp2"]

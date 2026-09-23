@@ -53,10 +53,27 @@ def test_roast_to_csv_header_and_rows():
         RoastProfilePoint(time_s=1.0, bt=95.5, et=201.0, heater_pct=70.0, fan_pct=20.0, drum_speed_pct=50.0),
     ])
     rows = list(csv.reader(io.StringIO(roast_to_csv(roast))))
-    assert rows[0] == ["time_s", "event", "bt", "et", "dt", "ror_bt", "ror_et", "heater_pct", "fan_pct", "drum_speed_pct", "burner_sv_c"]
+    assert rows[0] == [
+        "time_s", "event", "bt_c", "et_c", "dt_c", "ror_bt_c", "ror_et_c",
+        "heater_pct", "fan_pct", "drum_speed_pct", "burner_sv_c",
+    ]
     assert rows[1][0] == "0.0"
     assert rows[1][2] == "96.0"
     assert len(rows) == 3  # header + 2 samples
+
+
+def test_roast_to_csv_fahrenheit_converts_temps_not_percentages():
+    roast = _make_roast([
+        RoastProfilePoint(time_s=0.0, bt=100.0, et=200.0, heater_pct=70.0, fan_pct=20.0, drum_speed_pct=50.0, ror_bt=10.0),
+    ])
+    rows = list(csv.reader(io.StringIO(roast_to_csv(roast, "f"))))
+    assert rows[0] == [
+        "time_s", "event", "bt_f", "et_f", "dt_f", "ror_bt_f", "ror_et_f",
+        "heater_pct", "fan_pct", "drum_speed_pct", "burner_sv_f",
+    ]
+    assert rows[1][2] == "212.0"  # 100C -> 212F
+    assert rows[1][5] == "18.0"  # a rate: *1.8, no +32 offset
+    assert rows[1][7] == "70.0"  # heater_pct untouched
 
 
 def test_roast_to_csv_tags_the_row_a_milestone_landed_on():
@@ -90,5 +107,5 @@ def test_roast_to_csv_adds_a_column_per_extra_channel():
         RoastProfilePoint(time_s=1.0, bt=95.5, extra={"Flue": 121.0}),
     ])
     rows = list(csv.reader(io.StringIO(roast_to_csv(roast))))
-    assert rows[0][-1] == "extra_Flue"
+    assert rows[0][-1] == "extra_Flue_c"
     assert rows[1][-1] == "120.0"

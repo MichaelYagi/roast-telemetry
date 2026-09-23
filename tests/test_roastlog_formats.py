@@ -3,6 +3,8 @@ valid-JSON syntax -- see alog_playback/alog_io.py), and the tab-separated
 "roast log" table and its Excel twin (alog_playback/roastlog.py)."""
 from __future__ import annotations
 
+import ast
+import csv
 import io
 import json
 import zipfile
@@ -253,3 +255,53 @@ def test_zip_export_extra_formats_open_correctly(client, tmp_path):
     reimported = client.post("/api/v1/roasts/import-upload", params={"filename": "r.xlsx"}, content=zf.read(xlsx_name))
     assert reimported.status_code == 201, reimported.text
     assert len(client.get(f"/api/v1/roasts/{reimported.json()['id']}").json()["profile"]) > 400
+
+
+# -- Temperature Unit -- .alog/JSON now follow it too, same as CSV/xlsx already did ------
+
+
+def _set_fahrenheit(client):
+    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "temperature_unit": "f"})
+
+
+def test_alog_download_follows_temperature_unit_setting(client, tmp_path):
+    roast_id = make_roast(client, tmp_path)
+    celsius_content = client.get(f"/api/v1/roasts/{roast_id}/alog").content
+    _set_fahrenheit(client)
+    f_content = client.get(f"/api/v1/roasts/{roast_id}/alog").content
+    assert celsius_content != f_content
+    data = ast.literal_eval(f_content.decode("utf-8"))
+    assert data["mode"] == "F"
+    assert data["temp2"][0] == 212.0  # 100C charge temp -> 212F
+
+    # And it imports back correctly -- not just "looks converted".
+    reimported = client.post("/api/v1/roasts/import-upload", params={"filename": "r.alog"}, content=f_content)
+    assert reimported.status_code == 201, reimported.text
+    detail = client.get(f"/api/v1/roasts/{reimported.json()['id']}").json()
+    assert detail["profile"][0]["bt"] == 100.0  # back to Celsius on import
+
+
+def test_json_download_follows_temperature_unit_setting(client, tmp_path):
+    roast_id = make_roast(client, tmp_path)
+    _set_fahrenheit(client)
+    data = json.loads(client.get(f"/api/v1/roasts/{roast_id}/json").content)
+    assert data["mode"] == "F" and data["temp2"][0] == 212.0
+
+
+def test_zip_export_alog_follows_temperature_unit_setting(client, tmp_path):
+    make_roast(client, tmp_path)
+    _set_fahrenheit(client)
+    resp = client.get("/api/v1/analysis/export.zip")
+    zf = zipfile.ZipFile(io.BytesIO(resp.content))
+    alog_name = next(n for n in zf.namelist() if n.startswith("alog/"))
+    data = ast.literal_eval(zf.read(alog_name).decode("utf-8"))
+    assert data["mode"] == "F" and data["temp2"][0] == 212.0
+
+
+def test_csv_download_follows_temperature_unit_setting(client, tmp_path):
+    roast_id = make_roast(client, tmp_path)
+    _set_fahrenheit(client)
+    resp = client.get(f"/api/v1/roasts/{roast_id}/csv")
+    rows = list(csv.reader(io.StringIO(resp.content.decode("utf-8"))))
+    assert rows[0][2] == "bt_f"
+    assert float(rows[1][2]) == 212.0

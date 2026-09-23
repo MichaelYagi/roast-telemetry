@@ -672,6 +672,44 @@ def _f_to_c(value):
     return (value - 32.0) * 5.0 / 9.0
 
 
+def _c_to_f(value):
+    if not isinstance(value, (int, float)) or value == -1:
+        return value
+    return value * 9.0 / 5.0 + 32.0
+
+
+# Milestone temperature fields inside `computed` -- everything else in that
+# dict is a time offset, a weight/loss number, or an index, never a
+# temperature, so this is an explicit whitelist, not a blanket scan.
+_COMPUTED_TEMP_KEYS = (
+    "TP_ET", "TP_BT", "CHARGE_ET", "CHARGE_BT", "DRY_ET", "DRY_BT",
+    "FCs_ET", "FCs_BT", "DROP_ET", "DROP_BT", "COOL_ET", "COOL_BT",
+)
+
+
+def _etypes_role_is_percent(match: re.Match) -> bool:
+    idx = int(match.group(1))
+    return NATIVE_ETYPES[idx] in _CHANNEL_FIELD if 0 <= idx < len(NATIVE_ETYPES) else False
+
+
+def _percent_channel_indices(names: list) -> set[int]:
+    """Which indices in an extraname1/extraname2 list are this app's own
+    Burner/Air/Drum *percentage* channels (the `{N}` etype convention this
+    module's own writer below uses for extraname1 -- see
+    roast_to_native_alog_dict) rather than a genuine temperature probe.
+    Those must never go through a Celsius<->Fahrenheit conversion: they
+    aren't a temperature in either unit, and (for extraname1 specifically)
+    a real third-party file could legitimately use these same slots for an
+    actual extra temperature probe -- this only excludes the specific
+    labels this app's own writer produces, not the whole bank."""
+    indices = set()
+    for i, name in enumerate(names):
+        m = _EXTRANAME_ETYPE_RE.match(str(name)) if name else None
+        if m and _etypes_role_is_percent(m):
+            indices.add(i)
+    return indices
+
+
 def _fahrenheit_file_to_celsius(data: dict) -> dict:
     """A copy of `data` with every temperature (and rate of rise) converted
     from Fahrenheit to Celsius. Files record which unit they use in `mode`;
@@ -679,12 +717,52 @@ def _fahrenheit_file_to_celsius(data: dict) -> dict:
     out = dict(data)
     for key in ("temp1", "temp2"):
         out[key] = [_f_to_c(v) for v in data.get(key) or []]
-    for key in ("extratemp1", "extratemp2"):
-        if data.get(key):
-            out[key] = [[_f_to_c(v) for v in series] if isinstance(series, list) else series for series in data[key]]
+    for names_key, temps_key in (("extraname1", "extratemp1"), ("extraname2", "extratemp2")):
+        if data.get(temps_key):
+            skip = _percent_channel_indices(data.get(names_key) or [])
+            out[temps_key] = [
+                series if (i in skip or not isinstance(series, list)) else [_f_to_c(v) for v in series]
+                for i, series in enumerate(data[temps_key])
+            ]
     for key in ("ror_bt", "ror_et"):
         if data.get(key):
             out[key] = [None if v is None else (v * 5.0 / 9.0 if isinstance(v, (int, float)) else v) for v in data[key]]
+    return out
+
+
+def _celsius_dict_to_fahrenheit(data: dict) -> dict:
+    """The write-side mirror of _fahrenheit_file_to_celsius -- everything
+    this app itself ever stores is Celsius, so this is only ever applied
+    once, right before handing an already-built dict to a caller that
+    wants a Fahrenheit-unit export (a roast/analysis download endpoint
+    reading the current Temperature Unit setting), never to what's kept
+    on disk. Converts the same fields that function converts, in reverse,
+    plus `computed`'s own milestone temperatures and the chart's
+    ymin/ymax -- none of which _fahrenheit_file_to_celsius needs to touch
+    on the read side, since alog_dict_to_points below never reads any of
+    those three back into the app at all."""
+    out = dict(data)
+    out["mode"] = "F"
+    for key in ("temp1", "temp2"):
+        out[key] = [_c_to_f(v) for v in data.get(key) or []]
+    for names_key, temps_key in (("extraname1", "extratemp1"), ("extraname2", "extratemp2")):
+        if data.get(temps_key):
+            skip = _percent_channel_indices(data.get(names_key) or [])
+            out[temps_key] = [
+                series if (i in skip or not isinstance(series, list)) else [_c_to_f(v) for v in series]
+                for i, series in enumerate(data[temps_key])
+            ]
+    for key in ("ror_bt", "ror_et"):
+        if data.get(key):
+            out[key] = [None if v is None else (v * 9.0 / 5.0 if isinstance(v, (int, float)) else v) for v in data[key]]
+    computed = dict(data.get("computed") or {})
+    for key in _COMPUTED_TEMP_KEYS:
+        if computed.get(key) is not None:
+            computed[key] = _c_to_f(computed[key])
+    out["computed"] = computed
+    for key in ("ymin", "ymax"):
+        if data.get(key) is not None:
+            out[key] = _c_to_f(data[key])
     return out
 
 

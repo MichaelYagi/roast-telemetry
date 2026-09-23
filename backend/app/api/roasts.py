@@ -16,8 +16,8 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
 from sse_starlette.sse import EventSourceResponse
 
-from alog_playback.alog_io import _nearest_index, load_alog
-from alog_playback.roastlog import RoastlogParseError, parse_roastlog_csv, parse_roastlog_xlsx, roast_to_json, save_roastlog_csv, save_roastlog_xlsx
+from alog_playback.alog_io import _celsius_dict_to_fahrenheit, _nearest_index, load_alog
+from alog_playback.roastlog import RoastlogParseError, _c_to_f, parse_roastlog_csv, parse_roastlog_xlsx, roast_to_json, save_roastlog_csv, save_roastlog_xlsx
 
 from .. import auth, ollama_client, storage
 from ..models import (
@@ -83,7 +83,7 @@ def csv_filename(title: str, created_at: str) -> str:
     return f"{safe_title}_{timestamp}.csv"
 
 
-def roast_to_csv(roast: Roast) -> str:
+def roast_to_csv(roast: Roast, temperature_unit: str = "c") -> str:
     """One row per recorded sample, time-aligned -- BT/ET/DT/RoR/Burner-
     Air-Drum-%/Burner-SV plus any role=EXTRA DeviceProfile channels this
     roast happens to have (collected as the union of every point's own
@@ -94,7 +94,15 @@ def roast_to_csv(roast: Roast) -> str:
     uses) rather than requiring an exact match -- CHARGE in particular
     can land at time_s=0.0 while a live-recorded roast's first real
     sample is at time_s=1.0 (confirmed empirically against a live
-    simulator roast), so exact equality silently drops it."""
+    simulator roast), so exact equality silently drops it.
+
+    Column headers say which unit (bt_c/bt_f, ...) rather than leaving it
+    ambiguous -- this format has no separate metadata line to carry a
+    Unit tag the way roastlog.csv does. heater_pct/fan_pct/drum_speed_pct
+    are percentages, never converted, regardless of temperature_unit."""
+    to_native = (lambda c: c) if temperature_unit != "f" else _c_to_f
+    to_rate = (lambda c: c) if temperature_unit != "f" else (lambda c: None if c is None else c * 9.0 / 5.0)
+    suffix = "f" if temperature_unit == "f" else "c"
     extra_labels: list[str] = []
     for p in roast.profile:
         for label in p.extra or {}:
@@ -112,17 +120,26 @@ def roast_to_csv(roast: Roast) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(
-        ["time_s", "event", "bt", "et", "dt", "ror_bt", "ror_et", "heater_pct", "fan_pct", "drum_speed_pct", "burner_sv_c"]
-        + [f"extra_{label}" for label in extra_labels]
+        [
+            "time_s", "event", f"bt_{suffix}", f"et_{suffix}", f"dt_{suffix}", f"ror_bt_{suffix}", f"ror_et_{suffix}",
+            "heater_pct", "fan_pct", "drum_speed_pct", f"burner_sv_{suffix}",
+        ]
+        + [f"extra_{label}_{suffix}" for label in extra_labels]
     )
     for p in roast.profile:
         writer.writerow(
             [
                 p.time_s,
                 "; ".join(events_by_time.get(p.time_s, [])),
-                p.bt, p.et, p.dt, p.ror_bt, p.ror_et, p.heater_pct, p.fan_pct, p.drum_speed_pct, p.burner_sv_c,
+                to_native(p.bt) if p.bt is not None else None,
+                to_native(p.et) if p.et is not None else None,
+                to_native(p.dt) if p.dt is not None else None,
+                to_rate(p.ror_bt),
+                to_rate(p.ror_et),
+                p.heater_pct, p.fan_pct, p.drum_speed_pct,
+                to_native(p.burner_sv_c) if p.burner_sv_c is not None else None,
             ]
-            + [p.extra.get(label) for label in extra_labels]
+            + [(to_native(p.extra.get(label)) if p.extra.get(label) is not None else None) for label in extra_labels]
         )
     return buffer.getvalue()
 
@@ -656,16 +673,30 @@ def set_tags(roast_id: str, update: TagsUpdateRequest, http_request: Request) ->
 
 
 @router.get("/{roast_id}/alog")
-def download_alog(roast_id: str) -> FileResponse:
+def download_alog(roast_id: str) -> Response:
     """The native .alog format (Python-literal syntax +
     timeindex/computed/specialevents), which software that reads .alog
     opens directly. See roast_to_native_alog_dict's docstring for
-    why that's the only format this app writes."""
+    why that's the only format this app writes.
+
+    Serves the stored file byte-for-byte when the Temperature Unit
+    setting is Celsius (the common case -- no read/convert/reserialize
+    cost). Fahrenheit reads the file, converts a copy of the already-built
+    dict (never rebuilds it -- see download_json's own docstring for why
+    rebuilding from roast.profile/events here would silently shift
+    Charge), and serves that instead."""
     roast = session_manager.get_roast_detail(roast_id)
     if roast is None or not roast.alog_path:
         raise HTTPException(status_code=404, detail="alog not available (roast still in progress or not found)")
-    return FileResponse(
-        roast.alog_path, filename=alog_filename(roast.title, roast.created_at), media_type="application/octet-stream"
+    filename = alog_filename(roast.title, roast.created_at)
+    unit = storage.get_settings().get("temperature_unit") or "c"
+    if unit != "f":
+        return FileResponse(roast.alog_path, filename=filename, media_type="application/octet-stream")
+    data = _celsius_dict_to_fahrenheit(load_alog(roast.alog_path))
+    return Response(
+        content=repr(data),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -680,8 +711,9 @@ def download_csv(roast_id: str) -> Response:
     roast = session_manager.get_roast_detail(roast_id)
     if roast is None:
         raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
+    unit = storage.get_settings().get("temperature_unit") or "c"
     return Response(
-        content=roast_to_csv(roast),
+        content=roast_to_csv(roast, unit),
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{csv_filename(roast.title, roast.created_at)}"'},
     )
@@ -724,8 +756,12 @@ def download_json(roast_id: str) -> Response:
     roast = session_manager.get_roast_detail(roast_id)
     if roast is None or not roast.alog_path:
         raise HTTPException(status_code=404, detail="not available (roast still in progress or not found)")
+    data = load_alog(roast.alog_path)
+    unit = storage.get_settings().get("temperature_unit") or "c"
+    if unit == "f":
+        data = _celsius_dict_to_fahrenheit(data)
     return Response(
-        content=roast_to_json(load_alog(roast.alog_path)),
+        content=roast_to_json(data),
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{json_filename(roast.title, roast.created_at)}"'},
     )

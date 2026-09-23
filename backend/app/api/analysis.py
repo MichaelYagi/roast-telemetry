@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 
 from .. import analysis_insights, ollama_client, storage
 from ..roast_metrics import METRIC_KEYS, METRICS, alog_metrics, build_row, row_source
-from alog_playback.alog_io import load_alog
+from alog_playback.alog_io import _celsius_dict_to_fahrenheit, load_alog
 from alog_playback.roastlog import roast_to_json, save_roastlog_csv, save_roastlog_xlsx
 
 from ..roast_session import RoastSessionError, session_manager
@@ -259,8 +259,11 @@ def summary(group_by: str = "none", filters: dict = Depends(_filters)) -> dict:
 # cost one .alog read per roast per format asked for -- fine for the "tick a
 # couple of extra formats" case this is for, not meant for every format on a
 # large history at once.
-def _zip_json_bytes(roast, row) -> bytes:
-    return roast_to_json(load_alog(row["alog_path"])).encode("utf-8")
+def _zip_json_bytes(roast, row, unit: str) -> bytes:
+    data = load_alog(row["alog_path"])
+    if unit == "f":
+        data = _celsius_dict_to_fahrenheit(data)
+    return roast_to_json(data).encode("utf-8")
 
 
 def _zip_roastlog_csv_bytes(roast, row, unit: str) -> bytes:
@@ -276,7 +279,7 @@ def _zip_xlsx_bytes(roast, row, unit: str) -> bytes:
 
 
 _EXTRA_FORMATS = {
-    "json": ("json", json_filename, lambda roast, row, unit: _zip_json_bytes(roast, row)),
+    "json": ("json", json_filename, _zip_json_bytes),
     "roastlog_csv": ("roastlog_csv", roastlog_csv_filename, _zip_roastlog_csv_bytes),
     "xlsx": ("xlsx", xlsx_filename, _zip_xlsx_bytes),
 }
@@ -329,7 +332,10 @@ def export_zip(
                 if name in used["alog"]:
                     name = name[: -len(".alog")] + f"_{r['id'][:8]}.alog"
                 used["alog"].add(name)
-                zf.write(row["alog_path"], f"alog/{name}")
+                if unit == "f":
+                    zf.writestr(f"alog/{name}", repr(_celsius_dict_to_fahrenheit(load_alog(row["alog_path"]))))
+                else:
+                    zf.write(row["alog_path"], f"alog/{name}")
 
                 if not extra:
                     continue

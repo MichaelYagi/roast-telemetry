@@ -162,11 +162,11 @@ export default function SettingsView() {
       <div className="panel">
         <h2>Temperature Unit</h2>
         <p className="hint">
-          Display only -- everything is still stored and sent as Celsius; this only changes how live
-          readings (readouts, chart, event history) are shown. Threshold/config fields (Dry End, FC Start,
-          SV ranges, alarm rule temperatures) stay in Celsius regardless, so what you type there always
-          means the same thing. CSV/Excel/PDF exports also use this unit (CSV/Excel record which one); the
-          .alog and JSON exports always stay Celsius, for exact compatibility with other software.
+          Display only -- storage and the API always stay Celsius; this only changes how live readings
+          (readouts, chart, event history) are shown. Threshold/config fields (Dry End, FC Start, SV ranges,
+          alarm rule temperatures) stay in Celsius regardless, so what you type there always means the same
+          thing. Every download (.alog, JSON, CSV, Excel, PDF) uses this unit too, and most record which
+          unit they're in right in the file.
         </p>
         <div className="form-row">
           <label className="checkbox-label">
