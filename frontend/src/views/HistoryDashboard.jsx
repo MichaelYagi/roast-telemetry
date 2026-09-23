@@ -72,12 +72,19 @@ export default function HistoryDashboard() {
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [importPath, setImportPath] = useState("");
-  const [importTitle, setImportTitle] = useState("");
   const [importError, setImportError] = useState(null);
   const [importing, setImporting] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(null); // e.g. "Uploading 2 of 5…"
   const [dragging, setDragging] = useState(false);
+  // dragenter/dragleave fire symmetrically at every element boundary inside
+  // the drop zone -- moving over the box's own child elements (the label,
+  // the "Choose files" button, etc.) fires a leave+enter pair on the form,
+  // toggling `dragging` off and back on for each one and visibly flickering
+  // the highlight. A depth counter (dragenter: +1, dragleave: -1) only
+  // reports "actually left" once it's back at 0, which is what setting
+  // `dragging` from plain dragover/dragleave handlers can't tell.
+  const dragDepth = useRef(0);
   const fileInputRef = useRef(null);
   // The ticked roasts. A comparison in the address (?compare=id,id,...) starts them
   // off ticked, so a reload or a shared link brings the same comparison back.
@@ -275,9 +282,8 @@ export default function HistoryDashboard() {
     setImportError(null);
     setImporting(true);
     try {
-      const summary = await api.importAlog(importPath.trim(), importTitle.trim() || undefined);
+      const summary = await api.importAlog(importPath.trim());
       setImportPath("");
-      setImportTitle("");
       navigate(`/roasts/${summary.id}`);
     } catch (err) {
       setImportError(err.message);
@@ -303,8 +309,7 @@ export default function HistoryDashboard() {
       for (let i = 0; i < files.length; i++) {
         setUploadStatus(files.length > 1 ? `Uploading ${i + 1} of ${files.length}…` : "Uploading…");
         try {
-          // The title box applies to a single file only -- one title can't fit several roasts.
-          done.push(await api.uploadAlog(files[i], files.length === 1 ? importTitle.trim() || undefined : undefined));
+          done.push(await api.uploadAlog(files[i]));
         } catch (err) {
           failed.push(`${files[i].name}: ${err.message}`);
         }
@@ -315,12 +320,10 @@ export default function HistoryDashboard() {
     }
     if (skipped) failed.push(`${skipped} file${skipped === 1 ? " was" : "s were"} not a supported format and was skipped.`);
     if (done.length === 1 && !failed.length) {
-      setImportTitle("");
       navigate(`/roasts/${done[0].id}`);
       return;
     }
     if (done.length) {
-      setImportTitle("");
       refresh();
       refreshTrends();
     }
@@ -467,13 +470,20 @@ export default function HistoryDashboard() {
       <form
         className={`panel import-panel${dragging ? " import-dragging" : ""}`}
         onSubmit={handleImport}
-        onDragOver={(e) => {
+        onDragEnter={(e) => {
           e.preventDefault();
+          dragDepth.current += 1;
           setDragging(true);
         }}
-        onDragLeave={() => setDragging(false)}
+        onDragOver={(e) => e.preventDefault()}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          dragDepth.current = Math.max(0, dragDepth.current - 1);
+          if (dragDepth.current === 0) setDragging(false);
+        }}
         onDrop={(e) => {
           e.preventDefault();
+          dragDepth.current = 0;
           setDragging(false);
           if (e.dataTransfer?.files?.length) handleUploadFiles(e.dataTransfer.files);
         }}
@@ -487,10 +497,6 @@ export default function HistoryDashboard() {
         </button>
         {importShown && (
           <div className="import-body">
-            <label className="import-title-field">
-              Title (optional, one file at a time)
-              <input value={importTitle} onChange={(e) => setImportTitle(e.target.value)} placeholder="Defaults to the file's own title" />
-            </label>
             {importError && <p className="error import-error">{importError}</p>}
             <div className="upload-drop">
               <span>Drop {IMPORTABLE_EXTENSIONS.join(", ")} files here, or</span>

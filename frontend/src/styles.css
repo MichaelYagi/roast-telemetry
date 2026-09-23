@@ -3355,15 +3355,6 @@ button.link-neutral {
   margin: 0;
 }
 
-.import-title-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-.import-title-field input,
 .path-with-browse input {
   box-sizing: border-box;
   width: 100%;
