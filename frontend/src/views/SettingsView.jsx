@@ -241,29 +241,28 @@ export default function SettingsView() {
 
       <div className="panel">
         <h2>History</h2>
-        <p className="hint">
-          How many roasts the History page loads per page (Prev/Next paging through the rest).
-        </p>
-        <label>
-          Results per page
-          <input
-            type="number"
-            min="10"
-            max="500"
-            value={historyPageSize}
-            onChange={(e) => setHistoryPageSize(Number(e.target.value) || 100)}
-          />
-        </label>
-        <label>
-          Max roasts to compare at once
-          <input
-            type="number"
-            min="3"
-            max="100000"
-            value={maxCompare}
-            onChange={(e) => setMaxCompare(Number(e.target.value) || 20)}
-          />
-        </label>
+        <div className="form-row">
+          <label>
+            Results per page
+            <input
+              type="number"
+              min="10"
+              max="500"
+              value={historyPageSize}
+              onChange={(e) => setHistoryPageSize(Number(e.target.value) || 100)}
+            />
+          </label>
+          <label>
+            Max roasts to compare at once
+            <input
+              type="number"
+              min="3"
+              max="100000"
+              value={maxCompare}
+              onChange={(e) => setMaxCompare(Number(e.target.value) || 20)}
+            />
+          </label>
+        </div>
       </div>
 
       <div className="panel">
