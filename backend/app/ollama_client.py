@@ -9,7 +9,15 @@ from typing import Optional
 import httpx
 
 CONNECT_TIMEOUT_S = 3.0
-GENERATE_TIMEOUT_S = 180.0  # local models can be slow; this runs in a background task, not on the request path
+# This runs in a background task (see roasts.py's _run_review), never on the
+# request path, so a generous timeout costs nothing but eventually giving up
+# on a genuinely wedged/unreachable server. 180s turned out too short for a
+# real setup: a large local model (e.g. a 32B one) on modest hardware can
+# run at under 2 tokens/sec, so processing a several-thousand-token roast
+# prompt plus generating the review comfortably exceeds 3 minutes and was
+# failing with "ReadTimeout" partway through an otherwise-working
+# generation (confirmed live against Ollama's own server log).
+GENERATE_TIMEOUT_S = 1800.0
 
 
 async def check_connection(url: str) -> dict:
