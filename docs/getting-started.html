@@ -26,38 +26,33 @@
 <main>
   <h1>Getting started</h1>
   <p>
-    Setup and the run command differ slightly by platform — find yours
-    below, then the rest of this page (accounts, data sources, saving a
-    roast...) is the same regardless.
+    Install steps differ by platform — find yours below. Everything
+    after that (accounts, data sources, saving a roast) is the same
+    for everyone.
   </p>
 
   <h2 id="setup-and-run">Setup &amp; run</h2>
   <h3 id="macos-linux-wsl2">macOS, Linux, or Windows via WSL2</h3>
-  <p>Open a terminal:</p>
   <pre><code>cd roast-telemetry
 scripts/install.sh
 scripts/run-server.sh</code></pre>
   <p>
-    <code>install.sh</code> is one-time setup (installs Python/Node if
-    missing, creates a venv, installs everything) — safe to re-run.
+    <code>install.sh</code> sets everything up (once, safe to re-run).
     <code>run-server.sh</code> starts the app at
-    <code>http://localhost:8000</code> — that's it. Full option
-    reference for both: <a href="#scripts-reference">Scripts
-    reference</a> below.
+    <code>http://localhost:8000</code>. Options for both:
+    <a href="#scripts-reference">Scripts reference</a> below.
   </p>
 
   <h3 id="windows-powershell">Windows — native PowerShell</h3>
   <p>
-    Only needed to reach a real roaster's COM port directly (WSL can't
-    see USB serial devices without extra setup) — otherwise, use WSL2
-    above instead.
+    Only needed for a real roaster's USB/COM port — WSL can't reach
+    that. Otherwise use WSL2 above.
   </p>
   <pre><code>cd roast-telemetry
 scripts\install.ps1
 scripts\run-server.ps1</code></pre>
   <p>
-    Same idea as above, PowerShell-flavored. If <code>Activate.ps1</code>
-    refuses to run, once:
+    If <code>Activate.ps1</code> refuses to run, once:
     <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code>.
   </p>
 
@@ -66,128 +61,75 @@ scripts\run-server.ps1</code></pre>
     <code>scripts/install.sh --yes</code>, then
     <code>scripts/run-server.sh --lan</code>, then open
     <code>http://&lt;that machine's address&gt;:8000</code> from another
-    device. Using a serial roaster (Direct Modbus over USB, MS6514,
-    TC4+)? Your user needs the <code>dialout</code> group first:
-    <code>sudo usermod -aG dialout $USER</code>, then log out and back
+    device. Serial roaster? Your user needs the <code>dialout</code>
+    group: <code>sudo usermod -aG dialout $USER</code>, then log back
     in.
   </p>
 
   <div class="callout" id="lan-exposure">
     <strong>Before using <code>--lan</code> / <code>-Lan</code>:</strong>
-    the server still has to run on whatever machine the roaster's own
-    USB/serial port is plugged into — other devices on the network can
-    only view/control an already-running roast remotely, not reach a
-    port on a different machine (Direct Modbus <em>over Ethernet</em>,
-    e.g. FZ-94 Evo, is the one exception). And since this app can send
-    real Burner/Air/Drum/Heater commands to a real, heat-producing
-    machine, anyone who can reach it on your network can too, with
-    nothing beyond the login screen in the way. Fine on a trusted home
-    network; worth real thought anywhere less trusted.
+    run the server on the machine the roaster is actually plugged into
+    — other devices can only view/control an already-running roast,
+    not reach a port on a different machine. And since this app can
+    send real heater/fan/drum commands to a real, heat-producing
+    machine, anyone on your network can too once <code>--lan</code> is
+    on. Fine on a trusted home network; think twice anywhere else.
   </div>
 
   <h2 id="accounts-and-access">Accounts and access</h2>
   <p>
-    Opening the app for the first time shows a login/register screen —
-    there's no built-in default account. <strong>The very first person to
-    register becomes the admin</strong>, with immediate access; every
-    account registered after that starts <strong>pending</strong> and
-    can't log in until the admin approves it from the <strong>Manage
-    Access</strong> page (only visible to the admin). From there the admin
-    can <strong>Allow</strong> a pending registration, <strong>Deny</strong>
-    one (pending or already-allowed — denying an already-logged-in user
-    ends their session immediately, not just on their next login attempt),
-    send a denied account back to <strong>pending</strong> for
-    reconsideration, or <strong>Delete</strong> an account outright.
+    First visit shows a login/register screen — no default account.
+    <strong>The first person to register becomes admin</strong> with
+    immediate access; everyone after that is <strong>pending</strong>
+    until the admin approves them on the <strong>Manage Access</strong>
+    page. Every allowed account, admin or not, can use everything in
+    the app — there's no per-feature permission system beyond that one
+    gate.
   </p>
   <p>
-    There's no per-feature permission system beyond this one gate —
-    every allowed account, admin or not, has full access to everything
-    else in the app (all roast modes, history, settings, automation
-    rules). Sessions are a plain httponly cookie, not a token stored in
-    the browser's own JS-accessible storage, and login persists across a
-    backend restart (accounts and sessions are both in the same SQLite
-    file as everything else, <code>backend/data/roasts.db</code>).
-  </p>
-  <p>
-    For calling the API directly — a script, a Home Assistant
-    integration, <code>curl</code> — without going through the browser's
-    cookie-based login at all, click your username in the header to open
-    <strong>Account</strong> and generate an API key. Send it as an
-    <code>X-API-Key</code> header; it's an alternative credential
-    alongside the session cookie, not a replacement for it (the browser
-    app itself keeps using cookies). The key is shown in full exactly
-    once, right when you generate/regenerate it — only its hash is
-    stored, so neither this app nor its database can show it to you
-    again afterward. <strong>Regenerate</strong> replaces it (the old one
-    stops working immediately); <strong>Revoke</strong> turns off
-    API-key access entirely without issuing a replacement.
+    To call the API directly (a script, Home Assistant, <code>curl</code>)
+    instead of logging in through the browser: click your username →
+    <strong>Account</strong> → generate an API key, sent as an
+    <code>X-API-Key</code> header. Shown once, in full — save it
+    somewhere, since it can't be shown again.
   </p>
 
   <h2>The Live Roast screen</h2>
   <p>
-    Laid out like a roasting-scope screen: a toolbar with the title,
-    ON/OFF device toggle + START recording button, and digital
-    elapsed-time clock; vertical control sliders (Burner/Air/Drum, plus
-    Burner SV in native &deg;C for <code>modbus_live</code>) beside the
-    banded live chart, with color-coded ET (crimson) / BT (blue) curves
-    (their rates of rise drawn thin in the same colors on a 0–25 °/min
-    axis; while recording, the time axis starts 30 seconds before
-    Charge and shows ten minutes, and a finished roast fills the chart
-    edge to edge; the temperature axis tops out at 350 °C / 527 °F
-    unless the roast runs hotter; the Burner, Air and Drum lines, when
-    shown, run low on the same axis on a 0–100 scale) and a matching
-    ET/BT/&Delta;BT readout column; and the CHARGE/DRY END/FC START/FC
-    END/SC START/DROP manual event-marker buttons underneath the chart.
-    DRY%/&raquo;DRY/&raquo;FCs and other milestone-derived readouts are
-    available as optional items in the configurable Breakout Panel
-    (Settings) rather than a fixed row.
+    Laid out like a roasting-scope screen: ON/OFF and START in the
+    toolbar, control sliders for Burner/Air/Drum beside a live BT/ET
+    chart, a readout column, and milestone buttons (Charge, Dry End,
+    FC Start, Drop, ...) underneath. More derived readouts (DRY%,
+    &raquo;DRY, &raquo;FCs) are available as optional add-ons in Settings.
   </p>
 
   <h2 id="the-data-sources">The data sources</h2>
   <p>
-    Every roast is driven by one of these modes, picked from the
-    Configure Roast form's "Data source" dropdown:
+    Pick one from the Configure Roast form's "Data source" dropdown:
   </p>
   <ol>
-    <li><strong>Simulator</strong> — a small thermal model that generates realistic BT/ET/RoR curves and auto-detects roast events (turning point, dry end, first crack, drop). No hardware needed.</li>
-    <li><strong>.alog Playback</strong> — loads a real roast log and replays it at real (or accelerated) speed, including its events and notes. Also reads real-world <code>.alog</code> files, not just this project's own.</li>
-    <li><strong>Direct Modbus (USB or Ethernet)</strong> — talks straight to a real roaster's PLC over Modbus. Ships with defaults for Coffee-Tech's FZ-94 (USB/RTU) and FZ-94 Evo (Ethernet/TCP); every register is overridable for a different Modbus roaster. See <a href="modbus/index.html">docs/modbus/</a>.</li>
-    <li><strong>Direct USB (thermocouple meter)</strong> — reads a Mastech MS6514 dual K-type thermocouple meter straight over USB-serial. Read-only (the meter has no command channel); T1 &rarr; BT, T2 &rarr; ET.</li>
-    <li><strong>Aillio Bullet (USB)</strong> — talks straight to a real Aillio Bullet over its own vendor-specific USB protocol (not Modbus/serial at all). Ships with the R1 model; nothing else to configure per-install (no port/host, the app finds it by its own USB id). See <a href="aillio/bullet-r1.html">docs/aillio/bullet-r1.html</a>.</li>
-    <li><strong>TC4+ (USB, aArtisanQ/PID firmware)</strong> — plain ASCII serial commands over USB to a TC4+ shield. Real Heater/Fan control (this hardware has no Drum channel at all); no feedback readback for either, so writes are fire-and-forget. DIY hardware with no single default wiring/config, so unlike the rest of these it has no built-in preset.</li>
+    <li><strong>Simulator</strong> — a thermal model that generates realistic BT/ET/RoR curves and auto-detects roast events. No hardware needed.</li>
+    <li><strong>.alog Playback</strong> — replays a real roast log (this app's own, or a real-world <code>.alog</code>), events and notes included.</li>
+    <li><strong>Direct Modbus (USB or Ethernet)</strong> — talks to a real roaster's PLC. Built-in defaults for Coffee-Tech's FZ-94 and FZ-94 Evo; any Modbus roaster's registers are overridable. See <a href="modbus/index.html">docs/modbus/</a>.</li>
+    <li><strong>Direct USB (thermocouple meter)</strong> — reads a Mastech MS6514 over USB-serial (read-only; T1 &rarr; BT, T2 &rarr; ET).</li>
+    <li><strong>Aillio Bullet (USB)</strong> — talks to a real Bullet over its own USB protocol. Ships with the R1 model, nothing to configure. See <a href="aillio/bullet-r1.html">docs/aillio/bullet-r1.html</a>.</li>
+    <li><strong>TC4+ (USB, aArtisanQ/PID firmware)</strong> — ASCII serial commands to a TC4+ shield. Heater/Fan control, no Drum channel, no feedback readback. DIY hardware, so no built-in preset.</li>
   </ol>
   <p>
-    Every live-hardware mode leaves every milestone (Charge, Dry End, FC
-    Start, and the rest) to the operator's own click by default, rather
-    than guessing them from the temperature curve the way the Simulator
-    does &mdash; live RoR is still computed and shown either way, to help
-    time the click. Charge/Dry End/FC Start can optionally be switched to
-    auto-detect from BT instead (Configure Roast form, opt-in, off by
-    default) &mdash; manual clicks still work as an override even with
-    that on. Turning Point always auto-fires either way; it's a pure
-    observation (the BT minimum right after Charge), not a judgment call.
-  </p>
-  <p>
-    Clicking <strong>ON</strong> connects to the device and starts
-    streaming live readings (nothing recorded yet); <strong>START</strong>
-    begins actually recording that stream into a roast — for
-    <code>modbus_live</code>/<code>ms6514_live</code>/<code>aillio_live</code>/<code>tc4_live</code>
-    these are two genuinely separate steps (verify the connection before
-    committing to a roast). For <code>simulator</code>/<code>alog_playback</code>, connecting
-    and recording happen together in one step, since there's no real
-    external connection to verify first.
+    Live-hardware milestones (Charge, Dry End, FC Start...) are manual
+    clicks by default; auto-detect from BT is an opt-in alternative in
+    Configure Roast. <strong>ON</strong> connects and streams live
+    readings; <strong>START</strong> actually starts recording — two
+    separate steps for real hardware, one step for
+    <code>simulator</code>/<code>alog_playback</code>.
   </p>
 
   <h2 id="built-in-presets">Built-in presets</h2>
   <p>
     "Load saved config" entries the app ships with, so most people never
-    type in a register map or port by hand. Alphabetical by preset name;
-    <strong>tested on real hardware</strong> means actually connected to
-    and verified against the physical device, not just protocol-level
-    unit tests or a fake — everything else here is well-tested in every
-    <em>other</em> sense (real end-to-end tests against
-    <code>hardware_fakes/</code>, or thorough protocol-decoding pytest
-    coverage for Aillio), just not yet against its real hardware.
+    type in a register map or port by hand. "Tested on real hardware"
+    means connected to and verified against the physical device, not
+    just tested against a fake.
   </p>
   <table>
     <thead><tr><th>Preset</th><th>Company</th><th>Model</th><th>Data source</th><th>Tested on real hardware</th></tr></thead>
@@ -199,95 +141,56 @@ scripts\run-server.ps1</code></pre>
     </tbody>
   </table>
   <p>
-    TC4+ has no built-in preset — it's DIY hardware with no single
-    default wiring/config to ship, unlike the rest of these.
+    TC4+ has no preset — it's DIY hardware with no single default config.
   </p>
   <p>
-    <strong>More machine support is planned over time</strong>, covering
-    a wide range of roasters/meters. In practice that
-    mostly isn't new engine code: a new <em>Modbus</em> roaster model is
-    usually just a new
-    <a href="modbus/index.html#device-profiles">Device Profile</a>
-    (register numbers as data, not code); a genuinely different
-    protocol (raw USB like Aillio, plain serial commands like TC4+)
-    gets its own thin engine sharing the same core contract
-    (<code>tick</code>/<code>apply_command</code>/<code>status</code>/<code>close</code>/<code>is_finished</code>)
-    every other data source already implements. If your roaster or
-    meter isn't listed above, it's very likely addable without a
-    rewrite.
+    <strong>More machine support is planned.</strong> A new Modbus
+    roaster is usually just a new
+    <a href="modbus/index.html#device-profiles">Device Profile</a>, not
+    new code — if yours isn't listed, it's likely addable.
   </p>
 
   <h2>Saving a roast</h2>
   <p>
-    Automatic — nothing extra to do. Click <strong>OFF</strong> once
-    you're done: that stops the roast and writes its <code>.alog</code>
-    file to <code>backend/data/roasts/&lt;roast_id&gt;.alog</code>,
-    regardless of how it ends ("complete" if the engine itself signaled
-    done, "stopped" if you clicked OFF yourself, "aborted" if something
-    actually went wrong). To get the file:
+    Automatic. Click <strong>OFF</strong> when you're done, then:
   </p>
   <ol>
-    <li>Click <strong>View detail</strong> (next to the toolbar once finished), or find the roast under <strong>History</strong>.</li>
+    <li>Click <strong>View detail</strong>, or find the roast under <strong>History</strong>.</li>
     <li>Click <strong>Download .alog</strong> at the top of the detail page.</li>
   </ol>
 
   <h2 id="testing-without-real-hardware">Testing without real hardware</h2>
   <p>
-    <strong>Simplest: pick a simulated device in the app.</strong> In
-    Configure Roast, under Device, the port (or host) field has a
-    <strong>Try a simulated one</strong> link — for the FZ-94, FZ-94 Evo,
-    MS6514 and TC4+. It fills in a <code>sim://…</code> value; connecting
-    starts a built-in fake of that machine inside the server, so there is
-    nothing to install or start, on Windows, macOS or Linux. The roast is
-    marked <strong>Simulated</strong>, tagged <code>simulated</code>
-    automatically, and left out of History's averages, so it never
-    skews your real numbers. (The Aillio Bullet has no simulated
-    device — it is a raw USB device.) While connected but not yet
-    recording, a simulated machine holds at its Charge readings; its
-    roast starts the moment you press START, so however long you spend
-    checking the connection first, the recording begins at Charge.
+    <strong>Pick a simulated device in the app.</strong> In Configure
+    Roast, the port/host field has a <strong>Try a simulated one</strong>
+    link (FZ-94, FZ-94 Evo, MS6514, TC4+) — nothing to install, on any
+    platform. The roast is tagged <code>simulated</code> and left out
+    of History's averages.
   </p>
   <p>
-    <code>simulator</code> and <code>alog_playback</code> need nothing
-    extra. For a developer who wants a fake running on its own (outside
-    the app) or a real virtual serial port to test against,
-    <code>scripts/fake-hardware.sh fz94</code> (or <code>ms6514</code> /
-    <code>tc4</code> / <code>evo</code>) starts one — see
-    <code>hardware_fakes/README.md</code> for the full reference,
-    including running it against an app on native Windows PowerShell.
-  </p>
-  <p>
-    <strong>Aillio Bullet (<code>aillio_live</code>) has no fake</strong>
-    — it's a raw USB device, not a serial port or a TCP socket, and
-    convincingly faking a real USB device needs kernel-level emulation
-    well beyond what the other fakes need. It's still thoroughly covered
-    by the backend's own pytest suite (pure protocol-decoding tests, no
-    hardware involved), just not something you can click through in a
-    running instance of the app without a real Bullet. See
+    For a developer who wants a fake running on its own, or a real
+    virtual serial port: <code>scripts/fake-hardware.sh fz94</code> (or
+    <code>ms6514</code> / <code>tc4</code> / <code>evo</code>) — see
+    <code>hardware_fakes/README.md</code> for the full reference.
+    The Aillio Bullet has no fake (it's a raw USB device) — see
     <a href="aillio/bullet-r1.html">docs/aillio/bullet-r1.html</a>.
   </p>
 
   <h2 id="scripts-reference">Scripts reference</h2>
-  <p>
-    Everything in <code>scripts/</code> and what each is for. Not sure
-    where to start? <code>install.sh</code> (<code>install.ps1</code> on
-    Windows) once, then <code>run-server.sh</code>
-    (<code>run-server.ps1</code>).
-  </p>
   <table>
     <thead><tr><th>Script</th><th>Platform</th><th>What it does</th></tr></thead>
     <tbody>
-      <tr><td><code>install.sh</code></td><td>macOS, Linux/WSL2</td><td>First-time setup, safe to re-run. Checks for Python 3.10+ and Node.js (offers to install them via <code>brew</code>/<code>apt-get</code> — asks first), creates <code>.venv</code>, installs the backend dependencies and the frontend's npm packages, and offers <code>socat</code> (only <code>fake-hardware.sh</code> needs it). <code>--yes</code> runs it unattended. Refuses to reuse a <code>.venv</code> created by native Windows Python, and says why.</td></tr>
-      <tr><td><code>install.ps1</code></td><td>Windows</td><td>The same, via <code>winget</code>; also offers to set up WSL2 for <code>fake-hardware.sh</code> if WSL2 is present. <code>-Yes</code> runs it unattended.</td></tr>
-      <tr><td><code>run-server.sh</code> / <code>run-server.ps1</code></td><td>macOS, Linux/WSL2 / Windows</td><td>Starts the server (uvicorn) at <code>http://localhost:8000</code>, rebuilding the frontend first if it's out of date. Options: a port number (<code>-Port</code>), <code>--reload</code> (<code>-Reload</code>), <code>--lan</code> / <code>--host</code> (<code>-Lan</code> / <code>-BindHost</code>), <code>--skip-build</code> (<code>-SkipBuild</code>), <code>--force-build</code> (<code>-ForceBuild</code>).</td></tr>
-      <tr><td><code>fake-hardware.sh</code></td><td>WSL2, Linux, macOS</td><td>Starts a fake roaster/meter (<code>fz94</code>, <code>ms6514</code>, <code>tc4</code> or <code>evo</code>) so you can try the full connection path without real hardware, and prints the value to paste into the app. <code>--help</code> lists the options; <code>--tcp</code> bridges to an app running natively on Windows. Needs <code>socat</code> (except <code>evo</code>). See <a href="#testing-without-real-hardware">Testing without real hardware</a>.</td></tr>
+      <tr><td><code>install.sh</code></td><td>macOS, Linux/WSL2</td><td>First-time setup: Python/Node if missing, venv, dependencies. <code>--yes</code> for unattended.</td></tr>
+      <tr><td><code>install.ps1</code></td><td>Windows</td><td>The same, via <code>winget</code>. <code>-Yes</code> for unattended.</td></tr>
+      <tr><td><code>run-server.sh</code> / <code>run-server.ps1</code></td><td>All</td><td>Starts the app at <code>http://localhost:8000</code>. Options: a port number, <code>--reload</code>, <code>--lan</code>/<code>--host</code>, <code>--skip-build</code>, <code>--force-build</code>.</td></tr>
+      <tr><td><code>fake-hardware.sh</code></td><td>WSL2, Linux, macOS</td><td>Starts a fake roaster/meter to test without real hardware. See <a href="#testing-without-real-hardware">above</a>.</td></tr>
     </tbody>
   </table>
 
   <h2>Next steps</h2>
   <ul>
-    <li>Actively editing the frontend, running the test suite, or cutting a release: see <a href="https://github.com/MichaelYagi/roast-telemetry/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</li>
-    <li>What each data source actually stores, and the full API surface: see <a href="architecture.html#whats-stored-where">Architecture reference</a>.</li>
+    <li>Frontend dev, tests, releases: <a href="https://github.com/MichaelYagi/roast-telemetry/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</li>
+    <li>What's stored where, and the full API: <a href="architecture.html#whats-stored-where">Architecture reference</a>.</li>
   </ul>
 
   <div class="page-nav"><a href="index.html">&larr; Back to docs home</a></div>
