@@ -2,16 +2,21 @@
 
 Produces an unsigned, standalone single executable per platform --
 `Roast Telemetry.exe` (Windows), `Roast Telemetry.app` (macOS, a real
-double-clickable app bundle wrapping a single-file executable inside)
--- no Python/Node install required to *run* the result, just to
-*build* it, and (the default mode) nothing else to keep alongside the
-file itself. Windows and macOS are the only supported desktop targets
--- see `scripts/tray_app.py`'s own module docstring for why native
-Linux desktop isn't (real testing surfaced genuine, unresolvable-from-
-this-app's-own-code tray-icon fragmentation across Linux desktop
-environments). Must be built natively on each target platform
-(PyInstaller has no supported cross-compile path) -- see
-`roast-telemetry.spec`'s own header comment for the full design notes,
+double-clickable app bundle wrapping a single-file executable inside),
+`roast-telemetry` (Linux, a plain command-line binary) -- no Python/Node
+install required to *run* the result, just to *build* it, and (the
+default mode) nothing else to keep alongside the file itself. Windows
+and macOS get a tray icon; Linux doesn't and never will (see
+`scripts/tray_app.py`'s own module docstring for why native Linux
+desktop tray isn't attempted: real testing surfaced genuine,
+unresolvable-from-this-app's-own-code tray-icon fragmentation across
+Linux desktop environments) -- the Linux build is a genuinely simpler,
+separate spec (`roast-telemetry-linux.spec`) and entry point
+(`scripts/server_app.py`) that never imports `pystray`/Pillow at all,
+rather than a third branch bolted onto the tray-first
+`roast-telemetry.spec`/`tray_app.py` pair. Must be built natively on
+each target platform (PyInstaller has no supported cross-compile path)
+-- see each spec file's own header comment for the full design notes,
 including the `PACKAGE_MODE`/`-Mode`/positional-arg switch to build a
 folder instead (faster startup, no single-exe antivirus-heuristic risk,
 just not a single file -- see that comment for the full tradeoff).
@@ -80,6 +85,38 @@ for the `pystray`/`pyserial` hidden-import fixes.
    Windows tray, not a normal windowed app), click for the same
    Start/Stop/Open in browser/Save logs menu.
 
+## Linux
+
+1. Clone/pull the repo onto the Linux machine (or build in CI on
+   `ubuntu-latest` -- the common case; the resulting binary is tied to
+   the glibc version of whatever it was built on, same as any compiled
+   Linux binary).
+2. If you haven't already: `scripts/install.sh`.
+3. `packaging/build-linux.sh` (or `packaging/build-linux.sh onedir` for
+   a folder instead of a single file).
+4. Output: `dist/roast-telemetry` -- a genuinely single file, no
+   installer, no tray icon. `chmod +x` it if the executable bit didn't
+   survive however it got there, then run it: it prints the URL to open
+   in a browser (`--host`/`--port` to change from the 127.0.0.1:7890
+   default), Ctrl+C to stop. No SmartScreen/Gatekeeper-equivalent
+   warning to click past -- Linux has no OS-level unsigned-binary
+   gate like Windows/macOS do.
+
+**Verified end-to-end via a real build in this sandbox** (WSL2, which
+*is* a real Linux target for this build specifically, unlike for the
+tray-based Windows/macOS ones): a real `pyinstaller` build actually run,
+the resulting binary actually started, `/api/v1/health` responded, a
+user could register and log in, the bundled frontend served correctly
+through a real browser (Playwright), a `simulator` roast could be
+started and recorded live data, and `$XDG_DATA_HOME/RoastTelemetry`
+correctly received `roasts.db`/`roasts/`. One real bug caught and fixed
+in the process: the startup line printed via a plain `print()` sat in
+Python's block-output-buffering (stdout isn't a TTY when redirected to
+a log file, a plausible way to run a long-lived server binary) until
+the process actually exited, appearing *after* every one of uvicorn's
+own eagerly-flushed startup log lines instead of before them -- fixed
+with `flush=True`.
+
 ## Why unsigned, and what that costs
 
 Code signing needs a paid Apple Developer account (~$99/yr) and a
@@ -127,13 +164,14 @@ from-source dev workflow (`scripts/install.sh`/`.ps1` +
   yourself. A reasonable next step once the raw build is confirmed
   working, not bundled into this first pass.
 - **Auto-update.** Every new version is a fresh manual build/download.
-- **Linux packages (`.deb`, `.rpm`, AppImage), including for Raspberry
-  Pi OS.** Considered and deliberately not built: Linux has no tray icon
-  (see above), so the app there is a server you open in a browser, and
-  `scripts/install.sh` + `scripts/run-server.sh` (`--yes` for unattended
-  setup) already do the real work -- see docs/getting-started.html's
-  "Linux / Raspberry Pi (server only)". A package would add three
-  formats to maintain across two CPU architectures (arm64 runners aren't
-  free for private repos) for little gain. If one were ever added, the
+- **Distro packages (`.deb`, `.rpm`, AppImage), including for Raspberry
+  Pi OS.** The plain `roast-telemetry` binary above is attempted and
+  verified; these aren't. `scripts/install.sh` + `scripts/run-server.sh`
+  (`--yes` for unattended setup) remain the documented free path -- see
+  docs/getting-started.html's "Linux / Raspberry Pi (server only)". A
+  package would add three formats to maintain across two CPU
+  architectures (arm64 runners aren't free for private repos) for
+  little gain over the single binary. If one were ever added, the
   `.deb` is the only one with a real payoff (a systemd unit, USB/serial
   permissions).
+- **arm64 Linux** (Raspberry Pi). x86_64 only for now -- see above.
