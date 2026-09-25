@@ -28,6 +28,14 @@ export default function LoginView() {
       .catch(() => setHasAdmin(true)); // can't tell -- assume the safer, more common case
   }, []);
 
+  // First-ever visit to a fresh install (no admin yet) -- land straight on
+  // Register instead of Login, since there's no account to log into yet.
+  // Only fires once, right when the fetch above resolves, so it never
+  // fights a manual tab switch afterward.
+  useEffect(() => {
+    if (hasAdmin === false) setMode("register");
+  }, [hasAdmin]);
+
   function switchMode(next) {
     setMode(next);
     setError(null);
