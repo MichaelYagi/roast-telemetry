@@ -103,27 +103,6 @@ scripts\run-server.ps1</code></pre>
     &raquo;DRY, &raquo;FCs) are available as optional add-ons in Settings.
   </p>
 
-  <h2 id="the-data-sources">The data sources</h2>
-  <p>
-    Pick one from the Configure Roast form's "Data source" dropdown:
-  </p>
-  <ol>
-    <li><strong>Simulator</strong> — a thermal model that generates realistic BT/ET/RoR curves and auto-detects roast events. No hardware needed.</li>
-    <li><strong>.alog Playback</strong> — replays a real roast log (this app's own, or a real-world <code>.alog</code>), events and notes included.</li>
-    <li><strong>Direct Modbus (USB or Ethernet)</strong> — talks to a real roaster's PLC. Built-in defaults for Coffee-Tech's FZ-94 and FZ-94 Evo; any Modbus roaster's registers are overridable. See <a href="modbus/index.html">docs/modbus/</a>.</li>
-    <li><strong>Direct USB (thermocouple meter)</strong> — reads a Mastech MS6514 over USB-serial (read-only; T1 &rarr; BT, T2 &rarr; ET).</li>
-    <li><strong>Aillio Bullet (USB)</strong> — talks to a real Bullet over its own USB protocol. Ships with the R1 model, nothing to configure. See <a href="aillio/bullet-r1.html">docs/aillio/bullet-r1.html</a>.</li>
-    <li><strong>TC4+ (USB, aArtisanQ/PID firmware)</strong> — ASCII serial commands to a TC4+ shield. Heater/Fan control, no Drum channel, no feedback readback. DIY hardware, so no built-in preset.</li>
-  </ol>
-  <p>
-    Live-hardware milestones (Charge, Dry End, FC Start...) are manual
-    clicks by default; auto-detect from BT is an opt-in alternative in
-    Configure Roast. <strong>ON</strong> connects and streams live
-    readings; <strong>START</strong> actually starts recording — two
-    separate steps for real hardware, one step for
-    <code>simulator</code>/<code>alog_playback</code>.
-  </p>
-
   <h2 id="built-in-presets">Built-in presets</h2>
   <p>
     "Load saved config" entries the app ships with, so most people never
@@ -148,6 +127,27 @@ scripts\run-server.ps1</code></pre>
     roaster is usually just a new
     <a href="modbus/index.html#device-profiles">Device Profile</a>, not
     new code — if yours isn't listed, it's likely addable.
+  </p>
+
+  <h2 id="the-data-sources">The data sources</h2>
+  <p>
+    Pick one from the Configure Roast form's "Data source" dropdown:
+  </p>
+  <ol>
+    <li><strong>Simulator</strong> — a thermal model that generates realistic BT/ET/RoR curves and auto-detects roast events. No hardware needed.</li>
+    <li><strong>.alog Playback</strong> — replays a real roast log (this app's own, or a real-world <code>.alog</code>), events and notes included.</li>
+    <li><strong>Direct Modbus (USB or Ethernet)</strong> — talks to a real roaster's PLC. Built-in defaults for Coffee-Tech's FZ-94 and FZ-94 Evo; any Modbus roaster's registers are overridable. See <a href="modbus/index.html">docs/modbus/</a>.</li>
+    <li><strong>Direct USB (thermocouple meter)</strong> — reads a Mastech MS6514 over USB-serial (read-only; T1 &rarr; BT, T2 &rarr; ET).</li>
+    <li><strong>Aillio Bullet (USB)</strong> — talks to a real Bullet over its own USB protocol. Ships with the R1 model, nothing to configure. See <a href="aillio/bullet-r1.html">docs/aillio/bullet-r1.html</a>.</li>
+    <li><strong>TC4+ (USB, aArtisanQ/PID firmware)</strong> — ASCII serial commands to a TC4+ shield. Heater/Fan control, no Drum channel, no feedback readback. DIY hardware, so no built-in preset.</li>
+  </ol>
+  <p>
+    Live-hardware milestones (Charge, Dry End, FC Start...) are manual
+    clicks by default; auto-detect from BT is an opt-in alternative in
+    Configure Roast. <strong>ON</strong> connects and streams live
+    readings; <strong>START</strong> actually starts recording — two
+    separate steps for real hardware, one step for
+    <code>simulator</code>/<code>alog_playback</code>.
   </p>
 
   <h2>Saving a roast</h2>
