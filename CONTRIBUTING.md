@@ -5,15 +5,43 @@ outside contributions are welcome — here's what to know before sending a PR.
 
 ## Getting set up
 
-See [docs/getting-started.html](docs/getting-started.html) for the two ways
-to run this locally (one-port demo build vs. two-port frontend dev with
-hot reload). The short version:
+See [docs/getting-started.html](docs/getting-started.html) for the plain
+one-port way to run this (`scripts/install.sh` + `scripts/run-server.sh`).
+For active frontend development, use two ports instead so Vite's hot
+reload applies immediately instead of rebuilding on every change:
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt   # backend/requirements.txt + pytest
 cd frontend && npm install && cd ..
 ```
+
+**Backend** (auto-restarts on backend code changes):
+
+```bash
+scripts/run-server.sh --skip-build --reload
+```
+
+`--skip-build` since Vite, not this backend, serves the frontend in this
+flow. Docs at `http://localhost:8000/docs`. Roast data persists to
+`backend/data/roasts.db` (SQLite index) and `backend/data/roasts/*.alog`
+(full profiles); a pre-baked example lives at
+`backend/data/sample_roasts/demo_roast.alog` for exercising playback mode.
+
+**Frontend** (separate terminal):
+
+```bash
+cd frontend && npm run dev
+```
+
+Opens on `http://localhost:5173` and proxies `/api/v1/*` (including
+WebSockets) to the backend on port 8000 — see `frontend/vite.config.js`.
+
+If this repo lives under a Windows-mounted path in WSL (e.g.
+`/mnt/c/...`), filesystem change events don't propagate to Vite's
+watcher, so hot reload can silently serve stale code after an edit —
+`vite.config.js` already sets `server.watch.usePolling` to work around
+this; restart `npm run dev` if you still see stale behavior.
 
 ## Running the backend tests
 

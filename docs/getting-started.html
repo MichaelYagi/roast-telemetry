@@ -32,249 +32,57 @@
   </p>
 
   <h2 id="setup-and-run">Setup &amp; run</h2>
-  <div class="callout" id="lan-exposure">
-    <strong>Run it on whichever computer is physically connected to the
-    roaster.</strong> For every USB/serial data source (Direct Modbus
-    RTU, MS6514, TC4+, Aillio Bullet) the server process itself needs
-    the OS to see that serial/USB port directly — it can't reach across
-    a network to a port plugged into a different machine. Other devices
-    on your network (a phone, another computer) can still view/control
-    an already-running roast remotely — that's what
-    <code>--lan</code> / <code>-Lan</code> (listening on
-    <code>0.0.0.0</code>) is for — but that's
-    about who can reach the server once it's running, not about which
-    machine the server itself has to run on. The one exception: Direct
-    Modbus <em>over Ethernet</em> (e.g. FZ-94 Evo) is genuinely
-    network-connected, so the server can run on any machine that can
-    reach its IP address.
-    <br><br>
-    Also worth weighing before turning on LAN access at all: this app
-    can send real Burner/Air/Drum/Heater commands to a real,
-    heat-producing machine — anyone who can reach <code>0.0.0.0</code>
-    on your network can too, with nothing beyond the login screen
-    standing between them and a roaster mid-roast. Fine on a trusted
-    home network; worth real thought anywhere less trusted.
-  </div>
+  <p><strong>macOS, Linux, or Windows via WSL2</strong> — open a terminal:</p>
+  <pre><code>cd roast-telemetry
+scripts/install.sh
+scripts/run-server.sh</code></pre>
   <p>
-    From a terminal: <code>scripts/install.sh</code> once (or
-    <code>scripts\install.ps1</code> on Windows), then
-    <code>scripts/run-server.sh</code> (or
-    <code>scripts\run-server.ps1</code>) whenever you want to run it —
-    the app is then at <code>http://localhost:8000</code>. What every
-    script does, and its options, is in the
-    <a href="#scripts-reference">Scripts reference</a> below.
+    <code>install.sh</code> is one-time setup (installs Python/Node if
+    missing, creates a venv, installs everything) — safe to re-run.
+    <code>run-server.sh</code> starts the app at
+    <code>http://localhost:8000</code> — that's it. Full option
+    reference for both: <a href="#scripts-reference">Scripts
+    reference</a> below.
   </p>
 
-  <h3 id="windows-powershell">Windows — PowerShell (native)</h3>
+  <h3 id="windows-powershell">Windows — native PowerShell</h3>
   <p>
-    Only worth it for one specific reason: reaching a real roaster's
-    actual COM port directly. WSL doesn't expose USB serial devices
-    without extra tooling (<code>usbipd-win</code>), so if you're
-    connecting to a real FZ-94 (or any real Modbus roaster) over USB,
-    this is the recommended path over WSL2.
+    Only needed to reach a real roaster's COM port directly (WSL can't
+    see USB serial devices without extra setup) — otherwise, use WSL2
+    above instead.
   </p>
   <pre><code>cd roast-telemetry
 scripts\install.ps1
 scripts\run-server.ps1</code></pre>
   <p>
-    <code>install.ps1</code> installs Python/Node.js themselves too (via
-    <code>winget</code>, asking first) if either is missing, then creates
-    the venv and installs everything below — so this is the whole setup,
-    not just a shortcut for part of it. It also offers to set up WSL2 (if
-    present) for <code>fake-hardware.sh</code>, the fake-hardware testing
-    tool — skipped automatically if WSL2 isn't installed; the app itself
-    never needs it. Add <code>-Yes</code> to run it unattended (no
-    prompts — it answers yes to the required Python/Node installs and
-    skips the optional WSL2 offer). Equivalent by hand:
+    Same idea as above, PowerShell-flavored. If <code>Activate.ps1</code>
+    refuses to run, once:
+    <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code>.
   </p>
-  <pre><code>python -m venv .venv-windows
-.venv-windows\Scripts\Activate.ps1
-pip install -r backend\requirements.txt
-cd frontend; npm install; cd ..</code></pre>
-  <div class="callout">
-    <strong>Note:</strong> if <code>Activate.ps1</code> refuses to run
-    ("running scripts is disabled on this system"), run once:
-    <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code>,
-    then retry. Requires Python and Node.js installed natively on
-    Windows — a venv created inside WSL only runs inside WSL (its files
-    are Linux binaries), it's not usable from PowerShell even though the
-    files are visible from Windows too if the repo sits under a
-    Windows-mounted path.
+
+  <p>
+    <strong>Raspberry Pi / headless Linux, over SSH:</strong>
+    <code>scripts/install.sh --yes</code>, then
+    <code>scripts/run-server.sh --lan</code>, then open
+    <code>http://&lt;that machine's address&gt;:8000</code> from another
+    device. Using a serial roaster (Direct Modbus over USB, MS6514,
+    TC4+)? Your user needs the <code>dialout</code> group first:
+    <code>sudo usermod -aG dialout $USER</code>, then log out and back
+    in.
+  </p>
+
+  <div class="callout" id="lan-exposure">
+    <strong>Before using <code>--lan</code> / <code>-Lan</code>:</strong>
+    the server still has to run on whatever machine the roaster's own
+    USB/serial port is plugged into — other devices on the network can
+    only view/control an already-running roast remotely, not reach a
+    port on a different machine (Direct Modbus <em>over Ethernet</em>,
+    e.g. FZ-94 Evo, is the one exception). And since this app can send
+    real Burner/Air/Drum/Heater commands to a real, heat-producing
+    machine, anyone who can reach it on your network can too, with
+    nothing beyond the login screen in the way. Fine on a trusted home
+    network; worth real thought anywhere less trusted.
   </div>
-  <p>
-    <code>scripts\run-server.ps1</code> takes the same options as the
-    WSL2/Linux/macOS script below, PowerShell-flavored:
-    <code>-Port 7890</code>, <code>-Reload</code>,
-    <code>-SkipBuild</code>, <code>-ForceBuild</code>, and
-    <code>-Lan</code> (reachable from other devices on your network —
-    <code>-BindHost 0.0.0.0</code> is the same thing spelled out; it's
-    not called <code>-Host</code> because PowerShell reserves that
-    name). Windows may ask to allow Python through its firewall the
-    first time you use <code>-Lan</code>.
-  </p>
-
-  <h3 id="wsl2-linux">Windows (WSL2) / Linux</h3>
-  <pre><code>cd roast-telemetry
-scripts/install.sh
-scripts/run-server.sh</code></pre>
-  <p>
-    <code>install.sh</code> installs Python 3.10+/Node.js/<code>socat</code>
-    themselves too (via <code>apt-get</code>, asking first) if any are
-    missing, then creates the venv and installs everything below.
-    Equivalent by hand:
-  </p>
-  <pre><code>python3 -m venv .venv &amp;&amp; source .venv/bin/activate   # first time only
-pip install -r backend/requirements.txt               # first time only
-cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first time only</code></pre>
-  <p>
-    <code>scripts/run-server.sh</code> takes a port number
-    (<code>scripts/run-server.sh 7890</code>, default 8000),
-    <code>--reload</code> (auto-restart on backend code changes),
-    <code>--lan</code> (or <code>--host 0.0.0.0</code>; reachable from
-    other devices on your network), and <code>--skip-build</code> /
-    <code>--force-build</code> (see the callout below).
-    <code>install.sh --yes</code> runs the setup unattended (no
-    prompts — it answers yes to the required Python/Node installs, so
-    it will run <code>sudo apt-get</code>/<code>brew</code> without
-    asking; optional extras like <code>socat</code> are skipped).
-  </p>
-  <div class="callout">
-    <strong>Note:</strong> if this repo lives under a Windows-mounted
-    path in WSL (e.g. <code>/mnt/c/...</code>), filesystem change events
-    don't propagate to Vite's watcher, so Hot Module Reload can silently
-    serve stale code after an edit. <code>vite.config.js</code> already
-    sets <code>server.watch.usePolling</code> to work around this — if
-    you still see stale behavior, restart <code>npm run dev</code>.
-  </div>
-
-  <h3 id="linux-headless">Linux / Raspberry Pi (server only)</h3>
-  <p>
-    On Linux — a Raspberry Pi running Raspberry Pi OS included — the app
-    runs as a plain server you open in a browser, using the same two
-    scripts as above. There's no <code>.deb</code>/<code>.rpm</code>/AppImage
-    package: for a server-only app those would save little over
-    <code>install.sh</code> + <code>run-server.sh</code>, and the scripts
-    already cover the real setup work. Over SSH, unattended:
-  </p>
-  <pre><code>scripts/install.sh --yes
-scripts/run-server.sh --lan     # then open http://&lt;this machine's address&gt;:8000 from another device</code></pre>
-  <ul>
-    <li><strong>Serial roasters</strong> (Direct Modbus over USB, MS6514,
-      TC4+): your user needs permission to open the serial port. On
-      Debian-based systems (Raspberry Pi OS, Ubuntu) that means being in
-      the <code>dialout</code> group:
-      <code>sudo usermod -aG dialout $USER</code>, then log out and back
-      in. USB-direct devices (Aillio Bullet) have their own requirements
-      — see <a href="aillio/bullet-r1.html">Aillio Bullet R1</a>.</li>
-    <li><strong>The server has to run on the computer the roaster is
-      plugged into</strong> — here, that's the Pi. See the
-      <a href="#lan-exposure">note at the top of this page</a>, which
-      also covers the safety side of <code>--lan</code>.</li>
-    <li><strong>It runs in the foreground.</strong> Use something like
-      <code>tmux</code> or a systemd service if you want it to survive
-      closing the terminal or a reboot — no ready-made service file is
-      included. The first start builds the frontend, which is the slow
-      part on a small board; later starts skip it unless the source
-      changed.</li>
-  </ul>
-
-  <h3 id="macos">macOS</h3>
-  <p>Same script as WSL2/Linux above (it detects macOS and uses
-    <code>brew</code> instead of <code>apt-get</code>):</p>
-  <pre><code>cd roast-telemetry
-scripts/install.sh
-scripts/run-server.sh</code></pre>
-  <p>Equivalent by hand:</p>
-  <pre><code>python3 -m venv .venv &amp;&amp; source .venv/bin/activate   # first time only
-pip install -r backend/requirements.txt               # first time only
-cd frontend &amp;&amp; npm install &amp;&amp; cd ..                   # first time only</code></pre>
-  <p>
-    Real USB serial access (for a real roaster) works natively on macOS
-    with no equivalent of WSL's USB-passthrough problem. For the fake
-    hardware below, <code>socat</code> installs via
-    <code>brew install socat</code> (or let <code>install.sh</code> offer
-    to do it).
-  </p>
-
-  <p>
-    Whichever platform: open <code>http://localhost:8000</code> — one
-    process, one port. The API lives under <code>/api/v1/*</code> on the
-    same port (docs still at <code>/docs</code>), and any other path
-    falls back to the React app's <code>index.html</code> so
-    client-side routing (<code>/roasts/:id</code>, <code>/compare</code>,
-    etc.) works on a hard refresh too.
-  </p>
-  <div class="callout">
-    <strong>Note:</strong> the run scripts rebuild
-    the frontend before starting <em>when it's out of date</em>, since
-    the backend serves whatever's already sitting in
-    <code>frontend/dist/</code> and never rebuilds it for you — a stale
-    build silently keeps serving old code with no error of any kind,
-    including old login/auth behavior (this is a real thing that
-    happened: an old pre-login build let anyone straight into the app
-    with no login screen, even though the backend itself correctly
-    rejected every API call underneath it). "Out of date" means
-    <code>frontend/dist/</code> is missing, or something under
-    <code>frontend/src</code>, <code>public</code>,
-    <code>index.html</code>, <code>vite.config.js</code> or
-    <code>package.json</code> is newer than the last build — so a restart
-    with nothing changed doesn't pay for a rebuild.
-    <code>--force-build</code>/<code>-ForceBuild</code> rebuilds
-    regardless (e.g. after <code>npm install</code> changed dependencies
-    without touching <code>package.json</code>);
-    <code>--skip-build</code>/<code>-SkipBuild</code> never does.
-    Equivalent to running
-    <code>cd frontend &amp;&amp; npm run build &amp;&amp; cd .. &amp;&amp; PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code>
-    by hand.
-  </div>
-
-  <h2>Two ports (for frontend development)</h2>
-  <p>
-    Use this instead when you're actively editing the frontend and want
-    Vite's hot-reload rather than rebuilding on every change.
-  </p>
-
-  <h3>Backend</h3>
-  <pre><code>scripts/run-server.sh --skip-build --reload</code></pre>
-  <p>
-    (<code>scripts\run-server.ps1 -SkipBuild -Reload</code> on native
-    Windows PowerShell.) <code>--skip-build</code>/<code>-SkipBuild</code>
-    since Vite (not this backend) is serving the frontend here — nothing
-    to build/serve from <code>frontend/dist/</code> in this flow.
-    <code>--reload</code>/<code>-Reload</code> auto-restarts the backend
-    on backend code changes.
-  </p>
-  <p>
-    Docs at <code>http://localhost:8000/docs</code>. Roast data persists
-    to <code>backend/data/roasts.db</code> (SQLite index) and
-    <code>backend/data/roasts/*.alog</code> (full profiles). A pre-baked
-    example lives at
-    <code>backend/data/sample_roasts/demo_roast.alog</code> for
-    exercising playback mode.
-  </p>
-
-  <h3>Frontend</h3>
-  <pre><code>cd frontend
-npm install
-npm run dev</code></pre>
-  <p>
-    Opens on <code>http://localhost:5173</code> and proxies
-    <code>/api/v1/*</code> (including WebSockets) to the backend on port
-    8000 — see <code>frontend/vite.config.js</code>. Same on every
-    platform.
-  </p>
-  <p>
-    The Live Roast screen is laid out like a roasting-scope screen: a toolbar with the title, ON/OFF device toggle + START
-    recording button, and digital elapsed-time clock; vertical control
-    sliders (Burner/Air/Drum, plus Burner SV in native &deg;C for
-    <code>modbus_live</code>) beside the banded live chart,
-    with color-coded ET (crimson) / BT (blue) curves (their rates of rise drawn thin in the same colors on a 0–25 °/min axis; while recording, the time axis starts 30 seconds before Charge and shows ten minutes, and a finished roast fills the chart edge to edge; the temperature axis tops out at 350 °C / 527 °F unless the roast runs hotter; the Burner, Air and Drum lines, when shown, run low on the same axis on a 0–100 scale) and a matching
-    ET/BT/&Delta;BT readout column; and the CHARGE/DRY END/FC START/FC
-    END/SC START/DROP manual event-marker buttons underneath the chart.
-    DRY%/&raquo;DRY/&raquo;FCs and other milestone-derived readouts are
-    available as optional items in the configurable Breakout Panel
-    (Settings) rather than a fixed row.
-  </p>
 
   <h2 id="accounts-and-access">Accounts and access</h2>
   <p>
@@ -312,6 +120,26 @@ npm run dev</code></pre>
     again afterward. <strong>Regenerate</strong> replaces it (the old one
     stops working immediately); <strong>Revoke</strong> turns off
     API-key access entirely without issuing a replacement.
+  </p>
+
+  <h2>The Live Roast screen</h2>
+  <p>
+    Laid out like a roasting-scope screen: a toolbar with the title,
+    ON/OFF device toggle + START recording button, and digital
+    elapsed-time clock; vertical control sliders (Burner/Air/Drum, plus
+    Burner SV in native &deg;C for <code>modbus_live</code>) beside the
+    banded live chart, with color-coded ET (crimson) / BT (blue) curves
+    (their rates of rise drawn thin in the same colors on a 0–25 °/min
+    axis; while recording, the time axis starts 30 seconds before
+    Charge and shows ten minutes, and a finished roast fills the chart
+    edge to edge; the temperature axis tops out at 350 °C / 527 °F
+    unless the roast runs hotter; the Burner, Air and Drum lines, when
+    shown, run low on the same axis on a 0–100 scale) and a matching
+    ET/BT/&Delta;BT readout column; and the CHARGE/DRY END/FC START/FC
+    END/SC START/DROP manual event-marker buttons underneath the chart.
+    DRY%/&raquo;DRY/&raquo;FCs and other milestone-derived readouts are
+    available as optional items in the configurable Breakout Panel
+    (Settings) rather than a fixed row.
   </p>
 
   <h2 id="the-data-sources">The data sources</h2>
@@ -416,54 +244,16 @@ npm run dev</code></pre>
     device — it is a raw USB device.) While connected but not yet
     recording, a simulated machine holds at its Charge readings; its
     roast starts the moment you press START, so however long you spend
-    checking the connection first, the recording begins at Charge. The
-    standalone fakes below are only
-    for developers who want a fake running on its own, or a real
-    virtual serial port.
+    checking the connection first, the recording begins at Charge.
   </p>
   <p>
     <code>simulator</code> and <code>alog_playback</code> need nothing
-    extra — fully self-contained. Three of the four live-hardware modes
-    (<code>modbus_live</code>, <code>ms6514_live</code>,
-    <code>tc4_live</code> — see <code>aillio_live</code>'s own note
-    further down) can each be exercised end-to-end, through the app's
-    actual connection code, using a fake standing in for the real
-    device. The fake itself always runs via
-    <code>scripts/fake-hardware.sh</code> in WSL2/Linux/macOS (it
-    depends on <code>socat</code>, which doesn't exist on Windows, for
-    the serial-port-based fakes below — the Evo's own TCP fake needs no
-    <code>socat</code> at all) — <strong>which flag you pass depends on
-    where your app is running</strong>, not your own platform:
-  </p>
-  <p><strong>App running in WSL2/Linux/macOS</strong> (the <a href="#wsl2-linux">WSL2/Linux</a>/<a href="#macos">macOS</a> setup above):</p>
-  <pre><code>scripts/fake-hardware.sh fz94      # Coffee-Tech FZ-94, USB (Direct Modbus)
-scripts/fake-hardware.sh evo       # Coffee-Tech FZ-94 Evo, Ethernet (Direct Modbus) -- no socat needed
-scripts/fake-hardware.sh ms6514    # Mastech MS6514 meter (Direct USB)
-scripts/fake-hardware.sh tc4       # TC4+, USB (aArtisanQ/PID firmware)</code></pre>
-  <p>Prints a <code>/tmp/...</code> serial port (or, for <code>evo</code>, a host/port) to paste into the app's Configure Roast form.</p>
-  <p><strong>App running natively on Windows PowerShell</strong> (the <a href="#windows-powershell">Windows — PowerShell</a> setup above) — run this in WSL2 instead, add <code>--tcp</code>:</p>
-  <pre><code>scripts/fake-hardware.sh fz94 --tcp      # default port 5020
-scripts/fake-hardware.sh fz94 --tcp 5030 # or a specific port</code></pre>
-  <p>
-    Prints a <code>socket://127.0.0.1:&lt;port&gt;</code> URL to paste
-    instead — a WSL-internal <code>/tmp/...</code> path isn't reachable
-    from a native-Windows process at all, so this bridges to a TCP
-    listener over WSL2's own localhost port forwarding instead (pyserial
-    treats that URL as a live serial connection; verified working end to
-    end — both reads and writes — against a real Modbus client).
-    <code>evo</code>'s own fake already speaks real Modbus TCP, so it
-    needs no <code>--tcp</code> bridging at all — it works the same way
-    regardless of where the app runs.
-  </p>
-  <p>
-    Either way it cleans up after itself on Ctrl+C, and picks a fresh
-    port name every run. See the project's
-    <code>hardware_fakes/README.md</code> for what it's doing under the
-    hood, or
-    <a href="modbus/fz-94-usb.html#testing-without-real-hardware">docs/modbus/fz-94-usb.html</a>
-    for the FZ-94 one specifically (the one that can also be
-    <em>controlled</em> — Burner/Air/Drum — not just read), including
-    options this wrapper doesn't expose (like a separate drive port).
+    extra. For a developer who wants a fake running on its own (outside
+    the app) or a real virtual serial port to test against,
+    <code>scripts/fake-hardware.sh fz94</code> (or <code>ms6514</code> /
+    <code>tc4</code> / <code>evo</code>) starts one — see
+    <code>hardware_fakes/README.md</code> for the full reference,
+    including running it against an app on native Windows PowerShell.
   </p>
   <p>
     <strong>Aillio Bullet (<code>aillio_live</code>) has no fake</strong>
@@ -490,13 +280,12 @@ scripts/fake-hardware.sh fz94 --tcp 5030 # or a specific port</code></pre>
       <tr><td><code>install.ps1</code></td><td>Windows</td><td>The same, via <code>winget</code>; also offers to set up WSL2 for <code>fake-hardware.sh</code> if WSL2 is present. <code>-Yes</code> runs it unattended.</td></tr>
       <tr><td><code>run-server.sh</code> / <code>run-server.ps1</code></td><td>macOS, Linux/WSL2 / Windows</td><td>Starts the server (uvicorn) at <code>http://localhost:8000</code>, rebuilding the frontend first if it's out of date. Options: a port number (<code>-Port</code>), <code>--reload</code> (<code>-Reload</code>), <code>--lan</code> / <code>--host</code> (<code>-Lan</code> / <code>-BindHost</code>), <code>--skip-build</code> (<code>-SkipBuild</code>), <code>--force-build</code> (<code>-ForceBuild</code>).</td></tr>
       <tr><td><code>fake-hardware.sh</code></td><td>WSL2, Linux, macOS</td><td>Starts a fake roaster/meter (<code>fz94</code>, <code>ms6514</code>, <code>tc4</code> or <code>evo</code>) so you can try the full connection path without real hardware, and prints the value to paste into the app. <code>--help</code> lists the options; <code>--tcp</code> bridges to an app running natively on Windows. Needs <code>socat</code> (except <code>evo</code>). See <a href="#testing-without-real-hardware">Testing without real hardware</a>.</td></tr>
-      <tr><td><code>sync-docs.sh</code></td><td>maintainers</td><td>Publishes <code>docs/</code> to the public docs site (a separate GitHub repo), rewriting links that point back at this repo. Runs automatically in CI whenever <code>docs/</code> changes on <code>main</code>; can also be run by hand.</td></tr>
     </tbody>
   </table>
 
   <h2>Next steps</h2>
   <ul>
-    <li>Setting up and running the backend test suite, and cutting a release: see <a href="https://github.com/MichaelYagi/roast-telemetry/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</li>
+    <li>Actively editing the frontend, running the test suite, or cutting a release: see <a href="https://github.com/MichaelYagi/roast-telemetry/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</li>
     <li>What each data source actually stores, and the full API surface: see <a href="architecture.html#whats-stored-where">Architecture reference</a>.</li>
   </ul>
 
