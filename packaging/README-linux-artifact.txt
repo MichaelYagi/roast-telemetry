@@ -1,9 +1,12 @@
 Roast Telemetry for Linux
 ===========================
 
-This is a single command-line program -- no installer, no tray icon,
-no desktop integration. Open a terminal, run it, and it prints a URL
-to open in your browser (http://127.0.0.1:7890 by default).
+"roast-telemetry" is a 64-bit (x86_64) Linux executable (ELF), built
+with PyInstaller -- Python itself and every dependency are bundled
+inside it, so nothing else needs installing to run it. It's a single
+command-line program -- no installer, no tray icon, no desktop
+integration. Open a terminal, run it, and it prints a URL to open in
+your browser (http://127.0.0.1:7890 by default).
 
 To run it:
 
