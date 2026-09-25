@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — Roast Telemetry Docs</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="index.html"><img src="assets/icon-48x48.png" alt="" width="24" height="24"> Roast Telemetry</a>
+  <nav>
+    <a href="index.html">Docs</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="settings.html" aria-current="page">Settings</a>
+    <a href="control.html">Control &amp; Safety</a>
+    <a href="analysis.html">Analysis</a>
+    <a href="modbus/index.html">Direct Modbus</a>
+    <a href="architecture.html">Architecture</a>
+    <a href="glossary.html">Glossary</a>
+    <a href="https://github.com/MichaelYagi/roast-telemetry">GitHub</a>
+  </nav>
+</header>
+<main>
+  <h1>Settings</h1>
+  <p>
+    Every panel here is optional — nothing needs changing to use the app.
+    Click <strong>Save</strong> at the bottom after any change.
+  </p>
+
+  <h2 id="roaster-safety">Roaster safety</h2>
+  <p>
+    Limits on Heater/Fan/Drum, and the emergency fan level. See
+    <a href="control.html#safety-limits">Control &amp; Safety</a> for the
+    full explanation.
+  </p>
+
+  <h2 id="temperature-unit">Temperature Unit</h2>
+  <p>
+    Celsius or Fahrenheit — display only. Storage, the API, and every
+    threshold/config field you type into stay Celsius regardless.
+    Downloads (.alog, JSON, CSV, Excel, PDF) follow this setting too.
+  </p>
+
+  <h2 id="readout-panels">Big Readout Panel &amp; Small Readout</h2>
+  <p>
+    Pick which live values show in these two optional panels next to
+    the live chart. Independent of each other (a value can be in one,
+    both, or neither), but share the same colors.
+  </p>
+
+  <h2 id="controls">Controls</h2>
+  <p>
+    Arrange the vertical control sliders (Drum, Air, Burner %, Burner
+    SV) beside the live chart, and whether each gets +/- step buttons.
+  </p>
+
+  <h2 id="history">History</h2>
+  <p>
+    How many roasts load per page, and the most you can compare at once.
+  </p>
+
+  <h2 id="ai-roast-review">AI Roast Review (Ollama)</h2>
+  <p>
+    Point this at a local Ollama server to get AI-written reviews on a
+    roast's detail page. See
+    <a href="analysis.html#ai">Analysis</a> for what it does with it.
+  </p>
+
+  <div class="page-nav"><a href="index.html">&larr; Back to docs home</a></div>
+</main>
+<script src="assets/toc.js" defer></script>
+</body>
+</html>
