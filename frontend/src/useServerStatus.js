@@ -6,14 +6,22 @@ const POLL_INTERVAL_MS = 5000;
 // Powers the small status dot in the app header (App.jsx) -- global,
 // not tied to any one roast/mounted screen, unlike a per-roast hook.
 //
+// status -- the dot's color:
 // green: server reachable and something is connected to *real* hardware
 // (armed through roasting/cooling) -- mode=simulator and sim:// fake
 // devices don't count, see main.py's health() for why.
 // yellow: server reachable, nothing real connected.
 // red: the last poll failed -- either the server process is down, or
 // this browser just can't reach it (same signal either way from here).
+//
+// activeRoast -- { id, title } | null, powering the "Live Roast" nav
+// badge and the browser tab title, from any other page in the app.
+// Unlike `status`, this DOES include simulator/sim:// roasts -- the
+// question here is just "is a roast actually recording," not "is a real
+// roaster connected" -- see main.py's health() for the same reasoning.
 export default function useServerStatus() {
   const [status, setStatus] = useState("yellow"); // optimistic until the first poll lands
+  const [activeRoast, setActiveRoast] = useState(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -24,9 +32,11 @@ export default function useServerStatus() {
         const res = await api.health();
         if (!mountedRef.current) return;
         setStatus(res.roaster_connected ? "green" : "yellow");
+        setActiveRoast(res.active_roast || null);
       } catch {
         if (!mountedRef.current) return;
         setStatus("red");
+        setActiveRoast(null);
       }
     }
 
@@ -38,5 +48,5 @@ export default function useServerStatus() {
     };
   }, []);
 
-  return status;
+  return { status, activeRoast };
 }

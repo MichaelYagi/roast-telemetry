@@ -14,6 +14,7 @@ def test_health(client):
     # on (Linux, Linux (WSL2), macOS, Windows) -- just that it's populated.
     assert body["platform"]
     assert body["roaster_connected"] is False
+    assert body["active_roast"] is None
 
 
 def test_health_ignores_simulator_mode_sessions(client):
@@ -22,6 +23,30 @@ def test_health_ignores_simulator_mode_sessions(client):
     client.post("/api/v1/roasts", json={"title": "Health check", "mode": "simulator"})
     resp = client.get("/api/v1/health")
     assert resp.json()["roaster_connected"] is False
+
+
+def test_health_reports_active_roast_for_any_mode_including_simulator(client):
+    # Unlike roaster_connected, active_roast isn't scoped to real hardware
+    # -- it just answers "is a roast actually recording right now,"
+    # regardless of mode, so the nav badge/tab title work during a
+    # simulator roast too. create_roast connects *and* starts recording
+    # for simulator in one step, so it's ROASTING immediately.
+    resp = client.post("/api/v1/roasts", json={"title": "Active check", "mode": "simulator"})
+    roast_id = resp.json()["id"]
+    resp = client.get("/api/v1/health")
+    assert resp.json()["active_roast"] == {"id": roast_id, "title": "Active check"}
+
+
+def test_health_ignores_an_armed_but_not_recording_session(client):
+    # modbus_live's own POST /roasts only connects (ON) -- doesn't start
+    # recording -- so this should stay IDLE, not count as an active roast.
+    resp = client.post("/api/v1/roasts", json={"title": "Armed only", "mode": "modbus_live", "modbus_port": "sim://fz94"})
+    roast_id = resp.json()["id"]
+    try:
+        resp = client.get("/api/v1/health")
+        assert resp.json()["active_roast"] is None
+    finally:
+        client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_health_ignores_sim_fake_device_sessions(client):

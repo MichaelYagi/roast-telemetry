@@ -2230,6 +2230,32 @@ button:disabled {
   background: #dc2626;
 }
 
+/* "Live Roast" nav badge -- shown whenever a roast is actually recording
+   (any mode, including simulator; see useServerStatus.js's activeRoast),
+   so it stays visible from any other page in the app. Gently pulses
+   rather than sitting static, since the whole point is to catch the eye
+   of someone who's navigated away and might not otherwise glance back. */
+.nav-roast-badge {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: #dc2626;
+  margin-left: 0.4em;
+  vertical-align: middle;
+  animation: nav-roast-badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes nav-roast-badge-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .roast-toolbar-meta {
   font-size: 0.85rem;
   font-weight: 500;

@@ -34,11 +34,24 @@ function AppShell() {
   // differently for hardware access), and can't be baked in at build time
   // the way version/build already are, since the same build runs anywhere.
   const [serverPlatform, setServerPlatform] = useState(null);
-  const serverStatus = useServerStatus();
+  const { status: serverStatus, activeRoast } = useServerStatus();
 
   useEffect(() => {
     api.health().then((res) => setServerPlatform(res.platform)).catch(() => {});
   }, []);
+
+  // Lets the browser tab itself say a roast is running -- visible even
+  // with this tab in the background/unfocused, which no in-app element
+  // (nav badge included) can cover. Deliberately no live elapsed-time
+  // ticking here: this only needs to update on each ~5s health poll (see
+  // useServerStatus.js), not every second, to answer "is something
+  // running," not serve as a clock.
+  useEffect(() => {
+    document.title = activeRoast ? `\u{1F525} ${activeRoast.title} — Roast Telemetry` : "Roast Telemetry";
+    return () => {
+      document.title = "Roast Telemetry";
+    };
+  }, [activeRoast]);
 
   // Nothing rendered yet during the one-time /auth/me check on mount --
   // faster than a spinner for what's normally a same-machine round trip,
@@ -75,6 +88,7 @@ function AppShell() {
           <nav>
             <NavLink to="/" end>
               Live Roast
+              {activeRoast && <span className="nav-roast-badge" title={`Roasting: ${activeRoast.title}`} />}
             </NavLink>
             <NavLink to="/history">History</NavLink>
             <NavLink to="/analysis">Analysis</NavLink>

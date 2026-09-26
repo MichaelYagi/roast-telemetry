@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from . import auth, storage
 from .api import auth as auth_api
 from .api import activity, analysis, beans, device_profiles, devices, files, presets, roasts, serial_ports, settings, views
-from .models import DeviceProfileCreateRequest, DeviceStatus, RoastCreateRequest, RoastMode, UserStatus
+from .models import DeviceProfileCreateRequest, DeviceStatus, RoastCreateRequest, RoastMode, RoastStatus, UserStatus
 from .roast_session import RoastSessionError, session_manager
 from .version import VERSION
 from modbus_bridge.device_profiles import BUILT_IN_PROFILES
@@ -219,7 +219,25 @@ def health() -> dict:
         and s.device.status()["state"] in _CONNECTED_DEVICE_STATES
         for s in session_manager.sessions.values()
     )
-    return {"status": "ok", "platform": _server_platform(), "roaster_connected": roaster_connected}
+    # Powers the "Live Roast" nav badge and the browser tab title (App.jsx)
+    # -- unlike roaster_connected above, this deliberately includes
+    # simulator/sim:// sessions too: the question here is just "is a roast
+    # actually recording right now," across any page in the app, not
+    # "is a real machine connected." Scoped to ROASTING/COOLING (not the
+    # merely-armed-but-not-yet-recording state) to match every other
+    # roast-in-progress signal in the app (e.g. useAwayAlarm.js's own
+    # phase === "roasting" gate).
+    active_roast = None
+    for s in session_manager.sessions.values():
+        if s.status in (RoastStatus.ROASTING, RoastStatus.COOLING):
+            active_roast = {"id": s.id, "title": s.title}
+            break
+    return {
+        "status": "ok",
+        "platform": _server_platform(),
+        "roaster_connected": roaster_connected,
+        "active_roast": active_roast,
+    }
 
 
 # Serve the built frontend (frontend/dist, from `npm run build`) from the
