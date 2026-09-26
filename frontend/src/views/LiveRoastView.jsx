@@ -6,6 +6,7 @@ import SimulatedDeviceHint from "../components/SimulatedDeviceHint.jsx";
 import { isSimulatedForm, isSimulatedRoast } from "../simulated.js";
 import RoastToolbar from "../components/RoastToolbar.jsx";
 import useConnectionHealth from "../useConnectionHealth.js";
+import useAwayAlarm from "../useAwayAlarm.js";
 import BackgroundProfilePicker from "../components/BackgroundProfilePicker.jsx";
 import BreakoutPanel from "../components/BreakoutPanel.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
@@ -1027,6 +1028,12 @@ export default function LiveRoastView() {
   // armed/roasting/cooling (see toolbarElement below). Harmless the rest
   // of the time: with no `latest` yet it just sits at "checking".
   const connectionHealth = useConnectionHealth(roastId, latest, activeMode);
+
+  // A repeating audio alarm if this tab is hidden (minimized, switched
+  // away from) while actually roasting -- heat is being applied, not
+  // just connected/armed. See useAwayAlarm.js for how this differs from
+  // the server-side "no viewer" watchdog in Settings > Roaster safety.
+  useAwayAlarm(phase === "roasting");
 
   const chargeEvent = roast?.events?.find((e) => e.type === "CHARGE");
   const dryEndEvent = roast?.events?.find((e) => e.type === "DRY_END");
