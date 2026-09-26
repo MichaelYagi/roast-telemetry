@@ -61,24 +61,22 @@ export function flatToGroups(flat) {
 // VerticalControlPanel (render time, also given `svAvailable`) and the
 // settings editor (edit time, always both optional keys "available") use
 // this, so the two never disagree about what a given layout actually means.
+//
+// Deliberately falls back to heater_pct -- reappearing even if Settings
+// configured only burner_sv_c -- whenever the connected mode/device has
+// no SV range: simulator never has one at all, so a "Burner SV only"
+// layout used to leave a simulator roast with *no* burner control
+// whatsoever (confirmed live: Drum/Air only, no way to touch the heat
+// mid-roast). A working control that isn't exactly what Settings asked
+// for beats no control at all -- this only matters on a connection that
+// genuinely can't offer SV; a mode/device that does (e.g. the FZ-94
+// profile) still shows SV exactly as configured, Burner % staying hidden.
 export function normalizeLayout(rawGroups, { svAvailable = true } = {}) {
   const seen = new Set();
   const groups = [];
-  // Whether the *saved* layout configured any optional channel at all,
-  // before mode-filtering below -- distinct from `seen` having one, which
-  // also reflects burner_sv_c getting filtered out for THIS connection.
-  // Only the former should trigger the "nothing configured" fallback;
-  // conflating the two used to mean a layout that deliberately configured
-  // only Burner SV silently rendered Burner % instead the moment it
-  // connected to a mode/device without an SV range (simulator, or a real
-  // one with no SV register) -- overriding the operator's actual Settings
-  // choice instead of just not showing a burner slider on a connection
-  // that genuinely can't offer the one they picked.
-  let configuredAnyOptional = false;
   for (const group of rawGroups || []) {
     const filtered = group.filter((k) => {
       if (!VERTICAL_CONTROL_KEYS.includes(k)) return false;
-      if (OPTIONAL_VERTICAL_CONTROL_KEYS.includes(k)) configuredAnyOptional = true;
       if (k === "burner_sv_c" && !svAvailable) return false;
       if (seen.has(k)) return false;
       return true;
@@ -92,11 +90,8 @@ export function normalizeLayout(rawGroups, { svAvailable = true } = {}) {
       seen.add(key);
     }
   }
-  // Backfills heater_pct only for a stale/hand-edited settings row that
-  // never configured an optional channel to begin with (empty/malformed
-  // vertical_control_layout) -- a genuine "there's nothing configured to
-  // show" gap, not "what's configured isn't available right now."
-  if (!configuredAnyOptional) {
+  const hasOptional = OPTIONAL_VERTICAL_CONTROL_KEYS.some((k) => seen.has(k));
+  if (!hasOptional) {
     groups.push(["heater_pct"]);
   }
   return groups;
