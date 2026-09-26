@@ -131,7 +131,7 @@ fake — everything else here is well-tested in every *other* sense
 protocol-decoding pytest coverage for Aillio), just not yet against
 its real hardware.
 
-| Preset | Company | Model | Data source | Tested on real hardware |
+| Preset | Company | Model | Connection type | Tested on real hardware |
 | --- | --- | --- | --- | --- |
 | Bullet R1, USB | Aillio | Bullet R1 | Aillio Bullet (USB) | ❌ |
 | FZ-94 Evo, Ethernet | Coffee-Tech | FZ-94 Evo | Direct Modbus | ❌ |

@@ -162,7 +162,7 @@ python -m hardware_fakes.modbus_fz94 --port /tmp/ttyFAKE_ROASTER
 PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code></pre>
   <p>In the app's <strong>Live Roast → Configure Roast</strong> form:</p>
   <ul>
-    <li><strong>Data source</strong>: <code>Direct Modbus (USB)</code></li>
+    <li><strong>Connection type</strong>: <code>Direct Modbus (USB)</code></li>
     <li><strong>Serial port</strong>: <code>/tmp/ttyFAKE_ROASTER_APP</code></li>
     <li>Leave baud rate at its default (19200) and the drive-port field blank</li>
     <li>Click <strong>ON</strong>, then (after checking the Test Connection panel if you like) <strong>START</strong></li>

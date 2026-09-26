@@ -20,7 +20,7 @@ import { downloadRoastPdf, printRoastPdf } from "../lib/roastPdf.js";
 // so history shows the same human-readable name, not the raw mode enum.
 // modbus_live covers both USB and Ethernet (see roast.modbus_transport --
 // mode alone can't distinguish them, same reasoning as the Configure Roast
-// form's own Data Source dropdown), so this is a function, not a plain
+// form's own Connection type dropdown), so this is a function, not a plain
 // lookup, for that one entry.
 function modeLabel(roast) {
   if (roast.mode === "modbus_live") {
@@ -342,7 +342,7 @@ export default function RoastDetailView() {
 
       <div className="detail-grid">
         <div className="panel">
-          <h3>Data source</h3>
+          <h3>Connection type</h3>
           <ul className="kv-list">
             <li>
               <span>Mode</span>

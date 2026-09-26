@@ -157,7 +157,7 @@ export default function LiveRoastView() {
     modbus_control_baudrate: 19200,
     // "serial" (USB/RTU, uses modbus_port) or "tcp" (Modbus TCP/Ethernet,
     // e.g. the Coffee-Tech FZ-94 Evo, uses modbus_host/modbus_tcp_port
-    // instead) -- see the Data Source dropdown below, which maps its
+    // instead) -- see the Connection type dropdown below, which maps its
     // "Direct Modbus (Ethernet)" option onto mode=modbus_live +
     // modbus_transport="tcp" together (mode alone can't distinguish the
     // two -- see backend/app/models.py's RoastCreateRequest.modbus_transport).
@@ -1210,7 +1210,7 @@ export default function LiveRoastView() {
                   />
                 </label>
                 <label>
-                  Data source
+                  Connection type
                   {/* modbus_live covers both transports (see
                       modbus_transport above) -- USB and Ethernet are two
                       distinct dropdown entries here for clarity, but both
