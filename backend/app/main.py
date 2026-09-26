@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from . import auth, storage
 from .api import auth as auth_api
 from .api import activity, analysis, beans, device_profiles, devices, files, presets, roasts, serial_ports, settings, views
-from .models import DeviceProfileCreateRequest, RoastCreateRequest, UserStatus
+from .models import DeviceProfileCreateRequest, DeviceStatus, RoastCreateRequest, UserStatus
 from .roast_session import RoastSessionError, session_manager
 from .version import VERSION
 from modbus_bridge.device_profiles import BUILT_IN_PROFILES
@@ -195,9 +195,20 @@ def _server_platform() -> str:
     return system  # "Windows", or whatever else platform.system() reports
 
 
+_CONNECTED_DEVICE_STATES = (DeviceStatus.CONNECTED.value, DeviceStatus.STREAMING.value)
+
+
 @app.get("/api/v1/health")
 def health() -> dict:
-    return {"status": "ok", "platform": _server_platform()}
+    # Powers the header status dot (App.jsx) -- "connected" means any
+    # in-memory session's device is actually live (armed through
+    # roasting/cooling), not just IDLE-but-present. A session that's only
+    # been created but never turned ON sits at DISCONNECTED, same as no
+    # session at all.
+    roaster_connected = any(
+        s.device.status()["state"] in _CONNECTED_DEVICE_STATES for s in session_manager.sessions.values()
+    )
+    return {"status": "ok", "platform": _server_platform(), "roaster_connected": roaster_connected}
 
 
 # Serve the built frontend (frontend/dist, from `npm run build`) from the

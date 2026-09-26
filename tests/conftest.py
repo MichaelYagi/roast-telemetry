@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from backend.app import storage
+from backend.app.roast_session import session_manager
 
 
 @pytest.fixture(autouse=True)
@@ -27,9 +28,18 @@ def _default_db_isolation(tmp_path, monkeypatch):
     isolated_db explicitly depends on this fixture (see its own params) so
     its own monkeypatch.setattr calls, plus a real init_db(), always run
     strictly after this one and take final effect -- this is just the
-    baseline safety net underneath it, not a competing setup."""
+    baseline safety net underneath it, not a competing setup.
+
+    Also clears the process-wide session_manager.sessions dict before every
+    test -- it's a plain module-level dict with no per-test reset of its
+    own, so a session left CONNECTED/STREAMING by one test (most never call
+    stop/OFF, since their assertions don't need to) used to still be sitting
+    there when a later, unrelated test ran -- e.g. GET /api/v1/health's new
+    roaster_connected field (main.py) reading True in a test that created no
+    session of its own at all."""
     monkeypatch.setattr(storage, "DB_PATH", tmp_path / "unused-default-test.db")
     monkeypatch.setattr(storage, "ROASTS_DIR", tmp_path / "unused-default-roasts")
+    session_manager.sessions.clear()
 
 
 @pytest.fixture

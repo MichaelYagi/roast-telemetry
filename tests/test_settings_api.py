@@ -13,6 +13,13 @@ def test_health(client):
     # Not pinning an exact string -- varies by whatever box the suite runs
     # on (Linux, Linux (WSL2), macOS, Windows) -- just that it's populated.
     assert body["platform"]
+    assert body["roaster_connected"] is False
+
+
+def test_health_reports_roaster_connected_once_a_session_is_streaming(client):
+    client.post("/api/v1/roasts", json={"title": "Health check", "mode": "simulator"})
+    resp = client.get("/api/v1/health")
+    assert resp.json()["roaster_connected"] is True
 
 
 def test_get_settings_defaults(client):

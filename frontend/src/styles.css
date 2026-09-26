@@ -2256,6 +2256,30 @@ button:disabled {
   background: #dc2626;
 }
 
+/* Global server/roaster status dot in the app header (App.jsx, beside
+   the title) -- distinct from .connection-status-dot above, which is
+   per-roast and only exists on the Live Roast screen. See
+   useServerStatus.js for what each color means. */
+.server-status-dot {
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  margin-left: 0.5em;
+}
+
+.server-status-dot-green {
+  background: #16a34a;
+}
+
+.server-status-dot-yellow {
+  background: #ca8a04;
+}
+
+.server-status-dot-red {
+  background: #dc2626;
+}
+
 .roast-toolbar-meta {
   font-size: 0.85rem;
   font-weight: 500;

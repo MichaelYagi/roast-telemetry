@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./AuthContext.jsx";
 import AccountModal from "./components/AccountModal.jsx";
 import { DialogProvider } from "./components/DialogProvider.jsx";
 import ThemePicker from "./components/ThemePicker.jsx";
+import useServerStatus from "./useServerStatus.js";
 import HistoryDashboard from "./views/HistoryDashboard.jsx";
 import LiveRoastView from "./views/LiveRoastView.jsx";
 import LoginView from "./views/LoginView.jsx";
@@ -33,6 +34,7 @@ function AppShell() {
   // differently for hardware access), and can't be baked in at build time
   // the way version/build already are, since the same build runs anywhere.
   const [serverPlatform, setServerPlatform] = useState(null);
+  const serverStatus = useServerStatus();
 
   useEffect(() => {
     api.health().then((res) => setServerPlatform(res.platform)).catch(() => {});
@@ -58,6 +60,16 @@ function AppShell() {
               <img className="app-logo" src="/icon-48x48.png" alt="" width="28" height="28" />
               <h1>Roast Telemetry</h1>
             </Link>
+            <span
+              className={`server-status-dot server-status-dot-${serverStatus}`}
+              title={
+                serverStatus === "green"
+                  ? "Server running, connected to a roaster"
+                  : serverStatus === "yellow"
+                    ? "Server running, not connected to a roaster"
+                    : "Server unreachable"
+              }
+            />
             <ThemePicker />
           </div>
           <nav>
