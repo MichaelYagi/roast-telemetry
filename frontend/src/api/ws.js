@@ -36,7 +36,17 @@ export function useRoastStream(roastId) {
   const wsRef = useRef(null);
 
   useEffect(() => {
-    if (!roastId) return undefined;
+    if (!roastId) {
+      // Without this, RESET (LiveRoastView's handleReset, which sets
+      // roastId back to null) left the just-finished roast's data sitting
+      // here untouched -- the chart and elapsed-time clock both read from
+      // `roast`/`latestPreview`, so they kept showing the old roast right
+      // through Configure Roast until a new roast's first "snapshot"
+      // message happened to overwrite it.
+      setRoast(null);
+      setLatestPreview(null);
+      return undefined;
+    }
     setConnectionStatus("connecting");
     setLatestPreview(null);
     setLastError(null);
