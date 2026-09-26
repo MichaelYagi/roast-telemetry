@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -200,7 +200,13 @@ _REAL_HARDWARE_MODES = (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.
 
 
 @app.get("/api/v1/health")
-def health() -> dict:
+def health(response: Response) -> dict:
+    # This is polled every 5s specifically to catch state changes
+    # (roaster_connected, active_roast) -- an intermediary (a caching
+    # proxy, a browser's HTTP cache heuristics on a GET with no explicit
+    # freshness info) serving a stale response would silently break the
+    # header dot/nav badge/tab title without ever throwing an error.
+    response.headers["Cache-Control"] = "no-store"
     # Powers the header status dot (App.jsx) -- "connected" means any
     # in-memory session's device is actually live (armed through
     # roasting/cooling), not just IDLE-but-present. A session that's only
