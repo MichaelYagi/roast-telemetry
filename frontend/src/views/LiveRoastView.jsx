@@ -9,7 +9,6 @@ import useAwayAlarm from "../useAwayAlarm.js";
 import BackgroundProfilePicker from "../components/BackgroundProfilePicker.jsx";
 import BreakoutPanel from "../components/BreakoutPanel.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
-import ConnectionBadge from "../components/ConnectionBadge.jsx";
 import AlarmRulesEditor from "../components/AlarmRulesEditor.jsx";
 import ConnectionTestPanel from "../components/ConnectionTestPanel.jsx";
 import VerticalControlPanel from "../components/VerticalControlPanel.jsx";
@@ -346,7 +345,7 @@ export default function LiveRoastView() {
   const showBreakoutPanel = phase !== "idle" && brokenOutPanels.length > 0;
   const showSplitLayout = showBreakoutPanel && viewportWide;
 
-  const { roast, setRoast, connectionStatus, latestPreview, lastError, pendingAlarms, alarmNotifications, dismissAlarmNotification } =
+  const { roast, setRoast, latestPreview, lastError, pendingAlarms, alarmNotifications, dismissAlarmNotification } =
     useRoastStream(roastId);
 
   // Surfaces a server-side read/tick failure (e.g. the real serial link
@@ -2010,7 +2009,6 @@ export default function LiveRoastView() {
                 </ul>
               </div>
               <div className="live-header-actions">
-                <ConnectionBadge status={connectionStatus} />
                 {phase === "finished" && <Link to={`/roasts/${roastId}`}>View detail</Link>}
               </div>
             </div>
