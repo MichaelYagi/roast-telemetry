@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from . import auth, storage
 from .api import auth as auth_api
 from .api import activity, analysis, beans, device_profiles, devices, files, presets, roasts, serial_ports, settings, views
-from .models import DeviceProfileCreateRequest, DeviceStatus, RoastCreateRequest, UserStatus
+from .models import DeviceProfileCreateRequest, DeviceStatus, RoastCreateRequest, RoastMode, UserStatus
 from .roast_session import RoastSessionError, session_manager
 from .version import VERSION
 from modbus_bridge.device_profiles import BUILT_IN_PROFILES
@@ -196,6 +196,7 @@ def _server_platform() -> str:
 
 
 _CONNECTED_DEVICE_STATES = (DeviceStatus.CONNECTED.value, DeviceStatus.STREAMING.value)
+_REAL_HARDWARE_MODES = (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE)
 
 
 @app.get("/api/v1/health")
@@ -205,8 +206,18 @@ def health() -> dict:
     # roasting/cooling), not just IDLE-but-present. A session that's only
     # been created but never turned ON sits at DISCONNECTED, same as no
     # session at all.
+    #
+    # Deliberately excludes anything simulated: mode=simulator (the
+    # built-in thermal model, no hardware involved at all) and sim://
+    # fake-device sessions (tagged "simulated" by _start_sim, session.py)
+    # both stay out, same as History already keeps them out of real
+    # averages -- a practice/demo roast shouldn't make the header look
+    # like a real roaster is connected.
     roaster_connected = any(
-        s.device.status()["state"] in _CONNECTED_DEVICE_STATES for s in session_manager.sessions.values()
+        s.mode in _REAL_HARDWARE_MODES
+        and "simulated" not in s.tags
+        and s.device.status()["state"] in _CONNECTED_DEVICE_STATES
+        for s in session_manager.sessions.values()
     )
     return {"status": "ok", "platform": _server_platform(), "roaster_connected": roaster_connected}
 

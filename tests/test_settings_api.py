@@ -16,10 +16,47 @@ def test_health(client):
     assert body["roaster_connected"] is False
 
 
-def test_health_reports_roaster_connected_once_a_session_is_streaming(client):
+def test_health_ignores_simulator_mode_sessions(client):
+    # mode=simulator is the built-in thermal model, no hardware at all --
+    # must not make the header dot look like a real roaster is connected.
     client.post("/api/v1/roasts", json={"title": "Health check", "mode": "simulator"})
     resp = client.get("/api/v1/health")
-    assert resp.json()["roaster_connected"] is True
+    assert resp.json()["roaster_connected"] is False
+
+
+def test_health_ignores_sim_fake_device_sessions(client):
+    # A sim://... fake device is tagged "simulated" (session.py's
+    # _start_sim) -- same exclusion History already applies to real
+    # averages, extended here for the same reason.
+    resp = client.post("/api/v1/roasts", json={"title": "Health check", "mode": "modbus_live", "modbus_port": "sim://fz94"})
+    roast_id = resp.json()["id"]
+    try:
+        resp = client.get("/api/v1/health")
+        assert resp.json()["roaster_connected"] is False
+    finally:
+        # Stops the fake device's own background threads -- left running,
+        # they outlive this test and break test_simulated_devices.py's own
+        # "no leftover sim threads" assertions further down the suite.
+        client.post(f"/api/v1/roasts/{roast_id}/stop")
+
+
+def test_health_reports_roaster_connected_for_a_real_hardware_session(client):
+    # There's no real port to connect to in a test, so this gets a
+    # CONNECTED/STREAMING session the only way the suite can (a sim://
+    # fake device), then strips the "simulated" tag that sim:// always
+    # adds -- isolating health()'s own mode+tag filter from the connect
+    # flow itself, which is already covered elsewhere.
+    from backend.app.roast_session import session_manager
+
+    resp = client.post("/api/v1/roasts", json={"title": "Health check", "mode": "modbus_live", "modbus_port": "sim://fz94"})
+    roast_id = resp.json()["id"]
+    try:
+        session = session_manager.get(roast_id)
+        session.tags = [t for t in session.tags if t != "simulated"]
+        resp = client.get("/api/v1/health")
+        assert resp.json()["roaster_connected"] is True
+    finally:
+        client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
 def test_get_settings_defaults(client):
@@ -33,6 +70,7 @@ def test_get_settings_defaults(client):
         "chart_series_visible": {},
         "history_page_size": 100,
         "max_compare": 20,
+        "away_alarm_enabled": True,
         "control": {
             "heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0,
             "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": False,
@@ -161,6 +199,16 @@ def test_put_settings_clamps_max_compare(client):
 
     resp = client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "max_compare": 10**9})
     assert resp.json()["max_compare"] == 100000
+
+
+def test_put_settings_saves_away_alarm_enabled(client):
+    resp = client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "away_alarm_enabled": False})
+    assert resp.json()["away_alarm_enabled"] is False
+    assert client.get("/api/v1/settings").json()["away_alarm_enabled"] is False
+
+    resp = client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "away_alarm_enabled": True})
+    assert resp.json()["away_alarm_enabled"] is True
+    assert client.get("/api/v1/settings").json()["away_alarm_enabled"] is True
 
 
 def test_put_settings_drops_unknown_vertical_control_keys(client):
