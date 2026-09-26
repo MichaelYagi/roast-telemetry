@@ -64,9 +64,21 @@ export function flatToGroups(flat) {
 export function normalizeLayout(rawGroups, { svAvailable = true } = {}) {
   const seen = new Set();
   const groups = [];
+  // Whether the *saved* layout configured any optional channel at all,
+  // before mode-filtering below -- distinct from `seen` having one, which
+  // also reflects burner_sv_c getting filtered out for THIS connection.
+  // Only the former should trigger the "nothing configured" fallback;
+  // conflating the two used to mean a layout that deliberately configured
+  // only Burner SV silently rendered Burner % instead the moment it
+  // connected to a mode/device without an SV range (simulator, or a real
+  // one with no SV register) -- overriding the operator's actual Settings
+  // choice instead of just not showing a burner slider on a connection
+  // that genuinely can't offer the one they picked.
+  let configuredAnyOptional = false;
   for (const group of rawGroups || []) {
     const filtered = group.filter((k) => {
       if (!VERTICAL_CONTROL_KEYS.includes(k)) return false;
+      if (OPTIONAL_VERTICAL_CONTROL_KEYS.includes(k)) configuredAnyOptional = true;
       if (k === "burner_sv_c" && !svAvailable) return false;
       if (seen.has(k)) return false;
       return true;
@@ -80,8 +92,11 @@ export function normalizeLayout(rawGroups, { svAvailable = true } = {}) {
       seen.add(key);
     }
   }
-  const hasOptional = OPTIONAL_VERTICAL_CONTROL_KEYS.some((k) => seen.has(k));
-  if (!hasOptional) {
+  // Backfills heater_pct only for a stale/hand-edited settings row that
+  // never configured an optional channel to begin with (empty/malformed
+  // vertical_control_layout) -- a genuine "there's nothing configured to
+  // show" gap, not "what's configured isn't available right now."
+  if (!configuredAnyOptional) {
     groups.push(["heater_pct"]);
   }
   return groups;
