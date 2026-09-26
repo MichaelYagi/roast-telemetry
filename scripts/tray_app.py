@@ -417,6 +417,7 @@ class TrayApp:
                 pystray.MenuItem("Open in browser", self.open_browser, enabled=lambda _: self.is_running()),
                 pystray.MenuItem("Copy URL to clipboard", self.copy_url, enabled=lambda _: self.is_running()),
                 pystray.MenuItem("Save logs...", self.save_logs),
+                pystray.MenuItem("Open data folder", self.open_data_folder),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem(lambda _: f"Port: {self.config['port']}", self.change_port),
                 pystray.MenuItem(lambda _: f"Host: {self.config['host']}", self.change_host),
@@ -601,6 +602,22 @@ class TrayApp:
             self._notify(f"Saved to {dest}")
         except OSError as exc:
             self._notify(f"Couldn't save logs: {exc}")
+
+    def open_data_folder(self, _icon=None, _item=None) -> None:
+        """Opens roasts.db/roasts/server.log's own folder (_DATA_DIR) in
+        the OS file manager -- there was no way to find it short of
+        knowing _user_data_dir's own per-OS convention by heart."""
+        _DATA_DIR.mkdir(parents=True, exist_ok=True)  # first run, before the server's ever started -- storage.py hasn't created it yet
+        try:
+            system = platform.system()
+            if system == "Windows":
+                os.startfile(_DATA_DIR)  # noqa: S606 -- fixed internal path, not user input
+            elif system == "Darwin":
+                subprocess.run(["open", str(_DATA_DIR)], check=True)
+            else:
+                subprocess.run(["xdg-open", str(_DATA_DIR)], check=True)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            self._notify(f"Couldn't open {_DATA_DIR}: {exc}")
 
     # -- settings ------------------------------------------------------
     def _apply_setting_change(self) -> None:
