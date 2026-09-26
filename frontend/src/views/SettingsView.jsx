@@ -151,22 +151,6 @@ export default function SettingsView() {
           <label className="checkbox-label">
             <input
               type="checkbox"
-              checked={awayAlarmEnabled}
-              onChange={(e) => setAwayAlarmEnabled(e.target.checked)}
-            />
-            Away alarm while roasting
-          </label>
-          <span className="hint">
-            A gentle, repeating chime if this tab is hidden (minimized, switched away from) while actually roasting
-            -- not a substitute for the watchdog above, which only reacts once the connection itself drops. On by
-            default.
-          </span>
-        </div>
-
-        <div className="form-row">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
               checked={control.safety_disabled}
               onChange={(e) => setControl({ ...control, safety_disabled: e.target.checked })}
             />
@@ -178,6 +162,22 @@ export default function SettingsView() {
             Turns off the limits above, Emergency Stop and every fail-safe. Nothing is recorded while this is on.
           </p>
         )}
+
+        <div className="form-row">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={awayAlarmEnabled}
+              onChange={(e) => setAwayAlarmEnabled(e.target.checked)}
+            />
+            Away alarm while roasting
+          </label>
+          <span className="hint">
+            A gentle, repeating chime if this tab is hidden (minimized, switched away from) while actually roasting
+            -- not a substitute for the watchdog above, which only reacts once the connection itself drops. On by
+            default.
+          </span>
+        </div>
       </div>
 
       <div className="panel">
