@@ -27,6 +27,7 @@ export default function SettingsView() {
   const [verticalControlArrows, setVerticalControlArrows] = useState({});
   const [historyPageSize, setHistoryPageSize] = useState(100);
   const [maxCompare, setMaxCompare] = useState(20);
+  const [awayAlarmEnabled, setAwayAlarmEnabled] = useState(true);
   const [control, setControl] = useState({
     heater_max_pct: 100, fan_min_pct: 0, drum_min_pct: 0, safe_fan_pct: 100, client_watchdog_s: 0, safety_disabled: false,
   });
@@ -48,6 +49,9 @@ export default function SettingsView() {
       setVerticalControlArrows(s.vertical_control_arrows || {});
       setHistoryPageSize(s.history_page_size || 100);
       setMaxCompare(s.max_compare || 20);
+      // Not `?? true`/`|| true` -- those would force it back on whenever
+      // the saved value is false, since false is falsy too.
+      setAwayAlarmEnabled(s.away_alarm_enabled !== false);
       if (s.control) setControl(s.control);
       setLoaded(true);
     });
@@ -87,6 +91,7 @@ export default function SettingsView() {
         vertical_control_arrows: verticalControlArrows,
         history_page_size: historyPageSize,
         max_compare: maxCompare,
+        away_alarm_enabled: awayAlarmEnabled,
         control,
       });
       setSaveFeedback("Saved.");
@@ -141,6 +146,22 @@ export default function SettingsView() {
           In an emergency (the Emergency stop button, a lost connection or an error during a roast) the heater goes to 0 and the fan to the level above.
           The burner temperature setpoint can't be used while the heater limit is below 100%.
         </p>
+
+        <div className="form-row">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={awayAlarmEnabled}
+              onChange={(e) => setAwayAlarmEnabled(e.target.checked)}
+            />
+            Away alarm while roasting
+          </label>
+          <span className="hint">
+            A gentle, repeating chime if this tab is hidden (minimized, switched away from) while actually roasting
+            -- not a substitute for the watchdog above, which only reacts once the connection itself drops. On by
+            default.
+          </span>
+        </div>
 
         <div className="form-row">
           <label className="checkbox-label">

@@ -768,6 +768,15 @@ def get_settings() -> dict:
         control = json.loads(values["control"]) if values.get("control") else {}
     except (json.JSONDecodeError, TypeError):
         control = {}
+    try:
+        # "0"/"1" text (TEXT-affinity column) -- None means never saved,
+        # which must default to on (the fixed behavior before this was
+        # configurable at all), not be conflated with an explicit off.
+        away_alarm_enabled = (
+            bool(int(values["away_alarm_enabled"])) if values.get("away_alarm_enabled") is not None else True
+        )
+    except (TypeError, ValueError):
+        away_alarm_enabled = True
     return {
         "ollama_url": values.get("ollama_url"),
         "ollama_model": values.get("ollama_model"),
@@ -780,6 +789,7 @@ def get_settings() -> dict:
         "chart_series_visible": chart_series_visible,
         "history_page_size": history_page_size,
         "max_compare": max_compare,
+        "away_alarm_enabled": away_alarm_enabled,
         "control": control,
     }
 

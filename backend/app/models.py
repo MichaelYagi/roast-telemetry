@@ -739,6 +739,11 @@ class AppSettings(BaseModel):
     # 3 and "compare" stops meaning anything, and the ceiling is just a
     # sanity backstop against a typo, not a real expected value.
     max_compare: int = 20
+    # The Live Roast screen's away-alarm (useAwayAlarm.js) -- a gentle,
+    # repeating audio cue while the tab is hidden during an actual roast.
+    # On by default (matches the behavior before this was ever
+    # configurable); off silences it entirely.
+    away_alarm_enabled: bool = True
     # Safety limits for anything that writes to the roaster (see ControlSafety).
     control: ControlSafety = Field(default_factory=ControlSafety)
 

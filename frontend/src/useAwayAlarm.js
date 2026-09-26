@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
 
-const BEEP_INTERVAL_MS = 3000;
-const BEEP_DURATION_S = 0.4;
-const BEEP_FREQUENCY_HZ = 880; // A5 -- cuts through more than a low tone
+const BEEP_INTERVAL_MS = 12000; // a nudge every 12s, not a siren
+const BEEP_DURATION_S = 0.5;
+const BEEP_FREQUENCY_HZ = 660; // E5 -- a softer sine chime, not the old harsh square wave
+const BEEP_GAIN = 0.12; // quiet -- meant to be noticed, not startling
 
-// Warns with a repeating audio alarm whenever the tab is hidden
+// Reminds with a repeating, gentle chime whenever the tab is hidden
 // (minimized, or switched away from) while `active` -- a roast is
 // actually roasting, heat genuinely being applied. Distinct from the
 // server-side "no viewer" watchdog (Settings > Roaster safety,
@@ -13,10 +14,13 @@ const BEEP_FREQUENCY_HZ = 880; // A5 -- cuts through more than a low tone
 // seconds it's set to). This one fires immediately on switching away,
 // even with the tab -- and its connection -- still very much alive.
 // They catch different failure modes, not the same one twice.
+// Settings > Roaster safety can turn this one off entirely (see
+// away_alarm_enabled, threaded through from LiveRoastView.jsx) -- this
+// hook itself doesn't know or care why `active` might be false.
 //
 // Synthesized with the Web Audio API rather than an embedded sound
-// file -- no asset to source/license, and it's loud and repeats for as
-// long as the tab stays hidden, not a single easy-to-miss beep.
+// file -- no asset to source/license, and it repeats for as long as the
+// tab stays hidden, not a single easy-to-miss beep.
 export default function useAwayAlarm(active) {
   const audioCtxRef = useRef(null);
   const intervalRef = useRef(null);
@@ -33,13 +37,19 @@ export default function useAwayAlarm(active) {
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = "square"; // harsher, more attention-grabbing than a sine tone
+    osc.type = "sine"; // soft chime, not an alarm tone
     osc.frequency.value = BEEP_FREQUENCY_HZ;
-    gain.gain.value = 0.35;
+    // Ramped rather than a hard on/off -- an instant jump to full gain
+    // is what makes a tone read as a "beep"; fading it in and back out
+    // is what makes the same tone read as a chime.
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(BEEP_GAIN, now + 0.08);
+    gain.gain.linearRampToValueAtTime(0, now + BEEP_DURATION_S);
     osc.connect(gain);
     gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + BEEP_DURATION_S);
+    osc.start(now);
+    osc.stop(now + BEEP_DURATION_S);
   }
 
   useEffect(() => {

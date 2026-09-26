@@ -5,7 +5,6 @@ import { useRoastStream } from "../api/ws.js";
 import SimulatedDeviceHint from "../components/SimulatedDeviceHint.jsx";
 import { isSimulatedForm, isSimulatedRoast } from "../simulated.js";
 import RoastToolbar from "../components/RoastToolbar.jsx";
-import useConnectionHealth from "../useConnectionHealth.js";
 import useAwayAlarm from "../useAwayAlarm.js";
 import BackgroundProfilePicker from "../components/BackgroundProfilePicker.jsx";
 import BreakoutPanel from "../components/BreakoutPanel.jsx";
@@ -309,6 +308,7 @@ export default function LiveRoastView() {
   const [tempUnit, setTempUnit] = useState("c"); // "c" | "f" -- display only, see Settings > Temperature Unit
   const [verticalControlLayout, setVerticalControlLayout] = useState([]); // Settings > Controls -- see VerticalControlPanel.jsx
   const [verticalControlArrows, setVerticalControlArrows] = useState({});
+  const [awayAlarmEnabled, setAwayAlarmEnabled] = useState(true); // Settings > Roaster safety
   const [viewportWide, setViewportWide] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= BREAKOUT_SPLIT_MIN_VIEWPORT
   );
@@ -539,6 +539,10 @@ export default function LiveRoastView() {
       setTempUnit(s.temperature_unit || "c");
       setVerticalControlLayout(s.vertical_control_layout || []);
       setVerticalControlArrows(s.vertical_control_arrows || {});
+      // Not `s.away_alarm_enabled ?? true` -- that treats false the same
+      // as "unset" and would force the alarm back on for anyone who
+      // turned it off.
+      setAwayAlarmEnabled(s.away_alarm_enabled !== false);
     };
     const source = new EventSource(settingsStreamUrl());
     source.addEventListener("settings", (e) => {
@@ -1023,17 +1027,12 @@ export default function LiveRoastView() {
   // local state, which resets to its defaults on every page load.
   const activeMode = roast?.mode || form.mode;
 
-  // Always called (hook rules), even for simulator/alog_playback/idle --
-  // its result is only actually rendered for live-hardware modes while
-  // armed/roasting/cooling (see toolbarElement below). Harmless the rest
-  // of the time: with no `latest` yet it just sits at "checking".
-  const connectionHealth = useConnectionHealth(roastId, latest, activeMode);
-
   // A repeating audio alarm if this tab is hidden (minimized, switched
   // away from) while actually roasting -- heat is being applied, not
   // just connected/armed. See useAwayAlarm.js for how this differs from
   // the server-side "no viewer" watchdog in Settings > Roaster safety.
-  useAwayAlarm(phase === "roasting");
+  // Settings > Roaster safety can turn it off entirely too.
+  useAwayAlarm(phase === "roasting" && awayAlarmEnabled);
 
   const chargeEvent = roast?.events?.find((e) => e.type === "CHARGE");
   const dryEndEvent = roast?.events?.find((e) => e.type === "DRY_END");
@@ -1099,12 +1098,6 @@ export default function LiveRoastView() {
   // etc.) are shown per-mode in the .live-meta list below once `roast`
   // exists, matching the existing alog_playback rows there (source
   // file/speed) -- not appended to this status line.
-  // Only meaningful for a real device connection, and only for as long
-  // as one is live (armed through roasting/cooling) -- simulator/
-  // alog_playback have no real connection to verify, and "finished"'s
-  // device is already disconnected.
-  const showConnectionDot =
-    LIVE_MODES.includes(activeMode) && (phase === "armed" || phase === "roasting" || phase === "cooling");
   // True while a simulated device is (or is about to be) behind this roast --
   // shown as a badge on the toolbar and a note in Test Connection.
   const simulated = roast ? isSimulatedRoast(roast) : isSimulatedForm(form);
@@ -1119,8 +1112,6 @@ export default function LiveRoastView() {
       statusText={STATUS_TEXT[phase]}
       onToggleConnect={handleToggleConnect}
       onStart={handleStart}
-      connectionStatus={showConnectionDot ? connectionHealth.status : null}
-      connectionFailedLabels={connectionHealth.failedLabels}
       simulated={simulated}
       roastId={roastId}
       showEmergencyStop={CONTROLLABLE_MODES.includes(activeMode)}

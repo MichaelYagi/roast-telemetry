@@ -27,13 +27,6 @@ import EmergencyStop from "./EmergencyStop.jsx";
 // that flag that's meaningful with or without an active roast (a checkbox
 // change in Settings needs to hide the button on the Configure Roast
 // screen too, before any roastId exists yet).
-//
-// connectionStatus: "checking" | "pass" | "fail" | null (null/undefined
-// -- no live-hardware connection worth showing a dot for, e.g.
-// simulator/alog_playback, or idle/finished). "checking" is yellow --
-// shown right after ON, before enough readings have come in to call it
-// either way -- turning green once they look normal, or red if they
-// don't. See useConnectionHealth.js for how this gets computed.
 export default function RoastToolbar({
   title,
   beans,
@@ -43,8 +36,6 @@ export default function RoastToolbar({
   statusText,
   onToggleConnect,
   onStart,
-  connectionStatus,
-  connectionFailedLabels = [],
   simulated = false,
   roastId,
   showEmergencyStop = false,
@@ -110,18 +101,6 @@ export default function RoastToolbar({
             both are on the left, controls/clock on the right, same row. */}
         <div className="roast-toolbar-title-group">
           <h2 className="roast-toolbar-title">
-            {connectionStatus && (
-              <span
-                className={`connection-status-dot connection-status-dot-${connectionStatus}`}
-                title={
-                  connectionStatus === "pass"
-                    ? "Readings look normal"
-                    : connectionStatus === "fail"
-                      ? `${connectionFailedLabels.join(", ")} out of range -- see Test Connection`
-                      : "Checking connection…"
-                }
-              />
-            )}
             {title || "Untitled roast"}
             {simulated && (
               <span className="simulated-badge" title="A built-in simulated device -- not a real machine">

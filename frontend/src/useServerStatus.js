@@ -4,13 +4,12 @@ import { api } from "./api/client.js";
 const POLL_INTERVAL_MS = 5000;
 
 // Powers the small status dot in the app header (App.jsx) -- global,
-// not tied to any one roast, so it lives in its own hook rather than
-// useConnectionHealth.js (which needs a live roastId/latest sample and
-// only makes sense while a roast screen is mounted).
+// not tied to any one roast/mounted screen, unlike a per-roast hook.
 //
-// green: server reachable and something is connected to a roaster
-// (armed through roasting/cooling, any session).
-// yellow: server reachable, nothing connected.
+// green: server reachable and something is connected to *real* hardware
+// (armed through roasting/cooling) -- mode=simulator and sim:// fake
+// devices don't count, see main.py's health() for why.
+// yellow: server reachable, nothing real connected.
 // red: the last poll failed -- either the server process is down, or
 // this browser just can't reach it (same signal either way from here).
 export default function useServerStatus() {

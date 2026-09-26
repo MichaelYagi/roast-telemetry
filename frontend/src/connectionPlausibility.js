@@ -1,8 +1,4 @@
-// Shared by ConnectionTestPanel.jsx (the manual, on-demand deep check) and
-// useConnectionHealth.js (the automatic one powering the toolbar's
-// connection-status dot, live from the instant a connection goes "armed"
-// through roasting/cooling) -- same bounds/logic either way, so the two
-// never quietly disagree about what "normal" means.
+// Used by ConnectionTestPanel.jsx's manual, on-demand "Run read-only test".
 
 // Every channel worth checking on a full modbus_live connection -- ms6514
 // only ever has bt/et, tc4_live only has bt/et/dt (see channelsForMode

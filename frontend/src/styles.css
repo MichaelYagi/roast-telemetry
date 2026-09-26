@@ -2231,35 +2231,8 @@ button:disabled {
   overflow-wrap: break-word;
 }
 
-/* Connection-status dot beside the title (RoastToolbar) -- yellow
-   while checking (right after ON, before enough readings have come in
-   to call it either way), green once readings look normal, red if
-   they don't. See useConnectionHealth.js. */
-.connection-status-dot {
-  display: inline-block;
-  width: 0.6em;
-  height: 0.6em;
-  border-radius: 50%;
-  margin-right: 0.4em;
-  vertical-align: middle;
-}
-
-.connection-status-dot-checking {
-  background: #ca8a04;
-}
-
-.connection-status-dot-pass {
-  background: #16a34a;
-}
-
-.connection-status-dot-fail {
-  background: #dc2626;
-}
-
-/* Global server/roaster status dot in the app header (App.jsx, beside
-   the title) -- distinct from .connection-status-dot above, which is
-   per-roast and only exists on the Live Roast screen. See
-   useServerStatus.js for what each color means. */
+/* Server/roaster status dot in the app header (App.jsx, beside the
+   title). See useServerStatus.js for what each color means. */
 .server-status-dot {
   display: inline-block;
   width: 0.6em;

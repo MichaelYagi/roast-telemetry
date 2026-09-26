@@ -135,6 +135,7 @@ async def update_settings(settings: AppSettings, http_request: Request) -> AppSe
         chart_series_visible=series_visible,
         history_page_size=history_page_size,
         max_compare=max_compare,
+        away_alarm_enabled=settings.away_alarm_enabled,
         control=control.model_dump(),
     )
     # Not what tripped while it was off (see enter_safe_state's own
@@ -164,6 +165,7 @@ async def update_settings(settings: AppSettings, http_request: Request) -> AppSe
         chart_series_visible=series_visible,
         history_page_size=history_page_size,
         max_compare=max_compare,
+        away_alarm_enabled=settings.away_alarm_enabled,
         control=control,
     )
     await settings_pubsub.publish(result.model_dump_json())
