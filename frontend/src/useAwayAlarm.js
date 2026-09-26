@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-const BEEP_INTERVAL_MS = 12000; // a nudge every 12s, not a siren
+const BEEP_INTERVAL_MS = 5000; // a nudge every 5s -- 12s felt like too long a gap
 const BEEP_DURATION_S = 0.5;
 const BEEP_FREQUENCY_HZ = 660; // E5 -- a softer sine chime, not the old harsh square wave
 const BEEP_GAIN = 0.12; // quiet -- meant to be noticed, not startling
