@@ -11,7 +11,7 @@ import {
 // A controlled editor for AppSettings.vertical_control_layout/
 // vertical_control_arrows -- the vertical control panel beside the live
 // chart (see VerticalControlPanel.jsx), which fully replaced the old
-// always-on horizontal Controls panel. Drum/Air have no show/hide toggle
+// always-on horizontal Controls panel. Drum/Fan have no show/hide toggle
 // here (they're mandatory -- see normalizeLayout's own docstring for why);
 // Burner %/Burner SV each get one, with "at least one of the two" enforced
 // by disabling the last remaining Remove button rather than allowing a

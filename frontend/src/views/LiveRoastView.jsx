@@ -988,7 +988,7 @@ export default function LiveRoastView() {
 
   // "idle" here means "connected via connect(), not yet recording" (see
   // RoastSession.connect()/apply_command() on the backend) -- lets
-  // Air/Drum/Burner controls (and Testing Mode's checks) work while
+  // Fan/Drum/Burner controls (and Testing Mode's checks) work while
   // merely armed (controls work before recording starts), not
   // just once an actual roast is roasting/cooling.
   const isActive = roast && (roast.status === "roasting" || roast.status === "cooling" || roast.status === "idle");
@@ -1506,7 +1506,7 @@ export default function LiveRoastView() {
                   </div>
                   <div className="form-row">
                     <label>
-                      {t("liveRoast.modbus.slaveId", { ch: "Air" })}
+                      {t("liveRoast.modbus.slaveId", { ch: "Fan" })}
                       <input
                         type="number"
                         placeholder="2"
@@ -1515,7 +1515,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      {t("liveRoast.modbus.runStopRegister", { ch: "Air" })}
+                      {t("liveRoast.modbus.runStopRegister", { ch: "Fan" })}
                       <input
                         type="number"
                         placeholder="8192"
@@ -1524,7 +1524,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      {t("liveRoast.modbus.frequencyRegister", { ch: "Air" })}
+                      {t("liveRoast.modbus.frequencyRegister", { ch: "Fan" })}
                       <input
                         type="number"
                         placeholder="8193"
@@ -1533,7 +1533,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      {t("liveRoast.modbus.feedbackRegister", { ch: "Air" })}
+                      {t("liveRoast.modbus.feedbackRegister", { ch: "Fan" })}
                       <input
                         type="number"
                         placeholder="8451"
@@ -1542,7 +1542,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      {t("liveRoast.modbus.minRpm", { ch: "Air" })}
+                      {t("liveRoast.modbus.minRpm", { ch: "Fan" })}
                       <input
                         type="number"
                         placeholder="0"
@@ -1551,7 +1551,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      {t("liveRoast.modbus.maxRpm", { ch: "Air" })}
+                      {t("liveRoast.modbus.maxRpm", { ch: "Fan" })}
                       <input
                         type="number"
                         placeholder="100"

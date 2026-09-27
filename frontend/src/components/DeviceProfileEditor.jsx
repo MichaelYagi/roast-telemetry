@@ -6,7 +6,7 @@ import { useConfirm } from "./DialogProvider.jsx";
 const TEMP_ROLES = ["bt", "et", "dt", "extra"];
 const CONTROL_SLOTS = [
   { value: "heater_pct", label: "Burner" },
-  { value: "fan_pct", label: "Air" },
+  { value: "fan_pct", label: "Fan" },
   { value: "drum_speed_pct", label: "Drum" },
 ];
 

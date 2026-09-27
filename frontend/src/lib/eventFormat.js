@@ -1,5 +1,5 @@
 // What to show in brackets after an event on a roast's page.
-//  - an event tied to a control (Air, Burner...): "(Burner: 60)"
+//  - an event tied to a control (Fan, Burner...): "(Burner: 60)"
 //  - a plain marker with a number but no control ("--" in the log file): "(value 18.5)"
 //  - anything else with a number is a bean temperature: "(204.4°F)"
 export function formatEventValue(ev, formatTemp, tempUnit) {

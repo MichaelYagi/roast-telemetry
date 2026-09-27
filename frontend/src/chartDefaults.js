@@ -16,7 +16,7 @@ export function tempAxisMax(unit, dataMax) {
   return Math.max(floor, Math.ceil((dataMax + 10) / 50) * 50);
 }
 
-// 0 in both units: the control lines (Burner/Air/Drum/Damper, 0-100) share this
+// 0 in both units: the control lines (Burner/Fan/Drum/Damper, 0-100) share this
 // axis and sit in its low band, so it has to start at 0 -- not at 32 F.
 export function tempAxisMin() {
   return 0;

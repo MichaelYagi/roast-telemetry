@@ -11,10 +11,10 @@ const SAMPLE_INTERVAL_MS = 250; // just samples the already-live `latest` prop -
 // Per-(mode, channel) metadata for whichever channel(s) that mode's
 // write-test/nudge flow actually uses. fan_pct/drum_speed_pct mean
 // genuinely different things depending on which device is on the other
-// end -- Modbus's Air/Drum are real RPM-reporting VFD drives (register
+// end -- Modbus's Fan/Drum are real RPM-reporting VFD drives (register
 // writes, see modbus_bridge/engine.py's own docstring: same registers
 // 8192/8193/8451, same blog-sourced-only origin, just different slave
-// IDs -- Drum is a genuine differential test if Air's nudge doesn't
+// IDs -- Drum is a genuine differential test if Fan's nudge doesn't
 // visibly move anything, not a "more trustworthy" alternative); Aillio's
 // Fan/Drum are a small device-native 0-100% scale sent as raw USB
 // command packets, not registers at all (see aillio_bridge/r1.py --
@@ -26,7 +26,7 @@ const SAMPLE_INTERVAL_MS = 250; // just samples the already-live `latest` prop -
 // three different things), so this is keyed by mode first.
 const CHANNEL_META = {
   modbus_live: {
-    fan_pct: { label: "Air", unit: "RPM", nudgeMax: 100, nudgeAmount: 5, nudgeHoldMs: 2000, moverLabel: "fan" },
+    fan_pct: { label: "Fan", unit: "RPM", nudgeMax: 100, nudgeAmount: 5, nudgeHoldMs: 2000, moverLabel: "fan" },
     drum_speed_pct: { label: "Drum", unit: "RPM", nudgeMax: 70, nudgeAmount: 5, nudgeHoldMs: 2000, moverLabel: "drum motor" },
   },
   aillio_live: {
@@ -52,7 +52,7 @@ function unitSuffixFor(mode, channel) {
 }
 
 // modbus_live and aillio_live both genuinely poll Fan back from the
-// device (Air's VFD feedback register / AillioEngine.tick()'s _poll())
+// device (Fan's VFD feedback register / AillioEngine.tick()'s _poll())
 // -- a round-trip write-then-read-back check means something real for
 // either. tc4_live's OT1/DCFAN are write-only, no such poll exists.
 const ROUNDTRIP_CHANNEL = { modbus_live: "fan_pct", aillio_live: "fan_pct" };
@@ -96,9 +96,9 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     latestRef.current = latest;
   }, [latest]);
 
-  // ms6514 is a read-only thermocouple meter (no Burner/Air/Drum, no
+  // ms6514 is a read-only thermocouple meter (no Burner/Fan/Drum, no
   // apply_command effect at all -- see ms6514_bridge/engine.py) -- nothing
-  // to write there. modbus_live has Air/Drum VFD registers plus a Burner
+  // to write there. modbus_live has Fan/Drum VFD registers plus a Burner
   // SV register. aillio_live has real Heater/Fan/Drum control, genuinely
   // polled back from the device. tc4_live has real Heater (OT1)/Fan
   // (DCFAN) control, just with no feedback register at all -- see the
@@ -162,7 +162,7 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     }
     try {
       // The benign write: read the channel's own current value, write
-      // that exact same value straight back. On an idle machine (Fan/Air
+      // that exact same value straight back. On an idle machine (Fan
       // almost always already off) this writes "off" over "off" --
       // genuinely zero physical effect, while still exercising the real
       // write path (command encoding, the connection, the device's own

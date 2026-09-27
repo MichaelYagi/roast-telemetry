@@ -6,7 +6,7 @@ import { celsiusToUnit, unitToCelsius, unitSuffix } from "../tempUnits.js";
 
 // Replaces the old horizontal Controls panel entirely -- no fallback
 // below the chart any more (see the design discussion this came out of:
-// Drum/Air are always shown here specifically so there's never a roast
+// Drum/Fan are always shown here specifically so there's never a roast
 // with zero way to touch a control, even before Settings has been
 // visited). Sits beside the chart (LiveRoastView.jsx's .scope-body, before
 // .scope-chart), one vertical slider per configured channel, arranged into
@@ -48,7 +48,7 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
   // pairing dropped), so this still respects the Settings ordering.
   const groups = isMobile ? normalizedGroups.flat().map((key) => [key]) : normalizedGroups;
 
-  // Two independent numeric-state pairs: Drum/Air are simple, one write
+  // Two independent numeric-state pairs: Drum/Fan are simple, one write
   // path each, same as the old ControlPanel. Burner is a pair (heater_pct
   // %, burner_sv_c °C) that mirror each other -- see handleBurnerPctChange/
   // handleBurnerSvChange below for the optimistic local conversion between
@@ -58,7 +58,7 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
   const [fan, setFan] = useState(initial?.fan_pct ?? null);
   const [heater, setHeater] = useState(initial?.heater_pct ?? null);
   const [sv, setSv] = useState(initial?.burner_sv_c ?? null);
-  // Drum/Air only -- a real on/off gesture separate from the slider's own
+  // Drum/Fan only -- a real on/off gesture separate from the slider's own
   // position (see toggleDrumOn/toggleAirOn below), matching a real VFD
   // drive's own run/stop control instead of overloading "value is 0" as
   // the only way to stop it. Burner/SV have no equivalent -- they're a
@@ -184,7 +184,7 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
       : null,
   };
 
-  // Drum/Air only -- [isOn, toggle]. Burner/SV aren't in here at all,
+  // Drum/Fan only -- [isOn, toggle]. Burner/SV aren't in here at all,
   // since they have no on/off concept; `TOGGLES[key]` being undefined is
   // exactly how slider() below tells "plain text label" from "button."
   const TOGGLES = {

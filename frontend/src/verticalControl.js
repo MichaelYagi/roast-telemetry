@@ -9,7 +9,7 @@
 // -- their 0-100/0-70 range is just this machine's actual RPM range.
 export const VERTICAL_CONTROL_ITEMS = [
   { key: "drum_speed_pct", label: "Drum", unit: " RPM", color: "#16a34a", mandatory: true },
-  { key: "fan_pct", label: "Air", unit: " RPM", color: "#0891b2", mandatory: true },
+  { key: "fan_pct", label: "Fan", unit: " RPM", color: "#0891b2", mandatory: true },
   { key: "heater_pct", label: "Burner", unit: "%", color: "#f59e0b", mandatory: false },
   { key: "burner_sv_c", label: "SV", unit: "°C", color: "#92400e", mandatory: false },
 ];
@@ -66,7 +66,7 @@ export function flatToGroups(flat) {
 // configured only burner_sv_c -- whenever the connected mode/device has
 // no SV range: simulator never has one at all, so a "Burner SV only"
 // layout used to leave a simulator roast with *no* burner control
-// whatsoever (confirmed live: Drum/Air only, no way to touch the heat
+// whatsoever (confirmed live: Drum/Fan only, no way to touch the heat
 // mid-roast). A working control that isn't exactly what Settings asked
 // for beats no control at all -- this only matters on a connection that
 // genuinely can't offer SV; a mode/device that does (e.g. the FZ-94

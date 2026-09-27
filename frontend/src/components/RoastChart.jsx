@@ -54,7 +54,10 @@ const SERIES_DEFS = [
   { key: "ROR_BT", label: "RoR (BT)", color: "#1d4ed8", axis: "yRor", source: "profile", field: "ror_bt", defaultOn: true },
   { key: "ROR_ET", label: "RoR (ET)", color: "#be123c", axis: "yRor", source: "profile", field: "ror_et", defaultOn: false },
   { key: "Burner", label: "Burner", color: "#f59e0b", axis: "yControl", source: "channel", defaultOn: false },
-  { key: "Air", label: "Air", color: "#0891b2", axis: "yControl", source: "channel", defaultOn: false },
+  // key stays "Air" (matches CONTINUOUS_FIELD_BY_CHANNEL above, CHART_SERIES_KEYS
+  // on the backend, and the channel value on historical manual-adjustment
+  // events/.alog files); only the displayed label changed to "Fan".
+  { key: "Air", label: "Fan", color: "#0891b2", axis: "yControl", source: "channel", defaultOn: false },
   { key: "Drum", label: "Drum", color: "#16a34a", axis: "yControl", source: "channel", defaultOn: false },
   { key: "Damper", label: "Damper", color: "#7c3aed", axis: "yControl", source: "channel", defaultOn: false },
 ];
@@ -264,7 +267,7 @@ function markerPosition(chart, ev, tempUnit, dragPreviewTimeS) {
 // named milestone's point on the BT curve, with a stem + dot down to the
 // actual point. Manual control-channel (CUSTOM) events are excluded here
 // -- with dozens of those per roast, boxing each one would bury the
-// chart; they're already visualized via the Burner/Air/Drum/Damper step
+// chart; they're already visualized via the Burner/Fan/Drum/Damper step
 // curves and listed in the Events panel instead.
 const eventMarkersPlugin = {
   id: "eventMarkers",
@@ -573,7 +576,7 @@ const RoastChart = forwardRef(function RoastChart({
         const hasContinuous = continuousField && profile.some((p) => p[continuousField] != null);
         if (hasContinuous) {
           points = profile.map((p) => ({ x: p.time_s, y: p[continuousField] }));
-          // Air/Drum are Delta VFD-L drives that are actually just
+          // Fan/Drum are Delta VFD-L drives that are actually just
           // on/off on the FZ-94 (confirmed against real hardware) -- the
           // real change between two samples is instant, not a ramp, so
           // the curve shouldn't imply one either. Burner (and Damper,
@@ -588,7 +591,7 @@ const RoastChart = forwardRef(function RoastChart({
       return {
         label: s.label,
         data: points,
-        // Control channels (Burner/Air/Drum/Damper, 0-100) are drawn low on the
+        // Control channels (Burner/Fan/Drum/Damper, 0-100) are drawn low on the
         // temperature axis, in its 0-100 band, rather than on an axis of their own.
         isControl: s.axis === "yControl",
         borderColor: s.color,
