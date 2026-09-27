@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roast Analysis Playbook &mdash; Roast Telemetry Docs</title>
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="icon" href="../assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16x16.png">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="../index.html"><img src="../assets/icon-48x48.png" alt="" width="24" height="24"> Roast Telemetry</a>
+  <nav>
+    <a href="../index.html">Docs</a>
+    <a href="../getting-started.html">Getting Started</a>
+    <a href="../settings.html">Settings</a>
+    <a href="../control.html">Control &amp; Safety</a>
+    <a href="../analysis.html">Analysis</a>
+    <a href="../modbus/index.html">Direct Modbus</a>
+    <a href="../architecture.html">Architecture</a>
+    <a href="../glossary.html">Glossary</a>
+    <a href="https://github.com/MichaelYagi/roast-telemetry">GitHub</a>
+  </nav>
+</header>
+<main>
+  <h1>Roast Analysis Playbook</h1>
+  <p>
+    A worked example for the <a href="../analysis.html#analysis-page">Analysis page</a>'s three tabs, in the order
+    you'd actually reach for them. One running example throughout: a shop roasting <strong>Ethiopia
+    Yirgacheffe</strong> every week. The numbers below are illustrative, not real data &mdash; swap in your own bean
+    and figures.
+  </p>
+
+  <h2 id="drift">1. Drift &mdash; catches the one-off</h2>
+  <p>
+    Flags any roast more than two standard deviations from how that <em>same bean</em> usually roasts, across every
+    number that matters for repeatability &mdash; not just whatever happens to be plotted on Explore. Always grouped
+    by beans, no setup needed. Check it after every roast, or in a weekly batch review.
+  </p>
+  <div class="callout">
+    <strong>Example:</strong> Underdeveloped Batch &middot; Ethiopia Yirgacheffe &middot;
+    Development time: 0:10 (&minus;2.0&nbsp;SD) &mdash; usual for this bean: 1:43&nbsp;&plusmn;&nbsp;0:41.
+  </div>
+  <p>
+    <strong>What it means:</strong> one batch, not a trend &mdash; something was different about this roast
+    specifically, worth a second look before it ships.
+  </p>
+
+  <h2 id="trends">2. Trends &mdash; catches the slow slide</h2>
+  <p>
+    A fixed small chart per key number (roast duration, drop temperature, development time, development %, weight
+    loss), each plotted against date with a rolling average, regardless of bean. Check it on a schedule &mdash;
+    weekly or monthly &mdash; independent of any one bean.
+  </p>
+  <div class="callout">
+    <strong>Example:</strong> Drop temperature, rolling average, last 6 weeks: 178.4&deg;C &rarr; 181.6&deg;C
+    (+3.2&deg;C).
+  </div>
+  <p>
+    <strong>What it means:</strong> a gradual shift, not one bad batch &mdash; probe calibration, burner efficiency
+    and airflow are the usual suspects.
+  </p>
+
+  <h2 id="explore">3. Explore &mdash; finds the relationship</h2>
+  <p>
+    Pick any two numbers (or Date) for Across/Up, and a group to colour by. Each roast is a point &mdash; for
+    finding what correlates with what, or comparing groups against each other. Reach for it when something needs
+    explaining, or a recipe needs tuning.
+  </p>
+  <div class="callout">
+    <strong>Example:</strong> Across = Charge temperature, Up = Development time, Colour by = Beans &mdash; the
+    Ethiopia Yirgacheffe dots slope downward: higher charge temperature, shorter development time, visible across
+    18 points.
+  </div>
+  <p>
+    <strong>What it means:</strong> a lever you didn't know you had &mdash; useful for dialing in a recipe, or
+    explaining why one roast tasted different from the last.
+  </p>
+
+  <h2 id="action-plan">Action plan</h2>
+  <p>
+    Same priority order as the tabs above: chase the specific signal first, the slow one second, the investigative
+    one when you actually need to change something.
+  </p>
+  <ol>
+    <li><strong>From Drift:</strong> open the flagged roast and check its tasting notes or outcome. If it tasted
+      off, log why (bigger batch that day, a newly opened bag, something you got pulled away from) so it's not a
+      mystery next time. If it tasted fine, your "normal" window might be tighter than it needs to be.</li>
+    <li><strong>From Trends:</strong> treat a multi-week creep as an equipment question, not a recipe one &mdash;
+      check and clean the roaster, verify probe calibration if you can, then keep watching Trends over the next
+      couple of weeks to confirm it actually stabilizes rather than keeps climbing.</li>
+    <li><strong>From Explore:</strong> pick a charge-temperature target that gives the development time you
+      actually want, update the recipe or preset, then watch Trends and Drift over the next several batches to
+      confirm the change stuck and didn't just move the problem somewhere else.</li>
+  </ol>
+
+  <p>
+    Drift and Explore's own <a href="../analysis.html#analysis-page">Roasts that stand out</a> list use the same
+    threshold (two or more standard deviations, five or more roasts in the group). Drift always groups by beans;
+    Roasts that stand out follows whatever Explore is currently grouped and plotted by.
+  </p>
+
+  <div class="page-nav"><a href="../index.html">&larr; Back to docs home</a></div>
+</main>
+<script src="../assets/toc.js" defer></script>
+</body>
+</html>
