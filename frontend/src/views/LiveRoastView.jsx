@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, settingsStreamUrl } from "../api/client.js";
 import { useRoastStream } from "../api/ws.js";
@@ -136,15 +137,8 @@ const CHART_MIN_HEIGHT = 260;
 const CHART_HEIGHT_STORAGE_KEY = "roast-telemetry:chartHeight";
 const CHART_DEFAULT_HEIGHT = 420; // RoastChart's own default -- kept in sync explicitly, see chartHeight state below
 
-const STATUS_TEXT = {
-  idle: "Configure a roast, then press ON to connect the device.",
-  armed: "Device connected. Press START to begin recording.",
-  roasting: "Scope recording…",
-  cooling: "Cooling…",
-  finished: "Roast finished. Press RESET to configure a new one.",
-};
-
 export default function LiveRoastView() {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     title: defaultTitle(),
     mode: "simulator",
@@ -625,7 +619,7 @@ export default function LiveRoastView() {
   // unhelpfully-titled roast later in History).
   function requireTitle() {
     if (form.title.trim()) return true;
-    setError("Title is required.");
+    setError(t("liveRoast.requireTitleError"));
     return false;
   }
 
@@ -873,7 +867,7 @@ export default function LiveRoastView() {
       await api.savePreset(trimmed, buildConfigFromForm(), buildControlsFromForm());
       setPresetName("");
       setSelectedPresetId("");
-      setPresetFeedback(`Saved "${trimmed}" as a new config.`);
+      setPresetFeedback(t("liveRoast.savedFeedback", { name: trimmed }));
       refreshPresets();
     } catch (err) {
       setError(err.message);
@@ -887,7 +881,7 @@ export default function LiveRoastView() {
     try {
       const trimmed = presetName.trim();
       await api.updatePreset(selectedPresetId, trimmed, buildConfigFromForm(), buildControlsFromForm());
-      setPresetFeedback(`Updated "${trimmed}".`);
+      setPresetFeedback(t("liveRoast.updatedFeedback", { name: trimmed }));
       refreshPresets();
     } catch (err) {
       setError(err.message);
@@ -968,7 +962,7 @@ export default function LiveRoastView() {
         setSelectedPresetId("");
         setPresetName("");
       }
-      setPresetFeedback(name ? `Deleted "${name}".` : "Deleted.");
+      setPresetFeedback(name ? t("liveRoast.deletedFeedback", { name }) : t("liveRoast.deletedFeedbackPlain"));
       refreshPresets();
     } catch (err) {
       setError(err.message);
@@ -1117,7 +1111,7 @@ export default function LiveRoastView() {
       weightGreenG={roast?.weight_green_g ?? (form.weight_green_g ? Number(form.weight_green_g) : null)}
       phase={phase}
       elapsedLabel={elapsedLabel}
-      statusText={STATUS_TEXT[phase]}
+      statusText={t(`liveRoast.statusText.${phase}`)}
       onToggleConnect={handleToggleConnect}
       onStart={handleStart}
       simulated={simulated}
@@ -1144,13 +1138,13 @@ export default function LiveRoastView() {
             handleToggleConnect();
           }}
         >
-          <h2>Configure Roast</h2>
+          <h2>{t("liveRoast.configureRoast")}</h2>
           {presets.length > 0 && (
             <div className="form-row">
               <label>
-                Load saved config
+                {t("liveRoast.loadSavedConfig")}
                 <select value={selectedPresetId} onChange={(e) => handleLoadPreset(e.target.value)}>
-                  <option value="">(none)</option>
+                  <option value="">{t("liveRoast.none")}</option>
                   {/* User's own configs first (in their existing order),
                       built-ins appended at the bottom and grouped by
                       manufacturer -- built-ins are non-deletable
@@ -1189,21 +1183,21 @@ export default function LiveRoastView() {
                   style={{ alignSelf: "flex-end" }}
                   onClick={() => handleDeletePreset(selectedPresetId)}
                 >
-                  Delete selected config
+                  {t("liveRoast.deleteSelectedConfig")}
                 </button>
               )}
             </div>
           )}
           <div className="roast-form-tabs">
             <button type="button" className={activeTab === "general" ? "active" : ""} onClick={() => setActiveTab("general")}>
-              General
+              {t("liveRoast.tabs.general")}
             </button>
             <button type="button" className={activeTab === "device" ? "active" : ""} onClick={() => setActiveTab("device")}>
-              Device
+              {t("liveRoast.tabs.device")}
             </button>
             {availableTabs.includes("milestones") && (
               <button type="button" className={activeTab === "milestones" ? "active" : ""} onClick={() => setActiveTab("milestones")}>
-                Milestone / Automation
+                {t("liveRoast.tabs.milestones")}
               </button>
             )}
           </div>
@@ -1211,7 +1205,7 @@ export default function LiveRoastView() {
             <>
               <div className="form-row">
                 <label>
-                  Title *
+                  {t("liveRoast.title")}
                   <input
                     required
                     value={form.title}
@@ -1219,7 +1213,7 @@ export default function LiveRoastView() {
                   />
                 </label>
                 <label>
-                  Connection type
+                  {t("liveRoast.connectionType")}
                   {/* modbus_live covers both transports (see
                       modbus_transport above) -- USB and Ethernet are two
                       distinct dropdown entries here for clarity, but both
@@ -1239,20 +1233,20 @@ export default function LiveRoastView() {
                       }
                     }}
                   >
-                    <option value="simulator">Simulator</option>
-                    <option value="alog_playback">.alog Playback</option>
-                    <option value="modbus_live">Direct Modbus (USB)</option>
-                    <option value="modbus_live_tcp">Direct Modbus (Ethernet)</option>
-                    <option value="ms6514_live">Direct USB (thermocouple meter)</option>
-                    <option value="aillio_live">Aillio Bullet (USB)</option>
-                    <option value="tc4_live">TC4+ (USB, PID firmware)</option>
+                    <option value="simulator">{t("liveRoast.connectionOptions.simulator")}</option>
+                    <option value="alog_playback">{t("liveRoast.connectionOptions.alogPlayback")}</option>
+                    <option value="modbus_live">{t("liveRoast.connectionOptions.modbusUsb")}</option>
+                    <option value="modbus_live_tcp">{t("liveRoast.connectionOptions.modbusEthernet")}</option>
+                    <option value="ms6514_live">{t("liveRoast.connectionOptions.ms6514")}</option>
+                    <option value="aillio_live">{t("liveRoast.connectionOptions.aillio")}</option>
+                    <option value="tc4_live">{t("liveRoast.connectionOptions.tc4")}</option>
                   </select>
                 </label>
               </div>
               <div className="form-row">
                 <BeansField className="form-field" value={form.beans} onChange={(text) => setForm({ ...form, beans: text })} />
                 <label>
-                  Green weight (g)
+                  {t("liveRoast.greenWeightG")}
                   <input
                     type="number"
                     value={form.weight_green_g}
@@ -1265,11 +1259,11 @@ export default function LiveRoastView() {
           {activeTab === "device" && form.mode === "alog_playback" && (
             <div className="form-row">
               <label>
-                .alog or .json file path (server-side)
+                {t("liveRoast.alogPath")}
                 <input value={form.alog_path} onChange={(e) => setForm({ ...form, alog_path: e.target.value })} />
               </label>
               <label>
-                Playback speed
+                {t("liveRoast.playbackSpeed")}
                 <input
                   type="number"
                   step="0.5"
@@ -1285,7 +1279,7 @@ export default function LiveRoastView() {
               {form.modbus_transport === "tcp" ? (
                 <>
                   <label>
-                    Host / IP address
+                    {t("liveRoast.hostIpAddress")}
                     <input
                       placeholder="192.168.1.2"
                       value={form.modbus_host}
@@ -1294,7 +1288,7 @@ export default function LiveRoastView() {
                     <SimulatedDeviceHint kind="fz94_evo" value={form.modbus_host} onChange={(v) => setForm({ ...form, modbus_host: v })} />
                   </label>
                   <label>
-                    TCP port
+                    {t("liveRoast.tcpPort")}
                     <input
                       type="number"
                       value={form.modbus_tcp_port}
@@ -1320,7 +1314,7 @@ export default function LiveRoastView() {
                     ))}
                   </datalist>
                   <label>
-                    Serial port
+                    {t("liveRoast.serialPort")}
                     <span className="serial-port-input-row">
                       <input
                         placeholder="COM3"
@@ -1333,18 +1327,18 @@ export default function LiveRoastView() {
                         className="advanced-toggle"
                         onClick={refreshSerialPorts}
                         disabled={serialPortsLoading}
-                        title="Re-scan for connected serial ports"
+                        title={t("liveRoast.rescanPorts")}
                       >
                         {serialPortsLoading ? "…" : "⟳"}
                       </button>
                     </span>
                     {portsFor("modbus_live").every((p) => p.simulated) && !serialPortsLoading && (
-                      <span className="hint">No serial ports detected -- plug your adapter in, then ⟳.</span>
+                      <span className="hint">{t("liveRoast.noSerialPortsDetected")}</span>
                     )}
                     <SimulatedDeviceHint kind="fz94" value={form.modbus_port} onChange={(v) => setForm({ ...form, modbus_port: v })} />
                   </label>
                   <label>
-                    Baud rate
+                    {t("liveRoast.baudRate")}
                     <input
                       type="number"
                       value={form.modbus_baudrate}
@@ -1352,16 +1346,16 @@ export default function LiveRoastView() {
                     />
                   </label>
                   <label>
-                    Separate drive port (optional)
+                    {t("liveRoast.separateDrivePort")}
                     <input
-                      placeholder="only if your own wiring needs a 2nd connection for Air/Drum"
+                      placeholder={t("liveRoast.separateDrivePortPlaceholder")}
                       list="serial-ports-list"
                       value={form.modbus_control_port}
                       onChange={(e) => setForm({ ...form, modbus_control_port: e.target.value })}
                     />
                   </label>
                   <label>
-                    Drive baud rate
+                    {t("liveRoast.driveBaudRate")}
                     <input
                       type="number"
                       value={form.modbus_control_baudrate}
@@ -1371,44 +1365,36 @@ export default function LiveRoastView() {
                 </>
               )}
               <label>
-                Device profile
+                {t("liveRoast.deviceProfile")}
                 <select
                   value={form.modbus_device_profile_id}
                   onChange={(e) => setForm({ ...form, modbus_device_profile_id: e.target.value })}
                 >
                   {/* TCP has no flat-register "Custom" fallback -- a
                       profile is required (see RoastSession's own guard). */}
-                  {form.modbus_transport !== "tcp" && <option value="">Custom (advanced fields below)</option>}
+                  {form.modbus_transport !== "tcp" && <option value="">{t("liveRoast.customAdvancedFields")}</option>}
                   {deviceProfiles.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
-                      {p.built_in ? " (built-in)" : ""}
+                      {p.built_in ? t("liveRoast.builtIn") : ""}
                     </option>
                   ))}
                 </select>
               </label>
               {form.modbus_device_profile_id && (
                 <p className="hint">
-                  Using the "{deviceProfiles.find((p) => p.id === form.modbus_device_profile_id)?.name}" register
-                  map -- the advanced fields below don't apply while a profile is selected. Pick "Custom" above to
-                  go back to setting individual registers by hand.
+                  {t("liveRoast.usingProfileHint", {
+                    name: deviceProfiles.find((p) => p.id === form.modbus_device_profile_id)?.name,
+                  })}
                 </p>
               )}
               <DeviceProfileEditor onChange={refreshDeviceProfiles} />
               {form.modbus_transport !== "tcp" && !form.modbus_device_profile_id && (
                 <div className="advanced-modbus-fields">
-                  <p className="hint">
-                    Leave any of these blank to use the FZ-94 defaults above. Only worth touching once you've
-                    confirmed your own unit's actual register map differs (see the VFD's own nameplate/front-panel
-                    parameters, or a real probe's slave ID). BT/ET/DT/Burner are confirmed against a shipped
-                    FZ-94 machine preset and its interpreting source code — exposed here for a genuinely different
-                    Modbus roaster, not because a real FZ-94 should need them changed. Air/Drum (control+feedback
-                    registers, operating range) and the Burner SV°C range are that engine's least-confirmed,
-                    blog-sourced defaults.
-                  </p>
+                  <p className="hint">{t("liveRoast.advancedModbusHint")}</p>
                   <div className="form-row">
                     <label>
-                      BT slave ID
+                      {t("liveRoast.modbus.slaveId", { ch: "BT" })}
                       <input
                         type="number"
                         placeholder="11"
@@ -1417,7 +1403,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      BT register
+                      {t("liveRoast.modbus.register", { ch: "BT" })}
                       <input
                         type="number"
                         placeholder="0"
@@ -1426,7 +1412,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      BT divisor
+                      {t("liveRoast.modbus.divisor", { ch: "BT" })}
                       <input
                         type="number"
                         placeholder="10"
@@ -1435,7 +1421,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      ET slave ID
+                      {t("liveRoast.modbus.slaveId", { ch: "ET" })}
                       <input
                         type="number"
                         placeholder="13"
@@ -1444,7 +1430,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      ET register
+                      {t("liveRoast.modbus.register", { ch: "ET" })}
                       <input
                         type="number"
                         placeholder="0"
@@ -1453,7 +1439,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      ET divisor
+                      {t("liveRoast.modbus.divisor", { ch: "ET" })}
                       <input
                         type="number"
                         placeholder="10"
@@ -1464,7 +1450,7 @@ export default function LiveRoastView() {
                   </div>
                   <div className="form-row">
                     <label>
-                      DT slave ID
+                      {t("liveRoast.modbus.slaveId", { ch: "DT" })}
                       <input
                         type="number"
                         placeholder="12"
@@ -1473,7 +1459,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      DT register
+                      {t("liveRoast.modbus.register", { ch: "DT" })}
                       <input
                         type="number"
                         placeholder="0"
@@ -1482,7 +1468,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      DT divisor
+                      {t("liveRoast.modbus.divisor", { ch: "DT" })}
                       <input
                         type="number"
                         placeholder="10"
@@ -1491,7 +1477,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Burner slave ID
+                      {t("liveRoast.modbus.slaveId", { ch: "Burner" })}
                       <input
                         type="number"
                         placeholder="12"
@@ -1500,7 +1486,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Burner register
+                      {t("liveRoast.modbus.register", { ch: "Burner" })}
                       <input
                         type="number"
                         placeholder="5"
@@ -1509,7 +1495,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Burner divisor
+                      {t("liveRoast.modbus.divisor", { ch: "Burner" })}
                       <input
                         type="number"
                         placeholder="10"
@@ -1520,7 +1506,7 @@ export default function LiveRoastView() {
                   </div>
                   <div className="form-row">
                     <label>
-                      Air slave ID
+                      {t("liveRoast.modbus.slaveId", { ch: "Air" })}
                       <input
                         type="number"
                         placeholder="2"
@@ -1529,7 +1515,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Air run/stop register
+                      {t("liveRoast.modbus.runStopRegister", { ch: "Air" })}
                       <input
                         type="number"
                         placeholder="8192"
@@ -1538,7 +1524,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Air frequency register
+                      {t("liveRoast.modbus.frequencyRegister", { ch: "Air" })}
                       <input
                         type="number"
                         placeholder="8193"
@@ -1547,7 +1533,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Air feedback register
+                      {t("liveRoast.modbus.feedbackRegister", { ch: "Air" })}
                       <input
                         type="number"
                         placeholder="8451"
@@ -1556,7 +1542,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Air min RPM
+                      {t("liveRoast.modbus.minRpm", { ch: "Air" })}
                       <input
                         type="number"
                         placeholder="0"
@@ -1565,7 +1551,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Air max RPM
+                      {t("liveRoast.modbus.maxRpm", { ch: "Air" })}
                       <input
                         type="number"
                         placeholder="100"
@@ -1576,7 +1562,7 @@ export default function LiveRoastView() {
                   </div>
                   <div className="form-row">
                     <label>
-                      Drum slave ID
+                      {t("liveRoast.modbus.slaveId", { ch: "Drum" })}
                       <input
                         type="number"
                         placeholder="1"
@@ -1585,7 +1571,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Drum run/stop register
+                      {t("liveRoast.modbus.runStopRegister", { ch: "Drum" })}
                       <input
                         type="number"
                         placeholder="8192"
@@ -1594,7 +1580,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Drum frequency register
+                      {t("liveRoast.modbus.frequencyRegister", { ch: "Drum" })}
                       <input
                         type="number"
                         placeholder="8193"
@@ -1603,7 +1589,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Drum feedback register
+                      {t("liveRoast.modbus.feedbackRegister", { ch: "Drum" })}
                       <input
                         type="number"
                         placeholder="8451"
@@ -1612,7 +1598,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Drum min RPM
+                      {t("liveRoast.modbus.minRpm", { ch: "Drum" })}
                       <input
                         type="number"
                         placeholder="0"
@@ -1621,7 +1607,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Drum max RPM
+                      {t("liveRoast.modbus.maxRpm", { ch: "Drum" })}
                       <input
                         type="number"
                         placeholder="70"
@@ -1632,7 +1618,7 @@ export default function LiveRoastView() {
                   </div>
                   <div className="form-row">
                     <label>
-                      Burner SV min °C (0% heater)
+                      {t("liveRoast.burnerSvMin")}
                       <input
                         type="number"
                         placeholder="100"
@@ -1641,7 +1627,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
-                      Burner SV max °C (100% heater)
+                      {t("liveRoast.burnerSvMax")}
                       <input
                         type="number"
                         placeholder="260"
@@ -1650,8 +1636,7 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <p className="hint" style={{ flexBasis: "100%" }}>
-                      Air/Drum min+max and the Burner SV min+max only take effect as pairs — set both sides or
-                      neither.
+                      {t("liveRoast.burnerSvPairHint")}
                     </p>
                   </div>
                 </div>
@@ -1661,7 +1646,7 @@ export default function LiveRoastView() {
           {activeTab === "device" && form.mode === "ms6514_live" && (
             <div className="form-row">
               <label>
-                Serial port
+                {t("liveRoast.serialPort")}
                 <input
                   placeholder="COM5"
                   list="serial-ports-ms6514"
@@ -1675,36 +1660,27 @@ export default function LiveRoastView() {
                 </datalist>
                 <SimulatedDeviceHint kind="ms6514" value={form.ms6514_port} onChange={(v) => setForm({ ...form, ms6514_port: v })} />
               </label>
-              <p className="hint">
-                Direct USB read of the Mastech MS6514 — reads straight over USB, no other software needed.
-                Read-only. T1 → BT, T2 → ET. Keep the meter's display set to "T1" or "T2" (not "T1-T2") for
-                reliable dual-channel reading. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a
-                manual click — mark them yourself as the roast happens.
-              </p>
+              <p className="hint">{t("liveRoast.ms6514Hint")}</p>
             </div>
           )}
           {activeTab === "device" && form.mode === "aillio_live" && (
             <div className="form-row">
               <label>
-                Model
+                {t("liveRoast.model")}
                 <select
                   value={form.aillio_model}
                   onChange={(e) => setForm({ ...form, aillio_model: e.target.value })}
                 >
-                  <option value="r1">Bullet R1</option>
+                  <option value="r1">{t("liveRoast.bulletR1")}</option>
                 </select>
               </label>
-              <p className="hint">
-                Talks directly to the roaster over USB (no port/host to configure — the app finds it by its
-                own USB vendor/product id). Heater/Fan/Drum read back the device's own last-reported state,
-                same "don't clobber real state" behavior as Direct Modbus.
-              </p>
+              <p className="hint">{t("liveRoast.aillioHint")}</p>
             </div>
           )}
           {activeTab === "device" && form.mode === "tc4_live" && (
             <div className="form-row">
               <label>
-                Serial port
+                {t("liveRoast.serialPort")}
                 <input
                   placeholder="COM5"
                   list="serial-ports-tc4"
@@ -1718,12 +1694,7 @@ export default function LiveRoastView() {
                 </datalist>
                 <SimulatedDeviceHint kind="tc4" value={form.tc4_port} onChange={(v) => setForm({ ...form, tc4_port: v })} />
               </label>
-              <p className="hint">
-                Direct USB read/write of a TC4+ shield running the aArtisanQ (PID) firmware, 115200 baud —
-                talks straight over USB, no other software needed. Channel 1 → BT, channel 2 → ET, channel 3
-                (if wired) → DT. Heater and Fan sliders send real OT1/DCFAN commands; there's no Drum output
-                on TC4, so that slider doesn't do anything here.
-              </p>
+              <p className="hint">{t("liveRoast.tc4Hint")}</p>
             </div>
           )}
           {activeTab === "milestones" && LIVE_MODES.includes(form.mode) && (
@@ -1734,10 +1705,10 @@ export default function LiveRoastView() {
                   checked={form.auto_detect_milestones}
                   onChange={(e) => setForm({ ...form, auto_detect_milestones: e.target.checked })}
                 />
-                Auto-detect Charge/Dry End/FC Start from BT (opt-in)
+                {t("liveRoast.autoDetectMilestones")}
               </label>
               <label>
-                Dry End BT threshold (°C, blank to disable)
+                {t("liveRoast.dryEndThreshold")}
                 <input
                   type="number"
                   value={form.dry_end_c}
@@ -1746,7 +1717,7 @@ export default function LiveRoastView() {
                 />
               </label>
               <label>
-                FC Start BT threshold (°C, blank to disable)
+                {t("liveRoast.fcStartThreshold")}
                 <input
                   type="number"
                   value={form.fc_start_c}
@@ -1759,7 +1730,7 @@ export default function LiveRoastView() {
           {activeTab === "device" && (AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) || CONTROLLABLE_LIVE_MODES.includes(form.mode)) && (
             <div className="form-row">
               <label>
-                Burner % at start
+                {t("liveRoast.burnerPctAtStart")}
                 <span className="input-suffix-group">
                   <input
                     type="number" min="0" max="100"
@@ -1775,7 +1746,7 @@ export default function LiveRoastView() {
                     this same 0-100% field server-side, see
                     aillio_bridge/r1.py), not RPM, so it gets the generic "%"
                     label instead rather than a unit that isn't true for it. */}
-                {form.mode === "modbus_live" ? "Air RPM at start" : "Fan % at start"}
+                {form.mode === "modbus_live" ? t("liveRoast.airRpmAtStart") : t("liveRoast.fanPctAtStart")}
                 <span className="input-suffix-group">
                   <input
                     type="number" min="0" max="100"
@@ -1786,7 +1757,7 @@ export default function LiveRoastView() {
                 </span>
               </label>
               <label>
-                {form.mode === "modbus_live" ? "Drum RPM at start" : "Drum % at start"}
+                {form.mode === "modbus_live" ? t("liveRoast.drumRpmAtStart") : t("liveRoast.drumPctAtStart")}
                 <span className="input-suffix-group">
                   <input
                     type="number" min="0" max="100"
@@ -1798,18 +1769,18 @@ export default function LiveRoastView() {
               </label>
               <p className="hint" style={{ flexBasis: "100%" }}>
                 {shouldAutoApplyStartingControls
-                  ? "Sent as the roast's first command right after START, and used as the Controls panel's starting position."
+                  ? t("liveRoast.startingControlsHintAlways")
                   : CONTROLLABLE_LIVE_MODES.includes(form.mode)
-                    ? "Only applied at START when loaded from a saved preset (see \"Load saved config\" above) -- a fresh start like this one leaves the roaster wherever it already is, so it's not clobbered by an unrelated stale value. Otherwise these are just what gets saved into a new preset below."
-                    : "Sent as the roast's first command right after START, and used as the Controls panel's starting position."}
+                    ? t("liveRoast.startingControlsHintPresetOnly")
+                    : t("liveRoast.startingControlsHintAlways")}
               </p>
             </div>
           )}
           {activeTab === "milestones" && CONTROLLABLE_LIVE_MODES.includes(form.mode) && (
             <p className="hint">
               {shouldAutoApplyStartingControls
-                ? "Burner/Air/Drum start from this preset's saved values (see the Device tab), sent right after START -- from then on, the Controls panel on the Live Roast page reads and shows whatever the roaster is actually doing."
-                : "Burner/Air/Drum aren't set here -- once connected, the Controls panel on the Live Roast page reads and shows whatever the roaster is actually doing (from the device itself, not a guess), and nothing is written to it until you move a slider yourself."}
+                ? t("liveRoast.milestonesHintPreset")
+                : t("liveRoast.milestonesHintNoPreset")}
             </p>
           )}
           {activeTab === "milestones" && form.mode === "modbus_live" && (
@@ -1820,9 +1791,9 @@ export default function LiveRoastView() {
           )}
           <div className="form-row save-preset-row">
             <label>
-              {selectedPresetId ? "Config name" : "Save this configuration as"}
+              {selectedPresetId ? t("liveRoast.configName") : t("liveRoast.saveConfigAs")}
               <input
-                placeholder="e.g. Fake FZ94 test rig"
+                placeholder={t("liveRoast.savePresetPlaceholder")}
                 value={presetName}
                 onChange={(e) => {
                   setPresetName(e.target.value);
@@ -1832,18 +1803,18 @@ export default function LiveRoastView() {
             </label>
             {selectedPresetId && !presets.find((p) => p.id === selectedPresetId)?.built_in && (
               <button type="button" onClick={handleUpdatePreset} disabled={!presetName.trim()}>
-                Update "{presets.find((p) => p.id === selectedPresetId)?.name}"
+                {t("liveRoast.updateConfig", { name: presets.find((p) => p.id === selectedPresetId)?.name })}
               </button>
             )}
             <button type="button" onClick={handleSavePreset} disabled={!presetName.trim()}>
-              Save as new config
+              {t("liveRoast.saveAsNewConfig")}
             </button>
           </div>
           {presetFeedback && <p className="hint preset-feedback">{presetFeedback}</p>}
           {/* No visible submit button here -- the toolbar's ON/OFF toggle above
               is the single control for this action. The form keeps onSubmit
               so pressing Enter in a field still arms it. */}
-          <p className="hint">Press ON above when you're ready to connect.</p>
+          <p className="hint">{t("liveRoast.pressOnHint")}</p>
           <button type="submit" hidden />
         </form>
       )}
@@ -1931,7 +1902,7 @@ export default function LiveRoastView() {
                 of, so dragging it still resizes all three together. */}
             <div
               className="scope-chart-resize-handle"
-              title="Drag to resize the chart row (controls/chart/Small Readout follow it)"
+              title={t("liveRoast.resizeChartHandle")}
               onPointerDown={handleChartResizePointerDown}
               onPointerMove={handleChartResizePointerMove}
               onPointerUp={handleChartResizePointerUp}
@@ -1945,7 +1916,7 @@ export default function LiveRoastView() {
             {pendingAlarms.length > 0 && (
               <p className="hint alarm-pending-hint">
                 {pendingAlarms
-                  .map((a) => `${a.trigger.replace("_", " ")} automation fires in ~${a.delaySeconds}s`)
+                  .map((a) => t("liveRoast.pendingAlarmText", { trigger: a.trigger.replace("_", " "), seconds: a.delaySeconds }))
                   .join(" · ")}
               </p>
             )}
@@ -1971,24 +1942,24 @@ export default function LiveRoastView() {
               <div>
                 <h2>{roast.title}</h2>
                 <p className="sub">
-                  {roast.mode} · status: <strong>{roast.status}</strong>
+                  {roast.mode} · {t("liveRoast.statusLabel")} <strong>{roast.status}</strong>
                 </p>
                 <ul className="live-meta">
                   {roast.mode === "alog_playback" && roast.source_alog_path && (
                     <li>
-                      <span className="meta-label">Source file</span>
+                      <span className="meta-label">{t("liveRoast.sourceFile")}</span>
                       <span className="meta-value">{roast.source_alog_path}</span>
                     </li>
                   )}
                   {roast.mode === "alog_playback" && roast.playback_speed != null && (
                     <li>
-                      <span className="meta-label">Playback speed</span>
+                      <span className="meta-label">{t("liveRoast.playbackSpeed")}</span>
                       <span className="meta-value">{roast.playback_speed}x</span>
                     </li>
                   )}
                   {roast.mode === "modbus_live" && (
                     <li>
-                      <span className="meta-label">Connection</span>
+                      <span className="meta-label">{t("liveRoast.connection")}</span>
                       <span className="meta-value">
                         {roast.modbus_transport === "tcp"
                           ? `${roast.modbus_host}:${roast.modbus_tcp_port}`
@@ -1999,25 +1970,25 @@ export default function LiveRoastView() {
                   )}
                   {roast.mode === "ms6514_live" && roast.ms6514_port && (
                     <li>
-                      <span className="meta-label">Serial port</span>
+                      <span className="meta-label">{t("liveRoast.serialPort")}</span>
                       <span className="meta-value">{roast.ms6514_port}</span>
                     </li>
                   )}
                   {roast.mode === "aillio_live" && roast.aillio_model && (
                     <li>
-                      <span className="meta-label">Model</span>
-                      <span className="meta-value">Aillio Bullet {roast.aillio_model.toUpperCase()}</span>
+                      <span className="meta-label">{t("liveRoast.model")}</span>
+                      <span className="meta-value">{t("liveRoast.aillioBulletModel", { model: roast.aillio_model.toUpperCase() })}</span>
                     </li>
                   )}
                   {roast.mode === "tc4_live" && roast.tc4_port && (
                     <li>
-                      <span className="meta-label">Serial port</span>
+                      <span className="meta-label">{t("liveRoast.serialPort")}</span>
                       <span className="meta-value">{roast.tc4_port}</span>
                     </li>
                   )}
                   {serverPlatform && (
                     <li>
-                      <span className="meta-label">Server</span>
+                      <span className="meta-label">{t("liveRoast.server")}</span>
                       <span className="meta-value">
                         {serverPlatform}
                         {serverOsVersion ? ` ${serverOsVersion}` : ""}
@@ -2028,7 +1999,7 @@ export default function LiveRoastView() {
                 </ul>
               </div>
               <div className="live-header-actions">
-                {phase === "finished" && <Link to={`/roasts/${roastId}`}>View detail</Link>}
+                {phase === "finished" && <Link to={`/roasts/${roastId}`}>{t("liveRoast.viewDetail")}</Link>}
               </div>
             </div>
           )}
@@ -2045,17 +2016,22 @@ export default function LiveRoastView() {
               <ul className="kv-list">
                 {roast.beans && (
                   <li>
-                    <span>Beans</span>
+                    <span>{t("liveRoast.beans")}</span>
                     <span>{roast.beans}</span>
                   </li>
                 )}
                 <li>
-                  <span>Tags</span>
+                  <span>{t("liveRoast.tags")}</span>
                   <span className="tag-edit-group">
-                    {(tagsSaved ?? roast.tags ?? []).map((t) => (
-                      <span key={t} className="tag-chip">
-                        {t}
-                        <button type="button" className="tag-chip-remove" onClick={() => handleRemoveTag(t)} aria-label={`Remove tag ${t}`}>
+                    {(tagsSaved ?? roast.tags ?? []).map((tagValue) => (
+                      <span key={tagValue} className="tag-chip">
+                        {tagValue}
+                        <button
+                          type="button"
+                          className="tag-chip-remove"
+                          onClick={() => handleRemoveTag(tagValue)}
+                          aria-label={t("liveRoast.removeTag", { tag: tagValue })}
+                        >
                           ×
                         </button>
                       </span>
@@ -2071,17 +2047,17 @@ export default function LiveRoastView() {
                             handleAddTag();
                           }
                         }}
-                        placeholder="Add tag…"
+                        placeholder={t("liveRoast.addTagPlaceholder")}
                         list="existing-tags-live"
                       />
                       <button type="button" onClick={handleAddTag} disabled={!newTagInput.trim()}>
-                        Add
+                        {t("liveRoast.add")}
                       </button>
                       <datalist id="existing-tags-live">
                         {allTags
-                          .filter((t) => !(tagsSaved ?? roast.tags ?? []).includes(t.tag))
-                          .map((t) => (
-                            <option key={t.tag} value={t.tag} />
+                          .filter((tagObj) => !(tagsSaved ?? roast.tags ?? []).includes(tagObj.tag))
+                          .map((tagObj) => (
+                            <option key={tagObj.tag} value={tagObj.tag} />
                           ))}
                       </datalist>
                     </span>
@@ -2094,14 +2070,14 @@ export default function LiveRoastView() {
                   </li>
                 )}
                 <li>
-                  <span>Green weight</span>
+                  <span>{t("liveRoast.greenWeight")}</span>
                   <span>
                     <WeightField value={greenWeightValue} onSave={handleSaveGreenWeight} onDelete={handleDeleteGreenWeight} />
                   </span>
                 </li>
                 {phase === "finished" && (
                   <li>
-                    <span>Roasted weight</span>
+                    <span>{t("liveRoast.roastedWeight")}</span>
                     <span>
                       <WeightField value={roastedWeightValue} onSave={handleSaveRoastedWeight} onDelete={handleDeleteRoastedWeight} />
                     </span>
@@ -2109,7 +2085,7 @@ export default function LiveRoastView() {
                 )}
                 {phase === "finished" && greenWeightValue && roastedWeightValue != null && (
                   <li>
-                    <span>Weight loss</span>
+                    <span>{t("liveRoast.weightLoss")}</span>
                     <span>{(((roastedWeightValue / greenWeightValue) - 1) * 100).toFixed(1)}%</span>
                   </li>
                 )}
@@ -2119,7 +2095,7 @@ export default function LiveRoastView() {
 
           {phase === "finished" && roast && (
             <div className="panel">
-              <h3>Roast Stats</h3>
+              <h3>{t("liveRoast.roastStats")}</h3>
               <RoastStatsPanel roastId={roast.id} />
             </div>
           )}
@@ -2128,7 +2104,7 @@ export default function LiveRoastView() {
             {CONTROLLABLE_MODES.includes(activeMode) && isActive && <AutoControlPanel roastId={roastId} />}
             {activeMode === "alog_playback" && (
               <div className="panel control-panel">
-                <h3>Playback Speed</h3>
+                <h3>{t("liveRoast.playbackSpeedHeading")}</h3>
                 <input
                   type="range"
                   min="0.5"
@@ -2142,16 +2118,14 @@ export default function LiveRoastView() {
             )}
             {activeMode === "ms6514_live" && (
               <div className="panel control-panel">
-                <h3>Mastech MS6514</h3>
+                <h3>{t("liveRoast.mastechHeading")}</h3>
                 <p className="hint">
-                  Reading {form.ms6514_port || "the serial port"} directly — no other software needed.
-                  Read-only, this meter has no command to control anything. Every milestone (Charge, Dry
-                  End, FC Start, Drop, etc.) is a manual click — mark them yourself below.
+                  {t("liveRoast.mastechHint", { port: form.ms6514_port || t("liveRoast.theSerialPort") })}
                 </p>
               </div>
             )}
             <div className="panel">
-              <h3>Events</h3>
+              <h3>{t("liveRoast.events")}</h3>
               <ul className="event-feed">
                 {(roast?.events || [])
                   .slice()
@@ -2176,25 +2150,17 @@ export default function LiveRoastView() {
                 Notes can pair up normally above it instead. */}
             {activeMode === "modbus_live" && (
               <p className="hint" style={{ gridColumn: "1 / -1" }}>
-                The controls beside the chart read and write directly over{" "}
-                {form.modbus_transport === "tcp" ? form.modbus_host || "the configured host" : form.modbus_port || "the serial port"}:
-                Burner is a drum-temperature setpoint (register 5, default 100–250°C — not a power %, shown as
-                both a % slider and a direct °C slider that move each other), Air and Drum are VFD drives
-                (run/stop + frequency registers 8192/8193, default 0–100%/0–70%), each with its own feedback
-                register (8451) reporting the drive's actual current speed. Out-of-range values are clamped to
-                the configured range. See "Advanced Modbus register map" above to override any of these for
-                your own unit. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual click — mark
-                them yourself as the roast happens.
+                {t("liveRoast.modbusLiveHint", {
+                  target:
+                    form.modbus_transport === "tcp"
+                      ? form.modbus_host || t("liveRoast.theConfiguredHost")
+                      : form.modbus_port || t("liveRoast.theSerialPort"),
+                })}
               </p>
             )}
             {activeMode === "tc4_live" && (
               <p className="hint" style={{ gridColumn: "1 / -1" }}>
-                Reading/writing {form.tc4_port || "the serial port"} directly (115200 baud, aArtisanQ/PID
-                firmware) — no other software needed. The Heater/Fan sliders beside the chart send real OT1/
-                DCFAN commands; there's no Drum output on TC4, so that slider doesn't do anything here.
-                Heater/Fan readouts stay blank — TC4's own READ command only reports temperature channels, not
-                its current output duty. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual
-                click — mark them yourself as the roast happens.
+                {t("liveRoast.tc4LiveHint", { port: form.tc4_port || t("liveRoast.theSerialPort") })}
               </p>
             )}
           </div>
@@ -2202,7 +2168,7 @@ export default function LiveRoastView() {
         {showSplitLayout && (
           <div
             className="breakout-split-divider"
-            title="Drag to resize"
+            title={t("liveRoast.resizeDivider")}
             onPointerDown={handleDividerPointerDown}
             onPointerMove={handleDividerPointerMove}
             onPointerUp={handleDividerPointerUp}
