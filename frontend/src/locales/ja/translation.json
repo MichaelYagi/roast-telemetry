@@ -138,5 +138,36 @@
     "deletedFeedback": "「{{name}}」を削除しました。",
     "deletedFeedbackPlain": "削除しました。",
     "pendingAlarmText": "{{trigger}} の自動化が約{{seconds}}秒後に発動します"
+  },
+  "common": {
+    "simulatedDeviceHint": {
+      "simulatedBadge": "シミュレーション",
+      "builtInHint": "内蔵の {{machine}} です -- 実機ではありません。ハードウェアには何も送信されません。",
+      "useRealOne": "実機を使用する",
+      "noMachine": "{{machine}}をお持ちでないですか？",
+      "trySimulated": "シミュレーションを試す"
+    },
+    "roastToolbar": {
+      "untitledRoast": "無題のロースト",
+      "simulatedTitle": "内蔵のシミュレーションデバイスです -- 実機ではありません",
+      "simulatedBadge": "シミュレーション",
+      "stoppedForSafety": " · 安全のため停止しました: {{reason}}。",
+      "reset": "RESET",
+      "off": "OFF",
+      "on": "ON",
+      "start": "START"
+    },
+    "emergencyStop": {
+      "stopping": "停止中…",
+      "button": "緊急停止"
+    },
+    "weightField": {
+      "gramsPlaceholder": "グラム",
+      "saving": "保存中…",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "edit": "編集",
+      "delete": "削除"
+    }
   }
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import EmergencyStop from "./EmergencyStop.jsx";
 
@@ -40,6 +41,7 @@ export default function RoastToolbar({
   roastId,
   showEmergencyStop = false,
 }) {
+  const { t } = useTranslation();
   const connected = phase !== "idle";
   const recording = phase === "roasting" || phase === "cooling" || phase === "finished";
   // Distinct from `connected` above: that one also counts "finished" (so
@@ -101,10 +103,10 @@ export default function RoastToolbar({
             both are on the left, controls/clock on the right, same row. */}
         <div className="roast-toolbar-title-group">
           <h2 className="roast-toolbar-title">
-            {title || "Untitled roast"}
+            {title || t("common.roastToolbar.untitledRoast")}
             {simulated && (
-              <span className="simulated-badge" title="A built-in simulated device -- not a real machine">
-                Simulated
+              <span className="simulated-badge" title={t("common.roastToolbar.simulatedTitle")}>
+                {t("common.roastToolbar.simulatedBadge")}
               </span>
             )}
             {meta && <span className="roast-toolbar-meta"> · {meta}</span>}
@@ -113,8 +115,7 @@ export default function RoastToolbar({
             {statusText}
             {trippedReason && (
               <span className="status-line-danger" role="alert">
-                {" "}
-                · Stopped for safety: {trippedReason}.
+                {t("common.roastToolbar.stoppedForSafety", { reason: trippedReason })}
               </span>
             )}
           </div>
@@ -137,10 +138,10 @@ export default function RoastToolbar({
                   a second "OFF" click, after a roast is already stopped,
                   does something else entirely (discards the finished view
                   and clears the form) rather than repeating the first. */}
-              {phase === "finished" ? "RESET" : connected ? "OFF" : "ON"}
+              {phase === "finished" ? t("common.roastToolbar.reset") : connected ? t("common.roastToolbar.off") : t("common.roastToolbar.on")}
             </button>
             <button type="button" className="power-btn power-btn-start" onClick={onStart} disabled={!connected || recording}>
-              START
+              {t("common.roastToolbar.start")}
             </button>
             {showEmergencyStop && !safetyDisabled && (
               <EmergencyStop

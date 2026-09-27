@@ -138,5 +138,36 @@
     "deletedFeedback": "Deleted \"{{name}}\".",
     "deletedFeedbackPlain": "Deleted.",
     "pendingAlarmText": "{{trigger}} automation fires in ~{{seconds}}s"
+  },
+  "common": {
+    "simulatedDeviceHint": {
+      "simulatedBadge": "Simulated",
+      "builtInHint": "A built-in {{machine}} -- not a real machine. Nothing is sent to hardware.",
+      "useRealOne": "Use a real one instead",
+      "noMachine": "No {{machine}}?",
+      "trySimulated": "Try a simulated one"
+    },
+    "roastToolbar": {
+      "untitledRoast": "Untitled roast",
+      "simulatedTitle": "A built-in simulated device -- not a real machine",
+      "simulatedBadge": "Simulated",
+      "stoppedForSafety": " · Stopped for safety: {{reason}}.",
+      "reset": "RESET",
+      "off": "OFF",
+      "on": "ON",
+      "start": "START"
+    },
+    "emergencyStop": {
+      "stopping": "Stopping…",
+      "button": "Emergency stop"
+    },
+    "weightField": {
+      "gramsPlaceholder": "grams",
+      "saving": "Saving…",
+      "save": "Save",
+      "cancel": "Cancel",
+      "edit": "edit",
+      "delete": "delete"
+    }
   }
 }
