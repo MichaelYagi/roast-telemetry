@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { EVENT_BUTTONS } from "./EventButtonRow.jsx";
 
 // Every markable milestone (CHARGE..COOL_END) -- TURNING_POINT/CUSTOM
@@ -6,29 +7,23 @@ import { EVENT_BUTTONS } from "./EventButtonRow.jsx";
 // isn't a milestone), and neither has a row in EVENT_BUTTONS to begin with.
 const EVENT_TRIGGER_OPTIONS = EVENT_BUTTONS.map((b) => b.type);
 
-const TRIGGER_KINDS = [
-  { value: "event", label: "Milestone" },
-  { value: "temperature", label: "Temperature" },
-  { value: "time", label: "Elapsed time" },
-];
-
-function summarizeCommand(rule) {
+function summarizeCommand(rule, t) {
   const parts = [];
-  if (rule.heater_pct != null) parts.push(`Burner→${rule.heater_pct}%`);
-  if (rule.fan_pct != null) parts.push(`Air→${rule.fan_pct} RPM`);
-  if (rule.drum_speed_pct != null) parts.push(`Drum→${rule.drum_speed_pct} RPM`);
-  if (rule.message) parts.push(`banner: "${rule.message}"`);
-  if (rule.mark_milestone) parts.push(`mark ${rule.mark_milestone.replace("_", " ")}`);
-  return parts.join(", ") || "(nothing set)";
+  if (rule.heater_pct != null) parts.push(t("common.alarmRulesEditor.burnerArrow", { pct: rule.heater_pct }));
+  if (rule.fan_pct != null) parts.push(t("common.alarmRulesEditor.airArrow", { rpm: rule.fan_pct }));
+  if (rule.drum_speed_pct != null) parts.push(t("common.alarmRulesEditor.drumArrow", { rpm: rule.drum_speed_pct }));
+  if (rule.message) parts.push(t("common.alarmRulesEditor.bannerLabel", { message: rule.message }));
+  if (rule.mark_milestone) parts.push(t("common.alarmRulesEditor.markMilestone", { milestone: rule.mark_milestone.replace("_", " ") }));
+  return parts.join(", ") || t("common.alarmRulesEditor.nothingSet");
 }
 
-function summarizeTrigger(rule) {
+function summarizeTrigger(rule, t) {
   if (rule.trigger_kind === "temperature") {
     return `${(rule.channel || "bt").toUpperCase()} ≥ ${rule.threshold_c}°C`;
   }
   if (rule.trigger_kind === "time") {
     const s = Number(rule.at_time_s) || 0;
-    return `at ${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+    return t("common.alarmRulesEditor.atTime", { time: `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}` });
   }
   return (rule.event_type || "").replace("_", " ");
 }
@@ -37,6 +32,12 @@ function summarizeTrigger(rule) {
 // buildConfigFromForm/handleLoadPreset) -- modbus_live only, since
 // ms6514_live has no write capability to bind a command to at all.
 export default function AlarmRulesEditor({ rules, onChange }) {
+  const { t } = useTranslation();
+  const TRIGGER_KINDS = [
+    { value: "event", label: t("common.alarmRulesEditor.triggerKinds.event") },
+    { value: "temperature", label: t("common.alarmRulesEditor.triggerKinds.temperature") },
+    { value: "time", label: t("common.alarmRulesEditor.triggerKinds.time") },
+  ];
   // null while adding a new rule; the array index of the rule currently
   // loaded into the draft fields below while editing an existing one.
   const [editingIndex, setEditingIndex] = useState(null);
@@ -146,13 +147,9 @@ export default function AlarmRulesEditor({ rules, onChange }) {
 
   return (
     <div className="alarm-rules-editor">
-      <h4>Automation rules (optional)</h4>
+      <h4>{t("common.alarmRulesEditor.heading")}</h4>
       <div className="alarm-rules-fields">
-          <p className="hint">
-            Fire a Burner/Air/Drum command and/or show an in-app banner automatically when a milestone is marked, a
-            temperature threshold is crossed, or a set amount of roast time has elapsed — immediately, or after a
-            delay. Saved as part of this configuration, so it travels with "Save this configuration as" below.
-          </p>
+          <p className="hint">{t("common.alarmRulesEditor.intro")}</p>
 
           {rules.length > 0 && (
             <ul className="alarm-rules-list">
@@ -160,18 +157,22 @@ export default function AlarmRulesEditor({ rules, onChange }) {
                 const enabled = rule.enabled !== false;
                 return (
                   <li key={rule.id || i} className={`alarm-rules-row${enabled ? "" : " alarm-rules-row-disabled"}`}>
-                    <label className="checkbox-label alarm-rules-enabled-toggle" title={enabled ? "Disable this rule" : "Enable this rule"}>
+                    <label
+                      className="checkbox-label alarm-rules-enabled-toggle"
+                      title={enabled ? t("common.alarmRulesEditor.disableRule") : t("common.alarmRulesEditor.enableRule")}
+                    >
                       <input type="checkbox" checked={enabled} onChange={() => toggleEnabled(i)} />
                     </label>
-                    <span className="alarm-rules-trigger">{summarizeTrigger(rule)}</span>
+                    <span className="alarm-rules-trigger">{summarizeTrigger(rule, t)}</span>
                     <span className="alarm-rules-detail">
-                      {rule.delay_s > 0 ? `+${rule.delay_s}s` : "immediately"} → {summarizeCommand(rule)}
+                      {rule.delay_s > 0 ? t("common.alarmRulesEditor.delayLabel", { seconds: rule.delay_s }) : t("common.alarmRulesEditor.immediately")}{" "}
+                      → {summarizeCommand(rule, t)}
                     </span>
                     <button type="button" onClick={() => startEdit(i)} disabled={editingIndex === i}>
-                      {editingIndex === i ? "Editing…" : "Edit"}
+                      {editingIndex === i ? t("common.alarmRulesEditor.editing") : t("common.alarmRulesEditor.edit")}
                     </button>
                     <button type="button" className="danger" onClick={() => removeRule(i)}>
-                      Remove
+                      {t("common.alarmRulesEditor.remove")}
                     </button>
                   </li>
                 );
@@ -181,7 +182,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
 
           <div className="form-row">
             <label>
-              Trigger type
+              {t("common.alarmRulesEditor.triggerType")}
               <select value={draftKind} onChange={(e) => draftSetter(setDraftKind)(e.target.value)}>
                 {TRIGGER_KINDS.map((k) => (
                   <option key={k.value} value={k.value}>
@@ -192,11 +193,11 @@ export default function AlarmRulesEditor({ rules, onChange }) {
             </label>
             {draftKind === "event" && (
               <label>
-                On milestone
+                {t("common.alarmRulesEditor.onMilestone")}
                 <select value={draftEventType} onChange={(e) => draftSetter(setDraftEventType)(e.target.value)}>
-                  {EVENT_TRIGGER_OPTIONS.map((t) => (
-                    <option key={t} value={t}>
-                      {t.replace("_", " ")}
+                  {EVENT_TRIGGER_OPTIONS.map((eventType) => (
+                    <option key={eventType} value={eventType}>
+                      {eventType.replace("_", " ")}
                     </option>
                   ))}
                 </select>
@@ -205,17 +206,17 @@ export default function AlarmRulesEditor({ rules, onChange }) {
             {draftKind === "temperature" && (
               <>
                 <label>
-                  Channel
+                  {t("common.alarmRulesEditor.channel")}
                   <select value={draftChannel} onChange={(e) => draftSetter(setDraftChannel)(e.target.value)}>
                     <option value="bt">BT</option>
                     <option value="et">ET</option>
                   </select>
                 </label>
                 <label>
-                  At or above (°C)
+                  {t("common.alarmRulesEditor.atOrAbove")}
                   <input
                     type="number"
-                    placeholder="e.g. 200"
+                    placeholder={t("common.alarmRulesEditor.thresholdPlaceholder")}
                     value={draftThreshold}
                     onChange={(e) => draftSetter(setDraftThreshold)(e.target.value)}
                   />
@@ -224,18 +225,18 @@ export default function AlarmRulesEditor({ rules, onChange }) {
             )}
             {draftKind === "time" && (
               <label>
-                Elapsed roast time (seconds)
+                {t("common.alarmRulesEditor.elapsedRoastTime")}
                 <input
                   type="number"
                   min="0"
-                  placeholder="e.g. 300"
+                  placeholder={t("common.alarmRulesEditor.elapsedTimePlaceholder")}
                   value={draftAtTime}
                   onChange={(e) => draftSetter(setDraftAtTime)(e.target.value)}
                 />
               </label>
             )}
             <label>
-              Extra delay after trigger (seconds)
+              {t("common.alarmRulesEditor.extraDelay")}
               <input
                 type="number"
                 min="0"
@@ -247,34 +248,34 @@ export default function AlarmRulesEditor({ rules, onChange }) {
           </div>
           <div className="form-row">
             <label>
-              Burner %
+              {t("common.alarmRulesEditor.burnerPct")}
               <input
                 type="number"
                 min="0"
                 max="100"
-                placeholder="unset"
+                placeholder={t("common.alarmRulesEditor.unsetPlaceholder")}
                 value={draftHeater}
                 onChange={(e) => draftSetter(setDraftHeater)(e.target.value)}
               />
             </label>
             <label>
-              Air RPM
+              {t("common.alarmRulesEditor.airRpm")}
               <input
                 type="number"
                 min="0"
                 max="100"
-                placeholder="unset"
+                placeholder={t("common.alarmRulesEditor.unsetPlaceholder")}
                 value={draftFan}
                 onChange={(e) => draftSetter(setDraftFan)(e.target.value)}
               />
             </label>
             <label>
-              Drum RPM
+              {t("common.alarmRulesEditor.drumRpm")}
               <input
                 type="number"
                 min="0"
                 max="100"
-                placeholder="unset"
+                placeholder={t("common.alarmRulesEditor.unsetPlaceholder")}
                 value={draftDrum}
                 onChange={(e) => draftSetter(setDraftDrum)(e.target.value)}
               />
@@ -282,22 +283,22 @@ export default function AlarmRulesEditor({ rules, onChange }) {
           </div>
           <div className="form-row">
             <label style={{ flexGrow: 1 }}>
-              Banner message (optional)
+              {t("common.alarmRulesEditor.bannerMessage")}
               <input
                 type="text"
                 maxLength={200}
-                placeholder="e.g. First crack — airflow up"
+                placeholder={t("common.alarmRulesEditor.bannerPlaceholder")}
                 value={draftMessage}
                 onChange={(e) => draftSetter(setDraftMessage)(e.target.value)}
               />
             </label>
             <label>
-              Also mark milestone (optional)
+              {t("common.alarmRulesEditor.alsoMarkMilestone")}
               <select value={draftMarkMilestone} onChange={(e) => draftSetter(setDraftMarkMilestone)(e.target.value)}>
-                <option value="">(none)</option>
-                {EVENT_TRIGGER_OPTIONS.map((t) => (
-                  <option key={t} value={t}>
-                    {t.replace("_", " ")}
+                <option value="">{t("common.alarmRulesEditor.none")}</option>
+                {EVENT_TRIGGER_OPTIONS.map((eventType) => (
+                  <option key={eventType} value={eventType}>
+                    {eventType.replace("_", " ")}
                   </option>
                 ))}
               </select>
@@ -305,48 +306,53 @@ export default function AlarmRulesEditor({ rules, onChange }) {
           </div>
           {draftMarkMilestone && (
             <p className="hint">
-              Chains this rule's trigger into auto-marking {draftMarkMilestone.replace("_", " ")} — same as clicking
-              that button yourself, so it still has to happen in the correct order relative to whatever's already
-              been marked, or it's silently skipped.
+              {t("common.alarmRulesEditor.chainsIntoMarking", { milestone: draftMarkMilestone.replace("_", " ") })}
             </p>
           )}
 
           {editingIndex != null && (
-            <p className="hint">
-              Editing rule #{editingIndex + 1} above -- "Save changes" replaces it in place, or Cancel to leave it
-              unchanged.
-            </p>
+            <p className="hint">{t("common.alarmRulesEditor.editingRuleAbove", { n: editingIndex + 1 })}</p>
           )}
           {burnerConfirming ? (
             <>
               <p className="hint">
-                This rule sets Burner to {draftHeater}% automatically once {summarizeTrigger({
-                  trigger_kind: draftKind,
-                  event_type: draftEventType,
-                  channel: draftChannel,
-                  threshold_c: draftThreshold,
-                  at_time_s: draftAtTime,
+                {t("common.alarmRulesEditor.burnerConfirmIntro", {
+                  pct: draftHeater,
+                  trigger: summarizeTrigger(
+                    {
+                      trigger_kind: draftKind,
+                      event_type: draftEventType,
+                      channel: draftChannel,
+                      threshold_c: draftThreshold,
+                      at_time_s: draftAtTime,
+                    },
+                    t
+                  ),
                 })}
-                {Number(draftDelay) > 0 ? ` (after a ${draftDelay}s delay)` : ""} — no further confirmation once
-                saved. Only {editingIndex != null ? "save" : "add"} this if you're sure.
+                {Number(draftDelay) > 0 ? t("common.alarmRulesEditor.burnerConfirmDelay", { seconds: draftDelay }) : ""}
+                {t("common.alarmRulesEditor.burnerConfirmTail", {
+                  action: editingIndex != null ? t("common.alarmRulesEditor.save") : t("common.alarmRulesEditor.add"),
+                })}
               </p>
               <div className="event-button-row">
                 <button type="button" onClick={saveRule}>
-                  Confirm: {editingIndex != null ? "save Burner rule" : "add Burner rule"}
+                  {editingIndex != null
+                    ? t("common.alarmRulesEditor.confirmSaveBurnerRule")
+                    : t("common.alarmRulesEditor.confirmAddBurnerRule")}
                 </button>
                 <button type="button" className="danger" onClick={() => setBurnerConfirming(false)}>
-                  Cancel
+                  {t("common.alarmRulesEditor.cancel")}
                 </button>
               </div>
             </>
           ) : (
             <div className="event-button-row">
               <button type="button" onClick={saveRule} disabled={!hasAnyCommand || !triggerReady}>
-                {editingIndex != null ? "Save changes" : "Add rule"}
+                {editingIndex != null ? t("common.alarmRulesEditor.saveChanges") : t("common.alarmRulesEditor.addRule")}
               </button>
               {editingIndex != null && (
                 <button type="button" className="danger" onClick={resetDraft}>
-                  Cancel
+                  {t("common.alarmRulesEditor.cancel")}
                 </button>
               )}
             </div>
