@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 // Module-level, shared by every Modal instance -- a confirm()/notify() (see
 // DialogProvider.jsx, itself built on this component) can open on top of
@@ -15,6 +16,7 @@ let openModalCount = 0;
 // on top of this) -- any custom modal content in the app can use this
 // directly.
 export default function Modal({ open, onClose, title, wide = false, children }) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!open) return undefined;
     function onKeyDown(e) {
@@ -45,7 +47,7 @@ export default function Modal({ open, onClose, title, wide = false, children }) 
       <div className={`modal${wide ? " modal-wide" : ""}`} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           {title && <h3>{title}</h3>}
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+          <button type="button" className="modal-close" onClick={onClose} aria-label={t("common.modal.close")}>
             ×
           </button>
         </div>

@@ -488,6 +488,38 @@
       "noNumbersYet": "None of these roasts have numbers yet (mark Charge and Drop to get them).",
       "axisTimeFromCharge": "Time from Charge (m:ss)",
       "axisTime": "Time (m:ss)"
+    },
+    "accountModal": {
+      "title": "Account",
+      "signedInAs": "Signed in as",
+      "admin": "admin",
+      "changePassword": {
+        "heading": "Change password",
+        "currentPassword": "Current password",
+        "newPassword": "New password",
+        "confirmNewPassword": "Confirm new password",
+        "tooShort": "New password must be at least 8 characters.",
+        "mismatch": "New passwords don't match.",
+        "success": "Password changed. Any other signed-in browser has been logged out.",
+        "submit": "Change password"
+      },
+      "apiKey": {
+        "heading": "API key",
+        "hintPrefix": "Lets a script, a Home Assistant integration, or curl call the API directly with an",
+        "hintSuffix": "header, instead of logging in through the browser. Not required for using this app normally.",
+        "copyNowWarning": "Copy this now -- it won't be shown again.",
+        "copied": "Copied",
+        "copy": "Copy",
+        "active": "A key is active (hidden -- regenerate to see a new one).",
+        "none": "No key yet.",
+        "revoke": "Revoke",
+        "revokeConfirm": "Turn off API key access? This can't be undone -- you'd need to generate a new key to use the API directly again.",
+        "regenerate": "Regenerate",
+        "generate": "Generate API key"
+      }
+    },
+    "modal": {
+      "close": "Close"
     }
   },
   "history": {

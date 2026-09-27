@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import { useConfirm } from "./DialogProvider.jsx";
 import Modal from "./Modal.jsx";
@@ -12,6 +13,7 @@ import Modal from "./Modal.jsx";
 // after Generate/Regenerate -- neither this component nor the backend
 // can recover it afterward (only its hash is stored).
 export default function AccountModal({ open, onClose, user, onUserChange }) {
+  const { t } = useTranslation();
   const confirm = useConfirm();
   const [revealedKey, setRevealedKey] = useState(null); // cleared on close
   const [copied, setCopied] = useState(false);
@@ -47,11 +49,11 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
     // error shape (a list of objects, not a plain string) as the error
     // message.
     if (newPassword.length < 8) {
-      setPwError("New password must be at least 8 characters.");
+      setPwError(t("common.accountModal.changePassword.tooShort"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPwError("New passwords don't match.");
+      setPwError(t("common.accountModal.changePassword.mismatch"));
       return;
     }
     setPwBusy(true);
@@ -84,7 +86,7 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
   }
 
   async function handleRevoke() {
-    if (!(await confirm("Turn off API key access? This can't be undone -- you'd need to generate a new key to use the API directly again.", { confirmLabel: "Revoke" }))) {
+    if (!(await confirm(t("common.accountModal.apiKey.revokeConfirm"), { confirmLabel: t("common.accountModal.apiKey.revoke") }))) {
       return;
     }
     setBusy(true);
@@ -142,17 +144,17 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title="Account">
+    <Modal open={open} onClose={handleClose} title={t("common.accountModal.title")}>
       <p className="account-username">
-        Signed in as <strong>{user?.username}</strong>
-        {user?.role === "admin" && <span className="account-role-badge">admin</span>}
+        {t("common.accountModal.signedInAs")} <strong>{user?.username}</strong>
+        {user?.role === "admin" && <span className="account-role-badge">{t("common.accountModal.admin")}</span>}
       </p>
 
-      <h4>Change password</h4>
+      <h4>{t("common.accountModal.changePassword.heading")}</h4>
       <form className="account-password-form" onSubmit={handleChangePassword}>
         <div className="form-row">
           <label>
-            Current password
+            {t("common.accountModal.changePassword.currentPassword")}
             <input
               type="password"
               autoComplete="current-password"
@@ -164,7 +166,7 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
         </div>
         <div className="form-row">
           <label>
-            New password
+            {t("common.accountModal.changePassword.newPassword")}
             <input
               type="password"
               autoComplete="new-password"
@@ -176,7 +178,7 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
         </div>
         <div className="form-row">
           <label>
-            Confirm new password
+            {t("common.accountModal.changePassword.confirmNewPassword")}
             <input
               type="password"
               autoComplete="new-password"
@@ -188,34 +190,32 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
         </div>
 
         {pwError && <p className="error">{pwError}</p>}
-        {pwSuccess && <p className="hint account-password-success">Password changed. Any other signed-in browser has been logged out.</p>}
+        {pwSuccess && <p className="hint account-password-success">{t("common.accountModal.changePassword.success")}</p>}
 
         <div className="dialog-actions">
           <button type="submit" disabled={pwBusy}>
-            Change password
+            {t("common.accountModal.changePassword.submit")}
           </button>
         </div>
       </form>
 
-      <h4>API key</h4>
+      <h4>{t("common.accountModal.apiKey.heading")}</h4>
       <p className="hint">
-        Lets a script, a Home Assistant integration, or curl call the API directly with an{" "}
-        <code>X-API-Key</code> header, instead of logging in through the browser. Not required for using this app
-        normally.
+        {t("common.accountModal.apiKey.hintPrefix")} <code>X-API-Key</code> {t("common.accountModal.apiKey.hintSuffix")}
       </p>
 
       {revealedKey ? (
         <div className="account-key-reveal">
-          <p className="hint account-key-warning">Copy this now -- it won't be shown again.</p>
+          <p className="hint account-key-warning">{t("common.accountModal.apiKey.copyNowWarning")}</p>
           <div className="account-key-row">
             <code className="account-key-value">{revealedKey}</code>
             <button type="button" onClick={handleCopy}>
-              {copied ? "Copied" : "Copy"}
+              {copied ? t("common.accountModal.apiKey.copied") : t("common.accountModal.apiKey.copy")}
             </button>
           </div>
         </div>
       ) : (
-        <p className="hint">{user?.has_api_key ? "A key is active (hidden -- regenerate to see a new one)." : "No key yet."}</p>
+        <p className="hint">{user?.has_api_key ? t("common.accountModal.apiKey.active") : t("common.accountModal.apiKey.none")}</p>
       )}
 
       {error && <p className="error">{error}</p>}
@@ -223,11 +223,11 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
       <div className="dialog-actions account-key-actions">
         {user?.has_api_key && !revealedKey && (
           <button type="button" className="danger" onClick={handleRevoke} disabled={busy}>
-            Revoke
+            {t("common.accountModal.apiKey.revoke")}
           </button>
         )}
         <button type="button" onClick={handleGenerate} disabled={busy}>
-          {user?.has_api_key ? "Regenerate" : "Generate API key"}
+          {user?.has_api_key ? t("common.accountModal.apiKey.regenerate") : t("common.accountModal.apiKey.generate")}
         </button>
       </div>
     </Modal>
