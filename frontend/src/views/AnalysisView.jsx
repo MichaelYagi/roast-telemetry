@@ -387,14 +387,18 @@ export default function AnalysisView() {
             // No shared title callback -- a shared header only shows the
             // *first* matched point's title, but two dots can genuinely
             // overlap (same X/Y, different roasts), and each one then needs
-            // its own title, not just its own beans/metric lines under
-            // someone else's. Putting the title inside each item's own
+            // its own lines, not just its own beans/metric lines under
+            // someone else's. Putting everything inside each item's own
             // label lines guarantees it's always paired with the right
             // roast, in order, no matter how many points are matched at once.
             label: (item) => {
               const { row } = item.raw;
               const xText = x === DATE_KEY ? new Date(row.created_at).toLocaleDateString() : formatMetric(xMetric, row.metrics[x], tempUnit);
               return [
+                // Same text as the legend entry for this dot's group/color --
+                // lets you confirm which legend swatch a dot belongs to just
+                // by hovering it, instead of having to guess from color alone.
+                item.dataset.label,
                 row.title,
                 row.beans ? `${t("analysis.filters.beans")}: ${row.beans}` : null,
                 `${xMetric.label}: ${xText}`,
