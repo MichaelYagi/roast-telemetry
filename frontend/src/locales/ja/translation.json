@@ -505,5 +505,48 @@
       "deleteFailedTitle": "削除に失敗しました",
       "deleteFailedSummary": "{{total}}件中{{failedCount}}件を削除できませんでした:\n{{details}}"
     }
+  },
+  "roastDetail": {
+    "loading": "読み込み中…",
+    "statusLine": {
+      "status": "ステータス:",
+      "duration": "時間:"
+    },
+    "simulatedBadge": "シミュレーション",
+    "simulatedBadgeTitle": "内蔵のシミュレーションデバイスで記録されました",
+    "downloads": {
+      "download": "ダウンロード",
+      "spreadsheetNote": "（表計算ソフト用、タブ区切り）",
+      "buildingPdf": "PDFを作成中…",
+      "downloadPdf": "PDFをダウンロード",
+      "printReport": "レポートを印刷",
+      "pdfErrorFallback": "PDFを作成できませんでした。"
+    },
+    "connectionType": {
+      "heading": "接続タイプ",
+      "mode": "モード",
+      "roastedBy": "焙煎者",
+      "sourceFile": "ソースファイル",
+      "speed": "速度",
+      "connection": "接続",
+      "deviceProfile": "デバイスプロファイル",
+      "customAdvanced": "カスタム（詳細設定）",
+      "serialPort": "シリアルポート",
+      "model": "モデル"
+    },
+    "batch": {
+      "heading": "バッチ",
+      "beans": "豆",
+      "tags": "タグ",
+      "addTagPlaceholder": "タグを追加…",
+      "add": "追加",
+      "removeTag": "タグ {{tag}} を削除",
+      "greenWeight": "生豆重量",
+      "roastedWeight": "焙煎後重量",
+      "weightLoss": "重量ロス"
+    },
+    "roastStatsHeading": "ロースト統計",
+    "numbersHeading": "数値",
+    "eventsHeading": "イベント"
   }
 }

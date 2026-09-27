@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import RoastChart from "../components/RoastChart.jsx";
@@ -22,16 +23,18 @@ import { downloadRoastPdf, printRoastPdf } from "../lib/roastPdf.js";
 // mode alone can't distinguish them, same reasoning as the Configure Roast
 // form's own Connection type dropdown), so this is a function, not a plain
 // lookup, for that one entry.
-function modeLabel(roast) {
+function modeLabel(roast, t) {
   if (roast.mode === "modbus_live") {
-    return roast.modbus_transport === "tcp" ? "Direct Modbus (Ethernet)" : "Direct Modbus (USB)";
+    return roast.modbus_transport === "tcp"
+      ? t("liveRoast.connectionOptions.modbusEthernet")
+      : t("liveRoast.connectionOptions.modbusUsb");
   }
   const MODE_LABELS = {
-    simulator: "Simulator",
-    alog_playback: ".alog Playback",
-    ms6514_live: "Direct USB (thermocouple meter)",
-    aillio_live: "Aillio Bullet (USB)",
-    tc4_live: "TC4+ (USB, PID firmware)",
+    simulator: t("liveRoast.connectionOptions.simulator"),
+    alog_playback: t("liveRoast.connectionOptions.alogPlayback"),
+    ms6514_live: t("liveRoast.connectionOptions.ms6514"),
+    aillio_live: t("liveRoast.connectionOptions.aillio"),
+    tc4_live: t("liveRoast.connectionOptions.tc4"),
   };
   return MODE_LABELS[roast.mode] || roast.mode;
 }
@@ -71,6 +74,7 @@ function otherFilename(title, createdAt, ext) {
 }
 
 export default function RoastDetailView() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const [roast, setRoast] = useState(null);
   const [error, setError] = useState(null);
@@ -222,7 +226,7 @@ export default function RoastDetailView() {
       const chartImage = chartRef.current?.toImage() || null;
       downloadRoastPdf(roast, tempUnit, chartImage, extra);
     } catch (err) {
-      setPdfError(err.message || "Couldn't build the PDF.");
+      setPdfError(err.message || t("roastDetail.downloads.pdfErrorFallback"));
     } finally {
       setPdfBusy(false);
     }
@@ -239,7 +243,7 @@ export default function RoastDetailView() {
       const chartImage = chartRef.current?.toImage() || null;
       printRoastPdf(roast, tempUnit, chartImage, extra);
     } catch (err) {
-      setPdfError(err.message || "Couldn't build the PDF.");
+      setPdfError(err.message || t("roastDetail.downloads.pdfErrorFallback"));
     } finally {
       setPdfBusy(false);
     }
@@ -263,7 +267,7 @@ export default function RoastDetailView() {
   }, []);
 
   if (error) return <p className="error panel">{error}</p>;
-  if (!roast) return <p className="panel">Loading…</p>;
+  if (!roast) return <p className="panel">{t("roastDetail.loading")}</p>;
 
   return (
     <div className="detail-view">
@@ -271,13 +275,13 @@ export default function RoastDetailView() {
         <h2>
           {roast.title}
           {isSimulatedRoast(roast) && (
-            <span className="simulated-badge" title="Recorded from a built-in simulated device">
-              Simulated
+            <span className="simulated-badge" title={t("roastDetail.simulatedBadgeTitle")}>
+              {t("roastDetail.simulatedBadge")}
             </span>
           )}
         </h2>
         <p className="sub">
-          {roast.mode} · status: <strong>{roast.status}</strong> · duration:{" "}
+          {roast.mode} · {t("roastDetail.statusLine.status")} <strong>{roast.status}</strong> · {t("roastDetail.statusLine.duration")}{" "}
           {roast.duration_s ? `${Math.floor(roast.duration_s / 60)}:${String(Math.round(roast.duration_s % 60)).padStart(2, "0")}` : "—"}
         </p>
         <div className="detail-download-list">
@@ -289,28 +293,30 @@ export default function RoastDetailView() {
             // no-op click. The native .alog format, which
             // compatible roasting software opens directly, no conversion needed.
             <p>
-              Download <a href={api.alogDownloadUrl(roast.id)}>{alogFilename(roast.title, roast.created_at)}</a>
+              {t("roastDetail.downloads.download")} <a href={api.alogDownloadUrl(roast.id)}>{alogFilename(roast.title, roast.created_at)}</a>
             </p>
           )}
           <p>
-            Download <a href={api.csvDownloadUrl(roast.id)}>{csvFilename(roast.title, roast.created_at)}</a>
+            {t("roastDetail.downloads.download")} <a href={api.csvDownloadUrl(roast.id)}>{csvFilename(roast.title, roast.created_at)}</a>
           </p>
           <p>
-            Download <a href={api.jsonDownloadUrl(roast.id)}>{otherFilename(roast.title, roast.created_at, "json")}</a>
+            {t("roastDetail.downloads.download")} <a href={api.jsonDownloadUrl(roast.id)}>{otherFilename(roast.title, roast.created_at, "json")}</a>
           </p>
           <p>
-            Download <a href={api.roastlogCsvDownloadUrl(roast.id)}>{otherFilename(roast.title, roast.created_at, "_log.csv")}</a> (spreadsheet, tab-separated)
+            {t("roastDetail.downloads.download")}{" "}
+            <a href={api.roastlogCsvDownloadUrl(roast.id)}>{otherFilename(roast.title, roast.created_at, "_log.csv")}</a>{" "}
+            {t("roastDetail.downloads.spreadsheetNote")}
           </p>
           <p>
-            Download <a href={api.xlsxDownloadUrl(roast.id)}>{otherFilename(roast.title, roast.created_at, "xlsx")}</a>
+            {t("roastDetail.downloads.download")} <a href={api.xlsxDownloadUrl(roast.id)}>{otherFilename(roast.title, roast.created_at, "xlsx")}</a>
           </p>
           <p>
             <button type="button" className="link-like" onClick={handleDownloadPdf} disabled={pdfBusy}>
-              {pdfBusy ? "Building PDF…" : "Download PDF"}
+              {pdfBusy ? t("roastDetail.downloads.buildingPdf") : t("roastDetail.downloads.downloadPdf")}
             </button>
             {" · "}
             <button type="button" className="link-like" onClick={handlePrint} disabled={pdfBusy}>
-              {pdfBusy ? "Building PDF…" : "Print report"}
+              {pdfBusy ? t("roastDetail.downloads.buildingPdf") : t("roastDetail.downloads.printReport")}
             </button>
           </p>
           {pdfError && <p className="error no-print">{pdfError}</p>}
@@ -323,7 +329,7 @@ export default function RoastDetailView() {
       <div className="print-only detail-print-header">
         <h2>{roast.title}</h2>
         <p className="sub">
-          {roast.mode} · status: {roast.status} · duration:{" "}
+          {roast.mode} · {t("roastDetail.statusLine.status")} {roast.status} · {t("roastDetail.statusLine.duration")}{" "}
           {roast.duration_s ? `${Math.floor(roast.duration_s / 60)}:${String(Math.round(roast.duration_s % 60)).padStart(2, "0")}` : "—"}
         </p>
       </div>
@@ -342,24 +348,24 @@ export default function RoastDetailView() {
 
       <div className="detail-grid">
         <div className="panel">
-          <h3>Connection type</h3>
+          <h3>{t("roastDetail.connectionType.heading")}</h3>
           <ul className="kv-list">
             <li>
-              <span>Mode</span>
-              <span>{modeLabel(roast)}</span>
+              <span>{t("roastDetail.connectionType.mode")}</span>
+              <span>{modeLabel(roast, t)}</span>
             </li>
             <li>
-              <span>Roasted by</span>
+              <span>{t("roastDetail.connectionType.roastedBy")}</span>
               <span>{roast.created_by_username || "—"}</span>
             </li>
             {roast.mode === "alog_playback" && (
               <>
                 <li>
-                  <span>Source file</span>
+                  <span>{t("roastDetail.connectionType.sourceFile")}</span>
                   <span>{roast.source_alog_path || "—"}</span>
                 </li>
                 <li>
-                  <span>Speed</span>
+                  <span>{t("roastDetail.connectionType.speed")}</span>
                   <span>{roast.playback_speed != null ? `${roast.playback_speed}x` : "—"}</span>
                 </li>
               </>
@@ -367,7 +373,7 @@ export default function RoastDetailView() {
             {roast.mode === "modbus_live" && (
               <>
                 <li>
-                  <span>Connection</span>
+                  <span>{t("roastDetail.connectionType.connection")}</span>
                   <span>
                     {roast.modbus_transport === "tcp"
                       ? `${roast.modbus_host || "—"}:${roast.modbus_tcp_port || "—"}`
@@ -375,35 +381,35 @@ export default function RoastDetailView() {
                   </span>
                 </li>
                 <li>
-                  <span>Device profile</span>
-                  <span>{roast.modbus_device_profile_name || "Custom (advanced fields)"}</span>
+                  <span>{t("roastDetail.connectionType.deviceProfile")}</span>
+                  <span>{roast.modbus_device_profile_name || t("roastDetail.connectionType.customAdvanced")}</span>
                 </li>
               </>
             )}
             {roast.mode === "ms6514_live" && (
               <li>
-                <span>Serial port</span>
+                <span>{t("roastDetail.connectionType.serialPort")}</span>
                 <span>{roast.ms6514_port || "—"}</span>
               </li>
             )}
             {roast.mode === "aillio_live" && (
               <li>
-                <span>Model</span>
+                <span>{t("roastDetail.connectionType.model")}</span>
                 <span>{roast.aillio_model ? `Aillio Bullet ${roast.aillio_model.toUpperCase()}` : "—"}</span>
               </li>
             )}
             {roast.mode === "tc4_live" && (
               <li>
-                <span>Serial port</span>
+                <span>{t("roastDetail.connectionType.serialPort")}</span>
                 <span>{roast.tc4_port || "—"}</span>
               </li>
             )}
           </ul>
 
-          <h3>Batch</h3>
+          <h3>{t("roastDetail.batch.heading")}</h3>
           <ul className="kv-list">
             <li className="beans-row">
-              <span>Beans</span>
+              <span>{t("roastDetail.batch.beans")}</span>
               <span>
                 <BeansField
                   label=""
@@ -414,12 +420,17 @@ export default function RoastDetailView() {
               </span>
             </li>
             <li>
-              <span>Tags</span>
+              <span>{t("roastDetail.batch.tags")}</span>
               <span className="tag-edit-group">
-                {roast.tags.map((t) => (
-                  <span key={t} className="tag-chip">
-                    {t}
-                    <button type="button" className="tag-chip-remove no-print" onClick={() => handleRemoveTag(t)} aria-label={`Remove tag ${t}`}>
+                {roast.tags.map((tagValue) => (
+                  <span key={tagValue} className="tag-chip">
+                    {tagValue}
+                    <button
+                      type="button"
+                      className="tag-chip-remove no-print"
+                      onClick={() => handleRemoveTag(tagValue)}
+                      aria-label={t("roastDetail.batch.removeTag", { tag: tagValue })}
+                    >
                       ×
                     </button>
                   </span>
@@ -435,11 +446,11 @@ export default function RoastDetailView() {
                         handleAddTag();
                       }
                     }}
-                    placeholder="Add tag…"
+                    placeholder={t("roastDetail.batch.addTagPlaceholder")}
                     list="existing-tags"
                   />
                   <button type="button" onClick={handleAddTag} disabled={!newTagInput.trim()}>
-                    Add
+                    {t("roastDetail.batch.add")}
                   </button>
                   {/* Native browser autocomplete against every tag used
                       anywhere -- no library needed, and it degrades to a
@@ -447,9 +458,9 @@ export default function RoastDetailView() {
                       <datalist> (rare, but free either way). */}
                   <datalist id="existing-tags">
                     {allTags
-                      .filter((t) => !roast.tags.includes(t.tag))
-                      .map((t) => (
-                        <option key={t.tag} value={t.tag} />
+                      .filter((tagItem) => !roast.tags.includes(tagItem.tag))
+                      .map((tagItem) => (
+                        <option key={tagItem.tag} value={tagItem.tag} />
                       ))}
                   </datalist>
                 </span>
@@ -462,20 +473,20 @@ export default function RoastDetailView() {
               </li>
             )}
             <li>
-              <span>Green weight</span>
+              <span>{t("roastDetail.batch.greenWeight")}</span>
               <span>
                 <WeightField value={roast.weight_green_g} onSave={handleSaveGreenWeight} onDelete={handleDeleteGreenWeight} noPrint />
               </span>
             </li>
             <li>
-              <span>Roasted weight</span>
+              <span>{t("roastDetail.batch.roastedWeight")}</span>
               <span>
                 <WeightField value={roast.weight_roasted_g} onSave={handleSaveRoastedWeight} onDelete={handleDeleteRoastedWeight} noPrint />
               </span>
             </li>
             {weightLossPct != null && (
               <li>
-                <span>Weight loss</span>
+                <span>{t("roastDetail.batch.weightLoss")}</span>
                 <span>{weightLossPct}%</span>
               </li>
             )}
@@ -485,12 +496,12 @@ export default function RoastDetailView() {
         <BeansCard beanId={roast.bean_id} refreshKey={numbersKey} />
 
         <div className="panel">
-          <h3>Roast Stats</h3>
+          <h3>{t("roastDetail.roastStatsHeading")}</h3>
           <RoastStatsPanel roastId={roast.id} />
         </div>
 
         <div className="panel">
-          <h3>Numbers</h3>
+          <h3>{t("roastDetail.numbersHeading")}</h3>
           <RoastNumbers roastId={roast.id} tempUnit={tempUnit} refreshKey={numbersKey} />
         </div>
 
@@ -503,7 +514,7 @@ export default function RoastDetailView() {
         />
 
         <div className="panel">
-          <h3>Events</h3>
+          <h3>{t("roastDetail.eventsHeading")}</h3>
           <ul className="event-feed">
             {roast.events.map((ev) => (
               <li key={ev.id}>

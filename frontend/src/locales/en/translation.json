@@ -516,5 +516,48 @@
       "deleteFailedTitle": "Delete failed",
       "deleteFailedSummary": "{{failedCount}} of {{total}} couldn't be deleted:\n{{details}}"
     }
+  },
+  "roastDetail": {
+    "loading": "Loading…",
+    "statusLine": {
+      "status": "status:",
+      "duration": "duration:"
+    },
+    "simulatedBadge": "Simulated",
+    "simulatedBadgeTitle": "Recorded from a built-in simulated device",
+    "downloads": {
+      "download": "Download",
+      "spreadsheetNote": "(spreadsheet, tab-separated)",
+      "buildingPdf": "Building PDF…",
+      "downloadPdf": "Download PDF",
+      "printReport": "Print report",
+      "pdfErrorFallback": "Couldn't build the PDF."
+    },
+    "connectionType": {
+      "heading": "Connection type",
+      "mode": "Mode",
+      "roastedBy": "Roasted by",
+      "sourceFile": "Source file",
+      "speed": "Speed",
+      "connection": "Connection",
+      "deviceProfile": "Device profile",
+      "customAdvanced": "Custom (advanced fields)",
+      "serialPort": "Serial port",
+      "model": "Model"
+    },
+    "batch": {
+      "heading": "Batch",
+      "beans": "Beans",
+      "tags": "Tags",
+      "addTagPlaceholder": "Add tag…",
+      "add": "Add",
+      "removeTag": "Remove tag {{tag}}",
+      "greenWeight": "Green weight",
+      "roastedWeight": "Roasted weight",
+      "weightLoss": "Weight loss"
+    },
+    "roastStatsHeading": "Roast Stats",
+    "numbersHeading": "Numbers",
+    "eventsHeading": "Events"
   }
 }
