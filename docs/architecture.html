@@ -157,6 +157,7 @@
       <tr><td>POST</td><td><code>/roasts/import-upload</code></td><td>Import an <code>.alog</code> sent from the browser's own computer &mdash; the file is the request body (optional <code>filename</code> and <code>title</code> query parameters). Used by History's drop-or-choose-files box.</td></tr>
       <tr><td>WS</td><td><code>/roasts/{id}/stream</code></td><td>Live sample/event stream (sends a <code>snapshot</code> first)</td></tr>
       <tr><td>GET</td><td><code>/roasts/{id}/stream/sse</code></td><td>Same stream over Server-Sent Events</td></tr>
+      <tr><td>GET</td><td><code>/roasts/active/stream</code></td><td>Server-Sent Events push whenever any roast starts recording (any device/tab) &mdash; lets an idle Configure Roast tab reconnect to it on its own, instead of polling or waiting for a reload</td></tr>
       <tr><td>GET</td><td><code>/presets</code></td><td>List saved roast configurations</td></tr>
       <tr><td>POST</td><td><code>/presets</code></td><td>Save the current Configure-Roast form as a named preset</td></tr>
       <tr><td>PUT</td><td><code>/presets/{id}</code></td><td>Update a saved preset</td></tr>
