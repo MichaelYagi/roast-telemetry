@@ -168,6 +168,25 @@
       "cancel": "キャンセル",
       "edit": "編集",
       "delete": "削除"
+    },
+    "beansField": {
+      "label": "豆",
+      "placeholder": "名前を入力するか、豆リストから選んでください",
+      "inYourBeans": "登録済みの豆 · ",
+      "details": "詳細",
+      "newBeans": "新しい豆 · 保存時にリストへ追加されます",
+      "manageBeans": "豆を管理"
+    },
+    "verticalControlPanel": {
+      "waitingForReading": "デバイスからの実測値を待っています",
+      "channelOff": "{{label}}はオフです",
+      "clickToTurnOff": "{{tooltip}} -- クリックしてオフにする",
+      "clickToTurnOn": "{{tooltip}} -- クリックしてオンにする"
+    },
+    "eventButtonRow": {
+      "alwaysAuto": "常に自動検出されます -- 手動でマークできません",
+      "alreadyMarked": "このローストでは既にマーク済みです",
+      "laterAlreadyRecorded": "マークできません -- より後のマイルストーンが既に記録されています"
     }
   }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { TERM_TOOLTIPS } from "../termTooltips.js";
 import { normalizeLayout, verticalControlItem } from "../verticalControl.js";
 import { celsiusToUnit, unitToCelsius, unitSuffix } from "../tempUnits.js";
@@ -39,6 +40,7 @@ function useIsMobileViewport() {
 }
 
 export default function VerticalControlPanel({ disabled, onSend, initial, layout, arrows, svRangeC, tempUnit = "c" }) {
+  const { t } = useTranslation();
   const isMobile = useIsMobileViewport();
   const normalizedGroups = normalizeLayout(layout, { svAvailable: svRangeC != null });
   // Flatten every group down to single-channel lanes on mobile -- see
@@ -232,7 +234,13 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
           step={STEP}
           value={displayValue}
           disabled={isDisabled}
-          title={unknown ? "Waiting for a real reading from the device" : !isOn ? `${item.label} is off` : undefined}
+          title={
+            unknown
+              ? t("common.verticalControlPanel.waitingForReading")
+              : !isOn
+                ? t("common.verticalControlPanel.channelOff", { label: item.label })
+                : undefined
+          }
           onChange={(e) => ch.onChange(Number(e.target.value))}
         />
         {showArrows && (
@@ -246,7 +254,10 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
             className="vertical-slider-toggle"
             disabled={disabled}
             onClick={toggle[1]}
-            title={`${TERM_TOOLTIPS[item.label] || item.label} -- click to turn ${isOn ? "off" : "on"}`}
+            title={t(
+              isOn ? "common.verticalControlPanel.clickToTurnOff" : "common.verticalControlPanel.clickToTurnOn",
+              { tooltip: TERM_TOOLTIPS[item.label] || item.label }
+            )}
           >
             {item.label}
           </button>

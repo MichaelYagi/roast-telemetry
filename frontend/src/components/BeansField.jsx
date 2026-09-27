@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 
@@ -9,7 +10,8 @@ const same = (a, b) => (a || "").trim().toLowerCase() === (b || "").trim().toLow
 // roast is saved, so the Beans page always shows every name in use.
 // `onCommit(text)` fires when the field is left, on Enter, or when a suggestion
 // is picked; leave it out to just track typing through `onChange`.
-export default function BeansField({ label = "Beans", value, onChange, onCommit, className = "" }) {
+export default function BeansField({ label, value, onChange, onCommit, className = "" }) {
+  const { t } = useTranslation();
   const listId = useId();
   const [beans, setBeans] = useState([]);
 
@@ -28,7 +30,7 @@ export default function BeansField({ label = "Beans", value, onChange, onCommit,
   return (
     <div className={`beans-field ${className}`}>
       <label>
-        {label}
+        {label ?? t("common.beansField.label")}
         <input
           list={listId}
           value={value || ""}
@@ -40,7 +42,7 @@ export default function BeansField({ label = "Beans", value, onChange, onCommit,
           }}
           onBlur={() => commit(value || "")}
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), commit(value || ""))}
-          placeholder="Type a name, or pick from your beans"
+          placeholder={t("common.beansField.placeholder")}
           maxLength={200}
         />
         <datalist id={listId}>
@@ -52,12 +54,13 @@ export default function BeansField({ label = "Beans", value, onChange, onCommit,
       <span className="beans-field-status no-print">
         {match ? (
           <>
-            In your beans · <Link to="/beans">details</Link>
+            {t("common.beansField.inYourBeans")}
+            <Link to="/beans">{t("common.beansField.details")}</Link>
           </>
         ) : typed ? (
-          <>New beans · added to your list when saved</>
+          <>{t("common.beansField.newBeans")}</>
         ) : (
-          <Link to="/beans">manage beans</Link>
+          <Link to="/beans">{t("common.beansField.manageBeans")}</Link>
         )}
       </span>
     </div>

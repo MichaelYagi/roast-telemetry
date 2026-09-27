@@ -168,6 +168,25 @@
       "cancel": "Cancel",
       "edit": "edit",
       "delete": "delete"
+    },
+    "beansField": {
+      "label": "Beans",
+      "placeholder": "Type a name, or pick from your beans",
+      "inYourBeans": "In your beans · ",
+      "details": "details",
+      "newBeans": "New beans · added to your list when saved",
+      "manageBeans": "manage beans"
+    },
+    "verticalControlPanel": {
+      "waitingForReading": "Waiting for a real reading from the device",
+      "channelOff": "{{label}} is off",
+      "clickToTurnOff": "{{tooltip}} -- click to turn off",
+      "clickToTurnOn": "{{tooltip}} -- click to turn on"
+    },
+    "eventButtonRow": {
+      "alwaysAuto": "Always auto-detected -- not manually markable",
+      "alreadyMarked": "Already marked for this roast",
+      "laterAlreadyRecorded": "Can't mark -- a later milestone is already recorded"
     }
   }
 }

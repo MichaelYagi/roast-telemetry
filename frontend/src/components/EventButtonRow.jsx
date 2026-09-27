@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { TERM_TOOLTIPS } from "../termTooltips.js";
 
 // The row of manual event-marker buttons shown under the chart,
@@ -49,6 +50,7 @@ export const EVENT_BUTTONS = [
 // mirror of it so buttons are disabled *before* a doomed request round
 // trips, not instead of the backend check.
 export default function EventButtonRow({ disabled, events = [], onFire, manualCharge = false }) {
+  const { t } = useTranslation();
   const fired = new Set(events.filter((e) => e.type !== "CUSTOM").map((e) => e.type));
 
   return (
@@ -62,11 +64,11 @@ export default function EventButtonRow({ disabled, events = [], onFire, manualCh
         // onto whatever lock-state message applies, if any, since a
         // button only gets one title attribute.
         const lockMessage = alwaysAuto
-          ? "Always auto-detected -- not manually markable"
+          ? t("common.eventButtonRow.alwaysAuto")
           : alreadyFired
-            ? "Already marked for this roast"
+            ? t("common.eventButtonRow.alreadyMarked")
             : laterFired
-              ? "Can't mark -- a later milestone is already recorded"
+              ? t("common.eventButtonRow.laterAlreadyRecorded")
               : undefined;
         const term = TERM_TOOLTIPS[btn.label];
         const title = term && lockMessage ? `${term} -- ${lockMessage}` : term || lockMessage;
