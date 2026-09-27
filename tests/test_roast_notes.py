@@ -68,6 +68,49 @@ def test_unknown_roast_or_note_is_404_or_409(client):
     assert client.delete(f"/api/v1/roasts/{roast_id}/notes/missing").status_code == 409
 
 
+# -- notes are searchable via GET /roasts?q=... (roasts.notes_text) -------
+
+
+def _search(client, q):
+    return [r["id"] for r in client.get("/api/v1/roasts", params={"q": q}).json()]
+
+
+def test_note_added_mid_roast_is_immediately_searchable_warm(client):
+    # No .alog exists yet at this point (only written once the roast
+    # finishes) -- notes_text has to be updated independently of that.
+    roast_id = client.post("/api/v1/roasts", json={"title": "Search Warm Roast", "mode": "simulator"}).json()["id"]
+    client.post(f"/api/v1/roasts/{roast_id}/notes", json={"text": "tastes like blueberry"})
+
+    assert roast_id in _search(client, "blueberry")
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
+
+
+def test_note_search_tracks_edits_and_deletes_cold(client):
+    roast_id = _finished_roast(client)
+    note = client.post(f"/api/v1/roasts/{roast_id}/notes", json={"text": "smells like caramel"}).json()
+    session_manager.sessions.pop(roast_id, None)  # force the cold (reload-from-.alog) path
+
+    assert roast_id in _search(client, "caramel")
+
+    edited = client.patch(f"/api/v1/roasts/{roast_id}/notes/{note['id']}", json={"text": "smells like cherry"}).json()
+    assert roast_id not in _search(client, "caramel")
+    assert roast_id in _search(client, "cherry")
+
+    client.delete(f"/api/v1/roasts/{roast_id}/notes/{edited['id']}")
+    assert roast_id not in _search(client, "cherry")
+
+
+def test_note_search_does_not_match_other_roasts(client):
+    a = _finished_roast(client)
+    b = client.post("/api/v1/roasts", json={"title": "No Notes Roast", "mode": "simulator"}).json()["id"]
+    client.post(f"/api/v1/roasts/{a}/notes", json={"text": "distinctive aroma of stone fruit"})
+    client.post(f"/api/v1/roasts/{b}/stop")
+
+    ids = _search(client, "stone fruit")
+    assert a in ids
+    assert b not in ids
+
+
 def test_note_during_a_live_roast_still_works(client):
     roast_id = client.post("/api/v1/roasts", json={"title": "Live", "mode": "simulator"}).json()["id"]
     assert client.post(f"/api/v1/roasts/{roast_id}/notes", json={"text": "charged"}).status_code == 200

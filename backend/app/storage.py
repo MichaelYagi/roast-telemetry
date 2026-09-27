@@ -272,6 +272,16 @@ def init_db() -> None:
         ):
             if col not in existing_cols:
                 c.execute(f"ALTER TABLE roasts ADD COLUMN {col} {decl}")
+        # Idempotent migration for DBs created before roasts carried a
+        # denormalized copy of their own per-timestamp notes' text, kept in
+        # sync by every note add/edit/delete and by import_alog (see
+        # notes_search_text/RoastSession.add_note et al) -- lets search (the
+        # `q` filter below) match notes text with a plain LIKE against this
+        # table, instead of loading every .alog on every search. The notes
+        # themselves still live only in the .alog file; this column exists
+        # purely to make them findable.
+        if "notes_text" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN notes_text TEXT")
         # Idempotent migration for DBs created before roast_presets carried
         # control-channel starting values.
         preset_cols = {row[1] for row in c.execute("PRAGMA table_info(roast_presets)")}
@@ -307,16 +317,17 @@ def insert_roast(summary: dict) -> None:
                (id, title, mode, status, created_at, beans,
                 weight_green_g, weight_roasted_g, duration_s, alog_path, source_alog_path, playback_speed,
                 created_by_username, modbus_transport, modbus_port, modbus_host, modbus_tcp_port,
-                modbus_device_profile_name, ms6514_port, aillio_model, tc4_port, bean_id)
+                modbus_device_profile_name, ms6514_port, aillio_model, tc4_port, bean_id, notes_text)
                VALUES (:id, :title, :mode, :status, :created_at, :beans,
                        :weight_green_g, :weight_roasted_g, :duration_s, :alog_path, :source_alog_path,
                        :playback_speed, :created_by_username, :modbus_transport, :modbus_port, :modbus_host,
-                       :modbus_tcp_port, :modbus_device_profile_name, :ms6514_port, :aillio_model, :tc4_port, :bean_id)""",
+                       :modbus_tcp_port, :modbus_device_profile_name, :ms6514_port, :aillio_model, :tc4_port,
+                       :bean_id, :notes_text)""",
             {
                 "source_alog_path": None, "playback_speed": None, "created_by_username": None,
                 "modbus_transport": None, "modbus_port": None, "modbus_host": None, "modbus_tcp_port": None,
                 "modbus_device_profile_name": None, "ms6514_port": None, "aillio_model": None, "tc4_port": None,
-                "bean_id": None, **summary,
+                "bean_id": None, "notes_text": None, **summary,
             },
         )
 
@@ -393,13 +404,15 @@ def _roast_filter_clauses(
         clauses.append("NOT EXISTS (SELECT 1 FROM roast_tags x WHERE x.roast_id = r.id AND x.tag = :exclude_tag)")
         params["exclude_tag"] = exclude_tag
     if q:
-        # title/beans/tags only -- per-timestamp roast notes live inside
-        # each roast's own .alog file, not a DB column, so searching
-        # those would mean loading every .alog on every search. Not
-        # worth it for this table's realistic scale (hundreds to
-        # low-thousands of rows) -- plain LIKE, not FTS5, for the same
-        # reason: no virtual-table/tokenizer setup earned at this size.
-        clauses.append("(r.title LIKE :q OR r.beans LIKE :q OR t.tag LIKE :q)")
+        # title/beans/tags/notes. Notes themselves still live only in each
+        # roast's own .alog file -- notes_text is a denormalized copy of
+        # just their text, kept in sync on every add/edit/delete and by
+        # import_alog (see notes_search_text), so this can match against it
+        # directly instead of loading every .alog on every search. Plain
+        # LIKE, not FTS5, for this table's realistic scale (hundreds to
+        # low-thousands of rows) -- no virtual-table/tokenizer setup earned
+        # at this size.
+        clauses.append("(r.title LIKE :q OR r.beans LIKE :q OR t.tag LIKE :q OR r.notes_text LIKE :q)")
         params["q"] = f"%{q}%"
     return clauses, params
 

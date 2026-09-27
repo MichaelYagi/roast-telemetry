@@ -124,3 +124,20 @@ def test_a_file_missing_a_required_field_says_which_and_hides_the_temp_path(clie
     detail = resp.json()["detail"]
     assert detail.startswith("partial.alog doesn't look like a valid .alog file (it is missing the ")
     assert "temp2" in detail and "tmp" not in detail
+
+
+def test_uploaded_roasts_notes_are_immediately_searchable(client):
+    # Regression check for notes_text: an imported roast never goes through
+    # add_note/update_note (where the column is normally kept in sync), so
+    # import_alog itself has to populate it from the file's own notes.
+    profile = [{"time_s": float(i), "bt": 90.0 + i * 0.5, "et": 150.0 + i * 0.8, "heater_pct": 70.0, "fan_pct": 20.0, "drum_speed_pct": 50.0} for i in range(10)]
+    events = [{"type": "CHARGE", "time_s": 0.0}]
+    notes = [{"time_s": 5.0, "text": "first crack sounded early"}]
+    d = roast_to_native_alog_dict(title="Notes Import", profile=profile, events=events, notes=notes, beans="Test beans")
+    data = repr(d).encode("utf-8")
+
+    resp = _upload(client, data, filename="roast.alog")
+    assert resp.status_code == 201, resp.text
+
+    ids = [r["id"] for r in client.get("/api/v1/roasts", params={"q": "first crack sounded"}).json()]
+    assert resp.json()["id"] in ids

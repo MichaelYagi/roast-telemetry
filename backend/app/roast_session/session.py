@@ -21,6 +21,7 @@ from alog_playback import (
     assign_note_ids,
     load_alog,
     note_timestamp,
+    notes_search_text,
     round_note_time,
     roast_to_native_alog_dict,
     save_native_alog,
@@ -767,6 +768,10 @@ class RoastSession:
         }
         self.notes.append(note)
         assign_note_ids(self.notes)
+        # notes_text is kept in sync here too, not just in _rewrite_alog --
+        # unlike the .alog file (no-op until the roast finishes, see below),
+        # search needs to find a note the moment it's added, mid-roast or not.
+        storage.update_roast(self.id, notes_text=notes_search_text(self.notes))
         # A no-op while the roast is still recording (no .alog yet -- it's
         # written once at the end); after that it keeps the file in step.
         self._rewrite_alog()
@@ -776,12 +781,14 @@ class RoastSession:
         note = _find_note(self.notes, note_id)
         note["text"] = _clean_note_text(text)
         assign_note_ids(self.notes)
+        storage.update_roast(self.id, notes_text=notes_search_text(self.notes))
         self._rewrite_alog()
         return note
 
     def delete_note(self, note_id: str) -> None:
         self.notes.remove(_find_note(self.notes, note_id))
         assign_note_ids(self.notes)
+        storage.update_roast(self.id, notes_text=notes_search_text(self.notes))
         self._rewrite_alog()
 
     def add_event(self, req: EventCreateRequest) -> dict:
@@ -1320,6 +1327,7 @@ class RoastSessionManager:
         }
         parsed["notes"].append(note)
         assign_note_ids(parsed["notes"])
+        storage.update_roast(roast_id, notes_text=notes_search_text(parsed["notes"]))
         self._rewrite_cold_alog(row, parsed)
         return note
 
@@ -1331,6 +1339,7 @@ class RoastSessionManager:
         note = _find_note(parsed["notes"], note_id)
         note["text"] = _clean_note_text(text)
         assign_note_ids(parsed["notes"])
+        storage.update_roast(roast_id, notes_text=notes_search_text(parsed["notes"]))
         self._rewrite_cold_alog(row, parsed)
         return note
 
@@ -1342,6 +1351,7 @@ class RoastSessionManager:
         row, parsed = self._cold_roast_row_and_parsed(roast_id)
         parsed["notes"].remove(_find_note(parsed["notes"], note_id))
         assign_note_ids(parsed["notes"])
+        storage.update_roast(roast_id, notes_text=notes_search_text(parsed["notes"]))
         self._rewrite_cold_alog(row, parsed)
 
     def set_weight_roasted(self, roast_id: str, grams: Optional[float]) -> None:
@@ -1504,7 +1514,7 @@ class RoastSessionManager:
             "alog_path": dest_path,
             "created_by_username": created_by_username,
         }
-        storage.insert_roast(summary)
+        storage.insert_roast({**summary, "notes_text": notes_search_text(parsed["notes"])})
         return RoastSummary(**{k: v for k, v in summary.items() if k in RoastSummary.model_fields})
 
     def import_table(

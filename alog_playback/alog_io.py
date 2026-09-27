@@ -840,6 +840,14 @@ def note_timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def notes_search_text(notes: list) -> str:
+    """Joins every note's own text into one string, for storage.py's
+    roasts.notes_text column -- a denormalized copy that lets History's
+    search match notes without loading every .alog file. Just the text:
+    time/author aren't what anyone searches for."""
+    return "\n".join(n["text"] for n in notes if n.get("text"))
+
+
 def round_note_time(time_s: float) -> float:
     """Notes keep tenths of a second -- what the saved line holds."""
     return round(float(time_s), 1)

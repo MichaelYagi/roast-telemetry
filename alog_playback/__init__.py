@@ -3,6 +3,7 @@ from .alog_io import (
     alog_dict_to_points,
     assign_note_ids,
     note_timestamp,
+    notes_search_text,
     round_note_time,
     load_alog,
     roast_to_native_alog_dict,
@@ -18,6 +19,7 @@ __all__ = [
     "alog_dict_to_points",
     "assign_note_ids",
     "note_timestamp",
+    "notes_search_text",
     "round_note_time",
     "AlogPlayer",
 ]
