@@ -612,6 +612,30 @@
       "update": "更新",
       "save": "保存",
       "delete": "削除"
+    },
+    "outcomePanel": {
+      "heading": "仕上がり",
+      "colorAgtron": "色 (Agtron)",
+      "cuppingScore": "カッピングスコア",
+      "rating": "評価",
+      "tastingNotes": "テイスティングノート",
+      "saving": "保存中…",
+      "save": "保存",
+      "saved": "保存しました。"
+    },
+    "beansCard": {
+      "origin": "産地",
+      "process": "プロセス",
+      "variety": "品種",
+      "altitude": "標高",
+      "density": "密度",
+      "moisture": "水分率",
+      "supplier": "サプライヤー",
+      "editOnBeansPage": "豆ページで編集"
+    },
+    "roastNumbers": {
+      "loading": "読み込み中…",
+      "noneYet": "まだ数値がありません -- ChargeとDropを記録してください。"
     }
   },
   "history": {

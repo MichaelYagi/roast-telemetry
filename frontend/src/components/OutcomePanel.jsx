@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 
 // What the roast turned out like, filled in afterwards: color, cupping score,
 // a 1-5 rating and tasting notes. These become columns for comparing and
 // analysing roasts.
 export default function OutcomePanel({ roast, onSaved }) {
+  const { t } = useTranslation();
   const fromRoast = (r) => ({
     color_agtron: r.color_agtron ?? "",
     cupping_score: r.cupping_score ?? "",
@@ -34,7 +36,7 @@ export default function OutcomePanel({ roast, onSaved }) {
         tasting_notes: form.tasting_notes.trim() || null,
       });
       onSaved?.(saved);
-      setMessage("Saved.");
+      setMessage(t("common.outcomePanel.saved"));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -46,18 +48,18 @@ export default function OutcomePanel({ roast, onSaved }) {
 
   return (
     <div className="panel outcome-panel no-print">
-      <h3>How it turned out</h3>
+      <h3>{t("common.outcomePanel.heading")}</h3>
       <div className="outcome-grid">
         <label>
-          Color (Agtron)
+          {t("common.outcomePanel.colorAgtron")}
           <input type="number" min="0" max="250" step="0.1" value={form.color_agtron} onChange={set("color_agtron")} />
         </label>
         <label>
-          Cupping score
+          {t("common.outcomePanel.cuppingScore")}
           <input type="number" min="0" max="100" step="0.25" value={form.cupping_score} onChange={set("cupping_score")} />
         </label>
         <label>
-          Rating
+          {t("common.outcomePanel.rating")}
           <select value={form.rating} onChange={set("rating")}>
             <option value="">—</option>
             {[1, 2, 3, 4, 5].map((n) => (
@@ -69,12 +71,12 @@ export default function OutcomePanel({ roast, onSaved }) {
         </label>
       </div>
       <label className="outcome-notes">
-        Tasting notes
+        {t("common.outcomePanel.tastingNotes")}
         <textarea rows={3} value={form.tasting_notes} onChange={set("tasting_notes")} maxLength={2000} />
       </label>
       <div className="outcome-actions">
         <button type="button" onClick={save} disabled={saving}>
-          {saving ? "Saving…" : "Save"}
+          {saving ? t("common.outcomePanel.saving") : t("common.outcomePanel.save")}
         </button>
         {message && <span className="hint">{message}</span>}
         {error && <span className="error">{error}</span>}

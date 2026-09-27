@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import { formatMetric, groupMetrics } from "../lib/metricFormat.js";
 
@@ -6,6 +7,7 @@ import { formatMetric, groupMetrics } from "../lib/metricFormat.js";
 // temperatures and times at each milestone, phase times, rate of rise, and so on.
 // Only the ones this roast actually has are listed.
 export default function RoastNumbers({ roastId, tempUnit = "c", refreshKey = 0 }) {
+  const { t } = useTranslation();
   const [row, setRow] = useState(null);
   const [metrics, setMetrics] = useState([]);
   const [error, setError] = useState(null);
@@ -24,12 +26,12 @@ export default function RoastNumbers({ roastId, tempUnit = "c", refreshKey = 0 }
   }, [roastId, refreshKey]);
 
   if (error) return <p className="hint">{error}</p>;
-  if (!row) return <p>Loading…</p>;
+  if (!row) return <p>{t("common.roastNumbers.loading")}</p>;
 
   const groups = groupMetrics(metrics)
     .map(([name, list]) => [name, list.filter((m) => row.metrics[m.key] != null)])
     .filter(([, list]) => list.length > 0);
-  if (groups.length === 0) return <p className="hint">No numbers yet — mark Charge and Drop to get them.</p>;
+  if (groups.length === 0) return <p className="hint">{t("common.roastNumbers.noneYet")}</p>;
 
   return (
     <div className="numbers-groups">

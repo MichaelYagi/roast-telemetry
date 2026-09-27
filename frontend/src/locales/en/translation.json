@@ -619,6 +619,30 @@
       "update": "Update",
       "save": "Save",
       "delete": "delete"
+    },
+    "outcomePanel": {
+      "heading": "How it turned out",
+      "colorAgtron": "Color (Agtron)",
+      "cuppingScore": "Cupping score",
+      "rating": "Rating",
+      "tastingNotes": "Tasting notes",
+      "saving": "Saving…",
+      "save": "Save",
+      "saved": "Saved."
+    },
+    "beansCard": {
+      "origin": "Origin",
+      "process": "Process",
+      "variety": "Variety",
+      "altitude": "Altitude",
+      "density": "Density",
+      "moisture": "Moisture",
+      "supplier": "Supplier",
+      "editOnBeansPage": "Edit on the Beans page"
+    },
+    "roastNumbers": {
+      "loading": "Loading…",
+      "noneYet": "No numbers yet — mark Charge and Drop to get them."
     }
   },
   "history": {
