@@ -595,6 +595,18 @@
       "croissant": "Croissant",
       "matcha": "Matcha",
       "garbagefire": "Garbagefire"
+    },
+    "analysisInsights": {
+      "heading": "Ask the AI",
+      "hint": "Sends this chart's summary numbers (averages, spread and recent roasts, not full curves) to your Ollama model and shows what it makes of them. It follows the filters and grouping above. A local model can take a minute or two.",
+      "questionLabel": "Question (optional)",
+      "questionPlaceholder": "Which of my beans do I roast most consistently?",
+      "thinking": "Thinking…",
+      "askAgain": "Ask again",
+      "analyse": "Analyse",
+      "waitingFor": "Waiting for {{model}}…",
+      "analysisFailed": "The analysis failed: {{error}}",
+      "aiCanBeWrong": "AI can be wrong; check the numbers above."
     }
   },
   "history": {

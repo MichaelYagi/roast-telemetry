@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import { formatMessage } from "../lib/mdToHtml.js";
 
@@ -25,6 +26,7 @@ export default function AnalysisInsights({ filters, groupBy }) {
 }
 
 function InsightsPanel({ filters, groupBy }) {
+  const { t } = useTranslation();
   const [question, setQuestion] = useState("");
   const [job, setJob] = useState(null);
   const [error, setError] = useState(null);
@@ -61,37 +63,33 @@ function InsightsPanel({ filters, groupBy }) {
 
   return (
     <div className="panel insights-panel no-print">
-      <h3>Ask the AI</h3>
-      <p className="hint">
-        Sends this chart's summary numbers (averages, spread and recent roasts, not full curves) to your Ollama model and
-        shows what it makes of them. It follows the filters and grouping above. A local model can take a minute or two.
-      </p>
+      <h3>{t("common.analysisInsights.heading")}</h3>
+      <p className="hint">{t("common.analysisInsights.hint")}</p>
       <label className="insights-question">
-        Question (optional)
+        {t("common.analysisInsights.questionLabel")}
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Which of my beans do I roast most consistently?"
+          placeholder={t("common.analysisInsights.questionPlaceholder")}
           maxLength={500}
         />
       </label>
       <button type="button" onClick={ask} disabled={busy}>
-        {busy ? "Thinking…" : job ? "Ask again" : "Analyse"}
+        {busy ? t("common.analysisInsights.thinking") : job ? t("common.analysisInsights.askAgain") : t("common.analysisInsights.analyse")}
       </button>
 
       {busy && (
         <p className="hint">
-          <span className="spinner" aria-hidden="true" /> Waiting for {job.model}…
+          <span className="spinner" aria-hidden="true" /> {t("common.analysisInsights.waitingFor", { model: job.model })}
         </p>
       )}
       {error && <p className="error">{error}</p>}
-      {job?.status === "failed" && <p className="error">The analysis failed: {job.error}</p>}
+      {job?.status === "failed" && <p className="error">{t("common.analysisInsights.analysisFailed", { error: job.error })}</p>}
       {job?.status === "ready" && (
         <>
           <div className="review-text" dangerouslySetInnerHTML={{ __html: formatMessage(job.text) }} />
           <p className="hint review-meta">
-            {job.model} · {new Date(job.completed_at || job.created_at).toLocaleString()} · AI can be wrong; check the
-            numbers above.
+            {job.model} · {new Date(job.completed_at || job.created_at).toLocaleString()} · {t("common.analysisInsights.aiCanBeWrong")}
           </p>
         </>
       )}

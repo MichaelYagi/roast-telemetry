@@ -588,6 +588,18 @@
       "croissant": "クロワッサン",
       "matcha": "抹茶",
       "garbagefire": "大炎上"
+    },
+    "analysisInsights": {
+      "heading": "AIに質問",
+      "hint": "このチャートの要約数値（平均、ばらつき、直近のロースト -- 全曲線ではありません）をOllamaモデルに送り、その見解を表示します。上のフィルターとグループ分けに従います。ローカルモデルでは1〜2分かかることがあります。",
+      "questionLabel": "質問（任意）",
+      "questionPlaceholder": "どの豆を最も安定してローストできていますか？",
+      "thinking": "考え中…",
+      "askAgain": "再度質問",
+      "analyse": "分析",
+      "waitingFor": "{{model}} の応答待ち…",
+      "analysisFailed": "分析に失敗しました: {{error}}",
+      "aiCanBeWrong": "AIは間違うことがあります。上記の数値を確認してください。"
     }
   },
   "history": {
