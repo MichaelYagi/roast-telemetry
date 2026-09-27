@@ -9,6 +9,7 @@ import {
 } from "chart.js";
 import zoomPlugin from "chartjs-plugin-zoom";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Line } from "react-chartjs-2";
 import { api } from "../api/client.js";
 import { formatTime, rorAxisRange, seriesLineWidth, tempAxisMax, tempAxisMin, timeAxisFor } from "../chartDefaults.js";
@@ -372,7 +373,7 @@ const RoastChart = forwardRef(function RoastChart({
   background = [],
   backgroundLabel = null,
   height = 420,
-  title = "Roast chart",
+  title,
   tempUnit = "c",
   // False only on LiveRoastView while a roast is actively roasting/cooling
   // -- zoom/pan and the hide-labels control are for reviewing a finished
@@ -390,6 +391,12 @@ const RoastChart = forwardRef(function RoastChart({
   onDeleteEvent,
   onRetimeEvent,
 }, ref) {
+  const { t } = useTranslation();
+  // A strict undefined check (not `??`) so an explicit `title={null}`
+  // (LiveRoastView, which draws its own header elsewhere) still suppresses
+  // the header entirely, while simply omitting the prop (RoastDetailView)
+  // falls through to the translated default.
+  const resolvedTitle = title === undefined ? t("common.roastChart.defaultTitle") : title;
   // Cheap to recompute every tick (profile grows every second during a
   // live roast anyway, same cost the data/availability useMemos below
   // already pay) but stable in *output* -- a sorted, joined string only
@@ -766,7 +773,7 @@ const RoastChart = forwardRef(function RoastChart({
           min: timeAxis.min,
           ...(timeAxis.max != null ? { max: timeAxis.max } : { suggestedMax: timeAxis.suggestedMax }),
           grid: { color: "#e7e5e4" },
-          title: { display: true, text: "mins", color: "#78716c" },
+          title: { display: true, text: t("common.roastChart.axisMins"), color: "#78716c" },
           ticks: { callback: (value) => formatTime(value), color: "#78716c", maxTicksLimit: 8, includeBounds: false },
         },
         yTemp: {
@@ -799,14 +806,14 @@ const RoastChart = forwardRef(function RoastChart({
         },
       },
     }),
-    [events, phases, showTemp, showRor, showControl, tempUnit, tempDataMax, timeAxis.min, timeAxis.max, hideEventLabels, interactive, onRetimeEvent, handleDragMove, handleDragEnd]
+    [events, phases, showTemp, showRor, showControl, tempUnit, tempDataMax, timeAxis.min, timeAxis.max, hideEventLabels, interactive, onRetimeEvent, handleDragMove, handleDragEnd, t]
   );
 
   return (
     <div className="scope">
-      {title && (
+      {resolvedTitle && (
         <div className="scope-header">
-          <h2 className="scope-title">{title}</h2>
+          <h2 className="scope-title">{resolvedTitle}</h2>
         </div>
       )}
       <div className="scope-toggles">
@@ -814,7 +821,7 @@ const RoastChart = forwardRef(function RoastChart({
           <label
             key={s.key}
             className={`scope-toggle ${visible[s.key] ? "scope-toggle-on" : ""} ${!availability[s.key] ? "scope-toggle-empty" : ""}`}
-            title={availability[s.key] ? undefined : "No data for this channel in this roast"}
+            title={availability[s.key] ? undefined : t("common.roastChart.noDataForChannel")}
           >
             <input type="checkbox" checked={!!visible[s.key]} onChange={() => toggle(s.key)} />
             <span className="toggle-swatch" style={{ background: s.color }} />
@@ -828,7 +835,7 @@ const RoastChart = forwardRef(function RoastChart({
             <button
               type="button"
               className="scope-chart-menu-btn"
-              aria-label="Chart options"
+              aria-label={t("common.roastChart.chartOptions")}
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((v) => !v)}
             >
@@ -836,9 +843,9 @@ const RoastChart = forwardRef(function RoastChart({
             </button>
             {menuOpen && (
               <div className="scope-chart-menu-panel">
-                <label className="scope-toggle" title="Hides the CHARGE / Turning Point / Dry End / etc. callout boxes drawn on the curves">
+                <label className="scope-toggle" title={t("common.roastChart.hideEventLabelsHint")}>
                   <input type="checkbox" checked={hideEventLabels} onChange={() => setHideEventLabels((v) => !v)} />
-                  <span>Hide event labels</span>
+                  <span>{t("common.roastChart.hideEventLabels")}</span>
                 </label>
                 <button
                   type="button"
@@ -847,9 +854,9 @@ const RoastChart = forwardRef(function RoastChart({
                     chartRef.current?.resetZoom();
                     setMenuOpen(false);
                   }}
-                  title={`${WHEEL_ZOOM_MODIFIER_LABEL}+scroll to zoom, drag to pan`}
+                  title={t("common.roastChart.zoomHint", { modifier: WHEEL_ZOOM_MODIFIER_LABEL })}
                 >
-                  Reset zoom
+                  {t("common.roastChart.resetZoom")}
                 </button>
               </div>
             )}
@@ -866,7 +873,7 @@ const RoastChart = forwardRef(function RoastChart({
                 setContextMenu(null);
               }}
             >
-              Delete milestone
+              {t("common.roastChart.deleteMilestone")}
             </button>
           </div>
         )}

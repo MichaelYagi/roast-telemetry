@@ -387,6 +387,17 @@
       "saveDeviceProfile": "デバイスプロファイルを保存",
       "btRequired": "BT温度チャンネルが必要です",
       "confirmDelete": "このデバイスプロファイルを削除しますか？これを参照しているプリセットはプロファイル未選択の状態に戻ります。"
+    },
+    "roastChart": {
+      "defaultTitle": "ロースト チャート",
+      "noDataForChannel": "このローストにはこのチャンネルのデータがありません",
+      "chartOptions": "チャートオプション",
+      "hideEventLabels": "イベントラベルを非表示",
+      "hideEventLabelsHint": "CHARGE / Turning Point / Dry End などのコールアウトボックスを非表示にします",
+      "resetZoom": "ズームをリセット",
+      "zoomHint": "{{modifier}}+スクロールでズーム、ドラッグでパン",
+      "deleteMilestone": "マイルストーンを削除",
+      "axisMins": "分"
     }
   }
 }

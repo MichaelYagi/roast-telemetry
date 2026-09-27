@@ -392,6 +392,17 @@
       "saveDeviceProfile": "Save device profile",
       "btRequired": "A BT temperature channel is required",
       "confirmDelete": "Delete this device profile? Any preset referencing it will fall back to no profile selected."
+    },
+    "roastChart": {
+      "defaultTitle": "Roast chart",
+      "noDataForChannel": "No data for this channel in this roast",
+      "chartOptions": "Chart options",
+      "hideEventLabels": "Hide event labels",
+      "hideEventLabelsHint": "Hides the CHARGE / Turning Point / Dry End / etc. callout boxes drawn on the curves",
+      "resetZoom": "Reset zoom",
+      "zoomHint": "{{modifier}}+scroll to zoom, drag to pan",
+      "deleteMilestone": "Delete milestone",
+      "axisMins": "mins"
     }
   }
 }
