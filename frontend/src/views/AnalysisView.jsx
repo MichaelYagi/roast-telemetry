@@ -59,7 +59,7 @@ function formatTrendValue(metric, displayValue, tempUnit) {
 // Date. A separate component (not inlined in the tab body) purely so each
 // metric's own useMemo/options only recompute when that metric's own
 // inputs change, not on every render of the other four.
-function TrendChart({ metric, table, tempUnit, t }) {
+function TrendChart({ metric, table, tempUnit, t, dateRange }) {
   const points = useMemo(() => {
     return table.rows
       .map((row) => ({ x: Date.parse(row.created_at), y: metricValue(metric, row.metrics[metric.key], tempUnit), row }))
@@ -138,6 +138,20 @@ function TrendChart({ metric, table, tempUnit, t }) {
     scales: {
       x: {
         type: "linear",
+        // The same [min, max] on every trend chart (all of table.rows'
+        // created_at range, not just this metric's own points) -- so
+        // scanning down the page, the same x position always means the
+        // same date on every chart, even when one metric has fewer
+        // recorded roasts than another. `bounds: "data"` on top of that
+        // stops Chart.js's default tick-rounding from padding the axis
+        // out past the real range: it treats these as plain large numbers
+        // (millisecond timestamps), not dates, so its usual "round to a
+        // nice number" padding can overshoot the last real point by
+        // weeks -- confirmed live (DTR's last dot was 9/21, axis ran to
+        // 11/18).
+        min: dateRange?.[0],
+        max: dateRange?.[1],
+        bounds: "data",
         grid: { display: false },
         ticks: { callback: (v) => new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" }), maxTicksLimit: 4 },
       },
@@ -323,7 +337,16 @@ export default function AnalysisView() {
         },
       },
       scales: {
-        x: { type: "linear", title: { display: true, text: axisTitle(xMetric) }, ticks: { callback: axisTicks(xMetric) } },
+        x: {
+          type: "linear",
+          title: { display: true, text: axisTitle(xMetric) },
+          ticks: { callback: axisTicks(xMetric) },
+          // Date only, same reasoning as TrendChart's own x-scale: without
+          // this, Chart.js's default "round to a nice number" tick padding
+          // treats a millisecond timestamp as a plain large number and can
+          // pad the axis weeks past the last real point.
+          ...(x === DATE_KEY ? { bounds: "data" } : null),
+        },
         y: { type: "linear", title: { display: true, text: axisTitle(yMetric) }, ticks: { callback: axisTicks(yMetric) } },
       },
     };
@@ -340,6 +363,16 @@ export default function AnalysisView() {
   // is meant to always answer the same "how's my roasting going" question,
   // not shift around with whatever's picked in Explore.
   const trendMetrics = useMemo(() => KEY_METRICS.map((k) => byKey[k]).filter(Boolean), [byKey]);
+  // Every roast in the current filtered set, not just the ones with a value
+  // for a given metric -- passed to every TrendChart below as its x-axis
+  // min/max, so a metric with fewer recorded roasts than another still
+  // lines up on the same calendar range instead of auto-scaling to its own
+  // narrower span of points.
+  const trendDateRange = useMemo(() => {
+    if (!table) return null;
+    const times = table.rows.map((r) => Date.parse(r.created_at)).filter((t2) => !Number.isNaN(t2));
+    return times.length ? [Math.min(...times), Math.max(...times)] : null;
+  }, [table]);
 
   const meanSd = (metric, stats) => {
     if (!stats || stats.mean == null) return "—";
@@ -559,7 +592,9 @@ export default function AnalysisView() {
             <p className="hint">{t("analysis.trends.hint", { window: TREND_ROLLING_WINDOW })}</p>
             <div className="trend-charts-grid">
               {table &&
-                trendMetrics.map((m) => <TrendChart key={m.key} metric={m} table={table} tempUnit={tempUnit} t={t} />)}
+                trendMetrics.map((m) => (
+                  <TrendChart key={m.key} metric={m} table={table} tempUnit={tempUnit} t={t} dateRange={trendDateRange} />
+                ))}
             </div>
             <p className="hint analysis-count">
               {table ? t("analysis.count", { count: table.total }) : ""}
