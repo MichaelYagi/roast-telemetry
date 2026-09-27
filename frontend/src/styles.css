@@ -3970,9 +3970,11 @@ button.link-neutral {
   border-color: var(--accent);
 }
 
+/* One per row, not a grid -- each chart gets the full page width instead of
+   being squeezed several-across. */
 .trend-charts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
@@ -3989,7 +3991,7 @@ button.link-neutral {
 
 .trend-chart-canvas {
   position: relative;
-  height: 200px;
+  height: 260px;
 }
 
 .analysis-count {
