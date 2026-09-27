@@ -46,9 +46,15 @@ function colorForIndex(i, total) {
 
 // The numbers the consistency table shows for every group, besides the chart's
 // own Y -- also what the Trends tab charts, one small chart each (see
-// TrendChart below): the same handful of "how's my roasting going" numbers,
-// just trended over time instead of averaged into one row.
+// TrendChart below), and what the Drift tab checks each roast against its own
+// bean's mean/SD for: the same handful of "how's my roasting going" numbers,
+// just used three different ways.
 const KEY_METRICS = ["duration_s", "drop_temp_c", "development_time_s", "dtr_pct", "weight_loss_pct"];
+
+// Below this many roasts, a mean/SD is too noisy to call anything an outlier
+// against -- shared by the "Roasts that stand out" list and the Drift tab.
+const MIN_GROUP_FOR_OUTLIERS = 5;
+const OUTLIER_Z_THRESHOLD = 2;
 
 // How many recent roasts each point on a trend's bold line averages over --
 // smooths day-to-day noise without lagging so far behind that a real,
@@ -247,9 +253,11 @@ export default function AnalysisView() {
   const [x, setX] = useState(DEFAULTS.x);
   const [y, setY] = useState(DEFAULTS.y);
   const [groupBy, setGroupBy] = useState(DEFAULTS.groupBy);
-  // "explore" (the X/Y scatter picker, the page's long-standing default) or
-  // "trends" (a fixed set of small rolling-average charts, see TrendChart).
-  // Both read the same already-filtered `table` -- no separate fetch.
+  // "explore" (the X/Y scatter picker, the page's long-standing default),
+  // "trends" (a fixed set of small rolling-average charts, see TrendChart),
+  // or "drift" (which roasts fell outside their own bean's usual numbers,
+  // see driftFlags below). All three read the same already-filtered `table`
+  // -- no separate fetch.
   const [mode, setMode] = useState("explore");
   // Explore chart only: which dataset's legend entry is currently hovered
   // (its index, not its name -- the legend label has a "(count)" suffix
@@ -465,16 +473,53 @@ export default function AnalysisView() {
     }
     const found = [];
     for (const [key, items] of groups) {
-      if (items.length < 5) continue;
+      if (items.length < MIN_GROUP_FOR_OUTLIERS) continue;
       const { mean, sd } = meanAndSd(items.map((i) => i.value));
       if (!sd) continue;
       for (const { row, value } of items) {
         const z = (value - mean) / sd;
-        if (Math.abs(z) >= 2) found.push({ row, group: key, value, z });
+        if (Math.abs(z) >= OUTLIER_Z_THRESHOLD) found.push({ row, group: key, value, z });
       }
     }
     return found.sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
   }, [table, y, groupBy, yMetric]);
+
+  // -- drift: a roast that's off from its OWN bean's usual numbers, across every
+  // metric that matters for repeatability -- unlike `outliers` above (which only
+  // checks whichever Y is currently picked, grouped by whatever Colour by is
+  // set to), this always groups by beans and checks every KEY_METRICS entry, so
+  // it answers "is this batch normal for this bean," regardless of what's
+  // plotted or how the chart is currently grouped.
+  const driftFlags = useMemo(() => {
+    if (!table) return [];
+    const byBean = new Map();
+    for (const row of table.rows) {
+      for (const key of groupKeys(row, "beans", t, SOURCE_LABELS)) {
+        if (!byBean.has(key)) byBean.set(key, []);
+        byBean.get(key).push(row);
+      }
+    }
+    const byRoast = new Map();
+    for (const [bean, rows] of byBean) {
+      if (rows.length < MIN_GROUP_FOR_OUTLIERS) continue;
+      for (const metric of trendMetrics) {
+        const items = rows.map((row) => ({ row, value: row.metrics[metric.key] })).filter((i) => i.value != null);
+        if (items.length < MIN_GROUP_FOR_OUTLIERS) continue;
+        const { mean, sd } = meanAndSd(items.map((i) => i.value));
+        if (!sd) continue;
+        for (const { row, value } of items) {
+          const z = (value - mean) / sd;
+          if (Math.abs(z) < OUTLIER_Z_THRESHOLD) continue;
+          if (!byRoast.has(row.id)) byRoast.set(row.id, { row, bean, flags: [] });
+          byRoast.get(row.id).flags.push({ metric, value, z });
+        }
+      }
+    }
+    return [...byRoast.values()].sort((a, b) => {
+      const maxZ = (f) => Math.max(...f.flags.map((flag) => Math.abs(flag.z)));
+      return maxZ(b) - maxZ(a);
+    });
+  }, [table, trendMetrics, t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // -- saved views ------------------------------------------------------------------------
   const getConfig = () => ({ filters, x, y, groupBy });
@@ -598,6 +643,9 @@ export default function AnalysisView() {
           <button type="button" className={mode === "trends" ? "active" : ""} onClick={() => setMode("trends")}>
             {t("analysis.mode.trends")}
           </button>
+          <button type="button" className={mode === "drift" ? "active" : ""} onClick={() => setMode("drift")}>
+            {t("analysis.mode.drift")}
+          </button>
         </div>
 
         {mode === "explore" && (
@@ -656,7 +704,7 @@ export default function AnalysisView() {
               <BulkZipDownload params={applied} tempUnit={tempUnit} />
             </p>
           </>
-        ) : (
+        ) : mode === "trends" ? (
           <>
             <p className="hint">{t("analysis.trends.hint", { window: TREND_ROLLING_WINDOW })}</p>
             <div className="trend-charts-grid">
@@ -665,6 +713,39 @@ export default function AnalysisView() {
                   <TrendChart key={m.key} metric={m} table={table} tempUnit={tempUnit} t={t} dateRange={trendDateRange} />
                 ))}
             </div>
+            <p className="hint analysis-count">
+              {table ? t("analysis.count", { count: table.total }) : ""}
+              {table?.truncated ? t("analysis.countTruncated") : ""}
+              {table?.simulated_excluded ? t("analysis.countSimulatedExcluded", { count: table.simulated_excluded }) : ""}
+              {table?.missing_recording ? t("analysis.countMissingRecording", { count: table.missing_recording }) : ""}
+              .{" "}
+              <BulkZipDownload params={applied} tempUnit={tempUnit} />
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="hint">{t("analysis.drift.hint")}</p>
+            {driftFlags.length === 0 ? (
+              <p className="hint">{t("analysis.drift.none")}</p>
+            ) : (
+              <ul className="outlier-list">
+                {driftFlags.map(({ row, bean, flags }) => (
+                  <li key={row.id}>
+                    <Link to={`/roasts/${row.id}`}>{row.title}</Link>{" "}
+                    <span className="hint">
+                      {new Date(row.created_at).toLocaleDateString()} &middot; {bean} &middot;{" "}
+                      {flags.map((f, i) => (
+                        <span key={f.metric.key}>
+                          {i > 0 ? ", " : ""}
+                          {f.metric.label}: {formatMetric(f.metric, f.value, tempUnit)} ({f.z > 0 ? "+" : ""}
+                          {f.z.toFixed(1)} SD)
+                        </span>
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
             <p className="hint analysis-count">
               {table ? t("analysis.count", { count: table.total }) : ""}
               {table?.truncated ? t("analysis.countTruncated") : ""}

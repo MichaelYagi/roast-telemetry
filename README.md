@@ -62,9 +62,13 @@ locally.)*
   from an `.alog` log (Fahrenheit logs are converted), becomes one row of
   numbers: charge and drop temperatures, milestone times, phase times, rate
   of rise, weight loss and how it turned out (colour, cupping score,
-  rating). Chart any number against another or over time, group by beans,
-  tag or month, see how consistent each group is and which roasts stand
-  out, tick roasts on History and compare them against a baseline, save views, and download
+  rating). On the Analysis page, **Explore** charts any number against
+  another or over time and groups by beans, tag or month, seeing how
+  consistent each group is and which roasts stand out; **Trends** plots the
+  key repeatability numbers against date with a rolling average, to see
+  your own trajectory over time; **Drift** flags any roast that came out
+  more than two standard deviations from how that same bean usually
+  roasts. Tick roasts on History and compare them against a baseline, save views, and download
   everything as a zip of logs, with JSON, spreadsheet CSV, Excel or PDF
   reports added in per roast. Save each green bean
   once and link roasts to it. With Ollama set up, ask a local AI model to

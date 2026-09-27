@@ -871,11 +871,16 @@
     "clickToOpenNewTab": "Click to open in a new tab",
     "mode": {
       "explore": "Explore",
-      "trends": "Trends"
+      "trends": "Trends",
+      "drift": "Drift"
     },
     "trends": {
       "notEnoughRoasts": "Not enough roasts yet with this number recorded.",
       "hint": "Each small chart trends one number against Date: faint dots are individual roasts, the bold line is a rolling average over the last {{window}} (so day-to-day noise doesn't hide the actual drift). Click a dot to open that roast."
+    },
+    "drift": {
+      "hint": "Batches more than two standard deviations from how you usually roast the same bean, on drop temperature, development time, weight loss and the other numbers that matter for repeatability. Only beans with five or more finished roasts are checked, and each roast's own beans field is used, not whatever Colour by is set to above.",
+      "none": "None of your beans have five or more finished roasts yet, or none of them stand out from their own usual numbers."
     }
   },
   "activity": {

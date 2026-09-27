@@ -146,16 +146,38 @@
   <p>
     The place for questions across many roasts. Set the filters (search, beans, tag, where the data came from, date
     range, simulated roasts) and press <strong>Apply filters</strong> (or Enter). Nothing reloads while you're still
-    choosing, and a note reminds you when the filters have changed but not been applied. Then choose:
+    choosing, and a note reminds you when the filters have changed but not been applied. Three tabs answer three
+    different questions from the same filtered roasts:
   </p>
   <ul>
-    <li><strong>Across (X)</strong> and <strong>Up (Y)</strong> &mdash; any two numbers, or <em>Date</em> to see one number over time. Each roast is a point; click a point to open that roast in a new tab.</li>
-    <li><strong>Colour by</strong> &mdash; beans, origin, process, tag, month, who roasted it, or where the data came from.</li>
+    <li>
+      <strong id="explore">Explore</strong> &mdash; pick <strong>Across (X)</strong> and <strong>Up (Y)</strong>, any
+      two numbers, or <em>Date</em> to see one number over time, and <strong>Colour by</strong> a group (beans,
+      origin, process, tag, month, who roasted it, or where the data came from). Each roast is a point; click a
+      point to open that roast in a new tab. Use it to find relationships between two numbers, or to compare groups
+      against each other &mdash; for example, do hotter charge temperatures correlate with a shorter development
+      time, or does one origin drop cooler than another.
+    </li>
+    <li>
+      <strong id="trends">Trends</strong> &mdash; a fixed small chart per key number (roast duration, drop
+      temperature, development time, development % and weight loss), each plotted against date with a rolling
+      average line smoothing out day-to-day noise. Use it to see your own trajectory across your whole history &mdash;
+      are you getting more consistent as you go, or did something shift a while back &mdash; regardless of bean or
+      group.
+    </li>
+    <li>
+      <strong id="drift">Drift</strong> &mdash; roasts that came out more than two standard deviations from how that
+      <em>same bean</em> usually roasts, on any of the key repeatability numbers, no matter what's currently plotted
+      on Explore or how it's grouped there &mdash; this tab always groups by each roast's own beans field. Only
+      beans with five or more finished roasts are checked. Use it to catch one batch worth a second look, roasted
+      from the same bean as several others &mdash; a burner running hotter than usual, a green coffee that's
+      changed since the bag was opened, a batch that just went differently.
+    </li>
   </ul>
-  <p>Below the chart:</p>
+  <p>Below the tabs, shown regardless of which one is open:</p>
   <ul>
-    <li><strong>How consistent</strong> &mdash; for each group, the average and the spread (standard deviation) of the numbers that matter most for repeatability, plus your chosen Y. A smaller spread means more repeatable roasts. A group with a single roast has no spread.</li>
-    <li><strong>Roasts that stand out</strong> &mdash; roasts more than two standard deviations from the rest of their group on the chosen Y, for groups of five or more roasts.</li>
+    <li><strong>How consistent</strong> &mdash; for each of Explore's groups, the average and the spread (standard deviation) of the numbers that matter most for repeatability, plus Explore's chosen Y. A smaller spread means more repeatable roasts. A group with a single roast has no spread.</li>
+    <li><strong>Roasts that stand out</strong> &mdash; roasts more than two standard deviations from the rest of their group on Explore's chosen Y, for groups of five or more roasts. Unlike the Drift tab above, this follows whatever Explore is currently grouped and plotted by, not always beans.</li>
     <li><strong>Saved views</strong> &mdash; keep the filters, both axes and the grouping under a name, the same one-field way as in a comparison.</li>
     <li><strong>Download all</strong> &mdash; the same zip as History, for the current filters.</li>
   </ul>
