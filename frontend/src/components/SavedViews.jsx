@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 
 const same = (a, b) => (a || "").trim().toLowerCase() === (b || "").trim().toLowerCase();
@@ -8,6 +9,7 @@ const same = (a, b) => (a || "").trim().toLowerCase() === (b || "").trim().toLow
 // under a name that already exists updates that view.
 // `getConfig()` returns what to save; `onLoad(config)` applies a saved one.
 export default function SavedViews({ kind, getConfig, onLoad, loadOnly = false, placeholder }) {
+  const { t } = useTranslation();
   const listId = useId();
   const [views, setViews] = useState([]);
   const [name, setName] = useState("");
@@ -32,7 +34,7 @@ export default function SavedViews({ kind, getConfig, onLoad, loadOnly = false, 
     const exact = views.find((v) => v.name === next);
     if (exact) {
       onLoad(exact.config);
-      setMessage("Loaded.");
+      setMessage(t("common.savedViews.loaded"));
     } else {
       setMessage(null);
     }
@@ -45,7 +47,7 @@ export default function SavedViews({ kind, getConfig, onLoad, loadOnly = false, 
       const saved = await api.saveView(kind, name.trim(), getConfig());
       await refresh();
       setName(saved.name);
-      setMessage(match ? "Updated." : "Saved.");
+      setMessage(match ? t("common.savedViews.updated") : t("common.savedViews.saved"));
     } catch (err) {
       setError(err.message);
     }
@@ -71,9 +73,14 @@ export default function SavedViews({ kind, getConfig, onLoad, loadOnly = false, 
         onChange={change}
         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), save())}
         placeholder={
-          placeholder || (loadOnly ? "Pick a saved view" : views.length ? "Saved views: pick one, or type a name to save" : "Type a name to save this view")
+          placeholder ||
+          (loadOnly
+            ? t("common.savedViews.pickSavedView")
+            : views.length
+              ? t("common.savedViews.pickOrTypeName")
+              : t("common.savedViews.typeNameToSave"))
         }
-        aria-label="Saved views"
+        aria-label={t("common.savedViews.ariaLabel")}
         maxLength={120}
       />
       <datalist id={listId}>
@@ -83,12 +90,12 @@ export default function SavedViews({ kind, getConfig, onLoad, loadOnly = false, 
       </datalist>
       {!loadOnly && (
         <button type="button" onClick={save} disabled={!name.trim()}>
-          {match ? "Update" : "Save"}
+          {match ? t("common.savedViews.update") : t("common.savedViews.save")}
         </button>
       )}
       {match && !loadOnly && (
         <button type="button" className="link-like danger" onClick={remove}>
-          delete
+          {t("common.savedViews.delete")}
         </button>
       )}
       {message && <span className="hint">{message}</span>}

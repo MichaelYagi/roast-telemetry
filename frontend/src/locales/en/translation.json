@@ -607,6 +607,18 @@
       "waitingFor": "Waiting for {{model}}…",
       "analysisFailed": "The analysis failed: {{error}}",
       "aiCanBeWrong": "AI can be wrong; check the numbers above."
+    },
+    "savedViews": {
+      "loaded": "Loaded.",
+      "updated": "Updated.",
+      "saved": "Saved.",
+      "pickSavedView": "Pick a saved view",
+      "pickOrTypeName": "Saved views: pick one, or type a name to save",
+      "typeNameToSave": "Type a name to save this view",
+      "ariaLabel": "Saved views",
+      "update": "Update",
+      "save": "Save",
+      "delete": "delete"
     }
   },
   "history": {

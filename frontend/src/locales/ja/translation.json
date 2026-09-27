@@ -600,6 +600,18 @@
       "waitingFor": "{{model}} の応答待ち…",
       "analysisFailed": "分析に失敗しました: {{error}}",
       "aiCanBeWrong": "AIは間違うことがあります。上記の数値を確認してください。"
+    },
+    "savedViews": {
+      "loaded": "読み込みました。",
+      "updated": "更新しました。",
+      "saved": "保存しました。",
+      "pickSavedView": "保存済みビューを選択",
+      "pickOrTypeName": "保存済みビュー: 選択するか、名前を入力して保存",
+      "typeNameToSave": "名前を入力してこのビューを保存",
+      "ariaLabel": "保存済みビュー",
+      "update": "更新",
+      "save": "保存",
+      "delete": "削除"
     }
   },
   "history": {
