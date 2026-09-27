@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import Modal from "./Modal.jsx";
 
@@ -38,6 +39,7 @@ function formatSize(bytes) {
 // GET /api/files itself only ever lists .alog/.json/.csv/.tsv/.xlsx -- the
 // server never has a reason to show anything else through this picker.
 export default function ServerFileChooser({ open, onClose, onSelect, startPath = "" }) {
+  const { t } = useTranslation();
   const [listing, setListing] = useState(null);
   const [pathInput, setPathInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -116,16 +118,16 @@ export default function ServerFileChooser({ open, onClose, onSelect, startPath =
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Choose a roast log file" wide>
-      <p className="hint">Folders on the machine running the server. Click a folder to open it, or a file (.alog, .json, .csv, .tsv, .xlsx) to choose it.</p>
+    <Modal open={open} onClose={onClose} title={t("common.serverFileChooser.title")} wide>
+      <p className="hint">{t("common.serverFileChooser.hint")}</p>
 
       <form className="file-chooser-pathbar" onSubmit={handleGo}>
-        <button type="button" onClick={() => listing?.parent && go(listing.parent)} disabled={!listing?.parent || loading} aria-label="Up one folder">
-          ↑ Up
+        <button type="button" onClick={() => listing?.parent && go(listing.parent)} disabled={!listing?.parent || loading} aria-label={t("common.serverFileChooser.upOneFolder")}>
+          {t("common.serverFileChooser.up")}
         </button>
-        <input value={pathInput} onChange={(e) => setPathInput(e.target.value)} aria-label="Folder path" spellCheck={false} />
+        <input value={pathInput} onChange={(e) => setPathInput(e.target.value)} aria-label={t("common.serverFileChooser.folderPath")} spellCheck={false} />
         <button type="submit" disabled={loading || !pathInput.trim()}>
-          Go
+          {t("common.serverFileChooser.go")}
         </button>
       </form>
 
@@ -142,7 +144,7 @@ export default function ServerFileChooser({ open, onClose, onSelect, startPath =
       {error && <p className="error">{error}</p>}
 
       <ul className="file-chooser-list" aria-busy={loading}>
-        {listing && listing.entries.length === 0 && !error && <li className="file-chooser-empty">No folders or roast log files here.</li>}
+        {listing && listing.entries.length === 0 && !error && <li className="file-chooser-empty">{t("common.serverFileChooser.empty")}</li>}
         {listing?.entries.map((entry) => (
           <li key={entry.path}>
             <button type="button" className={`file-chooser-entry file-chooser-${entry.kind}`} onClick={() => handleEntry(entry)}>
@@ -155,7 +157,7 @@ export default function ServerFileChooser({ open, onClose, onSelect, startPath =
           </li>
         ))}
       </ul>
-      {listing?.truncated && <p className="hint">Only the first entries are shown -- this folder is very large. Type a more specific path above.</p>}
+      {listing?.truncated && <p className="hint">{t("common.serverFileChooser.truncated")}</p>}
     </Modal>
   );
 }

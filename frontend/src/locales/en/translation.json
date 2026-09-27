@@ -545,6 +545,16 @@
       "arrowButtons": "+/- buttons",
       "stepsBy": "steps by",
       "availableHeading": "Available"
+    },
+    "serverFileChooser": {
+      "title": "Choose a roast log file",
+      "hint": "Folders on the machine running the server. Click a folder to open it, or a file (.alog, .json, .csv, .tsv, .xlsx) to choose it.",
+      "upOneFolder": "Up one folder",
+      "up": "↑ Up",
+      "folderPath": "Folder path",
+      "go": "Go",
+      "empty": "No folders or roast log files here.",
+      "truncated": "Only the first entries are shown -- this folder is very large. Type a more specific path above."
     }
   },
   "history": {

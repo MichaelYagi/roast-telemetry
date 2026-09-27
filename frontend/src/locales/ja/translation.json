@@ -538,6 +538,16 @@
       "arrowButtons": "+/- ボタン",
       "stepsBy": "ステップ幅",
       "availableHeading": "追加可能"
+    },
+    "serverFileChooser": {
+      "title": "ロースト ログファイルを選択",
+      "hint": "サーバーを実行しているマシン上のフォルダです。フォルダをクリックして開くか、ファイル（.alog、.json、.csv、.tsv、.xlsx）をクリックして選択してください。",
+      "upOneFolder": "1つ上のフォルダへ",
+      "up": "↑ 上へ",
+      "folderPath": "フォルダパス",
+      "go": "移動",
+      "empty": "フォルダやロースト ログファイルがありません。",
+      "truncated": "件数が多いため最初の一部のみ表示しています。上でより具体的なパスを入力してください。"
     }
   },
   "history": {
