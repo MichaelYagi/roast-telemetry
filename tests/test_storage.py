@@ -32,6 +32,7 @@ def test_settings_roundtrip_including_panel_list(isolated_db):
         "history_page_size": 100,
         "max_compare": 20,
         "away_alarm_enabled": True,
+        "language": "en",
         "control": {},
     }
 
@@ -86,6 +87,7 @@ def test_get_settings_defaults_on_empty_db(isolated_db):
         "history_page_size": 100,
         "max_compare": 20,
         "away_alarm_enabled": True,
+        "language": "en",
         "control": {},
     }
 

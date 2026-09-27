@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import BreakoutSettingsEditor from "../components/BreakoutSettingsEditor.jsx";
 import VerticalControlSettingsEditor from "../components/VerticalControlSettingsEditor.jsx";
@@ -7,6 +8,7 @@ import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 const CHECK_DEBOUNCE_MS = 600;
 
 export default function SettingsView() {
+  const { t } = useTranslation();
   const [url, setUrl] = useState("");
   const [model, setModel] = useState("");
   const [brokenOutPanels, setBrokenOutPanels] = useState([]); // ordered -- display order == array order
@@ -28,6 +30,7 @@ export default function SettingsView() {
   const [historyPageSize, setHistoryPageSize] = useState(100);
   const [maxCompare, setMaxCompare] = useState(20);
   const [awayAlarmEnabled, setAwayAlarmEnabled] = useState(true);
+  const [language, setLanguage] = useState("en");
   const [control, setControl] = useState({
     heater_max_pct: 100, fan_min_pct: 0, drum_min_pct: 0, safe_fan_pct: 100, client_watchdog_s: 0, safety_disabled: false,
   });
@@ -52,6 +55,7 @@ export default function SettingsView() {
       // Not `?? true`/`|| true` -- those would force it back on whenever
       // the saved value is false, since false is falsy too.
       setAwayAlarmEnabled(s.away_alarm_enabled !== false);
+      setLanguage(s.language || "en");
       if (s.control) setControl(s.control);
       setLoaded(true);
     });
@@ -92,6 +96,7 @@ export default function SettingsView() {
         history_page_size: historyPageSize,
         max_compare: maxCompare,
         away_alarm_enabled: awayAlarmEnabled,
+        language,
         control,
       });
       setSaveFeedback("Saved.");
@@ -207,6 +212,21 @@ export default function SettingsView() {
               onChange={() => setTemperatureUnit("f")}
             />
             Fahrenheit (°F)
+          </label>
+        </div>
+      </div>
+
+      <div className="panel">
+        <h2>{t("settings.language.label")}</h2>
+        <p className="hint">{t("settings.language.hint")}</p>
+        <div className="form-row">
+          <label className="checkbox-label">
+            <input type="radio" name="language" checked={language === "en"} onChange={() => setLanguage("en")} />
+            English
+          </label>
+          <label className="checkbox-label">
+            <input type="radio" name="language" checked={language === "ja"} onChange={() => setLanguage("ja")} />
+            日本語
           </label>
         </div>
       </div>

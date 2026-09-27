@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { settingsStreamUrl } from "./api/client.js";
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
 import AccountModal from "./components/AccountModal.jsx";
 import { DialogProvider } from "./components/DialogProvider.jsx";
 import ThemePicker from "./components/ThemePicker.jsx";
+import i18n from "./i18n.js";
 import useServerStatus from "./useServerStatus.js";
 import HistoryDashboard from "./views/HistoryDashboard.jsx";
 import LiveRoastView from "./views/LiveRoastView.jsx";
@@ -26,6 +29,7 @@ export default function App() {
 }
 
 function AppShell() {
+  const { t } = useTranslation();
   const { user, loading, logout, refresh } = useAuth();
   const [accountOpen, setAccountOpen] = useState(false);
   // The OS/version/LAN address the server is actually running on --
@@ -49,6 +53,30 @@ function AppShell() {
       document.title = "Roast Telemetry";
     };
   }, [activeRoast]);
+
+  // Settings > Language (AppSettings.language) applies here, not just on
+  // the Settings page itself -- the nav/footer/etc. this file renders are
+  // outside any one route. Same settings-push stream LiveRoastView.jsx
+  // uses for its own hot-apply (pushes the current settings immediately
+  // on connect, then again on every save from any client), so a language
+  // change in one tab updates every other open tab too.
+  useEffect(() => {
+    // Settings is an authenticated endpoint -- nothing to connect yet
+    // while still on the login screen (avoids a stream of 401s there);
+    // `user` in the dependency array means this actually opens the
+    // instant login completes, not just on some later unrelated re-render.
+    if (!user) return undefined;
+    const source = new EventSource(settingsStreamUrl());
+    source.addEventListener("settings", (e) => {
+      try {
+        const s = JSON.parse(e.data);
+        if (s.language) i18n.changeLanguage(s.language);
+      } catch {
+        // malformed/partial event -- ignore, next push will self-correct
+      }
+    });
+    return () => source.close();
+  }, [user]);
 
   // Nothing rendered yet during the one-time /auth/me check on mount --
   // faster than a spinner for what's normally a same-machine round trip,
@@ -74,25 +102,27 @@ function AppShell() {
               className={`server-status-dot server-status-dot-${serverStatus}`}
               title={
                 serverStatus === "green"
-                  ? "Server running, connected to a roaster"
+                  ? t("app.statusDot.connected")
                   : serverStatus === "yellow"
-                    ? "Server running, not connected to a roaster"
-                    : "Server unreachable"
+                    ? t("app.statusDot.notConnected")
+                    : t("app.statusDot.unreachable")
               }
             />
             <ThemePicker />
           </div>
           <nav>
             <NavLink to="/" end>
-              Live Roast
-              {activeRoast && <span className="nav-roast-badge" title={`Roasting: ${activeRoast.title}`} />}
+              {t("app.nav.liveRoast")}
+              {activeRoast && (
+                <span className="nav-roast-badge" title={t("app.roastBadge", { title: activeRoast.title })} />
+              )}
             </NavLink>
-            <NavLink to="/history">History</NavLink>
-            <NavLink to="/analysis">Analysis</NavLink>
-            <NavLink to="/beans">Beans</NavLink>
-            <NavLink to="/activity">Activity</NavLink>
-            <NavLink to="/settings">Settings</NavLink>
-            {user.role === "admin" && <NavLink to="/users">Manage Access</NavLink>}
+            <NavLink to="/history">{t("app.nav.history")}</NavLink>
+            <NavLink to="/analysis">{t("app.nav.analysis")}</NavLink>
+            <NavLink to="/beans">{t("app.nav.beans")}</NavLink>
+            <NavLink to="/activity">{t("app.nav.activity")}</NavLink>
+            <NavLink to="/settings">{t("app.nav.settings")}</NavLink>
+            {user.role === "admin" && <NavLink to="/users">{t("app.nav.manageAccess")}</NavLink>}
           </nav>
           <div className="app-user-group">
             {/* Opens the Account modal (API key management) -- see
@@ -102,7 +132,7 @@ function AppShell() {
               {user.username}
             </button>
             <button type="button" className="logout-button" onClick={logout}>
-              Log out
+              {t("app.logout")}
             </button>
           </div>
         </div>
@@ -136,7 +166,7 @@ function AppShell() {
             its source -- the license's own guidance is a "Source" link in the
             interface. */}
         <a href="https://github.com/MichaelYagi/roast-telemetry" target="_blank" rel="noreferrer">
-          Source code
+          {t("app.footer.sourceCode")}
         </a>
       </footer>
     </div>

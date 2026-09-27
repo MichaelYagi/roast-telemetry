@@ -790,6 +790,7 @@ def get_settings() -> dict:
         "history_page_size": history_page_size,
         "max_compare": max_compare,
         "away_alarm_enabled": away_alarm_enabled,
+        "language": values.get("language") or "en",
         "control": control,
     }
 

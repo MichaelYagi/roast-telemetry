@@ -101,6 +101,7 @@ def test_get_settings_defaults(client):
         "history_page_size": 100,
         "max_compare": 20,
         "away_alarm_enabled": True,
+        "language": "en",
         "control": {
             "heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0,
             "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": False,
@@ -239,6 +240,17 @@ def test_put_settings_saves_away_alarm_enabled(client):
     resp = client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "away_alarm_enabled": True})
     assert resp.json()["away_alarm_enabled"] is True
     assert client.get("/api/v1/settings").json()["away_alarm_enabled"] is True
+
+
+def test_put_settings_saves_language(client):
+    resp = client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "language": "ja"})
+    assert resp.json()["language"] == "ja"
+    assert client.get("/api/v1/settings").json()["language"] == "ja"
+
+
+def test_put_settings_rejects_unknown_language(client):
+    resp = client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "language": "xx"})
+    assert resp.json()["language"] == "en"
 
 
 def test_put_settings_drops_unknown_vertical_control_keys(client):

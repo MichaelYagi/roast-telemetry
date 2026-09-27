@@ -744,6 +744,9 @@ class AppSettings(BaseModel):
     # On by default (matches the behavior before this was ever
     # configurable); off silences it entirely.
     away_alarm_enabled: bool = True
+    # The app's own UI language -- "en" or "ja" (frontend/src/locales/).
+    # Doesn't touch temperature_unit above, a separate, unrelated choice.
+    language: str = "en"
     # Safety limits for anything that writes to the roaster (see ControlSafety).
     control: ControlSafety = Field(default_factory=ControlSafety)
 

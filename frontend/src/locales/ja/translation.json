@@ -1,0 +1,29 @@
+{
+  "app": {
+    "nav": {
+      "liveRoast": "ライブロースト",
+      "history": "履歴",
+      "analysis": "分析",
+      "beans": "豆",
+      "activity": "アクティビティ",
+      "settings": "設定",
+      "manageAccess": "アクセス管理"
+    },
+    "logout": "ログアウト",
+    "statusDot": {
+      "connected": "サーバー稼働中、ロースターに接続済み",
+      "notConnected": "サーバー稼働中、ロースター未接続",
+      "unreachable": "サーバーに接続できません"
+    },
+    "roastBadge": "ロースト中: {{title}}",
+    "footer": {
+      "sourceCode": "ソースコード"
+    }
+  },
+  "settings": {
+    "language": {
+      "label": "言語",
+      "hint": "アプリ自体の表示言語を変更します。温度単位（Temperature Unit）には影響しません。"
+    }
+  }
+}

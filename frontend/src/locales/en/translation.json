@@ -1,0 +1,29 @@
+{
+  "app": {
+    "nav": {
+      "liveRoast": "Live Roast",
+      "history": "History",
+      "analysis": "Analysis",
+      "beans": "Beans",
+      "activity": "Activity",
+      "settings": "Settings",
+      "manageAccess": "Manage Access"
+    },
+    "logout": "Log out",
+    "statusDot": {
+      "connected": "Server running, connected to a roaster",
+      "notConnected": "Server running, not connected to a roaster",
+      "unreachable": "Server unreachable"
+    },
+    "roastBadge": "Roasting: {{title}}",
+    "footer": {
+      "sourceCode": "Source code"
+    }
+  },
+  "settings": {
+    "language": {
+      "label": "Language",
+      "hint": "Changes the app's own text. Doesn't affect Temperature Unit, which is separate."
+    }
+  }
+}

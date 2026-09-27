@@ -111,6 +111,7 @@ async def update_settings(settings: AppSettings, http_request: Request) -> AppSe
     colors = _filter_colors(settings.breakout_panel_colors)
     small_panels = _filter_panels(settings.small_readout_panels)
     temperature_unit = settings.temperature_unit if settings.temperature_unit in ("c", "f") else "c"
+    language = settings.language if settings.language in ("en", "ja") else "en"
     vertical_layout = _filter_vertical_layout(settings.vertical_control_layout)
     vertical_arrows = _filter_arrows(settings.vertical_control_arrows)
     series_visible = _filter_series_visible(settings.chart_series_visible)
@@ -136,6 +137,7 @@ async def update_settings(settings: AppSettings, http_request: Request) -> AppSe
         history_page_size=history_page_size,
         max_compare=max_compare,
         away_alarm_enabled=settings.away_alarm_enabled,
+        language=language,
         control=control.model_dump(),
     )
     # Not what tripped while it was off (see enter_safe_state's own
@@ -166,6 +168,7 @@ async def update_settings(settings: AppSettings, http_request: Request) -> AppSe
         history_page_size=history_page_size,
         max_compare=max_compare,
         away_alarm_enabled=settings.away_alarm_enabled,
+        language=language,
         control=control,
     )
     await settings_pubsub.publish(result.model_dump_json())
