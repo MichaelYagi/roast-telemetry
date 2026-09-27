@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Modal from "./Modal.jsx";
 
 // Replaces window.confirm/window.alert app-wide with a custom modal --
@@ -10,30 +11,37 @@ import Modal from "./Modal.jsx";
 const DialogContext = createContext(null);
 
 export function DialogProvider({ children }) {
+  const { t } = useTranslation();
   // { kind: "confirm" | "notice", title, message, confirmLabel, danger, resolve } | null
   // -- only one dialog can be open at a time, which matches every actual
   // call site (a confirm/alert always blocks the handler that triggered
   // it, same as window.confirm/window.alert did).
   const [state, setState] = useState(null);
 
-  const confirm = useCallback((message, options = {}) => {
-    return new Promise((resolve) => {
-      setState({
-        kind: "confirm",
-        title: options.title || "Confirm",
-        message,
-        confirmLabel: options.confirmLabel || "Delete",
-        danger: options.danger !== false,
-        resolve,
+  const confirm = useCallback(
+    (message, options = {}) => {
+      return new Promise((resolve) => {
+        setState({
+          kind: "confirm",
+          title: options.title || t("common.dialog.confirmTitle"),
+          message,
+          confirmLabel: options.confirmLabel || t("common.dialog.delete"),
+          danger: options.danger !== false,
+          resolve,
+        });
       });
-    });
-  }, []);
+    },
+    [t]
+  );
 
-  const notify = useCallback((message, options = {}) => {
-    return new Promise((resolve) => {
-      setState({ kind: "notice", title: options.title || "Notice", message, resolve });
-    });
-  }, []);
+  const notify = useCallback(
+    (message, options = {}) => {
+      return new Promise((resolve) => {
+        setState({ kind: "notice", title: options.title || t("common.dialog.noticeTitle"), message, resolve });
+      });
+    },
+    [t]
+  );
 
   function settle(result) {
     state?.resolve?.(result);
@@ -53,11 +61,11 @@ export function DialogProvider({ children }) {
             <div className="dialog-actions">
               {state.kind === "confirm" && (
                 <button type="button" onClick={() => settle(false)}>
-                  Cancel
+                  {t("common.dialog.cancel")}
                 </button>
               )}
               <button type="button" className={state.danger ? "danger" : undefined} onClick={() => settle(true)}>
-                {state.kind === "confirm" ? state.confirmLabel : "OK"}
+                {state.kind === "confirm" ? state.confirmLabel : t("common.dialog.ok")}
               </button>
             </div>
           </>
