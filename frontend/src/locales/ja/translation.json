@@ -579,6 +579,15 @@
       "buildingPdf": "PDFを作成中 {{total}}件中{{current}}件目…",
       "zipping": "ZIP圧縮中…",
       "couldntBuildZip": "zipを作成できませんでした。"
+    },
+    "themePicker": {
+      "changeTheme": "テーマを変更",
+      "light": "ライト",
+      "dark": "ダーク",
+      "coffee": "コーヒー",
+      "croissant": "クロワッサン",
+      "matcha": "抹茶",
+      "garbagefire": "大炎上"
     }
   },
   "history": {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 const STORAGE_KEY = "roast-telemetry:theme";
 
@@ -6,13 +7,13 @@ const STORAGE_KEY = "roast-telemetry:theme";
 // duplicated here (rather than read from computed CSS) since they're
 // static per theme and this needs to render a preview for a theme even
 // while a *different* one is currently applied to the page.
-const THEMES = [
-  { id: "light", label: "Light", swatch: ["#f5f5f4", "#ffffff", "#2e6da4"] },
-  { id: "dark", label: "Dark", swatch: ["#17171a", "#222226", "#5b9bd5"] },
-  { id: "coffee", label: "Coffee", swatch: ["#1b120d", "#2a1d16", "#d68c3f"] },
-  { id: "croissant", label: "Croissant", swatch: ["#fbf3e3", "#fffdf7", "#c8862b"] },
-  { id: "matcha", label: "Matcha", swatch: ["#eef2e3", "#f8faf3", "#5c8a3a"] },
-  { id: "garbagefire", label: "Garbagefire", swatch: ["#ffe4e1", "#fafad2", "#ff0000"] },
+const THEME_IDS = [
+  { id: "light", swatch: ["#f5f5f4", "#ffffff", "#2e6da4"] },
+  { id: "dark", swatch: ["#17171a", "#222226", "#5b9bd5"] },
+  { id: "coffee", swatch: ["#1b120d", "#2a1d16", "#d68c3f"] },
+  { id: "croissant", swatch: ["#fbf3e3", "#fffdf7", "#c8862b"] },
+  { id: "matcha", swatch: ["#eef2e3", "#f8faf3", "#5c8a3a"] },
+  { id: "garbagefire", swatch: ["#ffe4e1", "#fafad2", "#ff0000"] },
 ];
 
 function applyTheme(id) {
@@ -40,6 +41,8 @@ function Swatch({ colors }) {
 // inline script that applies the saved choice before first paint, so
 // picking Coffee doesn't flash Light on every reload.
 export default function ThemePicker() {
+  const { t } = useTranslation();
+  const THEMES = THEME_IDS.map((th) => ({ ...th, label: t(`common.themePicker.${th.id}`) }));
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_KEY) || "light";
@@ -77,7 +80,7 @@ export default function ThemePicker() {
     }
   }
 
-  const current = THEMES.find((t) => t.id === theme) || THEMES[0];
+  const current = THEMES.find((th) => th.id === theme) || THEMES[0];
 
   return (
     <div className="theme-picker" ref={rootRef}>
@@ -87,7 +90,7 @@ export default function ThemePicker() {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="true"
         aria-expanded={open}
-        title="Change theme"
+        title={t("common.themePicker.changeTheme")}
       >
         <Swatch colors={current.swatch} />
         <span className="theme-picker-label">{current.label}</span>
@@ -95,17 +98,17 @@ export default function ThemePicker() {
       </button>
       {open && (
         <div className="theme-picker-menu" role="menu">
-          {THEMES.map((t) => (
+          {THEMES.map((th) => (
             <button
               type="button"
-              key={t.id}
+              key={th.id}
               role="menuitemradio"
-              aria-checked={t.id === theme}
-              className={`theme-picker-option${t.id === theme ? " selected" : ""}`}
-              onClick={() => choose(t.id)}
+              aria-checked={th.id === theme}
+              className={`theme-picker-option${th.id === theme ? " selected" : ""}`}
+              onClick={() => choose(th.id)}
             >
-              <Swatch colors={t.swatch} />
-              <span className="theme-picker-option-label">{t.label}</span>
+              <Swatch colors={th.swatch} />
+              <span className="theme-picker-option-label">{th.label}</span>
               <span className="theme-picker-option-check">✓</span>
             </button>
           ))}

@@ -586,6 +586,15 @@
       "buildingPdf": "Building PDF {{current}} of {{total}}…",
       "zipping": "Zipping…",
       "couldntBuildZip": "Couldn't build the zip."
+    },
+    "themePicker": {
+      "changeTheme": "Change theme",
+      "light": "Light",
+      "dark": "Dark",
+      "coffee": "Coffee",
+      "croissant": "Croissant",
+      "matcha": "Matcha",
+      "garbagefire": "Garbagefire"
     }
   },
   "history": {
