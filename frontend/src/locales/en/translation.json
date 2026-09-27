@@ -562,6 +562,30 @@
       "noticeTitle": "Notice",
       "cancel": "Cancel",
       "ok": "OK"
+    },
+    "roastReviewCard": {
+      "heading": "AI Review",
+      "loading": "Loading…",
+      "generating": "Generating review…",
+      "reviewFailed": "Review failed: {{error}}",
+      "generateReview": "Generate review",
+      "regenerateReview": "Regenerate review",
+      "roastNotEnded": "The roast hasn't ended yet. Go to Live Roast and press OFF to end it."
+    },
+    "bulkZipDownload": {
+      "formatJson": "JSON",
+      "formatSpreadsheetCsv": "Spreadsheet CSV",
+      "formatExcel": "Excel",
+      "formatPdf": "PDF",
+      "downloadAllZip": "Download all (.zip)",
+      "chooseFormats": "Choose extra formats to include",
+      "findingRoasts": "Finding matching roasts…",
+      "noRoastsMatch": "No roasts match those filters.",
+      "tooManyForPdf": "{{count}} roasts match -- PDF export in the zip is limited to {{max}} at once. Narrow the filters, or uncheck PDF.",
+      "fetchingZip": "Fetching the .alog/other-format zip…",
+      "buildingPdf": "Building PDF {{current}} of {{total}}…",
+      "zipping": "Zipping…",
+      "couldntBuildZip": "Couldn't build the zip."
     }
   },
   "history": {

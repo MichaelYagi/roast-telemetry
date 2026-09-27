@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import { formatMessage } from "../lib/mdToHtml.js";
 
@@ -33,6 +34,7 @@ export default function RoastReviewCard(props) {
 }
 
 function RoastReviewPanel({ roastId, roastActive }) {
+  const { t } = useTranslation();
   const [review, setReview] = useState(undefined); // undefined = loading, null = none yet, object = loaded
   const [error, setError] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -87,17 +89,17 @@ function RoastReviewPanel({ roastId, roastActive }) {
 
   return (
     <div className="panel">
-      <h3>AI Review</h3>
+      <h3>{t("common.roastReviewCard.heading")}</h3>
       <div className="review-card-body">
         {error && <p className="error">{error}</p>}
 
-        {review === undefined && <p className="hint">Loading…</p>}
+        {review === undefined && <p className="hint">{t("common.roastReviewCard.loading")}</p>}
 
         {review !== undefined && (
           <>
             {busy && (
               <p className="hint">
-                <span className="spinner" aria-hidden="true" /> Generating review…
+                <span className="spinner" aria-hidden="true" /> {t("common.roastReviewCard.generating")}
               </p>
             )}
 
@@ -111,17 +113,15 @@ function RoastReviewPanel({ roastId, roastActive }) {
             )}
 
             {!busy && review?.status === "failed" && (
-              <p className="error">Review failed: {review.error}</p>
+              <p className="error">{t("common.roastReviewCard.reviewFailed", { error: review.error })}</p>
             )}
 
             {!busy && (
               <button type="button" className="no-print" onClick={handleGenerate} disabled={roastActive}>
-                {review ? "Regenerate review" : "Generate review"}
+                {review ? t("common.roastReviewCard.regenerateReview") : t("common.roastReviewCard.generateReview")}
               </button>
             )}
-            {roastActive && (
-              <p className="hint no-print">The roast hasn't ended yet. Go to Live Roast and press OFF to end it.</p>
-            )}
+            {roastActive && <p className="hint no-print">{t("common.roastReviewCard.roastNotEnded")}</p>}
           </>
         )}
       </div>

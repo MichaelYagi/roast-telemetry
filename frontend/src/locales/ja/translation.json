@@ -555,6 +555,30 @@
       "noticeTitle": "お知らせ",
       "cancel": "キャンセル",
       "ok": "OK"
+    },
+    "roastReviewCard": {
+      "heading": "AIレビュー",
+      "loading": "読み込み中…",
+      "generating": "レビューを生成中…",
+      "reviewFailed": "レビューに失敗しました: {{error}}",
+      "generateReview": "レビューを生成",
+      "regenerateReview": "レビューを再生成",
+      "roastNotEnded": "ローストがまだ終了していません。Live RoastでOFFを押して終了してください。"
+    },
+    "bulkZipDownload": {
+      "formatJson": "JSON",
+      "formatSpreadsheetCsv": "表計算ソフト用CSV",
+      "formatExcel": "Excel",
+      "formatPdf": "PDF",
+      "downloadAllZip": "すべてダウンロード (.zip)",
+      "chooseFormats": "追加フォーマットを選択",
+      "findingRoasts": "一致するローストを検索中…",
+      "noRoastsMatch": "このフィルターに一致するローストはありません。",
+      "tooManyForPdf": "{{count}}件が一致しています -- zip内でのPDF出力は一度に{{max}}件までです。フィルターを絞るか、PDFのチェックを外してください。",
+      "fetchingZip": ".alogおよびその他フォーマットのzipを取得中…",
+      "buildingPdf": "PDFを作成中 {{total}}件中{{current}}件目…",
+      "zipping": "ZIP圧縮中…",
+      "couldntBuildZip": "zipを作成できませんでした。"
     }
   },
   "history": {

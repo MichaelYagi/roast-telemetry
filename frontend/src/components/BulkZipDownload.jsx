@@ -1,14 +1,8 @@
 import { useState } from "react";
 import JSZip from "jszip";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import { buildRoastPdfBlob, pdfFilename } from "../lib/roastPdf.js";
-
-const EXTRA_FORMATS = [
-  { key: "json", label: "JSON" },
-  { key: "roastlog_csv", label: "Spreadsheet CSV" },
-  { key: "xlsx", label: "Excel" },
-  { key: "pdf", label: "PDF" },
-];
 
 // A PDF report is built in the browser (see lib/roastPdf.js), one roast at a
 // time -- unlike the other three formats, there's no server endpoint that
@@ -24,6 +18,13 @@ const MAX_PDF_ROASTS = 150;
 // Shared by History and Analysis, so the two stay in sync. `tempUnit` is only
 // used for the PDF path (chart axis labels, temperature columns).
 export default function BulkZipDownload({ params, tempUnit = "c" }) {
+  const { t } = useTranslation();
+  const EXTRA_FORMATS = [
+    { key: "json", label: t("common.bulkZipDownload.formatJson") },
+    { key: "roastlog_csv", label: t("common.bulkZipDownload.formatSpreadsheetCsv") },
+    { key: "xlsx", label: t("common.bulkZipDownload.formatExcel") },
+    { key: "pdf", label: t("common.bulkZipDownload.formatPdf") },
+  ];
   const [open, setOpen] = useState(false);
   const [formats, setFormats] = useState([]);
   const [busy, setBusy] = useState(null); // e.g. "Building PDF 3/12…"
@@ -40,19 +41,19 @@ export default function BulkZipDownload({ params, tempUnit = "c" }) {
   async function handlePdfDownload() {
     setError(null);
     try {
-      setBusy("Finding matching roasts…");
+      setBusy(t("common.bulkZipDownload.findingRoasts"));
       const table = await api.getAnalysisTable(params);
       const rows = table.rows || [];
       if (!rows.length) {
-        setError("No roasts match those filters.");
+        setError(t("common.bulkZipDownload.noRoastsMatch"));
         return;
       }
       if (rows.length > MAX_PDF_ROASTS) {
-        setError(`${rows.length} roasts match -- PDF export in the zip is limited to ${MAX_PDF_ROASTS} at once. Narrow the filters, or uncheck PDF.`);
+        setError(t("common.bulkZipDownload.tooManyForPdf", { count: rows.length, max: MAX_PDF_ROASTS }));
         return;
       }
 
-      setBusy("Fetching the .alog/other-format zip…");
+      setBusy(t("common.bulkZipDownload.fetchingZip"));
       const zipRes = await fetch(zipUrl);
       if (!zipRes.ok) throw new Error(`couldn't build the zip (${zipRes.status})`);
       const zip = await JSZip.loadAsync(await zipRes.arrayBuffer());
@@ -61,7 +62,7 @@ export default function BulkZipDownload({ params, tempUnit = "c" }) {
       const used = new Set();
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        setBusy(`Building PDF ${i + 1} of ${rows.length}…`);
+        setBusy(t("common.bulkZipDownload.buildingPdf", { current: i + 1, total: rows.length }));
         try {
           const [roast, stats] = await Promise.all([api.getRoast(row.id), api.getRoastStats(row.id).catch(() => null)]);
           const blob = await buildRoastPdfBlob(roast, tempUnit, { stats, numbersRow: row, metricsMeta });
@@ -75,7 +76,7 @@ export default function BulkZipDownload({ params, tempUnit = "c" }) {
         }
       }
 
-      setBusy("Zipping…");
+      setBusy(t("common.bulkZipDownload.zipping"));
       const finalBlob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(finalBlob);
       const a = document.createElement("a");
@@ -86,7 +87,7 @@ export default function BulkZipDownload({ params, tempUnit = "c" }) {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err.message || "Couldn't build the zip.");
+      setError(err.message || t("common.bulkZipDownload.couldntBuildZip"));
     } finally {
       setBusy(null);
     }
@@ -96,11 +97,11 @@ export default function BulkZipDownload({ params, tempUnit = "c" }) {
     <span className="bulk-zip">
       {wantsPdf ? (
         <button type="button" className="link-like" onClick={handlePdfDownload} disabled={Boolean(busy)}>
-          {busy || "Download all (.zip)"}
+          {busy || t("common.bulkZipDownload.downloadAllZip")}
         </button>
       ) : (
         <a href={zipUrl} download>
-          Download all (.zip)
+          {t("common.bulkZipDownload.downloadAllZip")}
         </a>
       )}{" "}
       <button
@@ -108,7 +109,7 @@ export default function BulkZipDownload({ params, tempUnit = "c" }) {
         className="link-like bulk-zip-toggle no-print"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        title="Choose extra formats to include"
+        title={t("common.bulkZipDownload.chooseFormats")}
       >
         {open ? "▾" : "▸"}
       </button>
