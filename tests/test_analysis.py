@@ -480,6 +480,42 @@ def test_insights_send_summary_numbers_and_return_the_models_text(client, tmp_pa
     assert len(prompt) < 12000  # small enough for a local model's window
 
 
+def test_insights_include_drift_flags_and_trend_summary(client, tmp_path, monkeypatch):
+    from backend.app import ollama_client
+
+    seen = {}
+
+    async def fake_generate(url, model, prompt, options=None):
+        seen["prompt"] = prompt
+        return "ok"
+
+    monkeypatch.setattr(ollama_client, "generate", fake_generate)
+    _configure_ollama(client)
+
+    # Five similar Ethiopia roasts (development time ~120s) plus one with
+    # First Crack much later, so its development time is far shorter --
+    # the same shape AnalysisView.jsx's Drift tab flags.
+    for i in range(5):
+        rid = import_roast(client, tmp_path, f"normal{i}", fc_at=480, drop_at=600)
+        client.put(f"/api/v1/roasts/{rid}/beans", json={"name": "Ethiopia"})
+    outlier_id = import_roast(client, tmp_path, "underdeveloped", fc_at=590, drop_at=600)
+    client.put(f"/api/v1/roasts/{outlier_id}/beans", json={"name": "Ethiopia"})
+
+    job = _wait_for_insight(client, client.post("/api/v1/analysis/insights", json={}).json()["id"])
+    assert job["status"] == "ready"
+    prompt = seen["prompt"]
+
+    assert "FLAGGED ROASTS" in prompt
+    assert '"title":"underdeveloped"' in prompt and '"beans":"Ethiopia"' in prompt
+    assert "Development time" in prompt
+    # None of the five similar roasts should themselves be flagged.
+    for i in range(5):
+        assert f'"title":"normal{i}"' not in prompt.split("FLAGGED ROASTS")[1].split("TREND SUMMARY")[0]
+
+    assert "TREND SUMMARY" in prompt
+    assert '"measurement":"Development time"' in prompt
+
+
 def test_insights_respect_the_filters_and_say_what_they_were(client, tmp_path, monkeypatch):
     from backend.app import ollama_client
 

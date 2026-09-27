@@ -202,6 +202,13 @@
     leaves your network unless your Ollama URL points elsewhere. Without Ollama configured the panel simply isn't
     shown.
   </p>
+  <p>
+    Two things from the <a href="#drift">Drift</a> and <a href="#trends">Trends</a> tabs are included too, computed
+    the same way those tabs compute them (not left for the model to guess): which roasts are flagged as unusual for
+    their own bean, and an earlier-half vs. later-half comparison for the key repeatability numbers. This is why the
+    AI's answer can point at specific flagged roasts and say something concrete about drift over time, instead of
+    reconstructing both from raw numbers itself.
+  </p>
   <p class="hint">
     A local model can take a minute or two; the page waits and shows the answer when it arrives. The request asks for
     an 8192-token context window so the summary isn't cut off. AI comments can be wrong, so check them against the
