@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import { formatTime } from "../chartDefaults.js";
 
@@ -17,6 +18,7 @@ function formatWritten(iso) {
 // position in the saved file, so they shift when a note is removed and a
 // locally patched copy would soon point at the wrong note.
 export default function NotesPanel({ roastId, notes, onReplace }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
@@ -71,17 +73,17 @@ export default function NotesPanel({ roastId, notes, onReplace }) {
 
   return (
     <div className="panel notes-panel">
-      <h3>Notes</h3>
+      <h3>{t("common.notesPanel.heading")}</h3>
       <div className="note-input">
         <textarea
-          placeholder="Add a note…"
+          placeholder={t("common.notesPanel.addPlaceholder")}
           rows={3}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           disabled={!roastId}
         />
         <button type="button" onClick={add} disabled={busy || !roastId || !draft.trim()}>
-          Add
+          {t("common.notesPanel.add")}
         </button>
       </div>
       {error && <p className="error">{error}</p>}
@@ -92,10 +94,10 @@ export default function NotesPanel({ roastId, notes, onReplace }) {
               <textarea rows={3} value={editText} onChange={(e) => setEditText(e.target.value)} autoFocus />
               <span className="note-actions">
                 <button type="button" onClick={saveEdit} disabled={busy || !editText.trim()}>
-                  Save
+                  {t("common.notesPanel.save")}
                 </button>
                 <button type="button" className="link-like" onClick={() => setEditingId(null)}>
-                  Cancel
+                  {t("common.notesPanel.cancel")}
                 </button>
               </span>
             </li>
@@ -116,16 +118,16 @@ export default function NotesPanel({ roastId, notes, onReplace }) {
                     setError(null);
                   }}
                 >
-                  edit
+                  {t("common.notesPanel.edit")}
                 </button>
                 <button type="button" className="danger link-like" onClick={() => remove(n.id)} disabled={busy}>
-                  delete
+                  {t("common.notesPanel.delete")}
                 </button>
               </span>
             </li>
           )
         )}
-        {notes.length === 0 && <li>No notes.</li>}
+        {notes.length === 0 && <li>{t("common.notesPanel.noNotes")}</li>}
       </ul>
     </div>
   );

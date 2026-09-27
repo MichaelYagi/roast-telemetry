@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
-import { STAT_ROW_DEFS, formatRoastStatRow } from "../roastStats.js";
+import { getStatRowDefs, formatRoastStatRow } from "../roastStats.js";
 
 // Single-roast derived stats -- Dry/Maillard/Development %, weight
 // loss%, duration, RoR crash/flatline/flick flags. Pure display, no
@@ -8,6 +9,7 @@ import { STAT_ROW_DEFS, formatRoastStatRow } from "../roastStats.js";
 // server-side from the roast's own profile/events (GET /roasts/{id}/stats,
 // see backend/app/roast_stats.py), nothing the user sets directly.
 export default function RoastStatsPanel({ roastId }) {
+  const { t } = useTranslation();
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
 
@@ -21,14 +23,14 @@ export default function RoastStatsPanel({ roastId }) {
   }, [roastId]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!stats) return <p>Loading…</p>;
+  if (!stats) return <p>{t("common.roastStats.loading")}</p>;
 
   return (
     <ul className="kv-list">
-      {STAT_ROW_DEFS.map(({ key, label }) => (
+      {getStatRowDefs(t).map(({ key, label }) => (
         <li key={key}>
           <span>{label}</span>
-          <span>{formatRoastStatRow(key, stats)}</span>
+          <span>{formatRoastStatRow(key, stats, t)}</span>
         </li>
       ))}
     </ul>

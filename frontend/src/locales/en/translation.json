@@ -187,6 +187,40 @@
       "alwaysAuto": "Always auto-detected -- not manually markable",
       "alreadyMarked": "Already marked for this roast",
       "laterAlreadyRecorded": "Can't mark -- a later milestone is already recorded"
+    },
+    "notesPanel": {
+      "heading": "Notes",
+      "addPlaceholder": "Add a note…",
+      "add": "Add",
+      "save": "Save",
+      "cancel": "Cancel",
+      "edit": "edit",
+      "delete": "delete",
+      "noNotes": "No notes."
+    },
+    "backgroundProfilePicker": {
+      "label": "Background profile",
+      "none": "None",
+      "clear": "Clear",
+      "pacingAgainst": "Pacing against \"{{title}}\" — BT/ET shown as dashed reference lines."
+    },
+    "roastStats": {
+      "loading": "Loading…",
+      "rows": {
+        "dry": "Dry %",
+        "maillard": "Maillard %",
+        "development": "Development % (DTR)",
+        "weightLoss": "Weight loss",
+        "duration": "Duration",
+        "rorFlags": "RoR flags"
+      },
+      "none": "None",
+      "crashes_one": "{{count}} crash",
+      "crashes_other": "{{count}} crashes",
+      "flatlines_one": "{{count}} flatline",
+      "flatlines_other": "{{count}} flatlines",
+      "flicks_one": "{{count}} flick",
+      "flicks_other": "{{count}} flicks"
     }
   }
 }

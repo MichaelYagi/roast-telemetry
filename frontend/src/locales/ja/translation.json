@@ -187,6 +187,37 @@
       "alwaysAuto": "常に自動検出されます -- 手動でマークできません",
       "alreadyMarked": "このローストでは既にマーク済みです",
       "laterAlreadyRecorded": "マークできません -- より後のマイルストーンが既に記録されています"
+    },
+    "notesPanel": {
+      "heading": "ノート",
+      "addPlaceholder": "ノートを追加…",
+      "add": "追加",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "edit": "編集",
+      "delete": "削除",
+      "noNotes": "ノートはありません。"
+    },
+    "backgroundProfilePicker": {
+      "label": "背景プロファイル",
+      "none": "なし",
+      "clear": "クリア",
+      "pacingAgainst": "「{{title}}」に合わせています — BT/ETは破線の参考線として表示されます。"
+    },
+    "roastStats": {
+      "loading": "読み込み中…",
+      "rows": {
+        "dry": "Dry %",
+        "maillard": "Maillard %",
+        "development": "Development % (DTR)",
+        "weightLoss": "重量減少率",
+        "duration": "所要時間",
+        "rorFlags": "RoRフラグ"
+      },
+      "none": "なし",
+      "crashes_other": "クラッシュ{{count}}件",
+      "flatlines_other": "フラットライン{{count}}件",
+      "flicks_other": "フリック{{count}}件"
     }
   }
 }

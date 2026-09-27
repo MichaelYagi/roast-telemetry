@@ -18,7 +18,16 @@ import { Chart, LinearScale, LineController, LineElement, PointElement } from "c
 import { formatMetric, groupMetrics } from "./metricFormat.js";
 import { formatEventValue } from "./eventFormat.js";
 import { celsiusToUnit, formatTemp, unitSuffix } from "../tempUnits.js";
-import { STAT_ROW_DEFS, formatRoastStatRow, formatDuration } from "../roastStats.js";
+import { getStatRowDefs, formatRoastStatRow, formatDuration } from "../roastStats.js";
+// A plain module, not a component -- can't call useTranslation(). Reads
+// the raw i18next instance directly, which reflects whatever language is
+// currently active at the moment a PDF is generated (an on-demand,
+// one-shot action, not a live re-render, so there's no staleness concern
+// here the way there would be for a cached React-tree value). The Roast
+// Stats table below is the only part of this file wired to it so far --
+// everything else here (headings, mode labels, etc.) is still English,
+// a deliberately scoped gap for a later pass, same as termTooltips.js.
+import i18n from "../i18n.js";
 
 Chart.register(LinearScale, LineController, LineElement, PointElement);
 
@@ -177,7 +186,7 @@ function buildDoc(roast, tempUnit, chartImage, { stats, numbersRow, metricsMeta 
     }
     doc.setFontSize(11);
     doc.text("Roast Stats", marginX, y);
-    const rows = STAT_ROW_DEFS.map(({ key, label }) => [label, formatRoastStatRow(key, stats)]);
+    const rows = getStatRowDefs(i18n.t.bind(i18n)).map(({ key, label }) => [label, formatRoastStatRow(key, stats, i18n.t.bind(i18n))]);
     autoTable(doc, { startY: y + 10, margin: { left: marginX }, body: rows, theme: "striped", styles: { fontSize: 9, cellPadding: 3 }, columnStyles: KV_COLUMN_STYLES });
     y = doc.lastAutoTable.finalY + 12;
   }

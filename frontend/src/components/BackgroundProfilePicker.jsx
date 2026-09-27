@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 
 // Only roasts with a real, finished profile are worth pacing against --
@@ -15,6 +16,7 @@ const FINISHED_STATUSES = new Set(["stopped", "complete"]);
 // a per-session decision, cleared on refresh, same as it not being part
 // of a roast's own saved config.
 export default function BackgroundProfilePicker({ excludeId, selectedId, selectedTitle, onSelect }) {
+  const { t } = useTranslation();
   const [roasts, setRoasts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -51,9 +53,9 @@ export default function BackgroundProfilePicker({ excludeId, selectedId, selecte
   return (
     <div className="background-profile-picker">
       <label>
-        Background profile
+        {t("common.backgroundProfilePicker.label")}
         <select value={selectedId || ""} onChange={handleChange} disabled={loading}>
-          <option value="">None</option>
+          <option value="">{t("common.backgroundProfilePicker.none")}</option>
           {roasts.map((r) => (
             <option key={r.id} value={r.id}>
               {r.title} — {new Date(r.created_at).toLocaleDateString()}
@@ -63,11 +65,13 @@ export default function BackgroundProfilePicker({ excludeId, selectedId, selecte
       </label>
       {selectedId && (
         <button type="button" className="link-like" onClick={() => onSelect(null, null)}>
-          Clear
+          {t("common.backgroundProfilePicker.clear")}
         </button>
       )}
       {error && <span className="error">{error}</span>}
-      {selectedTitle && <span className="hint">Pacing against "{selectedTitle}" — BT/ET shown as dashed reference lines.</span>}
+      {selectedTitle && (
+        <span className="hint">{t("common.backgroundProfilePicker.pacingAgainst", { title: selectedTitle })}</span>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 // Shared by Green weight/Roasted weight in both LiveRoastView.jsx and
 // RoastDetailView.jsx -- pulled out after those four instances drifted
@@ -16,6 +17,7 @@ import { useState } from "react";
 // `value` (e.g. LiveRoastView.jsx's roast object arriving after mount)
 // the way an independently-tracked "editing" boolean did before.
 export default function WeightField({ value, onSave, onDelete, noPrint = false }) {
+  const { t } = useTranslation();
   const [userWantsToEdit, setUserWantsToEdit] = useState(false);
   const [input, setInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -62,7 +64,7 @@ export default function WeightField({ value, onSave, onDelete, noPrint = false }
             type="number" min="0" step="0.1"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="grams"
+            placeholder={t("common.weightField.gramsPlaceholder")}
             // Only when the user explicitly clicked "edit" -- not just
             // because the field happens to start empty (value == null),
             // which used to steal focus and scroll the whole page down
@@ -71,11 +73,11 @@ export default function WeightField({ value, onSave, onDelete, noPrint = false }
           />
           <span className="input-suffix">g</span>
           <button type="button" onClick={handleSave} disabled={saving || !input.trim()}>
-            {saving ? "Saving…" : "Save"}
+            {saving ? t("common.weightField.saving") : t("common.weightField.save")}
           </button>
           {value != null && (
             <button type="button" className="link-like" onClick={() => { setUserWantsToEdit(false); setError(null); }}>
-              Cancel
+              {t("common.weightField.cancel")}
             </button>
           )}
         </span>
@@ -88,10 +90,10 @@ export default function WeightField({ value, onSave, onDelete, noPrint = false }
     <>
       {value} g{" "}
       <button type="button" className={`link-like${noPrint ? " no-print" : ""}`} onClick={startEditing}>
-        edit
+        {t("common.weightField.edit")}
       </button>{" "}
       <button type="button" className={`danger link-like${noPrint ? " no-print" : ""}`} onClick={handleDelete}>
-        delete
+        {t("common.weightField.delete")}
       </button>
       {error && <span className="error"> {error}</span>}
     </>
