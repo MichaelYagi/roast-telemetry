@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../AuthContext.jsx";
 import { api } from "../api/client.js";
 
@@ -8,6 +9,7 @@ import { api } from "../api/client.js";
 // now has to wait on the admin, and a pending/denied account trying to
 // log in again before that's resolved.
 export default function LoginView() {
+  const { t } = useTranslation();
   const { refresh } = useAuth();
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [username, setUsername] = useState("");
@@ -53,7 +55,7 @@ export default function LoginView() {
         if (created.status === "allowed") {
           await refresh(); // first-ever account -- admin, auto-logged-in
         } else {
-          setPendingMessage("Account created. An admin needs to approve it before you can log in.");
+          setPendingMessage(t("login.pendingApproval"));
           setPassword("");
         }
       } else {
@@ -61,7 +63,7 @@ export default function LoginView() {
         await refresh();
       }
     } catch (err) {
-      setError(err.message || "Something went wrong");
+      setError(err.message || t("login.genericError"));
     } finally {
       setSubmitting(false);
     }
@@ -73,20 +75,20 @@ export default function LoginView() {
         <h1>Roast Telemetry</h1>
         <div className="login-mode-toggle">
           <button type="button" className={mode === "login" ? "active" : ""} onClick={() => switchMode("login")}>
-            Log in
+            {t("login.logIn")}
           </button>
           <button
             type="button"
             className={mode === "register" ? "active" : ""}
             onClick={() => switchMode("register")}
           >
-            Register
+            {t("login.register")}
           </button>
         </div>
 
         <div className="form-row">
           <label>
-            Username
+            {t("login.username")}
             <input
               type="text"
               autoComplete="username"
@@ -98,7 +100,7 @@ export default function LoginView() {
         </div>
         <div className="form-row">
           <label>
-            Password
+            {t("login.password")}
             <input
               type="password"
               autoComplete={mode === "register" ? "new-password" : "current-password"}
@@ -114,27 +116,19 @@ export default function LoginView() {
           <div className="form-row">
             <label className="checkbox-label">
               <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
-              Remember me
+              {t("login.rememberMe")}
             </label>
           </div>
         )}
         {mode === "login" && (
-          <p className="hint">
-            {rememberMe
-              ? "Stays signed in on this browser until you log out."
-              : "Signed out automatically when you close this browser."}
-          </p>
+          <p className="hint">{rememberMe ? t("login.rememberMeOnHint") : t("login.rememberMeOffHint")}</p>
         )}
-        {mode === "register" && hasAdmin === false && (
-          <p className="hint">
-            The very first account registered on this install becomes its admin, with immediate access.
-          </p>
-        )}
+        {mode === "register" && hasAdmin === false && <p className="hint">{t("login.firstAdminHint")}</p>}
         {error && <p className="error">{error}</p>}
         {pendingMessage && <p className="hint">{pendingMessage}</p>}
 
         <button type="submit" disabled={submitting}>
-          {mode === "register" ? "Register" : "Log in"}
+          {mode === "register" ? t("login.register") : t("login.logIn")}
         </button>
       </form>
     </div>

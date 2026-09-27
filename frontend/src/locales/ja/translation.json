@@ -875,5 +875,17 @@
     "delete": "削除",
     "you": "（あなた）",
     "deleteConfirm": "{{username}} を削除しますか？この操作は取り消せません。"
+  },
+  "login": {
+    "logIn": "ログイン",
+    "register": "登録",
+    "username": "ユーザー名",
+    "password": "パスワード",
+    "rememberMe": "ログイン状態を保持",
+    "rememberMeOnHint": "ログアウトするまで、このブラウザでサインイン状態が保持されます。",
+    "rememberMeOffHint": "このブラウザを閉じると自動的にサインアウトされます。",
+    "firstAdminHint": "このインストールで最初に登録されたアカウントが管理者となり、即時アクセスできます。",
+    "pendingApproval": "アカウントを作成しました。ログインするには管理者の承認が必要です。",
+    "genericError": "問題が発生しました"
   }
 }

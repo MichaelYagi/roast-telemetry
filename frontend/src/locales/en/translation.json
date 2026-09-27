@@ -891,5 +891,17 @@
     "delete": "Delete",
     "you": "(you)",
     "deleteConfirm": "Delete {{username}}? This can't be undone."
+  },
+  "login": {
+    "logIn": "Log in",
+    "register": "Register",
+    "username": "Username",
+    "password": "Password",
+    "rememberMe": "Remember me",
+    "rememberMeOnHint": "Stays signed in on this browser until you log out.",
+    "rememberMeOffHint": "Signed out automatically when you close this browser.",
+    "firstAdminHint": "The very first account registered on this install becomes its admin, with immediate access.",
+    "pendingApproval": "Account created. An admin needs to approve it before you can log in.",
+    "genericError": "Something went wrong"
   }
 }
