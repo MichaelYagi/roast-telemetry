@@ -42,9 +42,21 @@ export default function useServerStatus() {
 
     poll();
     const timer = setInterval(poll, POLL_INTERVAL_MS);
+    // Browsers throttle setInterval in background/hidden tabs -- Safari
+    // on macOS noticeably more aggressively than Chrome/Edge on Windows
+    // (confirmed: the same build showed the nav badge/tab title
+    // immediately on Windows but not on a backgrounded Mac tab). Forcing
+    // a poll on every visibility change means the moment you switch back
+    // to check, it refreshes right then instead of waiting on whatever's
+    // left of a possibly-stalled interval.
+    function onVisibilityChange() {
+      if (!document.hidden) poll();
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       mountedRef.current = false;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
