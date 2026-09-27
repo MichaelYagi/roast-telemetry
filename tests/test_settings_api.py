@@ -13,6 +13,11 @@ def test_health(client):
     # Not pinning an exact string -- varies by whatever box the suite runs
     # on (Linux, Linux (WSL2), macOS, Windows) -- just that it's populated.
     assert body["platform"]
+    # Not asserting a truthy value for either -- both are best-effort
+    # (lan_ip can legitimately be None in a sandboxed CI network), just
+    # that the keys exist.
+    assert "os_version" in body
+    assert "lan_ip" in body
     assert body["roaster_connected"] is False
     assert body["active_roast"] is None
 

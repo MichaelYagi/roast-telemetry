@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { api } from "./api/client.js";
 import { AuthProvider, useAuth } from "./AuthContext.jsx";
 import AccountModal from "./components/AccountModal.jsx";
 import { DialogProvider } from "./components/DialogProvider.jsx";
@@ -29,16 +28,14 @@ export default function App() {
 function AppShell() {
   const { user, loading, logout, refresh } = useAuth();
   const [accountOpen, setAccountOpen] = useState(false);
-  // The OS the server is actually running on -- useful in the footer since
-  // this app runs self-hosted (Windows/WSL2/macOS/Linux all behave
-  // differently for hardware access), and can't be baked in at build time
-  // the way version/build already are, since the same build runs anywhere.
-  const [serverPlatform, setServerPlatform] = useState(null);
-  const { status: serverStatus, activeRoast } = useServerStatus();
-
-  useEffect(() => {
-    api.health().then((res) => setServerPlatform(res.platform)).catch(() => {});
-  }, []);
+  // The OS/version/LAN address the server is actually running on --
+  // useful in the footer since this app runs self-hosted (Windows/WSL2/
+  // macOS/Linux all behave differently for hardware access), and can't
+  // be baked in at build time the way version/build already are, since
+  // the same build runs anywhere. Rides along on useServerStatus's own
+  // recurring poll rather than a separate one-shot fetch.
+  const { status: serverStatus, activeRoast, platform: serverPlatform, osVersion: serverOsVersion, lanIp: serverLanIp } =
+    useServerStatus();
 
   // Lets the browser tab itself say a roast is running -- visible even
   // with this tab in the background/unfocused, which no in-app element
@@ -127,7 +124,14 @@ function AppShell() {
       </main>
       <footer className="app-footer no-print">
         v{__APP_VERSION__} · build {__APP_BUILD__}
-        {serverPlatform && <> · {serverPlatform}</>} · AGPL-3.0-or-later ·{" "}
+        {serverPlatform && (
+          <>
+            {" "}
+            · {serverPlatform}
+            {serverOsVersion && ` ${serverOsVersion}`}
+          </>
+        )}
+        {serverLanIp && <> · {serverLanIp}</>} · AGPL-3.0-or-later ·{" "}
         {/* AGPL section 13: a network-served program has to offer its users
             its source -- the license's own guidance is a "Source" link in the
             interface. */}

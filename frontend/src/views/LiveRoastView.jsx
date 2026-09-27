@@ -6,6 +6,7 @@ import SimulatedDeviceHint from "../components/SimulatedDeviceHint.jsx";
 import { isSimulatedForm, isSimulatedRoast } from "../simulated.js";
 import RoastToolbar from "../components/RoastToolbar.jsx";
 import useAwayAlarm from "../useAwayAlarm.js";
+import useServerStatus from "../useServerStatus.js";
 import BackgroundProfilePicker from "../components/BackgroundProfilePicker.jsx";
 import BreakoutPanel from "../components/BreakoutPanel.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
@@ -1033,6 +1034,14 @@ export default function LiveRoastView() {
   // Settings > Roaster safety can turn it off entirely too.
   useAwayAlarm(phase === "roasting" && awayAlarmEnabled);
 
+  // Server OS/version/LAN address, shown in the connection-details list
+  // below alongside the mode-specific fields (Serial port, Connection,
+  // etc.) -- useful for confirming which machine on the network actually
+  // has the roaster plugged in, same reasoning as the footer's own copy
+  // of this (a separate independent poll -- same precedent as
+  // RoastToolbar/AutoControlPanel each polling /control on their own).
+  const { platform: serverPlatform, osVersion: serverOsVersion, lanIp: serverLanIp } = useServerStatus();
+
   const chargeEvent = roast?.events?.find((e) => e.type === "CHARGE");
   const dryEndEvent = roast?.events?.find((e) => e.type === "DRY_END");
   const fcStartEvent = roast?.events?.find((e) => e.type === "FC_START");
@@ -2004,6 +2013,16 @@ export default function LiveRoastView() {
                     <li>
                       <span className="meta-label">Serial port</span>
                       <span className="meta-value">{roast.tc4_port}</span>
+                    </li>
+                  )}
+                  {serverPlatform && (
+                    <li>
+                      <span className="meta-label">Server</span>
+                      <span className="meta-value">
+                        {serverPlatform}
+                        {serverOsVersion ? ` ${serverOsVersion}` : ""}
+                        {serverLanIp ? ` — ${serverLanIp}` : ""}
+                      </span>
                     </li>
                   )}
                 </ul>

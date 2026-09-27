@@ -19,9 +19,16 @@ const POLL_INTERVAL_MS = 5000;
 // Unlike `status`, this DOES include simulator/sim:// roasts -- the
 // question here is just "is a roast actually recording," not "is a real
 // roaster connected" -- see main.py's health() for the same reasoning.
+//
+// platform/osVersion/lanIp -- the server's own OS name, OS version, and
+// LAN-reachable address (see main.py's _server_platform/_server_os_version/
+// _server_lan_ip) -- used by the footer and the Live Roast page's own
+// connection details. Riding along on this same poll instead of a
+// separate one-shot fetch, even though these rarely change mid-session.
 export default function useServerStatus() {
   const [status, setStatus] = useState("yellow"); // optimistic until the first poll lands
   const [activeRoast, setActiveRoast] = useState(null);
+  const [serverInfo, setServerInfo] = useState({ platform: null, osVersion: null, lanIp: null });
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -33,10 +40,15 @@ export default function useServerStatus() {
         if (!mountedRef.current) return;
         setStatus(res.roaster_connected ? "green" : "yellow");
         setActiveRoast(res.active_roast || null);
+        setServerInfo({ platform: res.platform || null, osVersion: res.os_version || null, lanIp: res.lan_ip || null });
       } catch {
         if (!mountedRef.current) return;
         setStatus("red");
         setActiveRoast(null);
+        // serverInfo deliberately NOT cleared here -- a transient failed
+        // poll doesn't mean the OS/version/IP just changed, so the last
+        // known-good values staying put (rather than flashing blank) is
+        // the less jarring choice for a footer/detail-page display.
       }
     }
 
@@ -60,5 +72,5 @@ export default function useServerStatus() {
     };
   }, []);
 
-  return { status, activeRoast };
+  return { status, activeRoast, ...serverInfo };
 }

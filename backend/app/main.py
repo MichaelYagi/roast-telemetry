@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import platform
+import socket
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -195,6 +196,40 @@ def _server_platform() -> str:
     return system  # "Windows", or whatever else platform.system() reports
 
 
+def _server_os_version() -> str | None:
+    """A short version string alongside _server_platform()'s OS name --
+    "14.5" for macOS, the actual build number for Windows, the kernel
+    release for Linux/WSL2. Best-effort: None if the platform module has
+    nothing to say."""
+    system = platform.system()
+    if system == "Darwin":
+        return platform.mac_ver()[0] or None
+    if system == "Windows":
+        # platform.release() alone is unreliable for Windows 10 vs 11 --
+        # both can report "10" (a known stdlib/Windows-API quirk).
+        # win32_ver()'s build-number element doesn't have that ambiguity.
+        return platform.win32_ver()[1] or None
+    return platform.release() or None  # Linux/WSL2 -- e.g. "5.15.90.1-microsoft-standard-WSL2"
+
+
+def _server_lan_ip() -> str | None:
+    """The server's own LAN-reachable address, not the request's own
+    client.host (that's whoever's asking, not the machine answering) --
+    what someone on the same network would actually type in to reach
+    this server, for the footer's own use. A UDP "connect" never sends a
+    packet, just asks the OS to pick the outbound interface for that
+    destination -- works without any real network access, and without
+    guessing which of possibly several interfaces (Wi-Fi, Ethernet, a VPN)
+    is the right one."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.settimeout(0.2)
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except OSError:
+        return None
+
+
 _CONNECTED_DEVICE_STATES = (DeviceStatus.CONNECTED.value, DeviceStatus.STREAMING.value)
 _REAL_HARDWARE_MODES = (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE)
 
@@ -241,6 +276,8 @@ def health(response: Response) -> dict:
     return {
         "status": "ok",
         "platform": _server_platform(),
+        "os_version": _server_os_version(),
+        "lan_ip": _server_lan_ip(),
         "roaster_connected": roaster_connected,
         "active_roast": active_roast,
     }
