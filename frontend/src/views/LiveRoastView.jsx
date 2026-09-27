@@ -261,14 +261,16 @@ export default function LiveRoastView() {
     return serialPorts.filter((p) => !p.simulated || p.mode === mode);
   }
   const [phase, setPhase] = useState("idle"); // idle | armed | roasting | cooling | finished
-  // Lets the active-roast SSE effect below (mount-once, so it can't just
-  // close over `phase`) always check the *current* phase, not whatever it
-  // was when that effect first subscribed.
+  const [roastId, setRoastId] = useState(null);
+  // Let the active-roast SSE effect below (mount-once, so it can't just
+  // close over `phase`/`roastId`) always check their *current* values, not
+  // whatever they were when that effect first subscribed.
   const phaseRef = useRef(phase);
+  const roastIdRef = useRef(roastId);
   useEffect(() => {
     phaseRef.current = phase;
-  }, [phase]);
-  const [roastId, setRoastId] = useState(null);
+    roastIdRef.current = roastId;
+  }, [phase, roastId]);
   // Background Profile (see BackgroundProfilePicker.jsx/RoastChart.jsx) --
   // a purely visual reference overlay, never touched by anything else in
   // this view (no automation, no control writes read this). Not tied to
@@ -567,7 +569,15 @@ export default function LiveRoastView() {
   useEffect(() => {
     const source = new EventSource(activeRoastStreamUrl());
     source.addEventListener("active_roast", (e) => {
-      if (phaseRef.current !== "idle") return; // already tracking a roast of our own -- ignore
+      // Skip only when this tab is itself actively recording (roasting/
+      // cooling) or has its own roastId -- the latter covers "armed" with a
+      // real hardware connection already open (POST /roasts already made,
+      // see handleToggleConnect), which reconnectActiveRoast() would
+      // otherwise silently abandon by overwriting roastId/phase out from
+      // under it. A plain "armed" with no roastId yet (simulator/
+      // alog_playback, before the real POST /roasts on START) has nothing
+      // to lose, so it's fine to fall through and reconnect.
+      if (phaseRef.current === "roasting" || phaseRef.current === "cooling" || roastIdRef.current) return;
       let info;
       try {
         info = JSON.parse(e.data);
