@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   MANDATORY_VERTICAL_CONTROL_KEYS,
   OPTIONAL_VERTICAL_CONTROL_KEYS,
@@ -22,6 +23,7 @@ import {
 // linear list + a per-row toggle is simpler than 2D drag-and-drop grouping
 // for the same expressiveness.
 export default function VerticalControlSettingsEditor({ layout, setLayout, arrows, setArrows }) {
+  const { t } = useTranslation();
   // Always both optional keys "available" here regardless of what mode is
   // currently connected (or whether anything's connected at all) -- this
   // is a general app-wide setting, not scoped to one roast's hardware; the
@@ -84,17 +86,9 @@ export default function VerticalControlSettingsEditor({ layout, setLayout, arrow
 
   return (
     <>
-      <h3>Stack order</h3>
-      <p className="hint">
-        "Stack with the one above" puts this slider in the same lane as the one above it, splitting that
-        lane's height between them (top half / bottom half, and so on) instead of giving it a separate lane
-        of its own -- each still stays its own independent slider either way.
-      </p>
-      <p className="hint">
-        Stacking only applies on wider screens. On a phone-width screen, every enabled slider always gets
-        its own full-height lane instead, side by side (scrolling sideways if they don't all fit) -- a
-        stacked lane's already-limited height splitting further between 2 phone-sized sliders wasn't legible.
-      </p>
+      <h3>{t("common.verticalControlSettingsEditor.stackOrderHeading")}</h3>
+      <p className="hint">{t("common.verticalControlSettingsEditor.stackHint1")}</p>
+      <p className="hint">{t("common.verticalControlSettingsEditor.stackHint2")}</p>
       <ul className="breakout-order-list vertical-control-order-list">
         {flat.map((item, i) => {
           const meta = verticalControlItem(item.key);
@@ -103,12 +97,12 @@ export default function VerticalControlSettingsEditor({ layout, setLayout, arrow
             <li key={item.key}>
               <div className="vertical-control-order-row">
                 <span className="vertical-control-order-label">{meta.label}</span>
-                {mandatory && <span className="hint vertical-control-mandatory-tag">always shown</span>}
+                {mandatory && <span className="hint vertical-control-mandatory-tag">{t("common.verticalControlSettingsEditor.alwaysShown")}</span>}
                 <span className="vertical-control-order-row-actions">
-                  <button type="button" onClick={() => move(item.key, -1)} disabled={i === 0} title="Move up">
+                  <button type="button" onClick={() => move(item.key, -1)} disabled={i === 0} title={t("common.verticalControlSettingsEditor.moveUp")}>
                     ▲
                   </button>
-                  <button type="button" onClick={() => move(item.key, 1)} disabled={i === flat.length - 1} title="Move down">
+                  <button type="button" onClick={() => move(item.key, 1)} disabled={i === flat.length - 1} title={t("common.verticalControlSettingsEditor.moveDown")}>
                     ▼
                   </button>
                   {!mandatory && (
@@ -117,9 +111,9 @@ export default function VerticalControlSettingsEditor({ layout, setLayout, arrow
                       className="danger"
                       onClick={() => remove(item.key)}
                       disabled={includedOptionalCount <= 1}
-                      title={includedOptionalCount <= 1 ? "At least one of Burner %/Burner SV must stay visible" : "Remove"}
+                      title={includedOptionalCount <= 1 ? t("common.verticalControlSettingsEditor.mustStayVisible") : t("common.verticalControlSettingsEditor.remove")}
                     >
-                      Remove
+                      {t("common.verticalControlSettingsEditor.remove")}
                     </button>
                   )}
                 </span>
@@ -128,18 +122,18 @@ export default function VerticalControlSettingsEditor({ layout, setLayout, arrow
                 <div className="vertical-control-order-row">
                   <label className="checkbox-label">
                     <input type="checkbox" checked={item.joinsPrevious} onChange={() => toggleJoinsPrevious(item.key)} />
-                    Stack with the one above
+                    {t("common.verticalControlSettingsEditor.stackWithAbove")}
                   </label>
                 </div>
               )}
               <div className="vertical-control-order-row">
                 <label className="checkbox-label">
                   <input type="checkbox" checked={Boolean(arrows?.[item.key])} onChange={() => toggleArrows(item.key)} />
-                  +/- buttons
+                  {t("common.verticalControlSettingsEditor.arrowButtons")}
                 </label>
                 {Boolean(arrows?.[item.key]) && (
                   <label className="checkbox-label">
-                    steps by
+                    {t("common.verticalControlSettingsEditor.stepsBy")}
                     <input
                       type="number"
                       min={1}
@@ -157,7 +151,7 @@ export default function VerticalControlSettingsEditor({ layout, setLayout, arrow
 
       {availableToAdd.length > 0 && (
         <>
-          <h3>Available</h3>
+          <h3>{t("common.verticalControlSettingsEditor.availableHeading")}</h3>
           <div className="breakout-toggle-grid">
             {availableToAdd.map((key) => (
               <button type="button" key={key} className="breakout-add-btn" onClick={() => add(key)}>

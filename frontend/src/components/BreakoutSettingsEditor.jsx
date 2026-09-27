@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { BREAKOUT_PANEL_ITEMS } from "../breakoutPanels.js";
 
 // Quick-pick swatches shown in a popover next to each item's native color
@@ -20,6 +21,7 @@ const PRESET_COLORS = [
 // palette-open state internally, so two instances on the same page never
 // collide over which row's popover is open.
 export default function BreakoutSettingsEditor({ enabledKeys, setEnabledKeys, colors, setColors, excludeKeys }) {
+  const { t } = useTranslation();
   const [paletteOpenFor, setPaletteOpenFor] = useState(null);
   const paletteRef = useRef(null);
   // Some items don't make sense for every instance of this editor (e.g.
@@ -105,7 +107,7 @@ export default function BreakoutSettingsEditor({ enabledKeys, setEnabledKeys, co
     <>
       {visibleEnabledKeys.length > 0 && (
         <>
-          <h3>Enabled, in display order</h3>
+          <h3>{t("common.breakoutSettingsEditor.enabledHeading")}</h3>
           <ul className="breakout-order-list">
             {visibleEnabledKeys.map((key, i) => {
               const item = BREAKOUT_PANEL_ITEMS.find((it) => it.key === key);
@@ -120,14 +122,14 @@ export default function BreakoutSettingsEditor({ enabledKeys, setEnabledKeys, co
                       type="color"
                       className="breakout-order-swatch"
                       value={color}
-                      title={`${item.label} color -- opens the full color picker`}
+                      title={t("common.breakoutSettingsEditor.colorPickerTitle", { label: item.label })}
                       onChange={(e) => setColor(key, e.target.value)}
                     />
                     <button
                       type="button"
                       className="breakout-order-palette-toggle"
                       onClick={() => setPaletteOpenFor((k) => (k === key ? null : key))}
-                      title="Choose from preset colors"
+                      title={t("common.breakoutSettingsEditor.choosePreset")}
                       aria-expanded={paletteOpen}
                     >
                       ▾
@@ -157,25 +159,25 @@ export default function BreakoutSettingsEditor({ enabledKeys, setEnabledKeys, co
                       type="button"
                       className="breakout-order-swatch-reset"
                       onClick={() => resetColor(key)}
-                      title="Reset to default color"
+                      title={t("common.breakoutSettingsEditor.resetColor")}
                     >
                       ↺
                     </button>
                   )}
                   <span className="breakout-order-label">{item.label}</span>
-                  <button type="button" onClick={() => move(key, -1)} disabled={i === 0} title="Move up">
+                  <button type="button" onClick={() => move(key, -1)} disabled={i === 0} title={t("common.breakoutSettingsEditor.moveUp")}>
                     ▲
                   </button>
                   <button
                     type="button"
                     onClick={() => move(key, 1)}
                     disabled={i === visibleEnabledKeys.length - 1}
-                    title="Move down"
+                    title={t("common.breakoutSettingsEditor.moveDown")}
                   >
                     ▼
                   </button>
-                  <button type="button" className="danger" onClick={() => disable(key)} title="Remove">
-                    Remove
+                  <button type="button" className="danger" onClick={() => disable(key)} title={t("common.breakoutSettingsEditor.remove")}>
+                    {t("common.breakoutSettingsEditor.remove")}
                   </button>
                 </li>
               );
@@ -184,7 +186,7 @@ export default function BreakoutSettingsEditor({ enabledKeys, setEnabledKeys, co
         </>
       )}
 
-      <h3>Available</h3>
+      <h3>{t("common.breakoutSettingsEditor.availableHeading")}</h3>
       <div className="breakout-toggle-grid">
         {visibleItems
           .filter((item) => !enabledKeys.includes(item.key))
@@ -194,7 +196,7 @@ export default function BreakoutSettingsEditor({ enabledKeys, setEnabledKeys, co
             </button>
           ))}
         {visibleItems.every((item) => enabledKeys.includes(item.key)) && (
-          <p className="hint">All items are enabled.</p>
+          <p className="hint">{t("common.breakoutSettingsEditor.allEnabled")}</p>
         )}
       </div>
     </>

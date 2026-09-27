@@ -520,6 +520,31 @@
     },
     "modal": {
       "close": "Close"
+    },
+    "breakoutSettingsEditor": {
+      "enabledHeading": "Enabled, in display order",
+      "colorPickerTitle": "{{label}} color -- opens the full color picker",
+      "choosePreset": "Choose from preset colors",
+      "resetColor": "Reset to default color",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove",
+      "availableHeading": "Available",
+      "allEnabled": "All items are enabled."
+    },
+    "verticalControlSettingsEditor": {
+      "stackOrderHeading": "Stack order",
+      "stackHint1": "\"Stack with the one above\" puts this slider in the same lane as the one above it, splitting that lane's height between them (top half / bottom half, and so on) instead of giving it a separate lane of its own -- each still stays its own independent slider either way.",
+      "stackHint2": "Stacking only applies on wider screens. On a phone-width screen, every enabled slider always gets its own full-height lane instead, side by side (scrolling sideways if they don't all fit) -- a stacked lane's already-limited height splitting further between 2 phone-sized sliders wasn't legible.",
+      "alwaysShown": "always shown",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "mustStayVisible": "At least one of Burner %/Burner SV must stay visible",
+      "remove": "Remove",
+      "stackWithAbove": "Stack with the one above",
+      "arrowButtons": "+/- buttons",
+      "stepsBy": "steps by",
+      "availableHeading": "Available"
     }
   },
   "history": {

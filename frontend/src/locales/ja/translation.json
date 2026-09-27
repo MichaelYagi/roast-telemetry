@@ -513,6 +513,31 @@
     },
     "modal": {
       "close": "閉じる"
+    },
+    "breakoutSettingsEditor": {
+      "enabledHeading": "有効な項目（表示順）",
+      "colorPickerTitle": "{{label}}の色 -- 詳細なカラーピッカーを開く",
+      "choosePreset": "プリセットカラーから選択",
+      "resetColor": "デフォルトの色に戻す",
+      "moveUp": "上に移動",
+      "moveDown": "下に移動",
+      "remove": "削除",
+      "availableHeading": "追加可能",
+      "allEnabled": "すべての項目が有効になっています。"
+    },
+    "verticalControlSettingsEditor": {
+      "stackOrderHeading": "積み重ね順",
+      "stackHint1": "「上と積み重ねる」を選ぶと、このスライダーは上のスライダーと同じレーンに入り、高さを分け合います（上半分/下半分…）。個別のレーンを持つ場合と同様、それぞれ独立したスライダーのままです。",
+      "stackHint2": "積み重ねは幅の広い画面でのみ適用されます。スマートフォン幅の画面では、有効なスライダーは常に横並びでそれぞれ全高のレーンを持ちます（収まらない場合は横スクロール）-- 積み重ねレーンの限られた高さをさらにスマートフォンサイズの2枚で分けると読みにくいためです。",
+      "alwaysShown": "常に表示",
+      "moveUp": "上に移動",
+      "moveDown": "下に移動",
+      "mustStayVisible": "Burner %かBurner SVの少なくとも一方は表示したままにする必要があります",
+      "remove": "削除",
+      "stackWithAbove": "上と積み重ねる",
+      "arrowButtons": "+/- ボタン",
+      "stepsBy": "ステップ幅",
+      "availableHeading": "追加可能"
     }
   },
   "history": {
