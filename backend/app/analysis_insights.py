@@ -10,7 +10,7 @@ import json
 import math
 from typing import Optional
 
-from .roast_metrics import METRICS
+from .roast_metrics import KEY_REPEATABILITY_METRICS, METRICS
 
 _METRIC_BY_KEY = {m["key"]: m for m in METRICS}
 
@@ -26,10 +26,6 @@ KEY_METRICS = [
     "max_ror", "weight_loss_pct", "ror_crashes", "ror_flatlines", "ror_flicks",
     "color_agtron", "cupping_score", "rating",
 ]
-# The same handful of numbers AnalysisView.jsx's Trends/Drift tabs use --
-# keeps what the model is told in sync with what a human sees on those tabs,
-# rather than a separately-chosen set that could drift out of step.
-DRIFT_TREND_METRICS = ["duration_s", "drop_temp_c", "development_time_s", "dtr_pct", "weight_loss_pct"]
 # Same threshold as AnalysisView.jsx's Drift tab (MIN_GROUP_FOR_OUTLIERS/OUTLIER_Z_THRESHOLD).
 MIN_GROUP_FOR_OUTLIERS = 5
 OUTLIER_Z_THRESHOLD = 2
@@ -96,7 +92,7 @@ def _mean_sd(values: list[float]) -> tuple[float, Optional[float]]:
 
 def compute_drift_flags(rows: list[dict]) -> list[dict]:
     """Same check as AnalysisView.jsx's Drift tab: any roast >= OUTLIER_Z_THRESHOLD
-    standard deviations from its own bean's mean, on any of DRIFT_TREND_METRICS,
+    standard deviations from its own bean's mean, on any of KEY_REPEATABILITY_METRICS,
     for beans with >= MIN_GROUP_FOR_OUTLIERS finished roasts. Computed here rather
     than left for the model to eyeball from group stats, so "roasts that stand
     out" in the prompt is grounded in the same deterministic check a human sees
@@ -109,7 +105,7 @@ def compute_drift_flags(rows: list[dict]) -> list[dict]:
     for bean, members in by_bean.items():
         if len(members) < MIN_GROUP_FOR_OUTLIERS:
             continue
-        for key in DRIFT_TREND_METRICS:
+        for key in KEY_REPEATABILITY_METRICS:
             pairs = [(r, r["metrics"][key]) for r in members if r["metrics"].get(key) is not None]
             if len(pairs) < MIN_GROUP_FOR_OUTLIERS:
                 continue
@@ -130,12 +126,12 @@ def compute_drift_flags(rows: list[dict]) -> list[dict]:
 
 
 def compute_trend_summary(rows: list[dict]) -> list[dict]:
-    """Earlier-half vs. later-half average for each of DRIFT_TREND_METRICS,
+    """Earlier-half vs. later-half average for each of KEY_REPEATABILITY_METRICS,
     across the whole matching set ordered by date -- a compact stand-in for
     what the Trends tab's rolling-average line shows visually, so the model
     doesn't have to reconstruct direction from a flat list of recent roasts."""
     trends = []
-    for key in DRIFT_TREND_METRICS:
+    for key in KEY_REPEATABILITY_METRICS:
         points = sorted(
             ((r["created_at"], r["metrics"][key]) for r in rows if r["metrics"].get(key) is not None),
             key=lambda p: p[0],
@@ -151,6 +147,39 @@ def compute_trend_summary(rows: list[dict]) -> list[dict]:
             "earlier_avg": _round(earlier_avg), "later_avg": _round(later_avg), "change": _round(later_avg - earlier_avg),
         })
     return trends
+
+
+def compute_bean_comparison(this_metrics: dict, other_metrics: list[dict]) -> Optional[list[dict]]:
+    """This roast's own value vs. the mean/SD of `other_metrics` (its bean's
+    other finished roasts -- the caller excludes this roast itself before
+    calling this, so the baseline isn't partly measured against its own
+    value), for each of KEY_REPEATABILITY_METRICS. Same numbers and
+    MIN_GROUP_FOR_OUTLIERS threshold as compute_drift_flags above, just
+    scoped to one roast instead of flagging across a whole set -- used by
+    the per-roast AI review (roast_review.py) to compare a roast to its own
+    bean's history instead of judging it in isolation. None if there isn't
+    enough history for this bean yet."""
+    if len(other_metrics) < MIN_GROUP_FOR_OUTLIERS:
+        return None
+    comparison = []
+    for key in KEY_REPEATABILITY_METRICS:
+        this_value = this_metrics.get(key)
+        if this_value is None:
+            continue
+        values = [m[key] for m in other_metrics if m.get(key) is not None]
+        if len(values) < MIN_GROUP_FOR_OUTLIERS:
+            continue
+        mean, sd = _mean_sd(values)
+        info = _METRIC_BY_KEY[key]
+        entry = {
+            "measurement": info["label"], "unit": info["unit"], "this_roast": _round(this_value),
+            "usual_mean": _round(mean), "roasts_compared": len(values),
+        }
+        if sd:
+            entry["usual_sd"] = _round(sd)
+            entry["sd_from_usual"] = round((this_value - mean) / sd, 1)
+        comparison.append(entry)
+    return comparison or None
 
 
 def build_prompt(*, groups: list[dict], rows: list[dict], group_by: str, total: int, truncated: bool,

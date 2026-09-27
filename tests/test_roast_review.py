@@ -34,3 +34,14 @@ def test_weight_loss_pct_handles_a_genuine_total_loss_batch():
     roast = _make_roast(weight_green_g=200.0, weight_roasted_g=0.0)
     summary = build_summary(roast)
     assert summary["roast_weight_loss_pct"] == 100.0
+
+
+def test_bean_comparison_included_when_given():
+    comparison = [{"measurement": "Drop temperature", "unit": "°C", "this_roast": 200.0, "usual_mean": 195.0}]
+    summary = build_summary(_make_roast(), bean_comparison=comparison)
+    assert summary["compared_to_this_beans_other_roasts"] == comparison
+
+
+def test_bean_comparison_omitted_without_one():
+    summary = build_summary(_make_roast())
+    assert "compared_to_this_beans_other_roasts" not in summary

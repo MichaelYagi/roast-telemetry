@@ -19,7 +19,7 @@ from sse_starlette.sse import EventSourceResponse
 from alog_playback.alog_io import _celsius_dict_to_fahrenheit, _nearest_index, load_alog
 from alog_playback.roastlog import RoastlogParseError, _c_to_f, parse_roastlog_csv, parse_roastlog_xlsx, roast_to_json, save_roastlog_csv, save_roastlog_xlsx
 
-from .. import auth, ollama_client, storage
+from .. import analysis_insights, auth, ollama_client, storage
 from ..models import (
     ControlCommand,
     EventCreateRequest,
@@ -43,6 +43,7 @@ from ..models import (
     UserStatus,
 )
 from ..roast_control import program_from_profile
+from ..roast_metrics import alog_metrics, build_row
 from ..roast_review import build_prompt, build_summary
 from ..roast_session import RoastSessionError, session_manager
 from ..roast_session.control import RoastControlError
@@ -838,6 +839,42 @@ def _row_to_review(row: dict) -> RoastReview:
     )
 
 
+_REVIEW_FINISHED_STATUSES = ("complete", "stopped")
+
+
+def _bean_history_comparison(roast: Roast) -> Optional[list[dict]]:
+    """This roast's own key numbers vs. the mean/SD of the same bean's
+    other finished roasts -- gives the AI review something to compare
+    against instead of judging this one curve in isolation. Blocking (reads
+    other roasts' .alog files), so the caller runs it off the event loop.
+    None if there isn't enough history for this bean yet (or it has none)."""
+    if not roast.bean_id:
+        return None
+    others = [
+        r for r in storage.list_roast_rows(bean_id=roast.bean_id, limit=1000)
+        if r["id"] != roast.id and r["status"] in _REVIEW_FINISHED_STATUSES
+    ]
+    if len(others) < analysis_insights.MIN_GROUP_FOR_OUTLIERS:
+        return None
+    tag_map = storage.get_tags_for_roasts([r["id"] for r in others] + [roast.id])
+
+    other_metrics = []
+    for r in others:
+        if "simulated" in tag_map.get(r["id"], []):
+            continue
+        other_roast = session_manager.get_roast_detail(r["id"])
+        if other_roast is None:
+            continue  # an unreadable recording doesn't fail the review, just isn't counted
+        other_metrics.append(build_row(r, alog_metrics(other_roast), None, tag_map.get(r["id"], []))["metrics"])
+
+    this_row = storage.get_roast_row(roast.id)
+    if this_row is None:
+        return None
+    this_metrics = build_row(this_row, alog_metrics(roast), None, tag_map.get(roast.id, []))["metrics"]
+
+    return analysis_insights.compute_bean_comparison(this_metrics, other_metrics)
+
+
 async def _run_review(roast_id: str, url: str, model: str, created_at: str) -> None:
     """Runs in the background (kicked off by BackgroundTasks in
     request_review below) -- the whole point is the HTTP request doesn't
@@ -847,7 +884,8 @@ async def _run_review(roast_id: str, url: str, model: str, created_at: str) -> N
         roast = session_manager.get_roast_detail(roast_id)
         if roast is None:
             raise ValueError(f"roast {roast_id!r} no longer exists")
-        summary = build_summary(roast)
+        bean_comparison = await asyncio.to_thread(_bean_history_comparison, roast)
+        summary = build_summary(roast, bean_comparison)
         prompt = build_prompt(summary)
         text = await ollama_client.generate(url, model, prompt)
         storage.upsert_review_row({

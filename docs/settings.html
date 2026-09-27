@@ -65,9 +65,13 @@
 
   <h2 id="ai-roast-review">AI Roast Review (Ollama)</h2>
   <p>
-    Point this at a local Ollama server to get AI-written reviews on a
-    roast's detail page. See
-    <a href="analysis.html#ai">Analysis</a> for what it does with it.
+    Point this at a local Ollama server to get AI-written reviews on a roast's own page (milestones,
+    phase timing, rate-of-rise shape, control changes and notes -- never the raw per-second curve).
+    Once a bean has five or more other finished roasts, the review also compares this roast's key
+    numbers (duration, drop temperature, development time, development %, weight loss) to that
+    bean's usual mean and spread, and is asked to call out anything that differs notably. The same
+    Ollama setup also powers the Analysis page's own <a href="analysis.html#ai">Ask the AI</a> panel,
+    a separate feature working on many roasts at once instead of just one.
   </p>
 
   <div class="page-nav"><a href="index.html">&larr; Back to docs home</a></div>

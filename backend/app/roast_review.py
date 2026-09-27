@@ -16,6 +16,8 @@ changes, and the prompt template itself.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 from .models import Roast
 from .roast_stats import events_by_type, phase_breakdown, ror_flags, weight_loss_pct as compute_weight_loss_pct
 
@@ -58,11 +60,11 @@ def _control_changes(profile: list) -> list[dict]:
     return changes
 
 
-def build_summary(roast: Roast) -> dict:
+def build_summary(roast: Roast, bean_comparison: Optional[list[dict]] = None) -> dict:
     events = events_by_type(roast)
     profile = [p.model_dump() for p in roast.profile]
 
-    return {
+    summary = {
         "coffee_bean_roast_title": roast.title,
         "green_coffee_beans": roast.beans,
         "green_bean_weight_g": roast.weight_green_g,
@@ -80,6 +82,9 @@ def build_summary(roast: Roast) -> dict:
         "roaster_burner_fan_drum_setting_changes": _control_changes(profile),
         "operator_notes_during_roast": [{"time_s": n.time_s, "text": n.text} for n in roast.notes],
     }
+    if bean_comparison:
+        summary["compared_to_this_beans_other_roasts"] = bean_comparison
+    return summary
 
 
 PROMPT_TEMPLATE = """You are an experienced coffee roaster reviewing a completed COFFEE BEAN ROASTING \
@@ -87,15 +92,21 @@ session on a drum coffee roaster machine. Below is structured data from that cof
 milestone events (Charge/Turning Point/Dry End/First Crack/Drop/Cool End), phase timing (Dry/ \
 Maillard/Development), rate-of-rise (RoR, how fast the bean temperature is climbing) shape flags, \
 a sampled bean-temperature/exhaust-temperature/RoR curve, changes to the roaster's burner heat, \
-fan airflow, and drum rotation speed settings (each 0-100%), and any notes the operator logged \
-during the roast.
+fan airflow, and drum rotation speed settings (each 0-100%), any notes the operator logged during \
+the roast, and -- when there's enough history -- "compared_to_this_beans_other_roasts": this \
+roast's own key numbers next to the mean ("usual_mean"), spread ("usual_sd") and count \
+("roasts_compared") of this same bean's other finished roasts, with how many standard deviations \
+away this roast is ("sd_from_usual", signed).
 
 Write a plain-text review (no markdown formatting, no headers with #, just clear paragraphs and \
 "-" bullet lists where useful) covering:
 1. A brief summary of what happened in this coffee roast.
 2. What went well.
 3. Any concerns or risks you see in the data (reference specific times/values).
-4. Concrete, specific suggestions for the next roast of this bean/setup.
+4. If compared_to_this_beans_other_roasts is present, call out anything that differs notably \
+(roughly two or more standard deviations) from usual for this bean -- say plainly if nothing does, \
+don't invent a difference that isn't there.
+5. Concrete, specific suggestions for the next roast of this bean/setup.
 
 Be specific and reference the actual numbers given -- avoid generic advice that doesn't engage \
 with this roast's actual data.

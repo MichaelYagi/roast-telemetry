@@ -52,6 +52,14 @@ METRICS: list[dict] = [
 ]
 METRIC_KEYS = [m["key"] for m in METRICS]
 
+# The handful of numbers that matter most for roast-to-roast repeatability --
+# shared by the Analysis page's Trends/Drift tabs and its "Ask the AI" prompt
+# (analysis_insights.py), and the per-roast review's own comparison to a
+# bean's history (roast_review.py), so all three stay in sync. AnalysisView.jsx
+# keeps its own copy (KEY_METRICS) in step by hand -- a different language,
+# no way to share this list there.
+KEY_REPEATABILITY_METRICS = ["duration_s", "drop_temp_c", "development_time_s", "dtr_pct", "weight_loss_pct"]
+
 # Milestone -> (time key, temperature key)
 _MILESTONES = {
     "TURNING_POINT": ("tp_time_s", "tp_temp_c"),
