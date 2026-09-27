@@ -166,3 +166,7 @@ export function roastStreamUrl(id) {
 export function settingsStreamUrl() {
   return `${BASE}/settings/stream`;
 }
+
+export function activeRoastStreamUrl() {
+  return `${BASE}/roasts/active/stream`;
+}

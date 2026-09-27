@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { api, settingsStreamUrl } from "../api/client.js";
+import { activeRoastStreamUrl, api, settingsStreamUrl } from "../api/client.js";
 import { useRoastStream } from "../api/ws.js";
 import SimulatedDeviceHint from "../components/SimulatedDeviceHint.jsx";
 import { isSimulatedForm, isSimulatedRoast } from "../simulated.js";
@@ -261,6 +261,13 @@ export default function LiveRoastView() {
     return serialPorts.filter((p) => !p.simulated || p.mode === mode);
   }
   const [phase, setPhase] = useState("idle"); // idle | armed | roasting | cooling | finished
+  // Lets the active-roast SSE effect below (mount-once, so it can't just
+  // close over `phase`) always check the *current* phase, not whatever it
+  // was when that effect first subscribed.
+  const phaseRef = useRef(phase);
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
   const [roastId, setRoastId] = useState(null);
   // Background Profile (see BackgroundProfilePicker.jsx/RoastChart.jsx) --
   // a purely visual reference overlay, never touched by anything else in
@@ -549,6 +556,28 @@ export default function LiveRoastView() {
     // EventSource retries on its own after a drop; nothing else to do here.
     return () => source.close();
   }, []);
+
+  // A roast started from another device/tab (e.g. a phone) doesn't touch
+  // this tab at all -- without a push, a tab left sitting on the idle
+  // Configure Roast form would only ever find out by a manual reload,
+  // since reconnectActiveRoast() below only runs once on mount. Server
+  // pushes whenever any roast starts recording (see roasts.py's
+  // /roasts/active/stream and session.py's active_roast_pubsub.publish()
+  // calls), same push-not-poll pattern as the settings stream above.
+  useEffect(() => {
+    const source = new EventSource(activeRoastStreamUrl());
+    source.addEventListener("active_roast", (e) => {
+      if (phaseRef.current !== "idle") return; // already tracking a roast of our own -- ignore
+      let info;
+      try {
+        info = JSON.parse(e.data);
+      } catch {
+        return;
+      }
+      if (info) reconnectActiveRoast();
+    });
+    return () => source.close();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A roast keeps running server-side across a page refresh -- the
   // in-memory session and its background loop don't stop just because

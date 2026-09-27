@@ -38,10 +38,15 @@ class RoastPubSub:
 pubsub = RoastPubSub()
 
 
-class SettingsPubSub:
-    """Single-topic broadcaster for app-wide settings changes -- unlike
-    RoastPubSub there's no per-roast key, just one set of subscribers,
-    since there's only ever one settings object."""
+class SingleTopicPubSub:
+    """Single-topic broadcaster: unlike RoastPubSub there's no per-roast
+    key, just one set of subscribers getting everything published, for
+    events that aren't scoped to any one roast (settings changes, a roast
+    starting somewhere). Messages are passed straight through as given --
+    either an already-JSON string (settings_pubsub, from
+    AppSettings.model_dump_json()) or a plain dict a consumer json.dumps's
+    itself (active_roast_pubsub), same convention RoastPubSub's own
+    per-roast queues already use."""
 
     def __init__(self) -> None:
         self._subscribers: set[asyncio.Queue] = set()
@@ -54,10 +59,7 @@ class SettingsPubSub:
     def unsubscribe(self, queue: asyncio.Queue) -> None:
         self._subscribers.discard(queue)
 
-    async def publish(self, message: str) -> None:
-        """`message` is already a JSON string (AppSettings.model_dump_json())
-        -- passed straight through as an SSE `data` field, unlike
-        RoastPubSub's dict messages which get json.dumps'd per-consumer."""
+    async def publish(self, message) -> None:
         for queue in list(self._subscribers):
             if queue.full():
                 try:
@@ -67,4 +69,11 @@ class SettingsPubSub:
             await queue.put(message)
 
 
-settings_pubsub = SettingsPubSub()
+settings_pubsub = SingleTopicPubSub()
+
+# Fires whenever a roast starts recording anywhere (see
+# RoastSessionManager.start()/begin_recording() in roast_session/session.py)
+# -- lets an idle Configure Roast tab on one device notice a roast started
+# from another device/tab and reconnect to it, instead of only finding out
+# on its own next full page load.
+active_roast_pubsub = SingleTopicPubSub()

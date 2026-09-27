@@ -47,7 +47,7 @@ from ..roast_review import build_prompt, build_summary
 from ..roast_session import RoastSessionError, session_manager
 from ..roast_session.control import RoastControlError
 from ..roast_stats import compute_roast_stats
-from ..ws_manager import pubsub
+from ..ws_manager import active_roast_pubsub, pubsub
 
 router = APIRouter(prefix="/roasts", tags=["roasts"])
 
@@ -236,6 +236,29 @@ def stats_batch(
         stats = compute_roast_stats(roast)
         results.append({"id": s.id, "title": s.title, **stats.model_dump()})
     return results
+
+
+@router.get("/active/stream")
+async def stream_active_roast() -> EventSourceResponse:
+    """Pushes the currently active (roasting/cooling) roast immediately,
+    then again every time one starts recording anywhere -- lets an idle
+    Configure Roast tab on one device notice a roast started from another
+    device/tab (e.g. a phone) and reconnect to it, instead of only finding
+    out on its own next full page load. See reconnectActiveRoast() in
+    LiveRoastView.jsx and RoastSessionManager.start()/begin_recording()'s
+    active_roast_pubsub.publish() calls."""
+
+    async def event_generator():
+        yield {"event": "active_roast", "data": json.dumps(session_manager.active_roast_info())}
+        queue = active_roast_pubsub.subscribe()
+        try:
+            while True:
+                message = await queue.get()
+                yield {"event": "active_roast", "data": json.dumps(message)}
+        finally:
+            active_roast_pubsub.unsubscribe(queue)
+
+    return EventSourceResponse(event_generator())
 
 
 @router.post("", response_model=RoastSummary, status_code=201)

@@ -54,7 +54,7 @@ from ..models import (
     RoastStatus,
     RoastSummary,
 )
-from ..ws_manager import pubsub
+from ..ws_manager import active_roast_pubsub, pubsub
 
 logger = logging.getLogger(__name__)
 
@@ -1174,11 +1174,23 @@ class RoastSessionManager:
     def get(self, roast_id: str) -> Optional[RoastSession]:
         return self.sessions.get(roast_id)
 
+    def active_roast_info(self) -> Optional[dict]:
+        """{"id", "title"} for whichever session is ROASTING/COOLING right
+        now, or None -- the one shared definition of "active roast," used
+        by both main.py's health() poll and the /roasts/active/stream SSE
+        push (ws_manager.active_roast_pubsub) below, so the two can't
+        silently drift apart."""
+        for s in self.sessions.values():
+            if s.status in (RoastStatus.ROASTING, RoastStatus.COOLING):
+                return {"id": s.id, "title": s.title}
+        return None
+
     async def start(self, roast_id: str) -> RoastSession:
         session = self.get(roast_id)
         if session is None:
             raise RoastSessionError(f"unknown roast {roast_id}")
         await session.start()
+        await active_roast_pubsub.publish(self.active_roast_info())
         return session
 
     async def connect(self, roast_id: str) -> RoastSession:
@@ -1193,6 +1205,7 @@ class RoastSessionManager:
         if session is None:
             raise RoastSessionError(f"unknown roast {roast_id}")
         await session.begin_recording()
+        await active_roast_pubsub.publish(self.active_roast_info())
         return session
 
     async def abort(self, roast_id: str) -> RoastSession:
