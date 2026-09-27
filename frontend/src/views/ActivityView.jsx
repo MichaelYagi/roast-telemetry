@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 
@@ -19,6 +20,7 @@ function formatWhen(iso) {
 // (Emergency Stop, fail-safe trips, automation start/stop/fire). See
 // backend/app/storage.py's activity_log table for what gets written and why.
 export default function ActivityView() {
+  const { t } = useTranslation();
   const [entries, setEntries] = useState([]);
   const [filters, setFilters] = useState({ category: "", action: "", q: "" });
   // Same debounced-search-separate-from-the-fetched-filter split as
@@ -75,26 +77,26 @@ export default function ActivityView() {
     <div className="activity-view">
       <div className="panel filters-grid">
         <label className="filter-search">
-          Search
+          {t("activity.filters.search")}
           <input
             type="search"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Message or roast title…"
+            placeholder={t("activity.filters.searchPlaceholder")}
           />
         </label>
         <label>
-          Category
+          {t("activity.filters.category")}
           <select value={filters.category} onChange={(e) => updateFilter("category", e.target.value)}>
-            <option value="">All</option>
-            <option value="roast">Roast edits</option>
-            <option value="safety">Safety &amp; control</option>
+            <option value="">{t("activity.filters.all")}</option>
+            <option value="roast">{t("activity.filters.roastEdits")}</option>
+            <option value="safety">{t("activity.filters.safetyControl")}</option>
           </select>
         </label>
         <label>
-          Action
+          {t("activity.filters.action")}
           <select value={filters.action} onChange={(e) => updateFilter("action", e.target.value)}>
-            <option value="">All</option>
+            <option value="">{t("activity.filters.all")}</option>
             {ACTIONS.map((a) => (
               <option key={a} value={a}>
                 {a}
@@ -104,7 +106,7 @@ export default function ActivityView() {
         </label>
         {anyFilter && (
           <button type="button" className="filters-clear" onClick={clearFilters}>
-            Clear filters
+            {t("activity.filters.clearFilters")}
           </button>
         )}
       </div>
@@ -118,9 +120,9 @@ export default function ActivityView() {
             room and drops Download to its own line on a narrow phone
             instead of squeezing both into overlapping text. */}
         <div className="activity-toolbar">
-          <p className="hint">Every roast delete/edit and safety-critical control event -- kept up to the newest 5000 entries.</p>
+          <p className="hint">{t("activity.hint")}</p>
           <span className="activity-download">
-            Download{" "}
+            {t("activity.download")}{" "}
             {totalCount > 0 ? (
               <>
                 <a href={api.activityExportUrl("csv", filters)} download>
@@ -146,23 +148,23 @@ export default function ActivityView() {
           <table className="roast-table activity-table">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Category</th>
-                <th>Action</th>
-                <th>Roast</th>
-                <th>Message</th>
-                <th>User</th>
+                <th>{t("activity.table.time")}</th>
+                <th>{t("activity.table.category")}</th>
+                <th>{t("activity.table.action")}</th>
+                <th>{t("activity.table.roast")}</th>
+                <th>{t("activity.table.message")}</th>
+                <th>{t("activity.table.user")}</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr className="table-message">
-                  <td colSpan={6}>Loading…</td>
+                  <td colSpan={6}>{t("activity.table.loading")}</td>
                 </tr>
               )}
               {!loading && entries.length === 0 && (
                 <tr className="table-message">
-                  <td colSpan={6}>{anyFilter ? "No activity matches these filters." : "No activity yet."}</td>
+                  <td colSpan={6}>{anyFilter ? t("activity.table.noMatch") : t("activity.table.noneYet")}</td>
                 </tr>
               )}
               {entries.map((e) => (
@@ -185,13 +187,11 @@ export default function ActivityView() {
         {totalCount > 0 && (
           <div className="pagination-row">
             <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
-              ← Prev
+              {t("activity.pagePrev")}
             </button>
-            <span>
-              Page {page} of {totalPages} ({totalCount} entr{totalCount === 1 ? "y" : "ies"})
-            </span>
+            <span>{t("activity.pageOf", { page, totalPages, count: totalCount })}</span>
             <button type="button" disabled={page >= totalPages || loading} onClick={() => setPage((p) => p + 1)}>
-              Next →
+              {t("activity.pageNext")}
             </button>
           </div>
         )}

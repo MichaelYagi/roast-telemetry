@@ -771,5 +771,34 @@
     "standoutHintSuffix": "(only groups of five or more roasts).",
     "standoutNone": "None.",
     "clickToOpenNewTab": "Click to open in a new tab"
+  },
+  "activity": {
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Message or roast title…",
+      "category": "Category",
+      "all": "All",
+      "roastEdits": "Roast edits",
+      "safetyControl": "Safety & control",
+      "action": "Action",
+      "clearFilters": "Clear filters"
+    },
+    "hint": "Every roast delete/edit and safety-critical control event -- kept up to the newest 5000 entries.",
+    "download": "Download",
+    "table": {
+      "time": "Time",
+      "category": "Category",
+      "action": "Action",
+      "roast": "Roast",
+      "message": "Message",
+      "user": "User",
+      "loading": "Loading…",
+      "noMatch": "No activity matches these filters.",
+      "noneYet": "No activity yet."
+    },
+    "pagePrev": "← Prev",
+    "pageNext": "Next →",
+    "pageOf_one": "Page {{page}} of {{totalPages}} ({{count}} entry)",
+    "pageOf_other": "Page {{page}} of {{totalPages}} ({{count}} entries)"
   }
 }

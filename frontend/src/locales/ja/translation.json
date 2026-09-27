@@ -757,5 +757,33 @@
     "standoutHintSuffix": "5件以上あるグループのみ対象）。",
     "standoutNone": "なし。",
     "clickToOpenNewTab": "クリックすると新しいタブで開きます"
+  },
+  "activity": {
+    "filters": {
+      "search": "検索",
+      "searchPlaceholder": "メッセージまたはロースト名…",
+      "category": "カテゴリー",
+      "all": "すべて",
+      "roastEdits": "ロースト編集",
+      "safetyControl": "安全・制御",
+      "action": "操作",
+      "clearFilters": "フィルターをクリア"
+    },
+    "hint": "すべてのロースト削除/編集と、安全に関わる制御イベントを最新5000件まで保持します。",
+    "download": "ダウンロード",
+    "table": {
+      "time": "日時",
+      "category": "カテゴリー",
+      "action": "操作",
+      "roast": "ロースト",
+      "message": "メッセージ",
+      "user": "ユーザー",
+      "loading": "読み込み中…",
+      "noMatch": "このフィルターに一致するアクティビティはありません。",
+      "noneYet": "まだアクティビティがありません。"
+    },
+    "pagePrev": "← 前へ",
+    "pageNext": "次へ →",
+    "pageOf_other": "{{page}} / {{totalPages}} ページ（{{count}}件）"
   }
 }
