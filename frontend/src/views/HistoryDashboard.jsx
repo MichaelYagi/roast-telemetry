@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import BulkZipDownload from "../components/BulkZipDownload.jsx";
@@ -18,15 +19,6 @@ function formatDuration(seconds) {
 // list -- .alog and .json go through the native reader, .csv/.tsv/.xlsx
 // through the roast-log table reader. See alog_playback/roastlog.py.
 const IMPORTABLE_EXTENSIONS = [".alog", ".json", ".csv", ".tsv", ".xlsx"];
-
-const MODE_LABELS = {
-  simulator: "Simulator",
-  alog_playback: "Playback",
-  modbus_live: "Modbus",
-  ms6514_live: "MS6514",
-  aillio_live: "Aillio Bullet",
-  tc4_live: "TC4+",
-};
 
 const IMPORT_OPEN_KEY = "roastTelemetry.historyImportOpen";
 
@@ -48,6 +40,22 @@ function formatCreated(iso) {
 }
 
 export default function HistoryDashboard() {
+  const { t } = useTranslation();
+  const MODE_LABELS = {
+    simulator: t("history.modeLabels.simulator"),
+    alog_playback: t("history.modeLabels.playback"),
+    modbus_live: t("history.modeLabels.modbus"),
+    ms6514_live: t("history.modeLabels.ms6514"),
+    aillio_live: t("history.modeLabels.aillioBullet"),
+    tc4_live: t("history.modeLabels.tc4"),
+  };
+  const STATUS_LABELS = {
+    roasting: t("history.filters.statusRoasting"),
+    cooling: t("history.filters.statusCooling"),
+    complete: t("history.filters.statusComplete"),
+    stopped: t("history.filters.statusStopped"),
+    aborted: t("history.filters.statusAborted"),
+  };
   const confirm = useConfirm();
   const notify = useNotify();
   const [roasts, setRoasts] = useState([]);
@@ -138,8 +146,8 @@ export default function HistoryDashboard() {
     if (!compareOpen) {
       const usable = ticked.filter((id) => !hasNoRecording(id));
       if (usable.length < 2) {
-        const names = leftOut.map((id) => `"${titleFor(id)}"`).join(", ");
-        setCompareNote(`Not enough to compare: ${names || "the selection"} ${leftOut.length === 1 ? "has" : "have"} no recording.`);
+        const names = leftOut.map((id) => `"${titleFor(id)}"`).join(", ") || t("history.selection.theSelection");
+        setCompareNote(t("history.selection.notEnoughToCompare", { count: leftOut.length, names }));
         return;
       }
       setCompareNote(null);
@@ -301,7 +309,7 @@ export default function HistoryDashboard() {
     const files = [...fileList].filter((f) => IMPORTABLE_EXTENSIONS.some((ext) => f.name.toLowerCase().endsWith(ext)));
     const skipped = fileList.length - files.length;
     if (!files.length) {
-      setImportError(skipped ? `Only ${IMPORTABLE_EXTENSIONS.join(", ")} files can be imported.` : null);
+      setImportError(skipped ? t("history.import.unsupportedFormat", { extensions: IMPORTABLE_EXTENSIONS.join(", ") }) : null);
       return;
     }
     setImportError(null);
@@ -310,7 +318,7 @@ export default function HistoryDashboard() {
     const failed = [];
     try {
       for (let i = 0; i < files.length; i++) {
-        setUploadStatus(files.length > 1 ? `Uploading ${i + 1} of ${files.length}…` : "Uploading…");
+        setUploadStatus(files.length > 1 ? t("history.import.uploadingOf", { current: i + 1, total: files.length }) : t("history.import.uploading"));
         try {
           done.push(await api.uploadAlog(files[i]));
         } catch (err) {
@@ -321,7 +329,7 @@ export default function HistoryDashboard() {
       setUploadStatus(null);
       setImporting(false);
     }
-    if (skipped) failed.push(`${skipped} file${skipped === 1 ? " was" : "s were"} not a supported format and was skipped.`);
+    if (skipped) failed.push(t("history.import.skippedFiles", { count: skipped }));
     if (done.length === 1 && !failed.length) {
       navigate(`/roasts/${done[0].id}`);
       return;
@@ -332,12 +340,12 @@ export default function HistoryDashboard() {
     }
     setImportError(failed.length ? failed.join("\n") : null);
     if (done.length > 1 || (done.length && failed.length)) {
-      notify(`Imported ${done.length} roast${done.length === 1 ? "" : "s"}.`, { title: "Import finished" });
+      notify(t("history.import.importedRoasts", { count: done.length }), { title: t("history.import.importFinishedTitle") });
     }
   }
 
   async function handleDelete(id, title) {
-    if (!(await confirm(`Delete "${title}"? This removes it from history and deletes its .alog file. This can't be undone.`))) {
+    if (!(await confirm(t("history.confirm.deleteOne", { title })))) {
       return;
     }
     try {
@@ -350,16 +358,14 @@ export default function HistoryDashboard() {
       refresh();
       refreshTrends();
     } catch (err) {
-      notify(err.message, { title: "Delete failed" });
+      notify(err.message, { title: t("history.notify.deleteFailedTitle") });
     }
   }
 
   async function handleDeleteSelected() {
     const ids = [...selectedIds];
     if (!ids.length) return;
-    const confirmed = await confirm(
-      `Delete ${ids.length} roast${ids.length === 1 ? "" : "s"}? This removes them from history and deletes their .alog files. This can't be undone.`
-    );
+    const confirmed = await confirm(t("history.confirm.deleteMany", { count: ids.length }));
     if (!confirmed) return;
     setDeletingSelected(true);
     try {
@@ -375,7 +381,9 @@ export default function HistoryDashboard() {
           const roast = roasts.find((r) => r.id === f.id);
           return `${roast ? roast.title : f.id}: ${f.reason}`;
         });
-        notify(`${failed.length} of ${ids.length} couldn't be deleted:\n${titles.join("\n")}`, { title: "Delete failed" });
+        notify(t("history.notify.deleteFailedSummary", { failedCount: failed.length, total: ids.length, details: titles.join("\n") }), {
+          title: t("history.notify.deleteFailedTitle"),
+        });
       }
     } finally {
       setDeletingSelected(false);
@@ -433,38 +441,34 @@ export default function HistoryDashboard() {
         <div className="stats-grid">
           <div className="stat-tile">
             <span className="stat-value">{shown(totals.total)}</span>
-            <span className="stat-label">Finished roasts</span>
+            <span className="stat-label">{t("history.stats.finishedRoasts")}</span>
           </div>
           <div className="stat-tile">
             <span className="stat-value">{trendsLoading ? "…" : formatDuration(totals.avgDuration)}</span>
-            <span className="stat-label">Avg duration</span>
+            <span className="stat-label">{t("history.stats.avgDuration")}</span>
           </div>
           <div className="stat-tile">
             <span className="stat-value">{pct(totals.avgLoss)}</span>
-            <span className="stat-label">Avg roast loss</span>
+            <span className="stat-label">{t("history.stats.avgRoastLoss")}</span>
           </div>
           <div className="stat-tile">
             <span className="stat-value">{pct(totals.avgDryPct)}</span>
-            <span className="stat-label">Avg Dry %</span>
+            <span className="stat-label">{t("history.stats.avgDryPct")}</span>
           </div>
           <div className="stat-tile">
             <span className="stat-value">{pct(totals.avgDtrPct)}</span>
-            <span className="stat-label">Avg DTR %</span>
+            <span className="stat-label">{t("history.stats.avgDtrPct")}</span>
           </div>
           <div className="stat-tile">
             <span className="stat-value">{shown(totals.flaggedCount)}</span>
-            <span className="stat-label">With RoR flags</span>
+            <span className="stat-label">{t("history.stats.withRorFlags")}</span>
           </div>
         </div>
         <p className="hint stats-note">
-          Covers every finished roast the filters match, across all pages
-          {totals.simulatedCount > 0
-            ? `, leaving out ${totals.simulatedCount} simulated roast${totals.simulatedCount === 1 ? "" : "s"}`
-            : ""}
-          {summary?.missing_recording
-            ? `, and ${summary.missing_recording} whose recording file is missing or unreadable`
-            : ""}
-          . <Link to="/analysis">Analyse these</Link>
+          {t("history.statsNote.base")}
+          {totals.simulatedCount > 0 ? t("history.statsNote.simulatedClause", { count: totals.simulatedCount }) : ""}
+          {summary?.missing_recording ? t("history.statsNote.missingClause", { count: summary.missing_recording }) : ""}
+          . <Link to="/analysis">{t("history.statsNote.analyseLink")}</Link>
         </p>
       </div>
 
@@ -490,8 +494,8 @@ export default function HistoryDashboard() {
         }}
       >
         <button type="button" className="import-toggle" aria-expanded={importShown} onClick={toggleImport}>
-          <span className="import-toggle-title">Import roast logs</span>
-          {!importShown && <span className="import-toggle-hint">Drop files here, or click to open</span>}
+          <span className="import-toggle-title">{t("history.import.heading")}</span>
+          {!importShown && <span className="import-toggle-hint">{t("history.import.hint")}</span>}
           <span className="import-chevron" aria-hidden="true">
             {importShown ? "▾" : "▸"}
           </span>
@@ -500,7 +504,7 @@ export default function HistoryDashboard() {
           <div className="import-body">
             {importError && <p className="error import-error">{importError}</p>}
             <div className="upload-drop">
-              <span>Drop {IMPORTABLE_EXTENSIONS.join(", ")} files here, or</span>
+              <span>{t("history.import.dropFilesHere", { extensions: IMPORTABLE_EXTENSIONS.join(", ") })}</span>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -513,24 +517,24 @@ export default function HistoryDashboard() {
                 }}
               />
               <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}>
-                Choose files…
+                {t("history.import.chooseFiles")}
               </button>
               {uploadStatus && <span className="hint">{uploadStatus}</span>}
             </div>
             <div className="path-field">
-              <span className="field-label">Or use a file already on the server (the machine running the backend)</span>
+              <span className="field-label">{t("history.import.orServerFile")}</span>
               <div className="path-with-browse">
                 <input
-                  aria-label="Roast log file path (server-side)"
+                  aria-label={t("history.import.pathAriaLabel")}
                   value={importPath}
                   onChange={(e) => setImportPath(e.target.value)}
                   placeholder="/path/to/roast.alog"
                 />
                 <button type="button" onClick={() => setChooserOpen(true)}>
-                  Browse…
+                  {t("history.import.browse")}
                 </button>
                 <button type="submit" disabled={importing || !importPath.trim()}>
-                  {importing ? "Importing…" : "Import"}
+                  {importing ? t("history.import.importing") : t("history.import.importBtn")}
                 </button>
               </div>
             </div>
@@ -546,52 +550,52 @@ export default function HistoryDashboard() {
 
       <div className="panel filters-grid">
         <label className="filter-search">
-          Search
+          {t("history.filters.search")}
           <input
             type="search"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Title, beans, or tag…"
+            placeholder={t("history.filters.searchPlaceholder")}
           />
         </label>
         <label>
-          Mode
+          {t("history.filters.mode")}
           <select value={filters.mode} onChange={(e) => updateFilter("mode", e.target.value)}>
-            <option value="">All</option>
-            <option value="simulator">Simulator</option>
-            <option value="alog_playback">Playback</option>
-            <option value="modbus_live">Modbus (live)</option>
-            <option value="ms6514_live">MS6514 (live)</option>
-            <option value="aillio_live">Aillio Bullet (live)</option>
-            <option value="tc4_live">TC4+ (live)</option>
+            <option value="">{t("history.filters.all")}</option>
+            <option value="simulator">{t("history.filters.modeOptions.simulator")}</option>
+            <option value="alog_playback">{t("history.filters.modeOptions.playback")}</option>
+            <option value="modbus_live">{t("history.filters.modeOptions.modbusLive")}</option>
+            <option value="ms6514_live">{t("history.filters.modeOptions.ms6514Live")}</option>
+            <option value="aillio_live">{t("history.filters.modeOptions.aillioLive")}</option>
+            <option value="tc4_live">{t("history.filters.modeOptions.tc4Live")}</option>
           </select>
         </label>
         <label>
-          Status
+          {t("history.filters.status")}
           <select value={filters.status} onChange={(e) => updateFilter("status", e.target.value)}>
-            <option value="">All</option>
-            <option value="roasting">Roasting</option>
-            <option value="cooling">Cooling</option>
-            <option value="complete">Complete</option>
-            <option value="stopped">Stopped</option>
-            <option value="aborted">Aborted</option>
+            <option value="">{t("history.filters.all")}</option>
+            <option value="roasting">{t("history.filters.statusRoasting")}</option>
+            <option value="cooling">{t("history.filters.statusCooling")}</option>
+            <option value="complete">{t("history.filters.statusComplete")}</option>
+            <option value="stopped">{t("history.filters.statusStopped")}</option>
+            <option value="aborted">{t("history.filters.statusAborted")}</option>
           </select>
         </label>
         <label>
-          Tag
+          {t("history.filters.tag")}
           <select value={filters.tag} onChange={(e) => updateFilter("tag", e.target.value)}>
-            <option value="">All</option>
-            {allTags.map((t) => (
-              <option key={t.tag} value={t.tag}>
-                {t.tag} ({t.count})
+            <option value="">{t("history.filters.all")}</option>
+            {allTags.map((tagItem) => (
+              <option key={tagItem.tag} value={tagItem.tag}>
+                {tagItem.tag} ({tagItem.count})
               </option>
             ))}
           </select>
         </label>
         <label>
-          Roasted by
+          {t("history.filters.roastedBy")}
           <select value={filters.created_by} onChange={(e) => updateFilter("created_by", e.target.value)}>
-            <option value="">All</option>
+            <option value="">{t("history.filters.all")}</option>
             {allRoasters.map((r) => (
               <option key={r.created_by_username} value={r.created_by_username}>
                 {r.created_by_username} ({r.count})
@@ -601,7 +605,7 @@ export default function HistoryDashboard() {
         </label>
         {anyFilter && (
           <button type="button" className="filters-clear" onClick={clearFilters}>
-            Clear filters
+            {t("history.filters.clearFilters")}
           </button>
         )}
       </div>
@@ -619,7 +623,7 @@ export default function HistoryDashboard() {
               <SavedViews
                 kind="compare"
                 loadOnly
-                placeholder="Open a saved comparison"
+                placeholder={t("history.selection.openSavedComparison")}
                 getConfig={() => ({})}
                 onLoad={(config) => {
                   setSelectedIds(new Set(Array.isArray(config.ids) ? config.ids : []));
@@ -632,25 +636,25 @@ export default function HistoryDashboard() {
           {selectedIds.size > 0 && (
             <div className="table-toolbar selection-bar">
               <span>
-                <strong>{selectedIds.size}</strong> selected
-                {offPageSelected > 0 ? ` (${offPageSelected} on other pages)` : ""}
+                <strong>{selectedIds.size}</strong> {t("history.selection.selected")}
+                {offPageSelected > 0 ? t("history.selection.offPage", { count: offPageSelected }) : ""}
               </span>
-              {selectedIds.size > maxCompare && <span className="hint">Compare works with up to {maxCompare} roasts.</span>}
+              {selectedIds.size > maxCompare && <span className="hint">{t("history.selection.compareLimitHint", { max: maxCompare })}</span>}
               <button
                 type="button"
                 onClick={startCompare}
                 disabled={!compareOpen && (selectedIds.size < 2 || selectedIds.size > maxCompare)}
-                title={selectedIds.size < 2 && !compareOpen ? "Select at least two roasts to compare" : `Compare up to ${maxCompare} roasts`}
+                title={selectedIds.size < 2 && !compareOpen ? t("history.selection.compareTitleMin") : t("history.selection.compareTitleMax", { max: maxCompare })}
               >
-                Compare
+                {t("history.selection.compare")}
               </button>
               <button type="button" className="danger" disabled={deletingSelected} onClick={handleDeleteSelected}>
-                {deletingSelected ? "Deleting…" : "Delete"}
+                {deletingSelected ? t("history.selection.deleting") : t("history.selection.delete")}
               </button>
-              {selectedIds.size === 1 && <span className="hint">Tick at least one more roast to compare.</span>}
+              {selectedIds.size === 1 && <span className="hint">{t("history.selection.tickOneMore")}</span>}
               {compareNote && !compareOpen && <span className="error">{compareNote}</span>}
               {compareOpen && leftOut.length > 0 && (
-                <span className="error">Left out {leftOut.map((id) => `"${titleFor(id)}"`).join(", ")}: no recording.</span>
+                <span className="error">{t("history.selection.leftOut", { names: leftOut.map((id) => `"${titleFor(id)}"`).join(", ") })}</span>
               )}
             </div>
           )}
@@ -663,7 +667,7 @@ export default function HistoryDashboard() {
             onChange={toggleSelectAll}
             disabled={roasts.length === 0}
           />
-          Select all
+          {t("history.table.selectAll")}
         </label>
         <div className="table-scroll">
           <table className="roast-table history-table">
@@ -672,31 +676,31 @@ export default function HistoryDashboard() {
                 <th className="col-select">
                   <input
                     type="checkbox"
-                    aria-label="Select all"
+                    aria-label={t("history.table.selectAll")}
                     checked={allSelected}
                     ref={(el) => el && (el.indeterminate = someSelected && !allSelected)}
                     onChange={toggleSelectAll}
                     disabled={roasts.length === 0}
                   />
                 </th>
-                <th>Roast</th>
-                <th>Mode</th>
-                <th>Status</th>
-                <th>Duration</th>
-                <th>Tags</th>
-                <th>Created</th>
+                <th>{t("history.table.roast")}</th>
+                <th>{t("history.table.mode")}</th>
+                <th>{t("history.table.status")}</th>
+                <th>{t("history.table.duration")}</th>
+                <th>{t("history.table.tags")}</th>
+                <th>{t("history.table.created")}</th>
                 <th className="col-actions"></th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr className="table-message">
-                  <td colSpan={8}>Loading…</td>
+                  <td colSpan={8}>{t("history.table.loading")}</td>
                 </tr>
               )}
               {!loading && roasts.length === 0 && (
                 <tr className="table-message">
-                  <td colSpan={8}>{anyFilter ? "No roasts match these filters." : "No roasts yet."}</td>
+                  <td colSpan={8}>{anyFilter ? t("history.table.noMatch") : t("history.table.noneYet")}</td>
                 </tr>
               )}
               {roasts.map((r) => {
@@ -706,7 +710,7 @@ export default function HistoryDashboard() {
                     <td className="cell-select">
                       <input
                         type="checkbox"
-                        aria-label={`Select ${r.title}`}
+                        aria-label={t("history.table.selectRoast", { title: r.title })}
                         checked={selectedIds.has(r.id)}
                         onChange={() => toggleSelected(r.id)}
                       />
@@ -717,16 +721,16 @@ export default function HistoryDashboard() {
                       </Link>
                       {r.beans && <span className="cell-sub">{r.beans}</span>}
                     </td>
-                    <td className="cell-mode">{r.mode === "alog_playback" && !r.source_alog_path ? "Uploaded log" : MODE_LABELS[r.mode] || r.mode}</td>
+                    <td className="cell-mode">{r.mode === "alog_playback" && !r.source_alog_path ? t("history.modeLabels.uploadedLog") : MODE_LABELS[r.mode] || r.mode}</td>
                     <td className="cell-status">
-                      <span className={`status-pill status-${r.status}`}>{r.status}</span>
+                      <span className={`status-pill status-${r.status}`}>{STATUS_LABELS[r.status] || r.status}</span>
                     </td>
                     <td className="cell-duration">{formatDuration(r.duration_s)}</td>
                     <td className="cell-tags">
                       {r.tags && r.tags.length > 0
-                        ? r.tags.map((t) => (
-                            <span key={t} className="tag-chip">
-                              {t}
+                        ? r.tags.map((tagValue) => (
+                            <span key={tagValue} className="tag-chip">
+                              {tagValue}
                             </span>
                           ))
                         : null}
@@ -740,10 +744,10 @@ export default function HistoryDashboard() {
                     </td>
                     <td className="cell-actions">
                       <Link className="btn-sm" to={`/roasts/${r.id}`}>
-                        View
+                        {t("history.table.view")}
                       </Link>
                       <button type="button" className="btn-sm btn-danger-soft" onClick={() => handleDelete(r.id, r.title)}>
-                        Delete
+                        {t("history.table.delete")}
                       </button>
                     </td>
                   </tr>
@@ -755,13 +759,11 @@ export default function HistoryDashboard() {
         {totalCount > 0 && (
           <div className="pagination-row">
             <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>
-              ← Prev
+              {t("history.table.pagePrev")}
             </button>
-            <span>
-              Page {page} of {totalPages} ({totalCount} roast{totalCount === 1 ? "" : "s"})
-            </span>
+            <span>{t("history.table.pageOf", { page, totalPages, count: totalCount })}</span>
             <button type="button" disabled={page >= totalPages || loading} onClick={() => setPage((p) => p + 1)}>
-              Next →
+              {t("history.table.pageNext")}
             </button>
           </div>
         )}

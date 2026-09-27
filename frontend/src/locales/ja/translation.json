@@ -399,5 +399,111 @@
       "deleteMilestone": "マイルストーンを削除",
       "axisMins": "分"
     }
+  },
+  "history": {
+    "stats": {
+      "finishedRoasts": "完了したロースト",
+      "avgDuration": "平均時間",
+      "avgRoastLoss": "平均ロースロス",
+      "avgDryPct": "平均Dry率",
+      "avgDtrPct": "平均DTR率",
+      "withRorFlags": "RoRフラグあり"
+    },
+    "statsNote": {
+      "base": "フィルターに一致するすべての完了ロースト（全ページ）が対象です",
+      "simulatedClause_other": "（シミュレーションロースト{{count}}件を除く）",
+      "missingClause": "、記録ファイルが見つからないか読み取れないもの{{count}}件を含む",
+      "analyseLink": "これらを分析"
+    },
+    "modeLabels": {
+      "simulator": "シミュレーター",
+      "playback": "再生",
+      "modbus": "Modbus",
+      "ms6514": "MS6514",
+      "aillioBullet": "Aillio Bullet",
+      "tc4": "TC4+",
+      "uploadedLog": "アップロードされたログ"
+    },
+    "import": {
+      "heading": "ロースト ログをインポート",
+      "hint": "ここにファイルをドロップするか、クリックして開く",
+      "dropFilesHere": "{{extensions}} ファイルをここにドロップするか、",
+      "chooseFiles": "ファイルを選択…",
+      "uploading": "アップロード中…",
+      "uploadingOf": "{{total}}件中{{current}}件目をアップロード中…",
+      "orServerFile": "またはサーバー（バックエンドを実行しているマシン）上の既存のファイルを使用",
+      "pathAriaLabel": "ロースト ログのファイルパス（サーバー側）",
+      "browse": "参照…",
+      "importing": "インポート中…",
+      "importBtn": "インポート",
+      "unsupportedFormat": "インポートできるのは {{extensions}} ファイルのみです。",
+      "skippedFiles_other": "{{count}}件のファイルはサポートされていない形式のためスキップされました。",
+      "importedRoasts_other": "{{count}}件のローストをインポートしました。",
+      "importFinishedTitle": "インポート完了"
+    },
+    "filters": {
+      "search": "検索",
+      "searchPlaceholder": "タイトル、豆、またはタグ…",
+      "mode": "モード",
+      "all": "すべて",
+      "status": "ステータス",
+      "statusRoasting": "焙煎中",
+      "statusCooling": "冷却中",
+      "statusComplete": "完了",
+      "statusStopped": "停止",
+      "statusAborted": "中止",
+      "tag": "タグ",
+      "roastedBy": "焙煎者",
+      "clearFilters": "フィルターをクリア",
+      "modeOptions": {
+        "simulator": "シミュレーター",
+        "playback": "再生",
+        "modbusLive": "Modbus（ライブ）",
+        "ms6514Live": "MS6514（ライブ）",
+        "aillioLive": "Aillio Bullet（ライブ）",
+        "tc4Live": "TC4+（ライブ）"
+      }
+    },
+    "table": {
+      "selectAll": "すべて選択",
+      "roast": "ロースト",
+      "mode": "モード",
+      "status": "ステータス",
+      "duration": "時間",
+      "tags": "タグ",
+      "created": "作成日時",
+      "loading": "読み込み中…",
+      "noMatch": "このフィルターに一致するローストはありません。",
+      "noneYet": "まだローストがありません。",
+      "view": "表示",
+      "delete": "削除",
+      "selectRoast": "{{title}} を選択",
+      "pagePrev": "← 前へ",
+      "pageNext": "次へ →",
+      "pageOf_other": "{{page}} / {{totalPages}} ページ（{{count}}件のロースト）"
+    },
+    "selection": {
+      "selected": "{{count}}件選択中",
+      "offPage": "（他のページに{{count}}件）",
+      "compareLimitHint": "比較は最大{{max}}件までです。",
+      "compare": "比較",
+      "compareTitleMin": "比較するには2件以上選択してください",
+      "compareTitleMax": "最大{{max}}件まで比較できます",
+      "deleting": "削除中…",
+      "delete": "削除",
+      "tickOneMore": "比較するにはもう1件選択してください。",
+      "leftOut": "除外: {{names}}（記録なし）",
+      "notEnoughToCompare_other": "比較するには不足しています: {{names}} に記録がありません。",
+      "theSelection": "選択した項目",
+      "openSavedComparison": "保存した比較を開く"
+    },
+    "confirm": {
+      "deleteOne": "「{{title}}」を削除しますか？履歴から削除され、.alogファイルも削除されます。この操作は取り消せません。",
+      "deleteMany_other": "{{count}}件のローストを削除しますか？履歴から削除され、.alogファイルも削除されます。この操作は取り消せません。"
+    },
+    "notify": {
+      "deleteFailedTitle": "削除に失敗しました",
+      "deleteFailedSummary": "{{total}}件中{{failedCount}}件を削除できませんでした:\n{{details}}"
+    }
   }
 }

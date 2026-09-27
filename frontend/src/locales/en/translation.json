@@ -404,5 +404,117 @@
       "deleteMilestone": "Delete milestone",
       "axisMins": "mins"
     }
+  },
+  "history": {
+    "stats": {
+      "finishedRoasts": "Finished roasts",
+      "avgDuration": "Avg duration",
+      "avgRoastLoss": "Avg roast loss",
+      "avgDryPct": "Avg Dry %",
+      "avgDtrPct": "Avg DTR %",
+      "withRorFlags": "With RoR flags"
+    },
+    "statsNote": {
+      "base": "Covers every finished roast the filters match, across all pages",
+      "simulatedClause_one": ", leaving out {{count}} simulated roast",
+      "simulatedClause_other": ", leaving out {{count}} simulated roasts",
+      "missingClause": ", and {{count}} whose recording file is missing or unreadable",
+      "analyseLink": "Analyse these"
+    },
+    "modeLabels": {
+      "simulator": "Simulator",
+      "playback": "Playback",
+      "modbus": "Modbus",
+      "ms6514": "MS6514",
+      "aillioBullet": "Aillio Bullet",
+      "tc4": "TC4+",
+      "uploadedLog": "Uploaded log"
+    },
+    "import": {
+      "heading": "Import roast logs",
+      "hint": "Drop files here, or click to open",
+      "dropFilesHere": "Drop {{extensions}} files here, or",
+      "chooseFiles": "Choose files…",
+      "uploading": "Uploading…",
+      "uploadingOf": "Uploading {{current}} of {{total}}…",
+      "orServerFile": "Or use a file already on the server (the machine running the backend)",
+      "pathAriaLabel": "Roast log file path (server-side)",
+      "browse": "Browse…",
+      "importing": "Importing…",
+      "importBtn": "Import",
+      "unsupportedFormat": "Only {{extensions}} files can be imported.",
+      "skippedFiles_one": "{{count}} file was not a supported format and was skipped.",
+      "skippedFiles_other": "{{count}} files were not a supported format and was skipped.",
+      "importedRoasts_one": "Imported {{count}} roast.",
+      "importedRoasts_other": "Imported {{count}} roasts.",
+      "importFinishedTitle": "Import finished"
+    },
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Title, beans, or tag…",
+      "mode": "Mode",
+      "all": "All",
+      "status": "Status",
+      "statusRoasting": "Roasting",
+      "statusCooling": "Cooling",
+      "statusComplete": "Complete",
+      "statusStopped": "Stopped",
+      "statusAborted": "Aborted",
+      "tag": "Tag",
+      "roastedBy": "Roasted by",
+      "clearFilters": "Clear filters",
+      "modeOptions": {
+        "simulator": "Simulator",
+        "playback": "Playback",
+        "modbusLive": "Modbus (live)",
+        "ms6514Live": "MS6514 (live)",
+        "aillioLive": "Aillio Bullet (live)",
+        "tc4Live": "TC4+ (live)"
+      }
+    },
+    "table": {
+      "selectAll": "Select all",
+      "roast": "Roast",
+      "mode": "Mode",
+      "status": "Status",
+      "duration": "Duration",
+      "tags": "Tags",
+      "created": "Created",
+      "loading": "Loading…",
+      "noMatch": "No roasts match these filters.",
+      "noneYet": "No roasts yet.",
+      "view": "View",
+      "delete": "Delete",
+      "selectRoast": "Select {{title}}",
+      "pagePrev": "← Prev",
+      "pageNext": "Next →",
+      "pageOf_one": "Page {{page}} of {{totalPages}} ({{count}} roast)",
+      "pageOf_other": "Page {{page}} of {{totalPages}} ({{count}} roasts)"
+    },
+    "selection": {
+      "selected": "{{count}} selected",
+      "offPage": " ({{count}} on other pages)",
+      "compareLimitHint": "Compare works with up to {{max}} roasts.",
+      "compare": "Compare",
+      "compareTitleMin": "Select at least two roasts to compare",
+      "compareTitleMax": "Compare up to {{max}} roasts",
+      "deleting": "Deleting…",
+      "delete": "Delete",
+      "tickOneMore": "Tick at least one more roast to compare.",
+      "leftOut": "Left out {{names}}: no recording.",
+      "notEnoughToCompare_one": "Not enough to compare: {{names}} has no recording.",
+      "notEnoughToCompare_other": "Not enough to compare: {{names}} have no recording.",
+      "theSelection": "the selection",
+      "openSavedComparison": "Open a saved comparison"
+    },
+    "confirm": {
+      "deleteOne": "Delete \"{{title}}\"? This removes it from history and deletes its .alog file. This can't be undone.",
+      "deleteMany_one": "Delete {{count}} roast? This removes them from history and deletes their .alog files. This can't be undone.",
+      "deleteMany_other": "Delete {{count}} roasts? This removes them from history and deletes their .alog files. This can't be undone."
+    },
+    "notify": {
+      "deleteFailedTitle": "Delete failed",
+      "deleteFailedSummary": "{{failedCount}} of {{total}} couldn't be deleted:\n{{details}}"
+    }
   }
 }
