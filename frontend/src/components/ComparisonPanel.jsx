@@ -8,6 +8,7 @@ import {
   Tooltip,
 } from "chart.js";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Line } from "react-chartjs-2";
 import { api } from "../api/client.js";
 import { formatMetric, formatSeconds, groupMetrics, isRate, isTemperature } from "../lib/metricFormat.js";
@@ -43,6 +44,7 @@ function formatDelta(metric, delta, tempUnit) {
 // when a roast can't be loaded), `onLoadIds` replaces the whole selection (a
 // saved view), and `onClose` goes back to the plain list.
 export default function ComparisonPanel({ ids, onRemoveId, onLoadIds, onClose, titleFor, initialConfig }) {
+  const { t } = useTranslation();
   const [details, setDetails] = useState({});
   const [numbers, setNumbers] = useState({});
   const [metrics, setMetrics] = useState([]);
@@ -124,7 +126,7 @@ export default function ComparisonPanel({ ids, onRemoveId, onLoadIds, onClose, t
       scales: {
         x: {
           type: "linear",
-          title: { display: true, text: alignOnCharge ? "Time from Charge (m:ss)" : "Time (m:ss)" },
+          title: { display: true, text: alignOnCharge ? t("common.comparisonPanel.axisTimeFromCharge") : t("common.comparisonPanel.axisTime") },
           ticks: { callback: (v) => formatSeconds(v) },
         },
         y: {
@@ -133,7 +135,7 @@ export default function ComparisonPanel({ ids, onRemoveId, onLoadIds, onClose, t
         },
       },
     }),
-    [curve, tempUnit, isRateCurve, alignOnCharge]
+    [curve, tempUnit, isRateCurve, alignOnCharge, t]
   );
 
   // Columns: every number at least one roast has, grouped.
@@ -196,29 +198,29 @@ export default function ComparisonPanel({ ids, onRemoveId, onLoadIds, onClose, t
     <div className="panel compare-panel">
       <div className="analysis-header">
         <h2>
-          Comparing {ids.length} roast{ids.length === 1 ? "" : "s"}
-          {hiddenCount > 0 && <span className="hint compare-hidden-note"> ({hiddenCount} hidden on the graph)</span>}
+          {t("common.comparisonPanel.comparing", { count: ids.length })}
+          {hiddenCount > 0 && <span className="hint compare-hidden-note"> {t("common.comparisonPanel.hiddenNote", { count: hiddenCount })}</span>}
         </h2>
         <div className="compare-panel-actions">
           <SavedViews kind="compare" getConfig={getConfig} onLoad={loadConfig} />
           <button type="button" onClick={onClose}>
-            Close comparison
+            {t("common.comparisonPanel.closeComparison")}
           </button>
         </div>
       </div>
 
       <div className="compare-controls">
         <label className="standalone-field-label">
-          Curve
+          {t("common.comparisonPanel.curve")}
           <select value={curve} onChange={(e) => setCurve(e.target.value)}>
-            <option value="bt">Bean Temp (BT)</option>
-            <option value="et">Environment Temp (ET)</option>
-            <option value="ror_bt">Rate of Rise (BT)</option>
+            <option value="bt">{t("common.comparisonPanel.curveBt")}</option>
+            <option value="et">{t("common.comparisonPanel.curveEt")}</option>
+            <option value="ror_bt">{t("common.comparisonPanel.curveRorBt")}</option>
           </select>
         </label>
         <label className="checkbox-label">
           <input type="checkbox" checked={alignOnCharge} onChange={(e) => setAlignOnCharge(e.target.checked)} />
-          Line up on Charge
+          {t("common.comparisonPanel.lineUpOnCharge")}
         </label>
       </div>
 
@@ -227,29 +229,31 @@ export default function ComparisonPanel({ ids, onRemoveId, onLoadIds, onClose, t
           {errorEntries.map(([id, message]) => (
             <p key={id}>
               {titleFor?.(id) || !/not found/.test(message)
-                ? `Couldn't compare ${titleFor?.(id) ? `"${titleFor(id)}"` : "a roast"}: ${message.replace(/\.$/, "")}.`
-                : "One of the roasts in this comparison no longer exists."}
+                ? titleFor?.(id)
+                  ? t("common.comparisonPanel.couldntCompareNamed", { title: titleFor(id), message: message.replace(/\.$/, "") })
+                  : t("common.comparisonPanel.couldntCompareGeneric", { message: message.replace(/\.$/, "") })
+                : t("common.comparisonPanel.roastNoLongerExists")}
             </p>
           ))}
         </div>
       )}
 
-      <div className="compare-chart">{readyIds.length === 0 ? <p>Loading…</p> : <Line data={data} options={options} />}</div>
+      <div className="compare-chart">{readyIds.length === 0 ? <p>{t("common.comparisonPanel.loading")}</p> : <Line data={data} options={options} />}</div>
 
       {readyIds.length > 0 && (
         <>
-          <h3>Numbers</h3>
+          <h3>{t("common.comparisonPanel.numbersHeading")}</h3>
           <p className="hint">
-            One row per roast. Click a heading to sort by that number, and a group name to open or close it. Pick a
-            baseline to see how each other roast differs from it, for example <em>+0:12</em> or <em>-3.5</em>. Hide
-            takes a roast off the graph only; it stays here.
+            {t("common.comparisonPanel.numbersHint.prefix")} <em>+0:12</em> {t("common.comparisonPanel.numbersHint.or")} <em>-3.5</em>
+            {t("common.comparisonPanel.numbersHint.exampleClose")}
+            {t("common.comparisonPanel.numbersHint.suffix")}
           </p>
           <div className="table-scroll">
             <table className="roast-table compare-table">
               <thead>
                 <tr>
                   <th className="compare-sticky" rowSpan={2}>
-                    Roast
+                    {t("common.comparisonPanel.roastColumn")}
                   </th>
                   {groups.map((g) => (
                     <th key={g.name} colSpan={openGroups.has(g.name) ? g.list.length : 1} className="compare-group-head">
@@ -264,7 +268,7 @@ export default function ComparisonPanel({ ids, onRemoveId, onLoadIds, onClose, t
                     openGroups.has(g.name)
                       ? g.list.map((m) => (
                           <th key={m.key} className="compare-metric-head">
-                            <button type="button" className="link-like" onClick={() => cycleSort(m.key)} title="Sort by this number">
+                            <button type="button" className="link-like" onClick={() => cycleSort(m.key)} title={t("common.comparisonPanel.sortByThisNumber")}>
                               {m.label}
                               {sort?.key === m.key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
                             </button>
@@ -292,7 +296,7 @@ export default function ComparisonPanel({ ids, onRemoveId, onLoadIds, onClose, t
                         </div>
                         <div className="compare-row-actions">
                           <button type="button" className="link-like" onClick={() => toggleHidden(id)}>
-                            {isHidden ? "Show on graph" : "Hide from graph"}
+                            {isHidden ? t("common.comparisonPanel.showOnGraph") : t("common.comparisonPanel.hideFromGraph")}
                           </button>
                           <label className="compare-baseline">
                             <input
@@ -302,7 +306,7 @@ export default function ComparisonPanel({ ids, onRemoveId, onLoadIds, onClose, t
                               onChange={() => setBaselineId(id)}
                               onClick={() => isBase && setBaselineId(null)}
                             />{" "}
-                            Baseline
+                            {t("common.comparisonPanel.baseline")}
                           </label>
                         </div>
                       </th>
@@ -327,7 +331,7 @@ export default function ComparisonPanel({ ids, onRemoveId, onLoadIds, onClose, t
               </tbody>
             </table>
           </div>
-          {groups.length === 0 && <p className="hint">None of these roasts have numbers yet (mark Charge and Drop to get them).</p>}
+          {groups.length === 0 && <p className="hint">{t("common.comparisonPanel.noNumbersYet")}</p>}
         </>
       )}
     </div>

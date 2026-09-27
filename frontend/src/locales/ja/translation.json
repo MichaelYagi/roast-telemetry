@@ -398,6 +398,35 @@
       "zoomHint": "{{modifier}}+スクロールでズーム、ドラッグでパン",
       "deleteMilestone": "マイルストーンを削除",
       "axisMins": "分"
+    },
+    "comparisonPanel": {
+      "comparing_other": "ロースト{{count}}件を比較中",
+      "hiddenNote": "（グラフ非表示{{count}}件）",
+      "closeComparison": "比較を閉じる",
+      "curve": "カーブ",
+      "curveBt": "豆温度 (BT)",
+      "curveEt": "環境温度 (ET)",
+      "curveRorBt": "上昇率 (BT)",
+      "lineUpOnCharge": "Chargeで揃える",
+      "couldntCompareNamed": "「{{title}}」を比較できませんでした: {{message}}。",
+      "couldntCompareGeneric": "ローストを比較できませんでした: {{message}}。",
+      "roastNoLongerExists": "この比較に含まれるローストの1つが既に存在しません。",
+      "loading": "読み込み中…",
+      "numbersHeading": "数値",
+      "numbersHint": {
+        "prefix": "1行につき1ローストです。見出しをクリックするとその数値で並べ替え、グループ名をクリックすると開閉できます。基準を選ぶと他のローストとの差（例:",
+        "or": "や",
+        "suffix": "が表示されます。「非表示」はグラフからのみ外し、この表には残ります。",
+        "exampleClose": "）"
+      },
+      "roastColumn": "ロースト",
+      "sortByThisNumber": "この数値で並べ替え",
+      "showOnGraph": "グラフに表示",
+      "hideFromGraph": "グラフから非表示",
+      "baseline": "基準",
+      "noNumbersYet": "これらのローストにはまだ数値がありません（ChargeとDropを記録してください）。",
+      "axisTimeFromCharge": "Chargeからの経過時間 (m:ss)",
+      "axisTime": "経過時間 (m:ss)"
     }
   },
   "history": {

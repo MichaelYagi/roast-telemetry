@@ -403,6 +403,36 @@
       "zoomHint": "{{modifier}}+scroll to zoom, drag to pan",
       "deleteMilestone": "Delete milestone",
       "axisMins": "mins"
+    },
+    "comparisonPanel": {
+      "comparing_one": "Comparing {{count}} roast",
+      "comparing_other": "Comparing {{count}} roasts",
+      "hiddenNote": " ({{count}} hidden on the graph)",
+      "closeComparison": "Close comparison",
+      "curve": "Curve",
+      "curveBt": "Bean Temp (BT)",
+      "curveEt": "Environment Temp (ET)",
+      "curveRorBt": "Rate of Rise (BT)",
+      "lineUpOnCharge": "Line up on Charge",
+      "couldntCompareNamed": "Couldn't compare \"{{title}}\": {{message}}.",
+      "couldntCompareGeneric": "Couldn't compare a roast: {{message}}.",
+      "roastNoLongerExists": "One of the roasts in this comparison no longer exists.",
+      "loading": "Loading…",
+      "numbersHeading": "Numbers",
+      "numbersHint": {
+        "prefix": "One row per roast. Click a heading to sort by that number, and a group name to open or close it. Pick a baseline to see how each other roast differs from it, for example",
+        "or": "or",
+        "suffix": " Hide takes a roast off the graph only; it stays here.",
+        "exampleClose": "."
+      },
+      "roastColumn": "Roast",
+      "sortByThisNumber": "Sort by this number",
+      "showOnGraph": "Show on graph",
+      "hideFromGraph": "Hide from graph",
+      "baseline": "Baseline",
+      "noNumbersYet": "None of these roasts have numbers yet (mark Charge and Drop to get them).",
+      "axisTimeFromCharge": "Time from Charge (m:ss)",
+      "axisTime": "Time (m:ss)"
     }
   },
   "history": {
