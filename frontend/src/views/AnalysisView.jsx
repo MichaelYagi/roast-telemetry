@@ -12,9 +12,37 @@ import { unitSuffix } from "../tempUnits.js";
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
 
-const PALETTE = ["#dc2626", "#2563eb", "#16a34a", "#ca8a04", "#9333ea", "#0891b2", "#db2777", "#334155"];
+// Draws a soft canvas glow around a hovered group's points -- paired with
+// the legend's onHover/onLeave in the Explore chart's own options below
+// (hovering a legend item flags its dataset with _glow: true, set in the
+// `chart` useMemo). beforeDatasetDraw/afterDatasetDraw bracket exactly one
+// dataset's own draw call, so this never bleeds onto any other dataset.
+const pointGlowPlugin = {
+  id: "pointGlow",
+  beforeDatasetDraw(chartInstance, args) {
+    const dataset = chartInstance.data.datasets[args.index];
+    if (!dataset?._glow) return;
+    chartInstance.ctx.save();
+    chartInstance.ctx.shadowColor = dataset.borderColor;
+    chartInstance.ctx.shadowBlur = 14;
+  },
+  afterDatasetDraw(chartInstance, args) {
+    if (!chartInstance.data.datasets[args.index]?._glow) return;
+    chartInstance.ctx.restore();
+  },
+};
+ChartJS.register(pointGlowPlugin);
 
 const DATE_KEY = "__date";
+
+// Evenly spread hues around the color wheel -- guarantees `total` visually
+// distinct colors for any number of groups, instead of a fixed palette that
+// wraps around (and silently duplicates) once there are more groups than it
+// has colors for.
+function colorForIndex(i, total) {
+  const hue = Math.round((360 * i) / Math.max(total, 1));
+  return { solid: `hsl(${hue}, 65%, 45%)`, dim: `hsla(${hue}, 65%, 45%, 0.18)` };
+}
 
 // The numbers the consistency table shows for every group, besides the chart's
 // own Y -- also what the Trends tab charts, one small chart each (see
@@ -223,6 +251,11 @@ export default function AnalysisView() {
   // "trends" (a fixed set of small rolling-average charts, see TrendChart).
   // Both read the same already-filtered `table` -- no separate fetch.
   const [mode, setMode] = useState("explore");
+  // Explore chart only: which dataset's legend entry is currently hovered
+  // (its index, not its name -- the legend label has a "(count)" suffix
+  // appended, so the raw group name isn't directly available there without
+  // re-parsing it). null when nothing's hovered.
+  const [hoveredDatasetIndex, setHoveredDatasetIndex] = useState(null);
   const [table, setTable] = useState(null);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -284,21 +317,31 @@ export default function AnalysisView() {
       data: {
         datasets: names.map((name, i) => {
           const points = groups.get(name).sort((p, q) => p.x - q.x);
-          const color = PALETTE[i % PALETTE.length];
+          const { solid, dim } = colorForIndex(i, names.length);
+          const isHovered = hoveredDatasetIndex === i;
+          // Only fade the *others* once something is actually hovered --
+          // with nothing hovered, every group shows at full color as before.
+          const dimmed = hoveredDatasetIndex != null && !isHovered;
+          const color = dimmed ? dim : solid;
           return {
             label: `${name} (${points.length})`,
             data: points,
             borderColor: color,
             backgroundColor: color,
-            pointRadius: 5,
-            pointHoverRadius: 7,
+            pointRadius: isHovered ? 7 : 5,
+            pointHoverRadius: isHovered ? 9 : 7,
+            // The white ring + glow (via pointGlowPlugin, keyed off _glow)
+            // are additive on top of the hovered group's own color -- left
+            // unset for everyone else so their normal appearance is
+            // unchanged from before this feature existed.
+            ...(isHovered ? { pointBorderColor: "#ffffff", pointBorderWidth: 2, _glow: true } : null),
             showLine: isDate,
             borderWidth: 1.5,
           };
         }),
       },
     };
-  }, [table, x, y, groupBy, tempUnit, xMetric, yMetric]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [table, x, y, groupBy, tempUnit, xMetric, yMetric, hoveredDatasetIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const axisTicks = (metric) => (value) => {
     if (metric.key === DATE_KEY) return new Date(value).toLocaleDateString(undefined, { month: "short", year: "2-digit" });
@@ -324,7 +367,21 @@ export default function AnalysisView() {
         event.native.target.style.cursor = elements.length ? "pointer" : "default";
       },
       plugins: {
-        legend: { position: "top", labels: { usePointStyle: true, boxWidth: 8 } },
+        legend: {
+          position: "top",
+          labels: { usePointStyle: true, boxWidth: 8 },
+          // Hovering a legend entry glows/enlarges that group's own dots in
+          // the chart below (see the `chart` useMemo and pointGlowPlugin
+          // above) so a busy scatter with many groups is easy to pick out.
+          onHover: (event, legendItem) => {
+            event.native.target.style.cursor = "pointer";
+            setHoveredDatasetIndex(legendItem.datasetIndex);
+          },
+          onLeave: (event) => {
+            event.native.target.style.cursor = "default";
+            setHoveredDatasetIndex(null);
+          },
+        },
         tooltip: {
           callbacks: {
             title: (items) => items[0]?.raw.row.title,
