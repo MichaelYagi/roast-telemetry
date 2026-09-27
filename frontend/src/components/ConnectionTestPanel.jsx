@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 import { TERM_TOOLTIPS } from "../termTooltips.js";
@@ -70,6 +71,7 @@ function analyzeReadSamples(samples, channels, tempUnit) {
 // IDLE/ROASTING/COOLING -- there's no path from here to a write firing
 // mid-roast.
 export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = "c", simulated = false }) {
+  const { t } = useTranslation();
   const [testMode, setTestMode] = useState(null); // null | "read" | "read_write"
   const [running, setRunning] = useState(false);
   const [readResults, setReadResults] = useState(null);
@@ -155,7 +157,7 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     const before = latestRef.current?.[channel];
     if (before == null) {
       setWriteStep("failed");
-      setWriteDetail(`no ${label} reading available yet -- can't verify a round-trip`);
+      setWriteDetail(t("common.connectionTestPanel.noReading", { label }));
       return;
     }
     try {
@@ -170,11 +172,13 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
       const after = latestRef.current?.[channel];
       if (after != null && Math.abs(after - before) > 1) {
         setWriteStep("failed");
-        setWriteDetail(`wrote ${before.toFixed(0)}${suffix} but feedback now reads ${after.toFixed(0)}${suffix} -- write may not be reaching the device`);
+        setWriteDetail(
+          t("common.connectionTestPanel.writeMismatch", { before: before.toFixed(0), after: after.toFixed(0), suffix })
+        );
         return;
       }
       setWriteStep("done");
-      setWriteDetail(`wrote ${label} back at its current ${before.toFixed(0)}${suffix} (no-op) -- feedback confirms it took effect`);
+      setWriteDetail(t("common.connectionTestPanel.writeConfirmed", { label, before: before.toFixed(0), suffix }));
     } catch (err) {
       setWriteStep("failed");
       setWriteDetail(err.message);
@@ -196,7 +200,12 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     setNudgeResult({
       channel,
       status: "pending",
-      detail: `nudging ${label} ${direction > 0 ? "up" : "down"} to ${nudged.toFixed(0)}${unitSuffixFor(mode, channel)} -- watch/listen for it…`,
+      detail: t("common.connectionTestPanel.nudging", {
+        label,
+        direction: direction > 0 ? t("common.connectionTestPanel.up") : t("common.connectionTestPanel.down"),
+        value: nudged.toFixed(0),
+        suffix: unitSuffixFor(mode, channel),
+      }),
     });
     // The nudge-up and restore writes are deliberately two separate
     // try/catches, not one -- if the FIRST fails, nothing changed at all
@@ -208,7 +217,7 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     try {
       await api.sendCommand(roastId, { [channel]: nudged });
     } catch (err) {
-      setNudgeResult({ channel, status: "failed", detail: `nudge failed, nothing changed -- ${err.message}` });
+      setNudgeResult({ channel, status: "failed", detail: t("common.connectionTestPanel.nudgeFailed", { message: err.message }) });
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, meta(mode, channel).nudgeHoldMs));
@@ -219,12 +228,21 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
     const { label } = meta(mode, channel);
     try {
       await api.sendCommand(roastId, { [channel]: before });
-      setNudgeResult({ channel, status: "done", detail: `set back to ${before.toFixed(0)}${unitSuffixFor(mode, channel)}` });
+      setNudgeResult({
+        channel,
+        status: "done",
+        detail: t("common.connectionTestPanel.restoredTo", { value: before.toFixed(0), suffix: unitSuffixFor(mode, channel) }),
+      });
     } catch (err) {
       setNudgeResult({
         channel,
         status: "failed",
-        detail: `${label} is still nudged up -- restoring it to ${before.toFixed(0)}${unitSuffixFor(mode, channel)} failed: ${err.message}. Set it back yourself with the ${label} slider below, or retry.`,
+        detail: t("common.connectionTestPanel.restoreFailed", {
+          label,
+          value: before.toFixed(0),
+          suffix: unitSuffixFor(mode, channel),
+          message: err.message,
+        }),
         retryTo: before,
       });
     }
@@ -243,30 +261,26 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
 
   return (
     <div className="panel connection-test-panel">
-      <h3>Test Connection</h3>
+      <h3>{t("common.connectionTestPanel.heading")}</h3>
       {simulated && (
         <p className="simulated-note">
-          <span className="simulated-badge">Simulated</span> This is a built-in simulated device, so passing checks here
-          say nothing about a real machine -- nothing is sent to hardware.
+          <span className="simulated-badge">{t("common.connectionTestPanel.simulatedBadge")}</span>
+          {t("common.connectionTestPanel.simulatedNote")}
         </p>
       )}
       <p className="hint">
-        Verifies the connection is actually working, before committing to a roast -- reads every configured
-        channel for a few seconds.
-        {canWrite && mode === "modbus_live" &&
-          " Read + write also confirms Air can be controlled, using the most benign possible write: reading its current value back and writing that exact same value again (a no-op)."}
-        {canWrite && mode === "aillio_live" &&
-          " Read + write also confirms Fan can be controlled, using the most benign possible write: reading its current value back and writing that exact same value again (a no-op)."}
-        {canWrite && mode === "tc4_live" &&
-          " Read + write also confirms Heater can be controlled -- TC4 has no write feedback register at all, so instead of a silent round-trip this briefly bumps OT1 and asks you to confirm you actually saw/heard it respond, then sets it back."}
+        {t("common.connectionTestPanel.intro")}
+        {canWrite && mode === "modbus_live" && t("common.connectionTestPanel.introModbus")}
+        {canWrite && mode === "aillio_live" && t("common.connectionTestPanel.introAillio")}
+        {canWrite && mode === "tc4_live" && t("common.connectionTestPanel.introTc4")}
       </p>
       <div className="event-button-row">
         <button type="button" onClick={() => startTest("read")} disabled={running}>
-          {running && testMode === "read" ? "Testing…" : "Run read-only test"}
+          {running && testMode === "read" ? t("common.connectionTestPanel.testing") : t("common.connectionTestPanel.runReadOnly")}
         </button>
         {canWrite && (
           <button type="button" onClick={() => startTest("read_write")} disabled={running}>
-            {running && testMode === "read_write" ? "Testing…" : "Run read + write test"}
+            {running && testMode === "read_write" ? t("common.connectionTestPanel.testing") : t("common.connectionTestPanel.runReadWrite")}
           </button>
         )}
       </div>
@@ -285,42 +299,53 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
 
       {testMode === "read_write" && ROUNDTRIP_CHANNEL[mode] && writeStep !== "idle" && (
         <p className={`connection-test-write connection-test-${writeStep === "done" ? "pass" : writeStep === "failed" ? "fail" : "pending"}`}>
-          {writeStep === "running" && `Testing write (${meta(mode, ROUNDTRIP_CHANNEL[mode]).label}, no-op round-trip)…`}
-          {writeStep === "done" && `✓ Write check passed — ${writeDetail}`}
-          {writeStep === "failed" && `✗ Write check failed — ${writeDetail}`}
+          {writeStep === "running" &&
+            t("common.connectionTestPanel.testingWrite", { label: meta(mode, ROUNDTRIP_CHANNEL[mode]).label })}
+          {writeStep === "done" && t("common.connectionTestPanel.writePassed", { detail: writeDetail })}
+          {writeStep === "failed" && t("common.connectionTestPanel.writeFailed", { detail: writeDetail })}
         </p>
       )}
       {testMode === "read_write" && mode === "tc4_live" && writeStep === "skipped" && (
-        <p className="hint">
-          TC4's OT1/DCFAN outputs are write-only -- there's no feedback register to read back and confirm against,
-          so use the check below to actually watch/listen for Heater responding.
-        </p>
+        <p className="hint">{t("common.connectionTestPanel.tc4SkippedHint")}</p>
       )}
 
       {testMode === "read_write" && (writeStep === "done" || writeStep === "skipped") && !nudgeResult && (
         <div className="connection-test-nudge">
           {!nudgeConfirming ? (
             <button type="button" className="advanced-toggle" onClick={() => setNudgeConfirming(defaultNudgeChannel)}>
-              {mode === "tc4_live" ? "Confirm Heater actually responds" : "Want a visible confirmation instead? (optional)"}
+              {mode === "tc4_live"
+                ? t("common.connectionTestPanel.confirmHeaterResponds")
+                : t("common.connectionTestPanel.wantVisibleConfirmation")}
             </button>
           ) : (
             <>
               <p className="hint">
-                This will briefly bump {meta(mode, nudgeConfirming).label}{" "}
-                {(latestRef.current?.[nudgeConfirming] ?? 0) + meta(mode, nudgeConfirming).nudgeAmount > meta(mode, nudgeConfirming).nudgeMax ? "down" : "up"}{" "}
-                by {meta(mode, nudgeConfirming).nudgeAmount}{unitSuffixFor(mode, nudgeConfirming)} for about{" "}
-                {(meta(mode, nudgeConfirming).nudgeHoldMs / 1000).toFixed(0)} seconds (you should see/hear the{" "}
-                {meta(mode, nudgeConfirming).moverLabel} respond), then set it back to exactly what it was. Only do
-                this if that's fine right now.
+                {t("common.connectionTestPanel.nudgeExplain", {
+                  label: meta(mode, nudgeConfirming).label,
+                  direction:
+                    (latestRef.current?.[nudgeConfirming] ?? 0) + meta(mode, nudgeConfirming).nudgeAmount > meta(mode, nudgeConfirming).nudgeMax
+                      ? t("common.connectionTestPanel.down")
+                      : t("common.connectionTestPanel.up"),
+                  amount: meta(mode, nudgeConfirming).nudgeAmount,
+                  suffix: unitSuffixFor(mode, nudgeConfirming),
+                  seconds: (meta(mode, nudgeConfirming).nudgeHoldMs / 1000).toFixed(0),
+                  mover: meta(mode, nudgeConfirming).moverLabel,
+                })}
               </p>
               <div className="event-button-row">
                 <button type="button" onClick={() => runNudge(nudgeConfirming)}>
-                  Confirm: nudge {meta(mode, nudgeConfirming).label}{" "}
-                  {(latestRef.current?.[nudgeConfirming] ?? 0) + meta(mode, nudgeConfirming).nudgeAmount > meta(mode, nudgeConfirming).nudgeMax ? "-" : "+"}
-                  {meta(mode, nudgeConfirming).nudgeAmount}{unitSuffixFor(mode, nudgeConfirming)} and back
+                  {t("common.connectionTestPanel.confirmNudge", {
+                    label: meta(mode, nudgeConfirming).label,
+                    sign:
+                      (latestRef.current?.[nudgeConfirming] ?? 0) + meta(mode, nudgeConfirming).nudgeAmount > meta(mode, nudgeConfirming).nudgeMax
+                        ? "-"
+                        : "+",
+                    amount: meta(mode, nudgeConfirming).nudgeAmount,
+                    suffix: unitSuffixFor(mode, nudgeConfirming),
+                  })}
                 </button>
                 <button type="button" className="danger" onClick={() => setNudgeConfirming(null)}>
-                  Cancel
+                  {t("common.connectionTestPanel.cancel")}
                 </button>
               </div>
             </>
@@ -334,7 +359,11 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
           </p>
           {nudgeResult.retryTo != null && (
             <button type="button" onClick={() => restoreChannelTo(nudgeResult.channel, nudgeResult.retryTo)}>
-              Retry restoring {meta(mode, nudgeResult.channel).label} to {nudgeResult.retryTo.toFixed(0)}{unitSuffixFor(mode, nudgeResult.channel)}
+              {t("common.connectionTestPanel.retryRestoring", {
+                label: meta(mode, nudgeResult.channel).label,
+                value: nudgeResult.retryTo.toFixed(0),
+                suffix: unitSuffixFor(mode, nudgeResult.channel),
+              })}
             </button>
           )}
 
@@ -348,13 +377,15 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
               directly rather than inferred. */}
           {nudgeResult.status === "done" && visibleConfirm === null && (
             <div className="connection-test-visible-confirm">
-              <p className="hint">Did the {meta(mode, nudgeResult.channel).moverLabel} actually respond?</p>
+              <p className="hint">
+                {t("common.connectionTestPanel.didItRespond", { mover: meta(mode, nudgeResult.channel).moverLabel })}
+              </p>
               <div className="event-button-row">
                 <button type="button" onClick={() => setVisibleConfirm("yes")}>
-                  Yes, it responded
+                  {t("common.connectionTestPanel.yesResponded")}
                 </button>
                 <button type="button" className="danger" onClick={() => setVisibleConfirm("no")}>
-                  No, nothing happened
+                  {t("common.connectionTestPanel.noNothingHappened")}
                 </button>
               </div>
             </div>
@@ -362,8 +393,9 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
 
           {nudgeResult.status === "done" && visibleConfirm === "yes" && (
             <p className="connection-test-write connection-test-pass">
-              ✓ confirmed -- the write path genuinely reaches the hardware
-              {nudgeResult.channel === "heater_pct" ? "" : ", not just its own feedback register"}.
+              {t("common.connectionTestPanel.confirmedGeneric", {
+                suffix: nudgeResult.channel === "heater_pct" ? "" : t("common.connectionTestPanel.notJustFeedback"),
+              })}
             </p>
           )}
 
@@ -372,9 +404,7 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
               {nudgeResult.channel === "fan_pct" && mode === "modbus_live" ? (
                 <>
                   <p className="connection-test-write connection-test-fail">
-                    ✗ The register write succeeded but nothing physically moved. Air and Drum share identical
-                    register numbers and confidence (both blog-sourced only, not independently confirmed) -- Drum is
-                    a genuine differential test, not just "try something else."
+                    {t("common.connectionTestPanel.modbusAirFailed")}
                   </p>
                   {/* Also clears nudgeResult -- the confirm/cancel dialog
                       below only renders while it's null (see the block
@@ -389,21 +419,17 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
                       setNudgeConfirming("drum_speed_pct");
                     }}
                   >
-                    Try Drum instead
+                    {t("common.connectionTestPanel.tryDrumInstead")}
                   </button>
                 </>
               ) : nudgeResult.channel === "drum_speed_pct" && mode === "modbus_live" ? (
                 <p className="connection-test-write connection-test-fail">
-                  ✗ Drum didn't respond either -- that's real evidence the shared register scheme (8192/8193) is
-                  wrong for this unit, not just something specific to Air/slave 1. Worth checking your VFD's own
-                  nameplate/front-panel parameters against those numbers.
+                  {t("common.connectionTestPanel.modbusDrumFailed")}
                 </p>
               ) : nudgeResult.channel === "fan_pct" && mode === "aillio_live" ? (
                 <>
                   <p className="connection-test-write connection-test-fail">
-                    ✗ The device acknowledged the write (no USB error) but nothing physically moved. Fan and Drum use
-                    the same underlying command mechanism on this device -- Drum is a genuine differential test, not
-                    just "try something else."
+                    {t("common.connectionTestPanel.aillioFanFailed")}
                   </p>
                   <button
                     type="button"
@@ -413,23 +439,19 @@ export default function ConnectionTestPanel({ roastId, latest, mode, tempUnit = 
                       setNudgeConfirming("drum_speed_pct");
                     }}
                   >
-                    Try Drum instead
+                    {t("common.connectionTestPanel.tryDrumInstead")}
                   </button>
                 </>
               ) : nudgeResult.channel === "drum_speed_pct" && mode === "aillio_live" ? (
                 <p className="connection-test-write connection-test-fail">
-                  ✗ Drum didn't respond either -- worth double-checking this is genuinely the roaster's own Fan/Drum
-                  command (see aillio_bridge/r1.py for the confirmed opcodes) rather than a connection/firmware issue
-                  specific to this unit.
+                  {t("common.connectionTestPanel.aillioDrumFailed")}
                 </p>
               ) : (
                 <p className="connection-test-write connection-test-fail">
-                  ✗ The OT1 write itself succeeded (no serial error) but nothing visibly responded. Since TC4 has no
-                  feedback register at all, this either means a real wiring/SSR problem, or the{" "}
-                  {meta("tc4_live", "heater_pct").nudgeAmount}% bump for{" "}
-                  {(meta("tc4_live", "heater_pct").nudgeHoldMs / 1000).toFixed(0)}s just wasn't enough to notice --
-                  check the board's own OT1 output directly (multimeter/scope on the pin, or the heating element
-                  itself) before assuming the write path is broken.
+                  {t("common.connectionTestPanel.tc4Failed", {
+                    pct: meta("tc4_live", "heater_pct").nudgeAmount,
+                    seconds: (meta("tc4_live", "heater_pct").nudgeHoldMs / 1000).toFixed(0),
+                  })}
                 </p>
               )}
             </div>
