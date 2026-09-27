@@ -875,5 +875,21 @@
     },
     "deleteConfirm_one": "Delete \"{{name}}\"? {{count}} roast used it and will keep the beans' name, but lose the link and its details.",
     "deleteConfirm_other": "Delete \"{{name}}\"? {{count}} roasts used it and will keep the beans' name, but lose the link and its details."
+  },
+  "users": {
+    "hint": "Every registered account below has full access to everything else in the app once Allowed -- there's no per-feature permission, just this one gate.",
+    "table": {
+      "username": "Username",
+      "role": "Role",
+      "status": "Status",
+      "registered": "Registered",
+      "actions": "Actions"
+    },
+    "allow": "Allow",
+    "deny": "Deny",
+    "resetToPending": "Reset to pending",
+    "delete": "Delete",
+    "you": "(you)",
+    "deleteConfirm": "Delete {{username}}? This can't be undone."
   }
 }

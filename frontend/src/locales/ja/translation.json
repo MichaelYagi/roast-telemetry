@@ -859,5 +859,21 @@
       "delete": "削除"
     },
     "deleteConfirm_other": "「{{name}}」を削除しますか？ {{count}}件のローストで使用されていますが、豆の名前は残り、リンクと詳細情報が失われます。"
+  },
+  "users": {
+    "hint": "以下に登録されたアカウントは、許可（Allowed）になった時点でアプリの他のすべてに完全にアクセスできます -- 機能ごとの権限はなく、この1つのゲートのみです。",
+    "table": {
+      "username": "ユーザー名",
+      "role": "権限",
+      "status": "ステータス",
+      "registered": "登録日時",
+      "actions": "操作"
+    },
+    "allow": "許可",
+    "deny": "拒否",
+    "resetToPending": "保留に戻す",
+    "delete": "削除",
+    "you": "（あなた）",
+    "deleteConfirm": "{{username}} を削除しますか？この操作は取り消せません。"
   }
 }

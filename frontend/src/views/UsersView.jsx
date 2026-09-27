@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../AuthContext.jsx";
 import { api } from "../api/client.js";
 import { useConfirm } from "../components/DialogProvider.jsx";
@@ -7,6 +8,7 @@ import { useConfirm } from "../components/DialogProvider.jsx";
 // role check), but this loads its own list independently either way, so
 // it's never relying on the router alone to keep a non-admin out.
 export default function UsersView() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const confirm = useConfirm();
   const [users, setUsers] = useState(null);
@@ -46,20 +48,17 @@ export default function UsersView() {
 
   return (
     <div className="panel">
-      <h2>Manage access</h2>
-      <p className="hint">
-        Every registered account below has full access to everything else in the app once Allowed -- there's no
-        per-feature permission, just this one gate.
-      </p>
+      <h2>{t("app.nav.manageAccess")}</h2>
+      <p className="hint">{t("users.hint")}</p>
       {error && <p className="error">{error}</p>}
       <table className="users-table">
         <thead>
           <tr>
-            <th>Username</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Registered</th>
-            <th>Actions</th>
+            <th>{t("users.table.username")}</th>
+            <th>{t("users.table.role")}</th>
+            <th>{t("users.table.status")}</th>
+            <th>{t("users.table.registered")}</th>
+            <th>{t("users.table.actions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -78,7 +77,7 @@ export default function UsersView() {
                   {u.status === "pending" && (
                     <>
                       <button type="button" disabled={busy} onClick={() => runAction(u.id, () => api.allowUser(u.id))}>
-                        Allow
+                        {t("users.allow")}
                       </button>
                       <button
                         type="button"
@@ -86,7 +85,7 @@ export default function UsersView() {
                         disabled={busy}
                         onClick={() => runAction(u.id, () => api.denyUser(u.id))}
                       >
-                        Deny
+                        {t("users.deny")}
                       </button>
                     </>
                   )}
@@ -97,12 +96,12 @@ export default function UsersView() {
                       disabled={busy}
                       onClick={() => runAction(u.id, () => api.denyUser(u.id))}
                     >
-                      Deny
+                      {t("users.deny")}
                     </button>
                   )}
                   {u.status === "denied" && (
                     <button type="button" disabled={busy} onClick={() => runAction(u.id, () => api.resetUserToPending(u.id))}>
-                      Reset to pending
+                      {t("users.resetToPending")}
                     </button>
                   )}
                   {!isSelf && (
@@ -111,15 +110,15 @@ export default function UsersView() {
                       className="danger"
                       disabled={busy}
                       onClick={async () => {
-                        if (await confirm(`Delete ${u.username}? This can't be undone.`)) {
+                        if (await confirm(t("users.deleteConfirm", { username: u.username }))) {
                           runAction(u.id, () => api.deleteUser(u.id));
                         }
                       }}
                     >
-                      Delete
+                      {t("users.delete")}
                     </button>
                   )}
-                  {isSelf && <span className="hint">(you)</span>}
+                  {isSelf && <span className="hint">{t("users.you")}</span>}
                 </td>
               </tr>
             );
