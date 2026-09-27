@@ -548,5 +548,74 @@
     "roastStatsHeading": "ロースト統計",
     "numbersHeading": "数値",
     "eventsHeading": "イベント"
+  },
+  "analysis": {
+    "hint": "完了したすべてのロースト（記録またはアップロード）が1つの点になります。何をプロットし、何でグループ分けするかを選んでください。シミュレーションデバイスで行ったローストと、保存済みログの再生（同じデータを繰り返すだけ）は、指定しない限り除外されます。",
+    "filters": {
+      "search": "検索",
+      "searchPlaceholder": "タイトル、豆、またはタグ…",
+      "beans": "豆",
+      "all": "すべて",
+      "tag": "タグ",
+      "dataFrom": "データの種類",
+      "recordedAndUploaded": "記録＋アップロード",
+      "uploadedLogFiles": "アップロードされたログファイル",
+      "replayedLogs": "再生されたログ",
+      "from": "開始日",
+      "to": "終了日",
+      "includeSimulated": "シミュレーションを含める",
+      "applyFilters": "フィルターを適用",
+      "filtersChangedHint": "フィルターが変更されました。適用を押して更新してください。",
+      "reset": "リセット"
+    },
+    "sourceLabels": {
+      "recorded": "デバイスから記録",
+      "uploaded": "アップロードされたログファイル",
+      "replay": "再生されたログ"
+    },
+    "groups": {
+      "nothing": "なし（単色）",
+      "beans": "豆",
+      "origin": "産地",
+      "process": "プロセス",
+      "tag": "タグ",
+      "month": "月",
+      "roastedBy": "焙煎者",
+      "source": "データの出所",
+      "allRoasts": "すべてのロースト"
+    },
+    "date": "日付",
+    "noTagFallback": "（タグなし）",
+    "noneFallback": "（なし）",
+    "xAxisLabel": "横軸 (X)",
+    "yAxisLabel": "縦軸 (Y)",
+    "colourBy": "色分け",
+    "loading": "読み込み中…",
+    "noMatch": {
+      "prefix": "一致する完了ローストがありません。",
+      "suffix": "ページでログをアップロードするか、フィルターを緩めてください。"
+    },
+    "caption": {
+      "prefix": "各点は1つのローストです:",
+      "acrossComma": "を横軸、",
+      "upDot": "を縦軸にしています",
+      "colouredBy": "（{{group}}で色分け）",
+      "hoverHint": "。点にカーソルを合わせるとどのローストか分かります。クリックすると新しいタブで開きます。",
+      "fewRoasts": " ローストが少なすぎてまだ傾向は見えません。ローストを増やすかフィルターを緩めてください。"
+    },
+    "noneOfBoth": "両方の数値を持つローストがありません（例: Dropが記録されていないなど）。",
+    "count_other": "ロースト{{count}}件",
+    "countTruncated": "（最新2000件を表示）",
+    "countSimulatedExcluded": "；シミュレーション{{count}}件を除外",
+    "countMissingRecording": "；記録ファイルが見つからないか読み取れないもの{{count}}件を除外",
+    "consistencyHeading": "再現性",
+    "consistencyHint": "各グループの平均 ± ばらつき（標準偏差）。ばらつきが小さいほど、ローストの再現性が高いことを示します。",
+    "roastsColumn": "ロースト数",
+    "groupDataLabel": "グループ",
+    "standoutHeading": "傾向から外れたロースト",
+    "standoutHintPrefix": "グループ内の他のローストと比べて標準偏差2以上離れているもの（",
+    "standoutHintSuffix": "5件以上あるグループのみ対象）。",
+    "standoutNone": "なし。",
+    "clickToOpenNewTab": "クリックすると新しいタブで開きます"
   }
 }

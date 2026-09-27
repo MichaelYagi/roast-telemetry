@@ -559,5 +559,75 @@
     "roastStatsHeading": "Roast Stats",
     "numbersHeading": "Numbers",
     "eventsHeading": "Events"
+  },
+  "analysis": {
+    "hint": "Every finished roast, recorded or uploaded, is one point. Pick what to plot and what to group by. Roasts made on simulated devices, and replays of a saved log (which just repeat its data), are left out unless you ask.",
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Title, beans, or tag…",
+      "beans": "Beans",
+      "all": "All",
+      "tag": "Tag",
+      "dataFrom": "Data from",
+      "recordedAndUploaded": "Recorded and uploaded",
+      "uploadedLogFiles": "Uploaded log files",
+      "replayedLogs": "Replayed logs",
+      "from": "From",
+      "to": "To",
+      "includeSimulated": "Include simulated",
+      "applyFilters": "Apply filters",
+      "filtersChangedHint": "Filters changed. Press Apply to update.",
+      "reset": "Reset"
+    },
+    "sourceLabels": {
+      "recorded": "Recorded from a device",
+      "uploaded": "Uploaded log file",
+      "replay": "Replayed log"
+    },
+    "groups": {
+      "nothing": "Nothing (one colour)",
+      "beans": "Beans",
+      "origin": "Origin",
+      "process": "Process",
+      "tag": "Tag",
+      "month": "Month",
+      "roastedBy": "Roasted by",
+      "source": "Where the data came from",
+      "allRoasts": "All roasts"
+    },
+    "date": "Date",
+    "noTagFallback": "(no tag)",
+    "noneFallback": "(none)",
+    "xAxisLabel": "Across (X)",
+    "yAxisLabel": "Up (Y)",
+    "colourBy": "Colour by",
+    "loading": "Loading…",
+    "noMatch": {
+      "prefix": "No finished roasts match. Upload logs on the",
+      "suffix": "page, or loosen the filters."
+    },
+    "caption": {
+      "prefix": "Each dot is one roast:",
+      "acrossComma": "across,",
+      "upDot": "up",
+      "colouredBy": ", coloured by {{group}}",
+      "hoverHint": ". Hover a dot to see which roast it is; click it to open it in a new tab.",
+      "fewRoasts": " With so few roasts there's no pattern to see yet; add more roasts or loosen the filters."
+    },
+    "noneOfBoth": "None of these roasts have both of those numbers (for example, no Drop marked).",
+    "count_one": "{{count}} roast",
+    "count_other": "{{count}} roasts",
+    "countTruncated": " (showing the newest 2000)",
+    "countSimulatedExcluded": "; {{count}} simulated left out",
+    "countMissingRecording": "; {{count}} left out because their recording file is missing or unreadable",
+    "consistencyHeading": "How consistent",
+    "consistencyHint": "Average ± spread (standard deviation) for each group. A smaller spread means more repeatable roasts.",
+    "roastsColumn": "Roasts",
+    "groupDataLabel": "Group",
+    "standoutHeading": "Roasts that stand out",
+    "standoutHintPrefix": "Roasts more than two standard deviations from the rest of their group on",
+    "standoutHintSuffix": "(only groups of five or more roasts).",
+    "standoutNone": "None.",
+    "clickToOpenNewTab": "Click to open in a new tab"
   }
 }

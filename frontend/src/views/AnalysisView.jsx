@@ -1,5 +1,6 @@
 import { Chart as ChartJS, Legend, LineElement, LinearScale, PointElement, Tooltip } from "chart.js";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Scatter } from "react-chartjs-2";
 import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
@@ -14,19 +15,6 @@ const PALETTE = ["#dc2626", "#2563eb", "#16a34a", "#ca8a04", "#9333ea", "#0891b2
 
 const DATE_KEY = "__date";
 
-const GROUPS = [
-  { key: "none", label: "Nothing (one colour)" },
-  { key: "beans", label: "Beans" },
-  { key: "origin", label: "Origin" },
-  { key: "process", label: "Process" },
-  { key: "tag", label: "Tag" },
-  { key: "month", label: "Month" },
-  { key: "roaster", label: "Roasted by" },
-  { key: "source", label: "Where the data came from" },
-];
-
-const SOURCE_LABELS = { recorded: "Recorded from a device", uploaded: "Uploaded log file", replay: "Replayed log" };
-
 // The numbers the consistency table shows for every group, besides the chart's own Y.
 const KEY_METRICS = ["duration_s", "drop_temp_c", "development_time_s", "dtr_pct", "weight_loss_pct"];
 
@@ -38,19 +26,35 @@ const DEFAULTS = {
 };
 
 // The group(s) a roast belongs to, the same way the server groups them.
-function groupKeys(row, groupBy) {
-  if (groupBy === "none") return ["All roasts"];
+function groupKeys(row, groupBy, t, sourceLabels) {
+  if (groupBy === "none") return [t("analysis.groups.allRoasts")];
   if (groupBy === "tag") {
-    const tags = row.tags.filter((t) => t !== "simulated");
-    return tags.length ? tags : ["(no tag)"];
+    const tags = row.tags.filter((tagValue) => tagValue !== "simulated");
+    return tags.length ? tags : [t("analysis.noTagFallback")];
   }
   if (groupBy === "month") return [row.created_at.slice(0, 7)];
   const value = row[groupBy];
-  if (groupBy === "source") return [SOURCE_LABELS[value] || value];
-  return [value || "(none)"];
+  if (groupBy === "source") return [sourceLabels[value] || value];
+  return [value || t("analysis.noneFallback")];
 }
 
 export default function AnalysisView() {
+  const { t } = useTranslation();
+  const GROUPS = [
+    { key: "none", label: t("analysis.groups.nothing") },
+    { key: "beans", label: t("analysis.groups.beans") },
+    { key: "origin", label: t("analysis.groups.origin") },
+    { key: "process", label: t("analysis.groups.process") },
+    { key: "tag", label: t("analysis.groups.tag") },
+    { key: "month", label: t("analysis.groups.month") },
+    { key: "roaster", label: t("analysis.groups.roastedBy") },
+    { key: "source", label: t("analysis.groups.source") },
+  ];
+  const SOURCE_LABELS = {
+    recorded: t("analysis.sourceLabels.recorded"),
+    uploaded: t("analysis.sourceLabels.uploaded"),
+    replay: t("analysis.sourceLabels.replay"),
+  };
   const [metrics, setMetrics] = useState([]);
   const [tags, setTags] = useState([]);
   const [beans, setBeans] = useState([]);
@@ -92,7 +96,7 @@ export default function AnalysisView() {
   }, [applied, groupBy]);
 
   const byKey = useMemo(() => Object.fromEntries(metrics.map((m) => [m.key, m])), [metrics]);
-  const xMetric = x === DATE_KEY ? { key: DATE_KEY, label: "Date", unit: "" } : byKey[x];
+  const xMetric = x === DATE_KEY ? { key: DATE_KEY, label: t("analysis.date"), unit: "" } : byKey[x];
   const yMetric = byKey[y];
 
   const setFilter = (key) => (e) => {
@@ -111,7 +115,7 @@ export default function AnalysisView() {
       const a = xValue(row);
       const b = yValue(row);
       if (a == null || b == null || Number.isNaN(a)) continue;
-      for (const key of groupKeys(row, groupBy)) {
+      for (const key of groupKeys(row, groupBy, t, SOURCE_LABELS)) {
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push({ x: a, y: b, row });
       }
@@ -146,7 +150,7 @@ export default function AnalysisView() {
 
   const options = useMemo(() => {
     if (!xMetric || !yMetric) return {};
-    const axisTitle = (m) => (m.key === DATE_KEY ? "Date" : `${m.label} (${metricUnitLabel(m, tempUnit)})`);
+    const axisTitle = (m) => (m.key === DATE_KEY ? t("analysis.date") : `${m.label} (${metricUnitLabel(m, tempUnit)})`);
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -170,7 +174,7 @@ export default function AnalysisView() {
             label: (item) => {
               const { row } = item.raw;
               const xText = x === DATE_KEY ? new Date(row.created_at).toLocaleDateString() : formatMetric(xMetric, row.metrics[x], tempUnit);
-              return [`${xMetric.label}: ${xText}`, `${yMetric.label}: ${formatMetric(yMetric, row.metrics[y], tempUnit)}`, "Click to open in a new tab"];
+              return [`${xMetric.label}: ${xText}`, `${yMetric.label}: ${formatMetric(yMetric, row.metrics[y], tempUnit)}`, t("analysis.clickToOpenNewTab")];
             },
           },
         },
@@ -180,7 +184,7 @@ export default function AnalysisView() {
         y: { type: "linear", title: { display: true, text: axisTitle(yMetric) }, ticks: { callback: axisTicks(yMetric) } },
       },
     };
-  }, [xMetric, yMetric, tempUnit, x]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [xMetric, yMetric, tempUnit, x, t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // -- consistency table ------------------------------------------------------------
   const shownMetrics = useMemo(() => {
@@ -203,7 +207,7 @@ export default function AnalysisView() {
     for (const row of table.rows) {
       const value = row.metrics[y];
       if (value == null) continue;
-      for (const key of groupKeys(row, groupBy)) {
+      for (const key of groupKeys(row, groupBy, t, SOURCE_LABELS)) {
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push({ row, value });
       }
@@ -249,7 +253,7 @@ export default function AnalysisView() {
   const anyFilter = Object.entries(filters).some(([k, v]) => (k === "include_simulated" ? v : Boolean(v)));
   const metricOptions = (withDate) => (
     <>
-      {withDate && <option value={DATE_KEY}>Date</option>}
+      {withDate && <option value={DATE_KEY}>{t("analysis.date")}</option>}
       {groupMetrics(metrics).map(([group, list]) => (
         <optgroup key={group} label={group}>
           {list.map((m) => (
@@ -266,23 +270,20 @@ export default function AnalysisView() {
     <div className="analysis-view">
       <div className="panel">
         <div className="analysis-header">
-          <h2>Analysis</h2>
+          <h2>{t("app.nav.analysis")}</h2>
           <SavedViews kind="analysis" getConfig={getConfig} onLoad={loadConfig} />
         </div>
-        <p className="hint">
-          Every finished roast, recorded or uploaded, is one point. Pick what to plot and what to group by. Roasts made on
-          simulated devices, and replays of a saved log (which just repeat its data), are left out unless you ask.
-        </p>
+        <p className="hint">{t("analysis.hint")}</p>
 
         <form className="filters-grid analysis-filters" onSubmit={apply}>
           <label className="filter-search">
-            Search
-            <input placeholder="Title, beans, or tag…" value={filters.q} onChange={setFilter("q")} />
+            {t("analysis.filters.search")}
+            <input placeholder={t("analysis.filters.searchPlaceholder")} value={filters.q} onChange={setFilter("q")} />
           </label>
           <label>
-            Beans
+            {t("analysis.filters.beans")}
             <select value={filters.bean_id} onChange={setFilter("bean_id")}>
-              <option value="">All</option>
+              <option value="">{t("analysis.filters.all")}</option>
               {beans.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
@@ -291,47 +292,47 @@ export default function AnalysisView() {
             </select>
           </label>
           <label>
-            Tag
+            {t("analysis.filters.tag")}
             <select value={filters.tag} onChange={setFilter("tag")}>
-              <option value="">All</option>
-              {tags.map((t) => (
-                <option key={t.tag} value={t.tag}>
-                  {t.tag} ({t.count})
+              <option value="">{t("analysis.filters.all")}</option>
+              {tags.map((tagItem) => (
+                <option key={tagItem.tag} value={tagItem.tag}>
+                  {tagItem.tag} ({tagItem.count})
                 </option>
               ))}
             </select>
           </label>
           <label>
-            Data from
+            {t("analysis.filters.dataFrom")}
             <select value={filters.source} onChange={setFilter("source")}>
-              <option value="">Recorded and uploaded</option>
-              <option value="recorded">Recorded from a device</option>
-              <option value="uploaded">Uploaded log files</option>
-              <option value="replay">Replayed logs</option>
+              <option value="">{t("analysis.filters.recordedAndUploaded")}</option>
+              <option value="recorded">{t("analysis.sourceLabels.recorded")}</option>
+              <option value="uploaded">{t("analysis.filters.uploadedLogFiles")}</option>
+              <option value="replay">{t("analysis.filters.replayedLogs")}</option>
             </select>
           </label>
           <label>
-            From
+            {t("analysis.filters.from")}
             <input type="date" value={filters.created_from} onChange={setFilter("created_from")} />
           </label>
           <label>
-            To
+            {t("analysis.filters.to")}
             <input type="date" value={filters.created_to} onChange={setFilter("created_to")} />
           </label>
           <div className="analysis-filter-extras">
             <label className="checkbox-label">
               <input type="checkbox" checked={filters.include_simulated} onChange={setFilter("include_simulated")} />
-              Include simulated
+              {t("analysis.filters.includeSimulated")}
             </label>
           </div>
           <div className="analysis-filter-extras">
             <button type="submit" className={dirty ? "" : "button-quiet"}>
-              Apply filters
+              {t("analysis.filters.applyFilters")}
             </button>
-            {dirty && <span className="hint">Filters changed. Press Apply to update.</span>}
+            {dirty && <span className="hint">{t("analysis.filters.filtersChangedHint")}</span>}
             {(anyFilter || x !== DEFAULTS.x || y !== DEFAULTS.y || groupBy !== DEFAULTS.groupBy) && (
               <button type="button" className="link-like" onClick={reset}>
-                Reset
+                {t("analysis.filters.reset")}
               </button>
             )}
           </div>
@@ -341,19 +342,19 @@ export default function AnalysisView() {
       <div className="panel">
         <div className="analysis-pickers">
           <label>
-            Across (X)
+            {t("analysis.xAxisLabel")}
             <select value={x} onChange={(e) => setX(e.target.value)}>
               {metricOptions(true)}
             </select>
           </label>
           <label>
-            Up (Y)
+            {t("analysis.yAxisLabel")}
             <select value={y} onChange={(e) => setY(e.target.value)}>
               {metricOptions(false)}
             </select>
           </label>
           <label>
-            Colour by
+            {t("analysis.colourBy")}
             <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
               {GROUPS.map((g) => (
                 <option key={g.key} value={g.key}>
@@ -366,32 +367,29 @@ export default function AnalysisView() {
 
         {error && <p className="error">{error}</p>}
         {loading && !table ? (
-          <p>Loading…</p>
+          <p>{t("analysis.loading")}</p>
         ) : table && table.total === 0 ? (
           <p className="hint">
-            No finished roasts match. Upload logs on the <Link to="/history">History</Link> page, or loosen the filters.
+            {t("analysis.noMatch.prefix")} <Link to="/history">{t("app.nav.history")}</Link> {t("analysis.noMatch.suffix")}
           </p>
         ) : (
           <>
             {chart && chart.shown > 0 && xMetric && yMetric && (
               <p className="analysis-caption">
-                Each dot is one roast: <strong>{xMetric.label}</strong> across, <strong>{yMetric.label}</strong> up
-                {groupBy === "none" ? "" : `, coloured by ${GROUPS.find((g) => g.key === groupBy)?.label.toLowerCase()}`}. Hover a dot
-                to see which roast it is; click it to open it in a new tab.
-                {chart.shown < 5 && " With so few roasts there's no pattern to see yet; add more roasts or loosen the filters."}
+                {t("analysis.caption.prefix")} <strong>{xMetric.label}</strong> {t("analysis.caption.acrossComma")} <strong>{yMetric.label}</strong>{" "}
+                {t("analysis.caption.upDot")}
+                {groupBy === "none" ? "" : t("analysis.caption.colouredBy", { group: GROUPS.find((g) => g.key === groupBy)?.label.toLowerCase() })}
+                {t("analysis.caption.hoverHint")}
+                {chart.shown < 5 && t("analysis.caption.fewRoasts")}
               </p>
             )}
             <div className="analysis-chart">{chart && chart.shown > 0 ? <Scatter data={chart.data} options={options} /> : null}</div>
-            {chart && chart.shown === 0 && table && table.total > 0 && (
-              <p className="hint">None of these roasts have both of those numbers (for example, no Drop marked).</p>
-            )}
+            {chart && chart.shown === 0 && table && table.total > 0 && <p className="hint">{t("analysis.noneOfBoth")}</p>}
             <p className="hint analysis-count">
-              {table ? `${table.total} roast${table.total === 1 ? "" : "s"}` : ""}
-              {table?.truncated ? " (showing the newest 2000)" : ""}
-              {table?.simulated_excluded ? `; ${table.simulated_excluded} simulated left out` : ""}
-              {table?.missing_recording
-                ? `; ${table.missing_recording} left out because their recording file is missing or unreadable`
-                : ""}
+              {table ? t("analysis.count", { count: table.total }) : ""}
+              {table?.truncated ? t("analysis.countTruncated") : ""}
+              {table?.simulated_excluded ? t("analysis.countSimulatedExcluded", { count: table.simulated_excluded }) : ""}
+              {table?.missing_recording ? t("analysis.countMissingRecording", { count: table.missing_recording }) : ""}
               .{" "}
               <BulkZipDownload params={applied} tempUnit={tempUnit} />
             </p>
@@ -401,16 +399,14 @@ export default function AnalysisView() {
 
       {summary && summary.groups.length > 0 && (
         <div className="panel">
-          <h3>How consistent</h3>
-          <p className="hint">
-            Average ± spread (standard deviation) for each group. A smaller spread means more repeatable roasts.
-          </p>
+          <h3>{t("analysis.consistencyHeading")}</h3>
+          <p className="hint">{t("analysis.consistencyHint")}</p>
           <div className="table-scroll">
             <table className="roast-table analysis-table">
               <thead>
                 <tr>
-                  <th>{GROUPS.find((g) => g.key === groupBy)?.label.replace("Nothing (one colour)", "All roasts")}</th>
-                  <th>Roasts</th>
+                  <th>{groupBy === "none" ? t("analysis.groups.allRoasts") : GROUPS.find((g) => g.key === groupBy)?.label}</th>
+                  <th>{t("analysis.roastsColumn")}</th>
                   {shownMetrics.map((m) => (
                     <th key={m.key}>{m.label}</th>
                   ))}
@@ -419,10 +415,10 @@ export default function AnalysisView() {
               <tbody>
                 {summary.groups.map((g) => (
                   <tr key={g.key}>
-                    <td data-label="Group">
+                    <td data-label={t("analysis.groupDataLabel")}>
                       <strong>{groupBy === "source" ? SOURCE_LABELS[g.key] || g.key : g.key}</strong>
                     </td>
-                    <td data-label="Roasts">{g.count}</td>
+                    <td data-label={t("analysis.roastsColumn")}>{g.count}</td>
                     {shownMetrics.map((m) => (
                       <td key={m.key} data-label={m.label}>
                         {meanSd(m, g.metrics[m.key])}
@@ -440,13 +436,12 @@ export default function AnalysisView() {
 
       {yMetric && (
         <div className="panel">
-          <h3>Roasts that stand out</h3>
+          <h3>{t("analysis.standoutHeading")}</h3>
           <p className="hint">
-            Roasts more than two standard deviations from the rest of their group on <strong>{yMetric.label}</strong>{" "}
-            (only groups of five or more roasts).
+            {t("analysis.standoutHintPrefix")} <strong>{yMetric.label}</strong> {t("analysis.standoutHintSuffix")}
           </p>
           {outliers.length === 0 ? (
-            <p className="hint">None.</p>
+            <p className="hint">{t("analysis.standoutNone")}</p>
           ) : (
             <ul className="outlier-list">
               {outliers.map(({ row, group, value, z }) => (
