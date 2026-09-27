@@ -120,6 +120,25 @@
     <li>They can't override the roaster's own panel: turning something up at the machine still works.</li>
   </ul>
 
+  <h2 id="off-reset-reconnect">What OFF, Reset, and reconnecting actually leave behind</h2>
+  <p>
+    Ending a roast doesn't put the roaster back to any particular state, and
+    Reset doesn't touch the roaster at all. It's easy to assume otherwise
+    after a test roast, so here's exactly what each step does:
+  </p>
+  <ul>
+    <li><strong>OFF</strong> switches the heater off <em>if it was on</em> &mdash; one write, the same fact as the last row of the fail-safes table above &mdash; and stops any automatic control. The fan and drum are left exactly as they were; nothing is sent for them. The app then disconnects, and no further commands go out after that.</li>
+    <li><strong>Reset</strong> (the button OFF turns into once a roast is finished) only clears the finished roast's view and blanks the Configure Roast form for a new one. It never talks to the roaster.</li>
+    <li><strong>ON again, on real hardware,</strong> reconnects to the same physical roaster: the heater reads back as 0 (from OFF, above), and the fan and drum read back as whatever they still physically are &mdash; the roaster's own registers don't reset just because the app disconnected.</li>
+    <li><strong>ON again, on a <a href="#trying-it-without-a-roaster">simulated device</a>,</strong> is different: a brand new simulated roaster is created for the new roast, with its own starting heater/fan/drum &mdash; not whatever the previous simulated roast was last set to. There's no physical machine underneath to remember anything between roasts.</li>
+  </ul>
+  <p class="hint">
+    If you set the sliders to something during a test roast, ended it, and
+    found them different next time: that's this, not a bug. On the simulator
+    it happens every time (a fresh simulated roaster every roast); on real
+    hardware, only the heater is affected, and only if it was on.
+  </p>
+
   <h2 id="activity-log">Activity log</h2>
   <p>
     Every Emergency stop, fail-safe trip, and automatic control rule firing
