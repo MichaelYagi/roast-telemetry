@@ -637,14 +637,14 @@ export default function AnalysisView() {
 
       <div className="panel">
         <div className="analysis-mode-toggle">
-          <button type="button" className={mode === "drift" ? "active" : ""} onClick={() => setMode("drift")}>
-            {t("analysis.mode.drift")}
+          <button type="button" className={mode === "explore" ? "active" : ""} onClick={() => setMode("explore")}>
+            {t("analysis.mode.explore")}
           </button>
           <button type="button" className={mode === "trends" ? "active" : ""} onClick={() => setMode("trends")}>
             {t("analysis.mode.trends")}
           </button>
-          <button type="button" className={mode === "explore" ? "active" : ""} onClick={() => setMode("explore")}>
-            {t("analysis.mode.explore")}
+          <button type="button" className={mode === "drift" ? "active" : ""} onClick={() => setMode("drift")}>
+            {t("analysis.mode.drift")}
           </button>
         </div>
 
@@ -682,30 +682,19 @@ export default function AnalysisView() {
           <p className="hint">
             {t("analysis.noMatch.prefix")} <Link to="/history">{t("app.nav.history")}</Link> {t("analysis.noMatch.suffix")}
           </p>
-        ) : mode === "drift" ? (
+        ) : mode === "explore" ? (
           <>
-            <p className="hint">{t("analysis.drift.hint")}</p>
-            {driftFlags.length === 0 ? (
-              <p className="hint">{t("analysis.drift.none")}</p>
-            ) : (
-              <ul className="outlier-list">
-                {driftFlags.map(({ row, bean, flags }) => (
-                  <li key={row.id}>
-                    <Link to={`/roasts/${row.id}`}>{row.title}</Link>{" "}
-                    <span className="hint">
-                      {new Date(row.created_at).toLocaleDateString()} &middot; {bean} &middot;{" "}
-                      {flags.map((f, i) => (
-                        <span key={f.metric.key}>
-                          {i > 0 ? ", " : ""}
-                          {f.metric.label}: {formatMetric(f.metric, f.value, tempUnit)} ({f.z > 0 ? "+" : ""}
-                          {f.z.toFixed(1)} SD)
-                        </span>
-                      ))}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+            {chart && chart.shown > 0 && xMetric && yMetric && (
+              <p className="analysis-caption">
+                {t("analysis.caption.prefix")} <strong>{xMetric.label}</strong> {t("analysis.caption.acrossComma")} <strong>{yMetric.label}</strong>{" "}
+                {t("analysis.caption.upDot")}
+                {groupBy === "none" ? "" : t("analysis.caption.colouredBy", { group: GROUPS.find((g) => g.key === groupBy)?.label.toLowerCase() })}
+                {t("analysis.caption.hoverHint")}
+                {chart.shown < 5 && t("analysis.caption.fewRoasts")}
+              </p>
             )}
+            <div className="analysis-chart">{chart && chart.shown > 0 ? <Scatter data={chart.data} options={options} /> : null}</div>
+            {chart && chart.shown === 0 && table && table.total > 0 && <p className="hint">{t("analysis.noneOfBoth")}</p>}
             <p className="hint analysis-count">
               {table ? t("analysis.count", { count: table.total }) : ""}
               {table?.truncated ? t("analysis.countTruncated") : ""}
@@ -735,17 +724,28 @@ export default function AnalysisView() {
           </>
         ) : (
           <>
-            {chart && chart.shown > 0 && xMetric && yMetric && (
-              <p className="analysis-caption">
-                {t("analysis.caption.prefix")} <strong>{xMetric.label}</strong> {t("analysis.caption.acrossComma")} <strong>{yMetric.label}</strong>{" "}
-                {t("analysis.caption.upDot")}
-                {groupBy === "none" ? "" : t("analysis.caption.colouredBy", { group: GROUPS.find((g) => g.key === groupBy)?.label.toLowerCase() })}
-                {t("analysis.caption.hoverHint")}
-                {chart.shown < 5 && t("analysis.caption.fewRoasts")}
-              </p>
+            <p className="hint">{t("analysis.drift.hint")}</p>
+            {driftFlags.length === 0 ? (
+              <p className="hint">{t("analysis.drift.none")}</p>
+            ) : (
+              <ul className="outlier-list">
+                {driftFlags.map(({ row, bean, flags }) => (
+                  <li key={row.id}>
+                    <Link to={`/roasts/${row.id}`}>{row.title}</Link>{" "}
+                    <span className="hint">
+                      {new Date(row.created_at).toLocaleDateString()} &middot; {bean} &middot;{" "}
+                      {flags.map((f, i) => (
+                        <span key={f.metric.key}>
+                          {i > 0 ? ", " : ""}
+                          {f.metric.label}: {formatMetric(f.metric, f.value, tempUnit)} ({f.z > 0 ? "+" : ""}
+                          {f.z.toFixed(1)} SD)
+                        </span>
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
-            <div className="analysis-chart">{chart && chart.shown > 0 ? <Scatter data={chart.data} options={options} /> : null}</div>
-            {chart && chart.shown === 0 && table && table.total > 0 && <p className="hint">{t("analysis.noneOfBoth")}</p>}
             <p className="hint analysis-count">
               {table ? t("analysis.count", { count: table.total }) : ""}
               {table?.truncated ? t("analysis.countTruncated") : ""}
