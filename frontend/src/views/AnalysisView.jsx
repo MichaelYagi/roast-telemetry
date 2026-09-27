@@ -1,13 +1,14 @@
 import { Chart as ChartJS, Legend, LineElement, LinearScale, PointElement, Tooltip } from "chart.js";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Scatter } from "react-chartjs-2";
+import { Line, Scatter } from "react-chartjs-2";
 import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 import AnalysisInsights from "../components/AnalysisInsights.jsx";
 import BulkZipDownload from "../components/BulkZipDownload.jsx";
 import SavedViews from "../components/SavedViews.jsx";
-import { formatMetric, formatSeconds, groupMetrics, meanAndSd, metricUnitLabel, metricValue } from "../lib/metricFormat.js";
+import { formatMetric, formatSeconds, groupMetrics, isRate, isTemperature, meanAndSd, metricUnitLabel, metricValue } from "../lib/metricFormat.js";
+import { unitSuffix } from "../tempUnits.js";
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -15,8 +16,146 @@ const PALETTE = ["#dc2626", "#2563eb", "#16a34a", "#ca8a04", "#9333ea", "#0891b2
 
 const DATE_KEY = "__date";
 
-// The numbers the consistency table shows for every group, besides the chart's own Y.
+// The numbers the consistency table shows for every group, besides the chart's
+// own Y -- also what the Trends tab charts, one small chart each (see
+// TrendChart below): the same handful of "how's my roasting going" numbers,
+// just trended over time instead of averaged into one row.
 const KEY_METRICS = ["duration_s", "drop_temp_c", "development_time_s", "dtr_pct", "weight_loss_pct"];
+
+// How many recent roasts each point on a trend's bold line averages over --
+// smooths day-to-day noise without lagging so far behind that a real,
+// sustained drift takes forever to show up.
+const TREND_ROLLING_WINDOW = 5;
+const TREND_MIN_POINTS = 2; // below this a "trend" is just one or two dots -- not worth drawing
+
+// points: [{x: timestamp, y: number}], already sorted by x ascending.
+function rollingAverage(points, window) {
+  return points.map((p, i) => {
+    const slice = points.slice(Math.max(0, i - window + 1), i + 1);
+    return { x: p.x, y: slice.reduce((sum, s) => sum + s.y, 0) / slice.length };
+  });
+}
+
+// Same suffix/decimals rules as formatMetric (lib/metricFormat.js), but for
+// a value that's already in display units (the rolling-average line's own
+// points, built from already-converted raw points below) -- formatMetric
+// itself always converts from Celsius/raw first, which would double-convert
+// here.
+function formatTrendValue(metric, displayValue, tempUnit) {
+  if (displayValue == null) return "—";
+  if (metric.unit === "s") return formatSeconds(displayValue);
+  const fixed = isTemperature(metric) || isRate(metric) || metric.unit === "%";
+  const text = fixed ? displayValue.toFixed(1) : Number.isInteger(displayValue) ? String(displayValue) : displayValue.toFixed(1);
+  if (isTemperature(metric)) return `${text}${unitSuffix(tempUnit)}`;
+  if (isRate(metric)) return `${text}${unitSuffix(tempUnit)}/min`;
+  if (metric.unit === "%") return `${text}%`;
+  if (metric.unit === "g") return `${text} g`;
+  if (metric.unit === "/5") return `${text}/5`;
+  return metric.unit ? `${text} ${metric.unit}` : text;
+}
+
+// One small chart per KEY_METRICS entry (see AnalysisView's Trends tab):
+// faint dots for each roast plus a bold rolling-average line, both against
+// Date. A separate component (not inlined in the tab body) purely so each
+// metric's own useMemo/options only recompute when that metric's own
+// inputs change, not on every render of the other four.
+function TrendChart({ metric, table, tempUnit, t }) {
+  const points = useMemo(() => {
+    return table.rows
+      .map((row) => ({ x: Date.parse(row.created_at), y: metricValue(metric, row.metrics[metric.key], tempUnit), row }))
+      .filter((p) => p.y != null && !Number.isNaN(p.y) && !Number.isNaN(p.x))
+      .sort((a, b) => a.x - b.x);
+  }, [table, metric, tempUnit]);
+
+  const unit = metricUnitLabel(metric, tempUnit);
+
+  if (points.length < TREND_MIN_POINTS) {
+    return (
+      <div className="trend-chart-box">
+        <h4>
+          {metric.label} {unit && <span className="hint">({unit})</span>}
+        </h4>
+        <p className="hint">{t("analysis.trends.notEnoughRoasts")}</p>
+      </div>
+    );
+  }
+
+  const avg = rollingAverage(points, TREND_ROLLING_WINDOW);
+  const data = {
+    datasets: [
+      {
+        label: metric.label,
+        data: points,
+        borderColor: "transparent",
+        backgroundColor: "#94a3b8",
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        showLine: false,
+      },
+      {
+        label: metric.label,
+        data: avg,
+        borderColor: "#2563eb",
+        backgroundColor: "#2563eb",
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: 0.25,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    parsing: false,
+    animation: false,
+    onClick: (_event, elements, chartInstance) => {
+      // Only the raw dots (dataset 0) have a roast behind a given point --
+      // a click landing on the average line itself does nothing.
+      const hit = elements.find((el) => el.datasetIndex === 0);
+      if (!hit) return;
+      const point = chartInstance.data.datasets[0].data[hit.index];
+      window.open(`/roasts/${point.row.id}`, "_blank", "noopener,noreferrer");
+    },
+    onHover: (event, elements) => {
+      event.native.target.style.cursor = elements.some((el) => el.datasetIndex === 0) ? "pointer" : "default";
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items) => {
+            const raw = items.find((i) => i.datasetIndex === 0);
+            return raw ? raw.raw.row.title : new Date(items[0].parsed.x).toLocaleDateString();
+          },
+          label: (item) =>
+            item.datasetIndex === 0
+              ? `${new Date(item.raw.row.created_at).toLocaleDateString()}: ${formatMetric(metric, item.raw.row.metrics[metric.key], tempUnit)}`
+              : formatTrendValue(metric, item.parsed.y, tempUnit),
+        },
+      },
+    },
+    scales: {
+      x: {
+        type: "linear",
+        grid: { display: false },
+        ticks: { callback: (v) => new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" }), maxTicksLimit: 4 },
+      },
+      y: { ticks: { callback: (v) => (metric.unit === "s" ? formatSeconds(v) : v) } },
+    },
+  };
+
+  return (
+    <div className="trend-chart-box">
+      <h4>
+        {metric.label} {unit && <span className="hint">({unit})</span>}
+      </h4>
+      <div className="trend-chart-canvas">
+        <Line data={data} options={options} />
+      </div>
+    </div>
+  );
+}
 
 const DEFAULTS = {
   filters: { q: "", tag: "", bean_id: "", source: "", created_from: "", created_to: "", include_simulated: false },
@@ -66,6 +205,10 @@ export default function AnalysisView() {
   const [x, setX] = useState(DEFAULTS.x);
   const [y, setY] = useState(DEFAULTS.y);
   const [groupBy, setGroupBy] = useState(DEFAULTS.groupBy);
+  // "explore" (the X/Y scatter picker, the page's long-standing default) or
+  // "trends" (a fixed set of small rolling-average charts, see TrendChart).
+  // Both read the same already-filtered `table` -- no separate fetch.
+  const [mode, setMode] = useState("explore");
   const [table, setTable] = useState(null);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -191,6 +334,12 @@ export default function AnalysisView() {
     const keys = [...new Set([y, ...KEY_METRICS])].filter((k) => byKey[k]);
     return keys.map((k) => byKey[k]);
   }, [y, byKey]);
+
+  // -- trends tab -------------------------------------------------------------------
+  // Fixed (not the user's own Y pick, unlike shownMetrics above) -- Trends
+  // is meant to always answer the same "how's my roasting going" question,
+  // not shift around with whatever's picked in Explore.
+  const trendMetrics = useMemo(() => KEY_METRICS.map((k) => byKey[k]).filter(Boolean), [byKey]);
 
   const meanSd = (metric, stats) => {
     if (!stats || stats.mean == null) return "—";
@@ -340,30 +489,41 @@ export default function AnalysisView() {
       </div>
 
       <div className="panel">
-        <div className="analysis-pickers">
-          <label>
-            {t("analysis.xAxisLabel")}
-            <select value={x} onChange={(e) => setX(e.target.value)}>
-              {metricOptions(true)}
-            </select>
-          </label>
-          <label>
-            {t("analysis.yAxisLabel")}
-            <select value={y} onChange={(e) => setY(e.target.value)}>
-              {metricOptions(false)}
-            </select>
-          </label>
-          <label>
-            {t("analysis.colourBy")}
-            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
-              {GROUPS.map((g) => (
-                <option key={g.key} value={g.key}>
-                  {g.label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="analysis-mode-toggle">
+          <button type="button" className={mode === "explore" ? "active" : ""} onClick={() => setMode("explore")}>
+            {t("analysis.mode.explore")}
+          </button>
+          <button type="button" className={mode === "trends" ? "active" : ""} onClick={() => setMode("trends")}>
+            {t("analysis.mode.trends")}
+          </button>
         </div>
+
+        {mode === "explore" && (
+          <div className="analysis-pickers">
+            <label>
+              {t("analysis.xAxisLabel")}
+              <select value={x} onChange={(e) => setX(e.target.value)}>
+                {metricOptions(true)}
+              </select>
+            </label>
+            <label>
+              {t("analysis.yAxisLabel")}
+              <select value={y} onChange={(e) => setY(e.target.value)}>
+                {metricOptions(false)}
+              </select>
+            </label>
+            <label>
+              {t("analysis.colourBy")}
+              <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
+                {GROUPS.map((g) => (
+                  <option key={g.key} value={g.key}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
 
         {error && <p className="error">{error}</p>}
         {loading && !table ? (
@@ -372,7 +532,7 @@ export default function AnalysisView() {
           <p className="hint">
             {t("analysis.noMatch.prefix")} <Link to="/history">{t("app.nav.history")}</Link> {t("analysis.noMatch.suffix")}
           </p>
-        ) : (
+        ) : mode === "explore" ? (
           <>
             {chart && chart.shown > 0 && xMetric && yMetric && (
               <p className="analysis-caption">
@@ -385,6 +545,22 @@ export default function AnalysisView() {
             )}
             <div className="analysis-chart">{chart && chart.shown > 0 ? <Scatter data={chart.data} options={options} /> : null}</div>
             {chart && chart.shown === 0 && table && table.total > 0 && <p className="hint">{t("analysis.noneOfBoth")}</p>}
+            <p className="hint analysis-count">
+              {table ? t("analysis.count", { count: table.total }) : ""}
+              {table?.truncated ? t("analysis.countTruncated") : ""}
+              {table?.simulated_excluded ? t("analysis.countSimulatedExcluded", { count: table.simulated_excluded }) : ""}
+              {table?.missing_recording ? t("analysis.countMissingRecording", { count: table.missing_recording }) : ""}
+              .{" "}
+              <BulkZipDownload params={applied} tempUnit={tempUnit} />
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="hint">{t("analysis.trends.hint", { window: TREND_ROLLING_WINDOW })}</p>
+            <div className="trend-charts-grid">
+              {table &&
+                trendMetrics.map((m) => <TrendChart key={m.key} metric={m} table={table} tempUnit={tempUnit} t={t} />)}
+            </div>
             <p className="hint analysis-count">
               {table ? t("analysis.count", { count: table.total }) : ""}
               {table?.truncated ? t("analysis.countTruncated") : ""}

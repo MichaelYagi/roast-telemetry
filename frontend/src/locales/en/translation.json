@@ -868,7 +868,15 @@
     "standoutHintPrefix": "Roasts more than two standard deviations from the rest of their group on",
     "standoutHintSuffix": "(only groups of five or more roasts).",
     "standoutNone": "None.",
-    "clickToOpenNewTab": "Click to open in a new tab"
+    "clickToOpenNewTab": "Click to open in a new tab",
+    "mode": {
+      "explore": "Explore",
+      "trends": "Trends"
+    },
+    "trends": {
+      "notEnoughRoasts": "Not enough roasts yet with this number recorded.",
+      "hint": "Each small chart trends one number against Date: faint dots are individual roasts, the bold line is a rolling average over the last {{window}} (so day-to-day noise doesn't hide the actual drift). Click a dot to open that roast."
+    }
   },
   "activity": {
     "filters": {

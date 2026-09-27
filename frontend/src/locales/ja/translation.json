@@ -854,7 +854,15 @@
     "standoutHintPrefix": "グループ内の他のローストと比べて標準偏差2以上離れているもの（",
     "standoutHintSuffix": "5件以上あるグループのみ対象）。",
     "standoutNone": "なし。",
-    "clickToOpenNewTab": "クリックすると新しいタブで開きます"
+    "clickToOpenNewTab": "クリックすると新しいタブで開きます",
+    "mode": {
+      "explore": "探索",
+      "trends": "トレンド"
+    },
+    "trends": {
+      "notEnoughRoasts": "この数値が記録されたローストがまだ十分にありません。",
+      "hint": "各小チャートは1つの数値を日付に対してトレンド表示します。薄い点は個々のロースト、太い線は直近{{window}}件の移動平均です（日々のばらつきに実際の傾向が隠れないようにするため）。点をクリックするとそのローストを開きます。"
+    }
   },
   "activity": {
     "filters": {
