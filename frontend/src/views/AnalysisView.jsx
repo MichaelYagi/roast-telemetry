@@ -384,11 +384,23 @@ export default function AnalysisView() {
         },
         tooltip: {
           callbacks: {
-            title: (items) => items[0]?.raw.row.title,
+            // No shared title callback -- a shared header only shows the
+            // *first* matched point's title, but two dots can genuinely
+            // overlap (same X/Y, different roasts), and each one then needs
+            // its own title, not just its own beans/metric lines under
+            // someone else's. Putting the title inside each item's own
+            // label lines guarantees it's always paired with the right
+            // roast, in order, no matter how many points are matched at once.
             label: (item) => {
               const { row } = item.raw;
               const xText = x === DATE_KEY ? new Date(row.created_at).toLocaleDateString() : formatMetric(xMetric, row.metrics[x], tempUnit);
-              return [`${xMetric.label}: ${xText}`, `${yMetric.label}: ${formatMetric(yMetric, row.metrics[y], tempUnit)}`, t("analysis.clickToOpenNewTab")];
+              return [
+                row.title,
+                row.beans ? `${t("analysis.filters.beans")}: ${row.beans}` : null,
+                `${xMetric.label}: ${xText}`,
+                `${yMetric.label}: ${formatMetric(yMetric, row.metrics[y], tempUnit)}`,
+                t("analysis.clickToOpenNewTab"),
+              ].filter(Boolean);
             },
           },
         },
