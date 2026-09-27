@@ -99,9 +99,9 @@ export default function SettingsView() {
         language,
         control,
       });
-      setSaveFeedback("Saved.");
+      setSaveFeedback(t("settings.saved"));
     } catch (err) {
-      setSaveFeedback(`Failed to save: ${err.message}`);
+      setSaveFeedback(t("settings.failedToSave", { error: err.message }));
     }
   }
 
@@ -111,46 +111,39 @@ export default function SettingsView() {
   return (
     <div className="settings-view">
       <div className="panel">
-        <h2>Roaster safety</h2>
-        <p className="hint">
-          Applies to everything that changes the roaster: the sliders, alarm rules, repeating a saved roast and
-          target control. These are the app's own limits. They are not a substitute for the roaster's own
-          safety features, and they only work while the app can still reach the roaster.
-        </p>
+        <h2>{t("settings.roasterSafety.heading")}</h2>
+        <p className="hint">{t("settings.roasterSafety.hint")}</p>
         <div className="form-row">
           <label>
-            Heater never above (%)
+            {t("settings.roasterSafety.heaterMaxPct")}
             <input type="number" min="0" max="100" value={control.heater_max_pct}
               onChange={(e) => setControl({ ...control, heater_max_pct: Number(e.target.value) })} />
           </label>
           <label>
-            Fan never below while heating (%)
+            {t("settings.roasterSafety.fanMinPct")}
             <input type="number" min="0" max="100" value={control.fan_min_pct}
               onChange={(e) => setControl({ ...control, fan_min_pct: Number(e.target.value) })} />
           </label>
           <label>
-            Drum never below while heating (%)
+            {t("settings.roasterSafety.drumMinPct")}
             <input type="number" min="0" max="100" value={control.drum_min_pct}
               onChange={(e) => setControl({ ...control, drum_min_pct: Number(e.target.value) })} />
           </label>
         </div>
         <div className="form-row">
           <label>
-            Fan level in an emergency (%)
+            {t("settings.roasterSafety.safeFanPct")}
             <input type="number" min="0" max="100" value={control.safe_fan_pct}
               onChange={(e) => setControl({ ...control, safe_fan_pct: Number(e.target.value) })} />
           </label>
           <label>
-            Turn the heater off if Roast Telemetry is not open in a browser for (seconds)
+            {t("settings.roasterSafety.watchdogLabel")}
             <input type="number" min="0" max="3600" value={control.client_watchdog_s}
               onChange={(e) => setControl({ ...control, client_watchdog_s: Number(e.target.value) })} />
-            <span className="hint">0 (the default) never turns it off for this reason.</span>
+            <span className="hint">{t("settings.roasterSafety.watchdogHint")}</span>
           </label>
         </div>
-        <p className="hint">
-          In an emergency (the Emergency stop button, a lost connection or an error during a roast) the heater goes to 0 and the fan to the level above.
-          The burner temperature setpoint can't be used while the heater limit is below 100%.
-        </p>
+        <p className="hint">{t("settings.roasterSafety.emergencyHint")}</p>
 
         <div className="form-row">
           <label className="checkbox-label">
@@ -159,14 +152,10 @@ export default function SettingsView() {
               checked={control.safety_disabled}
               onChange={(e) => setControl({ ...control, safety_disabled: e.target.checked })}
             />
-            Disable all of the above
+            {t("settings.roasterSafety.disableAll")}
           </label>
         </div>
-        {control.safety_disabled && (
-          <p className="error">
-            Turns off the limits above, Emergency Stop and every fail-safe. Nothing is recorded while this is on.
-          </p>
-        )}
+        {control.safety_disabled && <p className="error">{t("settings.roasterSafety.disabledWarning")}</p>}
 
         <div className="form-row">
           <label className="checkbox-label">
@@ -175,25 +164,15 @@ export default function SettingsView() {
               checked={awayAlarmEnabled}
               onChange={(e) => setAwayAlarmEnabled(e.target.checked)}
             />
-            Away alarm while roasting
+            {t("settings.roasterSafety.awayAlarm")}
           </label>
-          <span className="hint">
-            A gentle, repeating chime if this tab is hidden (minimized, switched away from) while actually roasting
-            -- not a substitute for the watchdog above, which only reacts once the connection itself drops. On by
-            default.
-          </span>
+          <span className="hint">{t("settings.roasterSafety.awayAlarmHint")}</span>
         </div>
       </div>
 
       <div className="panel">
-        <h2>Temperature Unit</h2>
-        <p className="hint">
-          Display only -- storage and the API always stay Celsius; this only changes how live readings
-          (readouts, chart, event history) are shown. Threshold/config fields (Dry End, FC Start, SV ranges,
-          alarm rule temperatures) stay in Celsius regardless, so what you type there always means the same
-          thing. Every download (.alog, JSON, CSV, Excel, PDF) uses this unit too, and most record which
-          unit they're in right in the file.
-        </p>
+        <h2>{t("settings.temperatureUnit.heading")}</h2>
+        <p className="hint">{t("settings.temperatureUnit.hint")}</p>
         <div className="form-row">
           <label className="checkbox-label">
             <input
@@ -202,7 +181,7 @@ export default function SettingsView() {
               checked={temperatureUnit === "c"}
               onChange={() => setTemperatureUnit("c")}
             />
-            Celsius (°C)
+            {t("settings.temperatureUnit.celsius")}
           </label>
           <label className="checkbox-label">
             <input
@@ -211,7 +190,7 @@ export default function SettingsView() {
               checked={temperatureUnit === "f"}
               onChange={() => setTemperatureUnit("f")}
             />
-            Fahrenheit (°F)
+            {t("settings.temperatureUnit.fahrenheit")}
           </label>
         </div>
       </div>
@@ -232,13 +211,8 @@ export default function SettingsView() {
       </div>
 
       <div className="panel">
-        <h2>Big Readout Panel</h2>
-        <p className="hint">
-          Pick which live values also show large in a dedicated panel next to the chart on the Live
-          Roast screen (only above ~1400px wide), alongside (not instead of) their normal small
-          display. Off by default. Changes here apply to an already-open Live Roast tab within a few
-          seconds, no refresh needed.
-        </p>
+        <h2>{t("settings.bigReadoutPanel.heading")}</h2>
+        <p className="hint">{t("settings.bigReadoutPanel.hint")}</p>
         <BreakoutSettingsEditor
           enabledKeys={brokenOutPanels}
           setEnabledKeys={setBrokenOutPanels}
@@ -248,14 +222,8 @@ export default function SettingsView() {
       </div>
 
       <div className="panel">
-        <h2>Small Readout</h2>
-        <p className="hint">
-          Independent from the Big Readout Panel above -- its own set of values, shown as a compact
-          scaled column right beside the chart at any screen width (used to be a fixed ET/BT/ΔBT
-          legend; now it's whatever you pick here). Which items are enabled can differ freely between
-          the two, but colors are shared -- recoloring an item here also changes it in the Big Readout
-          Panel, and vice versa.
-        </p>
+        <h2>{t("settings.smallReadout.heading")}</h2>
+        <p className="hint">{t("settings.smallReadout.hint")}</p>
         <BreakoutSettingsEditor
           enabledKeys={smallReadoutPanels}
           setEnabledKeys={setSmallReadoutPanels}
@@ -266,13 +234,8 @@ export default function SettingsView() {
       </div>
 
       <div className="panel">
-        <h2>Controls</h2>
-        <p className="hint">
-          The vertical control sliders beside the live chart's Drum/Air/Burner/SV. Drum and Air are always
-          shown; Burner % and Burner SV (°C) can each be shown or hidden, but at least one of the two always
-          stays visible -- moving one moves the other, they're the same underlying burner setpoint in
-          different units. Changes here apply to an already-open Live Roast tab within a few seconds.
-        </p>
+        <h2>{t("settings.controls.heading")}</h2>
+        <p className="hint">{t("settings.controls.hint")}</p>
         <VerticalControlSettingsEditor
           layout={verticalControlLayout}
           setLayout={setVerticalControlLayout}
@@ -282,10 +245,10 @@ export default function SettingsView() {
       </div>
 
       <div className="panel">
-        <h2>History</h2>
+        <h2>{t("settings.history.heading")}</h2>
         <div className="form-row">
           <label>
-            Results per page
+            {t("settings.history.resultsPerPage")}
             <input
               type="number"
               min="10"
@@ -295,7 +258,7 @@ export default function SettingsView() {
             />
           </label>
           <label>
-            Max roasts to compare at once
+            {t("settings.history.maxCompare")}
             <input
               type="number"
               min="3"
@@ -308,15 +271,12 @@ export default function SettingsView() {
       </div>
 
       <div className="panel">
-        <h2>AI Roast Review (Ollama)</h2>
-        <p className="hint">
-          Configures the local Ollama server used for AI roast reviews (Roast detail → Review card).
-          Nothing here is required for the rest of the app to work.
-        </p>
+        <h2>{t("settings.aiRoastReview.heading")}</h2>
+        <p className="hint">{t("settings.aiRoastReview.hint")}</p>
 
         <div className="form-row">
           <label>
-            Ollama URL
+            {t("settings.aiRoastReview.ollamaUrl")}
             <input
               placeholder="http://localhost:11434"
               value={url}
@@ -324,10 +284,10 @@ export default function SettingsView() {
             />
           </label>
           <label>
-            Model
+            {t("settings.aiRoastReview.model")}
             {modelsAvailable ? (
               <select value={model} onChange={(e) => setModel(e.target.value)}>
-                <option value="">(choose a model)</option>
+                <option value="">{t("settings.aiRoastReview.chooseModel")}</option>
                 {status.models.map((m) => (
                   <option key={m} value={m}>
                     {m}
@@ -336,7 +296,7 @@ export default function SettingsView() {
               </select>
             ) : (
               <input
-                placeholder="e.g. llama3.1 (not connected -- enter manually)"
+                placeholder={t("settings.aiRoastReview.modelPlaceholder")}
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
               />
@@ -346,18 +306,18 @@ export default function SettingsView() {
 
         <p className={`ollama-status ${connected ? "ollama-status-ok" : url.trim() ? "ollama-status-bad" : ""}`}>
           {checking
-            ? "Checking…"
+            ? t("settings.aiRoastReview.checking")
             : !url.trim()
-              ? "Enter an Ollama URL above."
+              ? t("settings.aiRoastReview.enterUrl")
               : connected
-                ? `Connected — ${status.models.length} model${status.models.length === 1 ? "" : "s"} available.`
-                : `Not connected${status?.error ? `: ${status.error}` : ""}`}
+                ? t("settings.aiRoastReview.connected", { count: status.models.length })
+                : t("settings.aiRoastReview.notConnected") + (status?.error ? t("settings.aiRoastReview.notConnectedError", { error: status.error }) : "")}
         </p>
       </div>
 
       <div className="panel">
         <button type="button" onClick={handleSave} disabled={!loaded}>
-          Save
+          {t("settings.save")}
         </button>
         {saveFeedback && <p className="hint preset-feedback">{saveFeedback}</p>}
       </div>
