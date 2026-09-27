@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import { useConfirm } from "../components/DialogProvider.jsx";
 
@@ -23,6 +24,7 @@ function toPayload(form) {
 // when configuring a roast), so roasts can be grouped and analysed by beans,
 // origin, process and density.
 export default function BeansView() {
+  const { t } = useTranslation();
   const confirm = useConfirm();
   const [beans, setBeans] = useState([]);
   const [editingId, setEditingId] = useState(null); // an id, "new", or null
@@ -67,9 +69,7 @@ export default function BeansView() {
   }
 
   async function remove(bean) {
-    const ok = await confirm(
-      `Delete "${bean.name}"? ${bean.roast_count} roast${bean.roast_count === 1 ? "" : "s"} used it and will keep the beans' name, but lose the link and its details.`
-    );
+    const ok = await confirm(t("beans.deleteConfirm", { name: bean.name, count: bean.roast_count }));
     if (!ok) return;
     await api.deleteBean(bean.id);
     if (editingId === bean.id) setEditingId(null);
@@ -82,58 +82,55 @@ export default function BeansView() {
     <div className="beans-view">
       <div className="panel">
         <div className="beans-header">
-          <h2>Beans</h2>
+          <h2>{t("app.nav.beans")}</h2>
           <button type="button" onClick={startNew}>
-            Add beans
+            {t("beans.addBeans")}
           </button>
         </div>
-        <p className="hint">
-          Save each green bean once, then pick it on a roast. That lets you group and compare roasts by beans, origin,
-          process and density on the Analysis page.
-        </p>
+        <p className="hint">{t("beans.hint")}</p>
 
         {editingId && (
           <form className="bean-form" onSubmit={save}>
             <label>
-              Name
+              {t("beans.form.name")}
               <input value={form.name} onChange={set("name")} required maxLength={200} autoFocus />
             </label>
             <label>
-              Origin
-              <input value={form.origin} onChange={set("origin")} placeholder="Ethiopia, Yirgacheffe" />
+              {t("beans.form.origin")}
+              <input value={form.origin} onChange={set("origin")} placeholder={t("beans.form.originPlaceholder")} />
             </label>
             <label>
-              Process
-              <input value={form.process} onChange={set("process")} placeholder="Washed, natural, honey…" />
+              {t("beans.form.process")}
+              <input value={form.process} onChange={set("process")} placeholder={t("beans.form.processPlaceholder")} />
             </label>
             <label>
-              Variety
+              {t("beans.form.variety")}
               <input value={form.variety} onChange={set("variety")} />
             </label>
             <label>
-              Altitude (m)
+              {t("beans.form.altitudeM")}
               <input type="number" min="0" value={form.altitude_m} onChange={set("altitude_m")} />
             </label>
             <label>
-              Density (g/L)
+              {t("beans.form.densityGL")}
               <input type="number" min="0" step="0.1" value={form.density_g_l} onChange={set("density_g_l")} />
             </label>
             <label>
-              Moisture (%)
+              {t("beans.form.moisturePct")}
               <input type="number" min="0" max="100" step="0.1" value={form.moisture_pct} onChange={set("moisture_pct")} />
             </label>
             <label>
-              Supplier
+              {t("beans.form.supplier")}
               <input value={form.supplier} onChange={set("supplier")} />
             </label>
             <label className="bean-notes">
-              Notes
+              {t("beans.form.notes")}
               <textarea rows={2} value={form.notes} onChange={set("notes")} maxLength={2000} />
             </label>
             <div className="bean-form-actions">
-              <button type="submit">{editingId === "new" ? "Add" : "Save"}</button>
+              <button type="submit">{editingId === "new" ? t("beans.form.add") : t("beans.form.save")}</button>
               <button type="button" className="link-like" onClick={() => setEditingId(null)}>
-                Cancel
+                {t("beans.form.cancel")}
               </button>
               {error && <span className="error">{error}</span>}
             </div>
@@ -141,40 +138,40 @@ export default function BeansView() {
         )}
 
         {loading ? (
-          <p>Loading…</p>
+          <p>{t("beans.loading")}</p>
         ) : beans.length === 0 ? (
-          <p className="hint">No beans yet.</p>
+          <p className="hint">{t("beans.noneYet")}</p>
         ) : (
           <table className="roast-table beans-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Origin</th>
-                <th>Process</th>
-                <th>Density</th>
-                <th>Moisture</th>
-                <th>Roasts</th>
+                <th>{t("beans.table.name")}</th>
+                <th>{t("beans.table.origin")}</th>
+                <th>{t("beans.table.process")}</th>
+                <th>{t("beans.table.density")}</th>
+                <th>{t("beans.table.moisture")}</th>
+                <th>{t("beans.table.roasts")}</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {beans.map((b) => (
                 <tr key={b.id}>
-                  <td data-label="Name">
+                  <td data-label={t("beans.table.name")}>
                     <strong>{b.name}</strong>
                     {b.variety && <span className="cell-sub">{b.variety}</span>}
                   </td>
-                  <td data-label="Origin">{b.origin || "—"}</td>
-                  <td data-label="Process">{b.process || "—"}</td>
-                  <td data-label="Density">{b.density_g_l != null ? `${b.density_g_l} g/L` : "—"}</td>
-                  <td data-label="Moisture">{b.moisture_pct != null ? `${b.moisture_pct}%` : "—"}</td>
-                  <td data-label="Roasts">{b.roast_count}</td>
+                  <td data-label={t("beans.table.origin")}>{b.origin || "—"}</td>
+                  <td data-label={t("beans.table.process")}>{b.process || "—"}</td>
+                  <td data-label={t("beans.table.density")}>{b.density_g_l != null ? `${b.density_g_l} g/L` : "—"}</td>
+                  <td data-label={t("beans.table.moisture")}>{b.moisture_pct != null ? `${b.moisture_pct}%` : "—"}</td>
+                  <td data-label={t("beans.table.roasts")}>{b.roast_count}</td>
                   <td className="row-actions">
                     <button type="button" className="btn-sm" onClick={() => startEdit(b)}>
-                      Edit
+                      {t("beans.table.edit")}
                     </button>{" "}
                     <button type="button" className="btn-sm btn-danger-soft" onClick={() => remove(b)}>
-                      Delete
+                      {t("beans.table.delete")}
                     </button>
                   </td>
                 </tr>

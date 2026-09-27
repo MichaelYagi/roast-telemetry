@@ -795,5 +795,38 @@
     "pagePrev": "← 前へ",
     "pageNext": "次へ →",
     "pageOf_other": "{{page}} / {{totalPages}} ページ（{{count}}件）"
+  },
+  "beans": {
+    "hint": "各生豆を一度保存すれば、ローストで選べるようになります。分析ページで豆、産地、プロセス、密度によってローストをグループ化・比較できます。",
+    "addBeans": "豆を追加",
+    "form": {
+      "name": "名前",
+      "origin": "産地",
+      "originPlaceholder": "エチオピア、イルガチェフェ",
+      "process": "プロセス",
+      "processPlaceholder": "ウォッシュド、ナチュラル、ハニー…",
+      "variety": "品種",
+      "altitudeM": "標高 (m)",
+      "densityGL": "密度 (g/L)",
+      "moisturePct": "水分率 (%)",
+      "supplier": "サプライヤー",
+      "notes": "メモ",
+      "add": "追加",
+      "save": "保存",
+      "cancel": "キャンセル"
+    },
+    "loading": "読み込み中…",
+    "noneYet": "まだ豆がありません。",
+    "table": {
+      "name": "名前",
+      "origin": "産地",
+      "process": "プロセス",
+      "density": "密度",
+      "moisture": "水分率",
+      "roasts": "ロースト数",
+      "edit": "編集",
+      "delete": "削除"
+    },
+    "deleteConfirm_other": "「{{name}}」を削除しますか？ {{count}}件のローストで使用されていますが、豆の名前は残り、リンクと詳細情報が失われます。"
   }
 }

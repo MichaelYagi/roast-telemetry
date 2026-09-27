@@ -810,5 +810,39 @@
     "pageNext": "Next →",
     "pageOf_one": "Page {{page}} of {{totalPages}} ({{count}} entry)",
     "pageOf_other": "Page {{page}} of {{totalPages}} ({{count}} entries)"
+  },
+  "beans": {
+    "hint": "Save each green bean once, then pick it on a roast. That lets you group and compare roasts by beans, origin, process and density on the Analysis page.",
+    "addBeans": "Add beans",
+    "form": {
+      "name": "Name",
+      "origin": "Origin",
+      "originPlaceholder": "Ethiopia, Yirgacheffe",
+      "process": "Process",
+      "processPlaceholder": "Washed, natural, honey…",
+      "variety": "Variety",
+      "altitudeM": "Altitude (m)",
+      "densityGL": "Density (g/L)",
+      "moisturePct": "Moisture (%)",
+      "supplier": "Supplier",
+      "notes": "Notes",
+      "add": "Add",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "loading": "Loading…",
+    "noneYet": "No beans yet.",
+    "table": {
+      "name": "Name",
+      "origin": "Origin",
+      "process": "Process",
+      "density": "Density",
+      "moisture": "Moisture",
+      "roasts": "Roasts",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "deleteConfirm_one": "Delete \"{{name}}\"? {{count}} roast used it and will keep the beans' name, but lose the link and its details.",
+    "deleteConfirm_other": "Delete \"{{name}}\"? {{count}} roasts used it and will keep the beans' name, but lose the link and its details."
   }
 }
