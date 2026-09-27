@@ -26,8 +26,13 @@ import os
 import platform
 import queue
 import shutil
+import signal
+import socket
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 import webbrowser
 from datetime import datetime
 from pathlib import Path
@@ -243,6 +248,25 @@ def _ask_string(root, prompt: str, initial: str) -> str | None:
     return simpledialog.askstring("Roast Telemetry", prompt, initialvalue=initial, parent=root)
 
 
+def _ask_yes_no(root, prompt: str) -> bool:
+    if platform.system() == "Darwin":
+        return _osascript_ask_yes_no(prompt)
+    from tkinter import messagebox
+
+    return messagebox.askyesno("Roast Telemetry", prompt, parent=root)
+
+
+def _osascript_ask_yes_no(prompt: str) -> bool:
+    script = (
+        f'display dialog "{_applescript_escape(prompt)}" with title "Roast Telemetry" '
+        f'buttons {{"Cancel", "Stop It"}} default button "Stop It" cancel button "Cancel"'
+    )
+    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    # Non-zero covers both Cancel and the dialog's own close button --
+    # same "treat as no" meaning _ask_string's Cancel already gets.
+    return result.returncode == 0 and "button returned:Stop It" in result.stdout
+
+
 def _ask_save_path(root, initial_name: str) -> str | None:
     if platform.system() == "Darwin":
         return _osascript_ask_save_path(initial_name)
@@ -315,6 +339,79 @@ def _copy_to_clipboard(text: str, root) -> bool:
         return True
     except Exception:
         return False
+
+
+# -- Leftover-server detection --------------------------------------------
+# is_running() (below, on TrayApp) only knows about a subprocess *this*
+# tray instance itself started -- nothing here persists across a run, so a
+# server left over from a previous instance that didn't exit cleanly
+# (Force Quit, a crash, killing the terminal it was launched from) is
+# completely invisible to it. Without this, Start would either silently
+# fail to bind the port (uvicorn's own subprocess exits, unnoticed -- see
+# start()'s own comment on that gap) or, worse, the tray would show
+# "running" while a real browser tab kept talking to the stale leftover
+# process instead. Confirmed as a real scenario, not a hypothetical: a
+# Mac install kept answering requests with weeks-old code after several
+# rebuild-and-relaunch cycles during testing.
+def _port_is_occupied(host: str, port: int) -> bool:
+    # 0.0.0.0 (bind-to-everything, --lan) isn't a connectable destination
+    # for a client-side probe -- loopback reaches the same process either way.
+    check_host = "127.0.0.1" if host == "0.0.0.0" else host
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(1.0)
+        return s.connect_ex((check_host, port)) == 0
+
+
+def _looks_like_our_own_server(host: str, port: int) -> bool:
+    """True only if whatever's listening answers like this app's own
+    /api/v1/health -- not just "something is listening" (that could be a
+    totally unrelated program that happens to use this port)."""
+    check_host = "127.0.0.1" if host == "0.0.0.0" else host
+    try:
+        with urllib.request.urlopen(f"http://{check_host}:{port}/api/v1/health", timeout=2) as resp:
+            return json.loads(resp.read()).get("status") == "ok"
+    except (OSError, urllib.error.URLError, ValueError):
+        return False
+
+
+def _find_listening_pid(port: int) -> int | None:
+    """The PID of whatever's listening on `port`, or None if the lookup
+    itself failed -- treated the same as "unknown" by callers, not
+    "definitely nothing," since a failed lookup isn't evidence either way."""
+    try:
+        if platform.system() == "Windows":
+            result = subprocess.run(
+                ["netstat", "-ano", "-p", "TCP"], capture_output=True, text=True, timeout=5
+            )
+            for line in result.stdout.splitlines():
+                if f":{port} " in line and "LISTENING" in line:
+                    return int(line.split()[-1])
+        else:
+            result = subprocess.run(
+                ["lsof", "-ti", f":{port}", "-sTCP:LISTEN"], capture_output=True, text=True, timeout=5
+            )
+            pids = result.stdout.split()
+            if pids:
+                return int(pids[0])
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        pass
+    return None
+
+
+def _kill_pid(pid: int, force: bool) -> None:
+    # No SIGKILL on Windows (Python's signal module doesn't define it
+    # there) -- taskkill /F is that platform's own equivalent, rather
+    # than trying to make os.kill's limited Windows signal set do it.
+    if platform.system() == "Windows":
+        args = ["taskkill", "/PID", str(pid)]
+        if force:
+            args.append("/F")
+        subprocess.run(args, capture_output=True)
+        return
+    try:
+        os.kill(pid, signal.SIGKILL if force else signal.SIGTERM)
+    except OSError:
+        pass  # already gone -- fine, that's the goal either way
 
 
 # -- Launch at login -----------------------------------------------------
@@ -490,6 +587,30 @@ class TrayApp:
             return
         port = self.config["port"]
         host = self.config["host"]
+
+        if _port_is_occupied(host, port):
+            if not _looks_like_our_own_server(host, port):
+                self._set_status(self.icon_error, "Roast Telemetry (port in use)")
+                self._notify(f"{host}:{port} is already in use by another program -- pick a different port.")
+                return
+            proceed = self._run_on_main_thread(lambda: _ask_yes_no(
+                self._tk_root,
+                f"A Roast Telemetry server is already running on {host}:{port} -- left over from an "
+                f"earlier session that didn't exit cleanly. Stop it and start fresh?",
+            ))
+            if not proceed:
+                return
+            pid = _find_listening_pid(port)
+            if pid is not None:
+                _kill_pid(pid, force=False)
+                time.sleep(1.5)
+                if _port_is_occupied(host, port):
+                    _kill_pid(pid, force=True)
+                    time.sleep(0.5)
+            if _port_is_occupied(host, port):
+                self._set_status(self.icon_error, "Roast Telemetry (couldn't free the port)")
+                self._notify(f"Couldn't stop the leftover server on {host}:{port} -- stop it manually, then try again.")
+                return
 
         if not FROZEN and _frontend_needs_rebuild():
             self._set_status(self.icon_building, "Roast Telemetry (building frontend...)")
