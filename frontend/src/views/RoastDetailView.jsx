@@ -14,6 +14,7 @@ import NotesPanel from "../components/NotesPanel.jsx";
 import WeightField from "../components/WeightField.jsx";
 import { formatTime } from "../chartDefaults.js";
 import { formatEventValue } from "../lib/eventFormat.js";
+import { formatSeconds } from "../lib/metricFormat.js";
 import { formatTemp } from "../tempUnits.js";
 import { downloadRoastPdf, printRoastPdf } from "../lib/roastPdf.js";
 
@@ -282,7 +283,7 @@ export default function RoastDetailView() {
         </h2>
         <p className="sub">
           {roast.mode} · {t("roastDetail.statusLine.status")} <strong>{roast.status}</strong> · {t("roastDetail.statusLine.duration")}{" "}
-          {roast.duration_s ? `${Math.floor(roast.duration_s / 60)}:${String(Math.round(roast.duration_s % 60)).padStart(2, "0")}` : "—"}
+          {formatSeconds(roast.duration_s)}
         </p>
         <div className="detail-download-list">
           {roast.alog_path && (
@@ -330,7 +331,7 @@ export default function RoastDetailView() {
         <h2>{roast.title}</h2>
         <p className="sub">
           {roast.mode} · {t("roastDetail.statusLine.status")} {roast.status} · {t("roastDetail.statusLine.duration")}{" "}
-          {roast.duration_s ? `${Math.floor(roast.duration_s / 60)}:${String(Math.round(roast.duration_s % 60)).padStart(2, "0")}` : "—"}
+          {formatSeconds(roast.duration_s)}
         </p>
       </div>
 

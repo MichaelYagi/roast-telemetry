@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
-
-function fmt(seconds) {
-  if (seconds == null) return "—";
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
+import { formatSeconds } from "../lib/metricFormat.js";
 
 // Automatic control: repeat a saved roast's heater/fan/drum settings, or hold a
 // target by adjusting the heater. Moving any slider by hand takes over again.
@@ -84,7 +78,7 @@ export default function AutoControlPanel({ roastId }) {
           {program.waiting_for_charge
             ? t("common.autoControlPanel.waitingForCharge")
             : program.next_step_in_s != null
-              ? t("common.autoControlPanel.nextChangeIn", { time: fmt(program.next_step_in_s) })
+              ? t("common.autoControlPanel.nextChangeIn", { time: formatSeconds(program.next_step_in_s) })
               : t("common.autoControlPanel.finishedSteps")}
         </p>
       )}

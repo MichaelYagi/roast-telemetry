@@ -7,13 +7,7 @@ import ComparisonPanel from "../components/ComparisonPanel.jsx";
 import SavedViews from "../components/SavedViews.jsx";
 import { useConfirm, useNotify } from "../components/DialogProvider.jsx";
 import ServerFileChooser from "../components/ServerFileChooser.jsx";
-
-function formatDuration(seconds) {
-  if (seconds == null) return "—";
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+import { formatSeconds } from "../lib/metricFormat.js";
 
 // What the Import box accepts, and (for the browser file picker) the "accept"
 // list -- .alog and .json go through the native reader, .csv/.tsv/.xlsx
@@ -444,7 +438,7 @@ export default function HistoryDashboard() {
             <span className="stat-label">{t("history.stats.finishedRoasts")}</span>
           </div>
           <div className="stat-tile">
-            <span className="stat-value">{trendsLoading ? "…" : formatDuration(totals.avgDuration)}</span>
+            <span className="stat-value">{trendsLoading ? "…" : formatSeconds(totals.avgDuration)}</span>
             <span className="stat-label">{t("history.stats.avgDuration")}</span>
           </div>
           <div className="stat-tile">
@@ -725,7 +719,7 @@ export default function HistoryDashboard() {
                     <td className="cell-status">
                       <span className={`status-pill status-${r.status}`}>{STATUS_LABELS[r.status] || r.status}</span>
                     </td>
-                    <td className="cell-duration">{formatDuration(r.duration_s)}</td>
+                    <td className="cell-duration">{formatSeconds(r.duration_s)}</td>
                     <td className="cell-tags">
                       {r.tags && r.tags.length > 0
                         ? r.tags.map((tagValue) => (

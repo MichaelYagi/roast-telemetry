@@ -1,3 +1,5 @@
+import { formatSeconds } from "./lib/metricFormat.js";
+
 // Shared row definitions + formatting for a RoastStats object (see
 // backend/app/models.py's RoastStats / GET /roasts/{id}/stats) -- one
 // canonical list of {key, label} rows, and a formatter that looks up
@@ -24,12 +26,12 @@ export function getStatRowDefs(t) {
   ];
 }
 
-export function formatDuration(seconds) {
-  if (seconds == null) return "—";
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+// Re-exported under this file's own established name (widely imported as
+// formatDuration) -- the actual m:ss logic is lib/metricFormat.js's
+// formatSeconds, the one correct implementation; rounding minutes and
+// seconds separately (this file's old inline version) breaks on negative
+// and near-whole-minute values -- see that module for the details.
+export const formatDuration = formatSeconds;
 
 function phasePct(stats, phaseName) {
   const phase = stats.phases.find((p) => p.phase === phaseName);
