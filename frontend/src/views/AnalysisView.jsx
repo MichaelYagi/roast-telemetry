@@ -7,7 +7,7 @@ import { api } from "../api/client.js";
 import AnalysisInsights from "../components/AnalysisInsights.jsx";
 import BulkZipDownload from "../components/BulkZipDownload.jsx";
 import SavedViews from "../components/SavedViews.jsx";
-import { formatMetric, formatSeconds, groupMetrics, isRate, isTemperature, meanAndSd, metricUnitLabel, metricValue } from "../lib/metricFormat.js";
+import { formatMetric, formatMetricSpread, formatSeconds, groupMetrics, isRate, isTemperature, meanAndSd, metricUnitLabel, metricValue } from "../lib/metricFormat.js";
 import { unitSuffix } from "../tempUnits.js";
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
@@ -455,7 +455,10 @@ export default function AnalysisView() {
     if (!stats || stats.mean == null) return "—";
     const mean = formatMetric(metric, stats.mean, tempUnit);
     if (stats.sd == null) return mean;
-    const sd = metric.unit === "s" ? formatSeconds(stats.sd) : formatMetric(metric, stats.sd, tempUnit, { withUnit: false });
+    // stats.sd is a spread, not a reading -- formatMetric would run a
+    // temperature's +32 °F offset through it too, which is wrong for a
+    // delta (a 7.8°C spread would show as +46°F instead of +14°F).
+    const sd = formatMetricSpread(metric, stats.sd, tempUnit, { withUnit: false });
     return `${mean} ± ${sd}`;
   };
 

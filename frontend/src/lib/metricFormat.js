@@ -1,7 +1,7 @@
 // Showing the numbers from /api/analysis (see backend/app/roast_metrics.py):
 // times as m:ss, temperatures in the chosen display unit, the rest as plain
 // numbers. A metric here is one entry of GET /analysis/metrics.
-import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
+import { celsiusDeltaToUnit, celsiusToUnit, unitSuffix } from "../tempUnits.js";
 
 export function isTemperature(metric) {
   return metric.unit === "°C";
@@ -20,6 +20,19 @@ export function metricValue(metric, value, tempUnit) {
   return value;
 }
 
+// Same, but for a *spread* between two readings (a standard deviation, a
+// delta) rather than a single absolute reading -- a temperature metric's
+// +32 offset cancels out when subtracting two Fahrenheit values, so a
+// spread only ever scales by 9/5, same as a rate already does either way.
+// Using metricValue (and its +32) on a spread is the bug this exists to
+// avoid: a 7.8°C spread would come out as +46°F instead of +14°F.
+export function metricSpreadValue(metric, value, tempUnit) {
+  if (value == null) return null;
+  if (isTemperature(metric)) return celsiusDeltaToUnit(value, tempUnit);
+  if (isRate(metric)) return tempUnit === "f" ? value * 1.8 : value;
+  return value;
+}
+
 export function metricUnitLabel(metric, tempUnit) {
   if (isTemperature(metric)) return unitSuffix(tempUnit);
   if (isRate(metric)) return `${unitSuffix(tempUnit)}/min`;
@@ -34,10 +47,10 @@ export function formatSeconds(seconds) {
   return `${sign}${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
-export function formatMetric(metric, value, tempUnit, { withUnit = true } = {}) {
-  if (value == null) return "—";
-  if (metric.unit === "s") return formatSeconds(value);
-  const shown = metricValue(metric, value, tempUnit);
+// Shared tail for formatMetric/formatMetricSpread: `shown` is already
+// converted to the display unit (by metricValue or metricSpreadValue) --
+// this just handles decimals and the unit suffix, identical either way.
+function _formatShown(metric, shown, tempUnit, withUnit) {
   // Temperatures, rates and percentages always show one decimal so a column lines up.
   const fixed = isTemperature(metric) || isRate(metric) || metric.unit === "%";
   const text = fixed ? shown.toFixed(1) : Number.isInteger(shown) ? String(shown) : shown.toFixed(1);
@@ -48,6 +61,20 @@ export function formatMetric(metric, value, tempUnit, { withUnit = true } = {}) 
   if (metric.unit === "g") return `${text} g`;
   if (metric.unit === "/5") return `${text}/5`;
   return metric.unit ? `${text} ${metric.unit}` : text;
+}
+
+export function formatMetric(metric, value, tempUnit, { withUnit = true } = {}) {
+  if (value == null) return "—";
+  if (metric.unit === "s") return formatSeconds(value);
+  return _formatShown(metric, metricValue(metric, value, tempUnit), tempUnit, withUnit);
+}
+
+// Same as formatMetric, but for a spread (standard deviation, a delta)
+// rather than a single absolute reading -- see metricSpreadValue.
+export function formatMetricSpread(metric, value, tempUnit, { withUnit = true } = {}) {
+  if (value == null) return "—";
+  if (metric.unit === "s") return formatSeconds(value);
+  return _formatShown(metric, metricSpreadValue(metric, value, tempUnit), tempUnit, withUnit);
 }
 
 // Groups the metric list for a <select> with <optgroup>s.

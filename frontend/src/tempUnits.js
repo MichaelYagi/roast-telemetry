@@ -11,6 +11,17 @@ export function celsiusToUnit(celsius, unit) {
   return unit === "f" ? (celsius * 9) / 5 + 32 : celsius;
 }
 
+// For a *spread* between two temperatures (a standard deviation, a delta)
+// rather than a single absolute reading -- same 9/5 scale as celsiusToUnit,
+// but no +32 offset. The offset cancels out when subtracting two
+// Fahrenheit readings, so running a spread through celsiusToUnit is wrong
+// by a flat +32 every time (a 7.8°C spread would show as +46°F instead of
+// the correct +14°F).
+export function celsiusDeltaToUnit(celsiusDelta, unit) {
+  if (celsiusDelta == null) return null;
+  return unit === "f" ? (celsiusDelta * 9) / 5 : celsiusDelta;
+}
+
 // Inverse of celsiusToUnit -- needed wherever a live *control* (not just a
 // readout) is displayed/dragged in the selected unit but must still write
 // Celsius underneath (e.g. VerticalControlPanel's burner_sv_c slider).
