@@ -279,7 +279,7 @@ async def create_roast(request: RoastCreateRequest, http_request: Request) -> Ro
     except RoastSessionError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     storage.log_activity(
-        "roast", "create", username=http_request.state.user["username"], roast_id=session.id,
+        "roast", "create", **auth.actor(http_request), roast_id=session.id,
         roast_title=session.title, message=f'Created "{session.title}"',
     )
     return session.summary()
@@ -335,7 +335,7 @@ def delete_roast(roast_id: str, http_request: Request) -> None:
         status = 409 if "still active" in str(exc) else 404
         raise HTTPException(status_code=status, detail=str(exc)) from exc
     storage.log_activity(
-        "roast", "delete", username=http_request.state.user["username"], roast_id=roast_id,
+        "roast", "delete", **auth.actor(http_request), roast_id=roast_id,
         roast_title=row["title"] if row else None, message=f'Deleted "{row["title"] if row else roast_id}"',
     )
 
@@ -393,7 +393,7 @@ async def emergency_stop(roast_id: str, http_request: Request) -> dict:
     itself keeps recording (as cooling) so nothing already logged is lost."""
     session = _active_session(roast_id)
     session.control.refresh_limits()
-    written = await session.control.emergency_stop(username=http_request.state.user["username"])
+    written = await session.control.emergency_stop(**auth.actor(http_request))
     return {"ok": written, **session.control.status()}
 
 
@@ -407,7 +407,7 @@ async def start_program(roast_id: str, program: ProgramRequest, http_request: Re
     except RoastControlError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     storage.log_activity(
-        "safety", "automation_started", username=http_request.state.user["username"], roast_id=roast_id,
+        "safety", "automation_started", **auth.actor(http_request), roast_id=roast_id,
         roast_title=session.title, message=f'Started a custom program on "{session.title}"',
     )
     return session.control.status()
@@ -431,7 +431,7 @@ async def start_program_from_roast(roast_id: str, body: ProgramFromRoastRequest,
     except RoastControlError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     storage.log_activity(
-        "safety", "automation_started", username=http_request.state.user["username"], roast_id=roast_id,
+        "safety", "automation_started", **auth.actor(http_request), roast_id=roast_id,
         roast_title=session.title, message=f'Started a program on "{session.title}" repeating "{source.title}"',
     )
     return session.control.status()
@@ -447,7 +447,7 @@ async def start_feedback(roast_id: str, config: FeedbackRequest, http_request: R
     except RoastControlError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     storage.log_activity(
-        "safety", "automation_started", username=http_request.state.user["username"], roast_id=roast_id,
+        "safety", "automation_started", **auth.actor(http_request), roast_id=roast_id,
         roast_title=session.title, message=f'Started target control on "{session.title}"',
     )
     return session.control.status()
@@ -459,7 +459,7 @@ async def stop_automation(roast_id: str, http_request: Request) -> dict:
     session = _active_session(roast_id)
     session.control.stop_automation("stopped by the operator")
     storage.log_activity(
-        "safety", "automation_stopped", username=http_request.state.user["username"], roast_id=roast_id,
+        "safety", "automation_stopped", **auth.actor(http_request), roast_id=roast_id,
         roast_title=session.title, message=f'Stopped automation on "{session.title}"',
     )
     return session.control.status()
@@ -487,7 +487,7 @@ async def add_note(roast_id: str, note: NoteCreateRequest, http_request: Request
     await pubsub.publish(roast_id, {"type": "note", "roast_id": roast_id, "note": created})
     row = storage.get_roast_row(roast_id)
     storage.log_activity(
-        "roast", "add_note", username=http_request.state.user["username"], roast_id=roast_id,
+        "roast", "add_note", **auth.actor(http_request), roast_id=roast_id,
         roast_title=row["title"] if row else None, message=f'Added a note to "{row["title"] if row else roast_id}"',
     )
     return created
@@ -503,7 +503,7 @@ async def update_note(roast_id: str, note_id: str, update: NoteUpdateRequest, ht
     await pubsub.publish(roast_id, _notes_message(roast_id))
     row = storage.get_roast_row(roast_id)
     storage.log_activity(
-        "roast", "update_note", username=http_request.state.user["username"], roast_id=roast_id,
+        "roast", "update_note", **auth.actor(http_request), roast_id=roast_id,
         roast_title=row["title"] if row else None, message=f'Edited a note on "{row["title"] if row else roast_id}"',
     )
     return updated
@@ -519,7 +519,7 @@ async def delete_note(roast_id: str, note_id: str, http_request: Request) -> Non
     await pubsub.publish(roast_id, _notes_message(roast_id))
     row = storage.get_roast_row(roast_id)
     storage.log_activity(
-        "roast", "delete_note", username=http_request.state.user["username"], roast_id=roast_id,
+        "roast", "delete_note", **auth.actor(http_request), roast_id=roast_id,
         roast_title=row["title"] if row else None, message=f'Deleted a note on "{row["title"] if row else roast_id}"',
     )
 
@@ -561,7 +561,7 @@ async def delete_event(roast_id: str, event_id: str, http_request: Request) -> N
     await pubsub.publish(roast_id, {"type": "event_deleted", "roast_id": roast_id, "event_id": event_id})
     row = storage.get_roast_row(roast_id)
     storage.log_activity(
-        "roast", "delete_event", username=http_request.state.user["username"], roast_id=roast_id,
+        "roast", "delete_event", **auth.actor(http_request), roast_id=roast_id,
         roast_title=row["title"] if row else None, message=f'Deleted a milestone on "{row["title"] if row else roast_id}"',
     )
 
@@ -576,7 +576,7 @@ async def retime_event(roast_id: str, event_id: str, update: EventUpdateRequest,
     await pubsub.publish(roast_id, {"type": "event_updated", "roast_id": roast_id, "event": updated})
     row = storage.get_roast_row(roast_id)
     storage.log_activity(
-        "roast", "retime_event", username=http_request.state.user["username"], roast_id=roast_id,
+        "roast", "retime_event", **auth.actor(http_request), roast_id=roast_id,
         roast_title=row["title"] if row else None,
         message=f'Retimed a milestone to {update.time_s:.0f}s on "{row["title"] if row else roast_id}"',
     )
@@ -634,7 +634,7 @@ def _log_weight_change(roast_id: str, http_request: Request, action_text: str) -
     row = storage.get_roast_row(roast_id)
     title = row["title"] if row else roast_id
     storage.log_activity(
-        "roast", "set_weight", username=http_request.state.user["username"], roast_id=roast_id,
+        "roast", "set_weight", **auth.actor(http_request), roast_id=roast_id,
         roast_title=row["title"] if row else None, message=f'{action_text} on "{title}"',
     )
 
@@ -651,7 +651,7 @@ def set_outcome(roast_id: str, update: OutcomeUpdate, http_request: Request) -> 
         fields["tasting_notes"] = fields["tasting_notes"].strip() or None
     storage.update_roast(roast_id, **fields)
     storage.log_activity(
-        "roast", "set_outcome", username=http_request.state.user["username"], roast_id=roast_id,
+        "roast", "set_outcome", **auth.actor(http_request), roast_id=roast_id,
         roast_title=row["title"], message=f'Updated how "{row["title"]}" turned out',
     )
     row = storage.get_roast_row(roast_id)
@@ -674,7 +674,7 @@ def set_beans(roast_id: str, update: RoastBeansUpdate, http_request: Request) ->
     if session is not None:
         session.beans, session.bean_id = fields["beans"], fields["bean_id"]
     storage.log_activity(
-        "roast", "set_beans", username=http_request.state.user["username"], roast_id=roast_id,
+        "roast", "set_beans", **auth.actor(http_request), roast_id=roast_id,
         roast_title=row["title"], message=f'Set beans on "{row["title"]}" to "{fields["beans"] or "(none)"}"',
     )
     return fields
@@ -689,7 +689,7 @@ def set_tags(roast_id: str, update: TagsUpdateRequest, http_request: Request) ->
     row = storage.get_roast_row(roast_id)
     tags_text = ", ".join(update.tags) or "(none)"
     storage.log_activity(
-        "roast", "set_tags", username=http_request.state.user["username"], roast_id=roast_id,
+        "roast", "set_tags", **auth.actor(http_request), roast_id=roast_id,
         roast_title=row["title"] if row else None,
         message=f'Set tags on "{row["title"] if row else roast_id}" to {tags_text}',
     )
@@ -956,7 +956,7 @@ def import_alog(path: str, http_request: Request, title: Optional[str] = None) -
     except (FileNotFoundError, ValueError, RoastlogParseError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     storage.log_activity(
-        "roast", "import", username=user, roast_id=summary.id, roast_title=summary.title,
+        "roast", "import", **auth.actor(http_request), roast_id=summary.id, roast_title=summary.title,
         message=f'Imported "{summary.title}" from {os.path.basename(path)}',
     )
     return summary
@@ -967,7 +967,9 @@ def import_alog(path: str, http_request: Request, title: Optional[str] = None) -
 MAX_ALOG_UPLOAD_BYTES = 25 * 1024 * 1024
 
 
-def _import_uploaded_bytes(data: bytes, *, filename: Optional[str], title: Optional[str], created_by_username: str) -> RoastSummary:
+def _import_uploaded_bytes(
+    data: bytes, *, filename: Optional[str], title: Optional[str], created_by_username: str, platform: str
+) -> RoastSummary:
     """The shared tail of import-upload, run in a worker thread: picks a reader
     by the uploaded file's own extension (falling back to content for a missing
     or unrecognized one), same split as the server-path /import above."""
@@ -980,7 +982,7 @@ def _import_uploaded_bytes(data: bytes, *, filename: Optional[str], title: Optio
         except RoastlogParseError as exc:
             raise HTTPException(status_code=400, detail=f"{label} doesn't look like a roast log spreadsheet ({exc}).") from exc
         summary = session_manager.import_table(parsed=parsed, title=title, created_by_username=created_by_username)
-        _log_import(summary, label, created_by_username)
+        _log_import(summary, label, created_by_username, platform)
         return summary
 
     if ext in (".csv", ".tsv"):
@@ -993,7 +995,7 @@ def _import_uploaded_bytes(data: bytes, *, filename: Optional[str], title: Optio
         except RoastlogParseError as exc:
             raise HTTPException(status_code=400, detail=f"{label} doesn't look like a roast log table ({exc}).") from exc
         summary = session_manager.import_table(parsed=parsed, title=title, created_by_username=created_by_username)
-        _log_import(summary, label, created_by_username)
+        _log_import(summary, label, created_by_username, platform)
         return summary
 
     # .alog, .json, or an extension-less/unrecognized file -- the native
@@ -1003,7 +1005,7 @@ def _import_uploaded_bytes(data: bytes, *, filename: Optional[str], title: Optio
         with os.fdopen(fd, "wb") as f:
             f.write(data)
         summary = session_manager.import_alog(tmp_path, title, created_by_username=created_by_username)
-        _log_import(summary, label, created_by_username)
+        _log_import(summary, label, created_by_username, platform)
         return summary
     except (FileNotFoundError, ValueError, SyntaxError, UnicodeDecodeError) as exc:
         # Our own explanations (e.g. a missing required field) are worth showing;
@@ -1021,9 +1023,9 @@ def _import_uploaded_bytes(data: bytes, *, filename: Optional[str], title: Optio
             pass
 
 
-def _log_import(summary: RoastSummary, label: str, username: str) -> None:
+def _log_import(summary: RoastSummary, label: str, username: str, platform: str) -> None:
     storage.log_activity(
-        "roast", "import", username=username, roast_id=summary.id, roast_title=summary.title,
+        "roast", "import", username=username, platform=platform, roast_id=summary.id, roast_title=summary.title,
         message=f'Imported "{summary.title}" from {label}',
     )
 
@@ -1055,7 +1057,8 @@ async def import_alog_upload(
     if not data.strip():
         raise HTTPException(status_code=400, detail=f"{label} is empty.")
     return await run_in_threadpool(
-        _import_uploaded_bytes, data, filename=filename, title=title, created_by_username=request.state.user["username"]
+        _import_uploaded_bytes, data, filename=filename, title=title,
+        created_by_username=request.state.user["username"], platform=auth.client_platform(request),
     )
 
 

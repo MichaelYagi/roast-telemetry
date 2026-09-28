@@ -2077,7 +2077,8 @@ button:disabled {
 
 /* ActivityView's category pills -- "roast" edits are routine (same blue as
    status-stopped), "safety" events (Emergency Stop, fail-safes, automation)
-   get the same red as status-aborted since they're the higher-stakes ones. */
+   get the same red as status-aborted since they're the higher-stakes ones.
+   "auth" (logins/logouts) is routine bookkeeping -- neutral slate. */
 .status-roast {
   background: #dbeafe;
   color: #1e40af;
@@ -2086,6 +2087,11 @@ button:disabled {
 .status-safety {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.status-auth {
+  background: #e2e8f0;
+  color: #334155;
 }
 
 .status-idle {

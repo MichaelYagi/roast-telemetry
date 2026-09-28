@@ -106,3 +106,73 @@ def require_admin(request: Request) -> dict:
     if user["role"] != "admin":
         raise HTTPException(403, "Admin access required")
     return user
+
+
+# -- Sign-in/sign-out activity log entries ------------------------------------
+
+# Sent by non-browser clients that want to name themselves in the activity
+# log (the Roast Telemetry mobile app sends e.g. "Roast Telemetry app 1.0.0
+# on Android 14") -- a browser's User-Agent is parsed instead. Client-
+# supplied either way, so it's a label for the log, never trusted for
+# anything else.
+CLIENT_PLATFORM_HEADER = "X-Client-Platform"
+_MAX_PLATFORM_LEN = 80
+_MAX_USER_AGENT_LEN = 300
+
+# First match wins, so the more specific tokens come first: Edge and Opera
+# UAs also say "Chrome", Chrome's also says "Safari", Chrome/Firefox on iOS
+# say "CriOS"/"FxiOS" instead of their usual names.
+_BROWSERS = (
+    ("Edg", "Edge"), ("OPR/", "Opera"), ("FxiOS", "Firefox"), ("Firefox/", "Firefox"),
+    ("CriOS", "Chrome"), ("SamsungBrowser", "Samsung Internet"), ("Chrome/", "Chrome"),
+    ("Safari/", "Safari"), ("curl/", "curl"), ("python-requests", "Python"), ("okhttp", "Android app"),
+)
+_OSES = (
+    ("iPhone", "iPhone"), ("iPad", "iPad"), ("Android", "Android"), ("Windows", "Windows"),
+    ("CrOS", "ChromeOS"), ("Mac OS X", "macOS"), ("Macintosh", "macOS"), ("Linux", "Linux"),
+)
+
+
+def _clean(value: str, limit: int) -> str:
+    return "".join(ch for ch in value if ch.isprintable()).strip()[:limit]
+
+
+def client_platform(request: Request) -> str:
+    """A short human label for what's on the other end of this request --
+    "Chrome on Windows", "Safari on iPhone", "Roast Telemetry app 1.0.0 on
+    Android 14" -- for the activity log's login/logout entries."""
+    declared = _clean(request.headers.get(CLIENT_PLATFORM_HEADER, ""), _MAX_PLATFORM_LEN)
+    if declared:
+        return declared
+    ua = request.headers.get("User-Agent", "")
+    browser = next((name for token, name in _BROWSERS if token in ua), None)
+    os_name = next((name for token, name in _OSES if token in ua), None)
+    if browser and os_name:
+        return f"{browser} on {os_name}"
+    return browser or os_name or "Unknown platform"
+
+
+def actor(request: Request) -> dict:
+    """username + platform for an activity_log row caused by this request --
+    `storage.log_activity(..., **auth.actor(request), ...)`. Only for routes
+    behind main.py's require_login gate (request.state.user is set there)."""
+    return {"username": request.state.user["username"], "platform": client_platform(request)}
+
+
+def log_sign_in_event(request: Request, action: str, username: str, method: str) -> None:
+    """One activity_log row per successful login/logout (category "auth").
+    Failed attempts are deliberately not logged: the log only keeps the
+    newest storage.ACTIVITY_LOG_MAX_ROWS entries, so a burst of bad
+    passwords would push real safety/roast history out of it."""
+    platform = client_platform(request)
+    storage.log_activity(
+        "auth",
+        action,
+        username=username,
+        platform=platform,
+        message=f"{'Logged in' if action == 'login' else 'Logged out'} ({platform})",
+        detail={
+            "method": method,
+            "user_agent": _clean(request.headers.get("User-Agent", ""), _MAX_USER_AGENT_LEN) or None,
+        },
+    )

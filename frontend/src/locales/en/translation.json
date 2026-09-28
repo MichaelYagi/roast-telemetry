@@ -891,10 +891,11 @@
       "all": "All",
       "roastEdits": "Roast edits",
       "safetyControl": "Safety & control",
+      "signIns": "Logins & logouts",
       "action": "Action",
       "clearFilters": "Clear filters"
     },
-    "hint": "Every roast delete/edit and safety-critical control event -- kept up to the newest 5000 entries.",
+    "hint": "Every roast delete/edit, safety-critical control event, and login/logout (with the device it came from) -- kept up to the newest 5000 entries.",
     "download": "Download",
     "table": {
       "time": "Time",
@@ -903,6 +904,7 @@
       "roast": "Roast",
       "message": "Message",
       "user": "User",
+      "platform": "Platform",
       "loading": "Loading…",
       "noMatch": "No activity matches these filters.",
       "noneYet": "No activity yet."

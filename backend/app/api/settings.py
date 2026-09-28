@@ -7,7 +7,7 @@ import re
 from fastapi import APIRouter, Request
 from sse_starlette.sse import EventSourceResponse
 
-from .. import ollama_client, storage
+from .. import auth, ollama_client, storage
 from ..models import BREAKOUT_PANEL_KEYS, CHART_SERIES_KEYS, VERTICAL_CONTROL_KEYS, AppSettings, OllamaStatus
 from ..ws_manager import settings_pubsub
 
@@ -151,6 +151,7 @@ async def update_settings(settings: AppSettings, http_request: Request) -> AppSe
             "safety",
             "safety_disabled" if control.safety_disabled else "safety_enabled",
             username=user["username"] if user else None,
+            platform=auth.client_platform(http_request),
             message="Roaster safety disabled -- Emergency Stop, fail-safes and command limits are all off"
             if control.safety_disabled
             else "Roaster safety re-enabled",

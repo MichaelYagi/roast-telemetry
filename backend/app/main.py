@@ -151,14 +151,19 @@ async def require_login(request: Request, call_next):
     # not a cookie. Falls back to the browser's session cookie when it's
     # absent, so the two credentials are simply alternatives, not layered.
     user = None
+    auth_method = "api_key"
     api_key = request.headers.get("X-API-Key")
     if api_key:
         user = storage.get_user_by_api_key_hash(auth.hash_api_key(api_key))
     if user is None:
         user = auth.get_user_for_token(request.cookies.get(auth.SESSION_COOKIE))
+        auth_method = "password"
     if user is None or user["status"] != UserStatus.ALLOWED.value:
         return JSONResponse({"detail": "Not authenticated"}, status_code=401)
     request.state.user = user
+    # Which credential actually got this request in -- for the activity
+    # log's sign-in entries (see api/auth.py's /connect).
+    request.state.auth_method = auth_method
     return await call_next(request)
 
 

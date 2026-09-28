@@ -177,14 +177,17 @@ CREATE TABLE IF NOT EXISTS saved_views (
 -- meaningful after the roast itself is deleted. username is NULL for
 -- autonomous events (a fail-safe or automation rule firing on its own, not
 -- from an HTTP request); no FK on either, same reasoning as
--- roasts.created_by_username below. See log_activity()'s own docstring for
--- the retention trim.
+-- roasts.created_by_username below. platform is what the action came from
+-- ("Chrome on Windows", "Roast Telemetry app 1.0.0 on Android 14" -- see
+-- auth.client_platform), or AUTOMATIC_PLATFORM for those autonomous events.
+-- See log_activity()'s own docstring for the retention trim.
 CREATE TABLE IF NOT EXISTS activity_log (
     id TEXT PRIMARY KEY,
     created_at TEXT NOT NULL,
     category TEXT NOT NULL,
     action TEXT NOT NULL,
     username TEXT,
+    platform TEXT,
     roast_id TEXT,
     roast_title TEXT,
     message TEXT NOT NULL,
@@ -198,6 +201,9 @@ CREATE INDEX IF NOT EXISTS idx_activity_log_roast_id ON activity_log(roast_id);
 # log_activity() itself. A module constant so tests can lower it instead of
 # inserting thousands of real rows to exercise the trim.
 ACTIVITY_LOG_MAX_ROWS = 5000
+# activity_log.platform for events the server fires on its own (fail-safe
+# trips, automation rules) -- no request, so no user and no client device.
+AUTOMATIC_PLATFORM = "Automatic (server)"
 
 
 @contextmanager
@@ -304,6 +310,12 @@ def init_db() -> None:
         if "api_key_hash" not in user_cols:
             c.execute("ALTER TABLE users ADD COLUMN api_key_hash TEXT")
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_api_key_hash ON users(api_key_hash)")
+        # Idempotent migration for DBs created before activity_log recorded
+        # the platform. Older rows just stay NULL (unknown) -- there's
+        # nothing to reconstruct it from.
+        activity_cols = {row[1] for row in c.execute("PRAGMA table_info(activity_log)")}
+        if "platform" not in activity_cols:
+            c.execute("ALTER TABLE activity_log ADD COLUMN platform TEXT")
 
 
 def alog_path_for(roast_id: str) -> str:
@@ -1155,6 +1167,7 @@ def log_activity(
     action: str,
     *,
     username: Optional[str] = None,
+    platform: str,
     roast_id: Optional[str] = None,
     roast_title: Optional[str] = None,
     message: str,
@@ -1163,19 +1176,25 @@ def log_activity(
     """Fire-and-forget: never raises. A logging failure must never break the
     mutation it's attached to (e.g. deleting a roast must still succeed even
     if this insert fails), so every call site is a plain one-liner and the
-    try/except lives here once, not at each of the ~15 call sites."""
+    try/except lives here once, not at each of the ~15 call sites.
+
+    `platform` is required, with no default, so a new call site can't
+    silently leave it out: request-driven ones pass **auth.actor(request)
+    (user + platform together), autonomous ones AUTOMATIC_PLATFORM."""
     try:
         with _conn() as c:
             c.execute(
                 """INSERT INTO activity_log
-                   (id, created_at, category, action, username, roast_id, roast_title, message, detail_json)
-                   VALUES (:id, :created_at, :category, :action, :username, :roast_id, :roast_title, :message, :detail_json)""",
+                   (id, created_at, category, action, username, platform, roast_id, roast_title, message, detail_json)
+                   VALUES (:id, :created_at, :category, :action, :username, :platform, :roast_id, :roast_title,
+                           :message, :detail_json)""",
                 {
                     "id": str(uuid.uuid4()),
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "category": category,
                     "action": action,
                     "username": username,
+                    "platform": platform,
                     "roast_id": roast_id,
                     "roast_title": roast_title,
                     "message": message,

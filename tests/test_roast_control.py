@@ -249,7 +249,7 @@ def test_emergency_stop_turns_the_heater_off_and_stops_automation():
     session.control.start_program([ProgramStep(time_s=0, heater_pct=80)], "test")
 
     async def body():
-        return await session.control.emergency_stop()
+        return await session.control.emergency_stop(username="test-admin", platform="Chrome on Windows")
 
     assert asyncio.run(body()) is True
     assert session.device.writes[-1] == {"heater_pct": 0.0, "fan_pct": 100}
@@ -264,7 +264,7 @@ def test_emergency_stop_reports_when_it_could_not_reach_the_roaster():
     feed(session, 0)
 
     async def body():
-        return await session.control.emergency_stop()
+        return await session.control.emergency_stop(username="test-admin", platform="Chrome on Windows")
 
     assert asyncio.run(body()) is False
     assert any("couldn't reach" in e["label"] for e in session.events)
@@ -281,7 +281,7 @@ def test_safety_disabled_makes_emergency_stop_a_no_op(isolated_db):
     session.control.start_program([ProgramStep(time_s=0, heater_pct=80)], "test")
 
     async def body():
-        return await session.control.emergency_stop()
+        return await session.control.emergency_stop(username="test-admin", platform="Chrome on Windows")
 
     assert asyncio.run(body()) is False
     assert session.device.writes == []  # nothing written at all, not even a failed attempt

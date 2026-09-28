@@ -218,9 +218,13 @@ class ActivityLogEntry(BaseModel):
 
     id: str
     created_at: str
-    category: Literal["roast", "safety"]
+    category: Literal["roast", "safety", "auth"]
     action: str
     username: Optional[str] = None
+    # What it came from -- "Chrome on Windows", "Roast Telemetry app ... on
+    # Android 14", or "Automatic (server)"; None only for rows logged
+    # before this column existed.
+    platform: Optional[str] = None
     roast_id: Optional[str] = None
     roast_title: Optional[str] = None
     message: str

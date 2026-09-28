@@ -969,7 +969,7 @@ class RoastSession:
             # Autonomous -- no HTTP request in flight, so no username (same
             # as the fail-safe trips in control.py's enter_safe_state).
             storage.log_activity(
-                "safety", "automation_rule_fired", roast_id=self.id, roast_title=self.title,
+                "safety", "automation_rule_fired", platform=storage.AUTOMATIC_PLATFORM, roast_id=self.id, roast_title=self.title,
                 message=f'Automation rule fired on "{self.title}" ({self._trigger_label(rule)})'
                 + (f": {rule.message}" if rule.message else ""),
             )

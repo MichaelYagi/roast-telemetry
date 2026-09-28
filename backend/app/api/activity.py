@@ -1,5 +1,6 @@
-"""Who did what, when -- roast deletes/edits and safety-critical control
-events (Emergency Stop, fail-safe trips, automation start/stop/fire). See
+"""Who did what, when -- roast deletes/edits, safety-critical control
+events (Emergency Stop, fail-safe trips, automation start/stop/fire), and
+logins/logouts with the platform they came from (auth.log_sign_in_event). See
 storage.py's activity_log table and log_activity() for how rows get written;
 this module only reads and exports them."""
 from __future__ import annotations
@@ -17,13 +18,13 @@ from ..models import ActivityLogEntry
 
 router = APIRouter(prefix="/activity", tags=["activity"])
 
-_COLUMNS = ["created_at", "category", "action", "username", "roast_id", "roast_title", "message", "detail_json"]
+_COLUMNS = ["created_at", "category", "action", "username", "platform", "roast_id", "roast_title", "message", "detail_json"]
 
 
 def _to_entry(row: dict) -> ActivityLogEntry:
     return ActivityLogEntry(
         id=row["id"], created_at=row["created_at"], category=row["category"], action=row["action"],
-        username=row.get("username"), roast_id=row.get("roast_id"), roast_title=row.get("roast_title"),
+        username=row.get("username"), platform=row.get("platform"), roast_id=row.get("roast_id"), roast_title=row.get("roast_title"),
         message=row["message"], detail=json.loads(row["detail_json"]) if row.get("detail_json") else None,
     )
 

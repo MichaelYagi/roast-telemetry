@@ -36,7 +36,7 @@ def auth_status() -> dict:
 
 
 @router.post("/register", response_model=UserPublic, status_code=201)
-def register(payload: RegisterRequest, response: Response) -> UserPublic:
+def register(payload: RegisterRequest, request: Request, response: Response) -> UserPublic:
     username = payload.username.strip()
     if not username:
         raise HTTPException(400, "Username is required")
@@ -62,11 +62,12 @@ def register(payload: RegisterRequest, response: Response) -> UserPublic:
         # there's no admin yet to click Allow, so requiring approval here
         # would permanently lock the app.
         auth.start_session(response, user["id"])
+        auth.log_sign_in_event(request, "login", user["username"], "password")
     return _public(user)
 
 
 @router.post("/login", response_model=UserPublic)
-def login(payload: LoginRequest, response: Response) -> UserPublic:
+def login(payload: LoginRequest, request: Request, response: Response) -> UserPublic:
     user = storage.get_user_by_username(payload.username.strip())
     if user is None or not auth.verify_password(payload.password, user["password_hash"]):
         raise HTTPException(401, "Incorrect username or password")
@@ -75,6 +76,7 @@ def login(payload: LoginRequest, response: Response) -> UserPublic:
     if user["status"] == UserStatus.DENIED.value:
         raise HTTPException(403, "Your account has been denied access")
     auth.start_session(response, user["id"], remember_me=payload.remember_me)
+    auth.log_sign_in_event(request, "login", user["username"], "password")
     return _public(user)
 
 
@@ -82,8 +84,27 @@ def login(payload: LoginRequest, response: Response) -> UserPublic:
 def logout(request: Request, response: Response) -> None:
     # Deliberately outside the require_login gate (see main.py's
     # _PUBLIC_API_PATHS) -- clearing a stale/invalid cookie has to work
-    # even when it no longer maps to a real session.
+    # even when it no longer maps to a real session. Only a session that
+    # still belonged to someone gets an activity-log entry -- there's no
+    # username to attribute a stale cookie's logout to.
+    user = auth.get_user_for_token(request.cookies.get(auth.SESSION_COOKIE))
     auth.end_session(request, response)
+    if user is not None:
+        auth.log_sign_in_event(request, "logout", user["username"], "password")
+
+
+# API-key clients (the mobile app) have no session to start or end -- the
+# key goes on every request -- so these exist purely so that "connected"/
+# "disconnected" shows up in the activity log alongside browser logins.
+# Called once when the user connects/disconnects, not on every app launch.
+@router.post("/connect", status_code=204)
+def connect(request: Request) -> None:
+    auth.log_sign_in_event(request, "login", request.state.user["username"], request.state.auth_method)
+
+
+@router.post("/disconnect", status_code=204)
+def disconnect(request: Request) -> None:
+    auth.log_sign_in_event(request, "logout", request.state.user["username"], request.state.auth_method)
 
 
 @router.get("/me", response_model=UserPublic)

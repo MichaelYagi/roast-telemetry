@@ -8,6 +8,7 @@ const ACTIONS = [
   "add_note", "update_note", "delete_note", "delete_event", "retime_event",
   "safe_state", "automation_started", "automation_stopped", "automation_rule_fired",
   "safety_disabled", "safety_enabled",
+  "login", "logout",
 ];
 
 function formatWhen(iso) {
@@ -91,6 +92,7 @@ export default function ActivityView() {
             <option value="">{t("activity.filters.all")}</option>
             <option value="roast">{t("activity.filters.roastEdits")}</option>
             <option value="safety">{t("activity.filters.safetyControl")}</option>
+            <option value="auth">{t("activity.filters.signIns")}</option>
           </select>
         </label>
         <label>
@@ -154,17 +156,18 @@ export default function ActivityView() {
                 <th>{t("activity.table.roast")}</th>
                 <th>{t("activity.table.message")}</th>
                 <th>{t("activity.table.user")}</th>
+                <th>{t("activity.table.platform")}</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr className="table-message">
-                  <td colSpan={6}>{t("activity.table.loading")}</td>
+                  <td colSpan={7}>{t("activity.table.loading")}</td>
                 </tr>
               )}
               {!loading && entries.length === 0 && (
                 <tr className="table-message">
-                  <td colSpan={6}>{anyFilter ? t("activity.table.noMatch") : t("activity.table.noneYet")}</td>
+                  <td colSpan={7}>{anyFilter ? t("activity.table.noMatch") : t("activity.table.noneYet")}</td>
                 </tr>
               )}
               {entries.map((e) => (
@@ -179,6 +182,7 @@ export default function ActivityView() {
                   </td>
                   <td>{e.message}</td>
                   <td>{e.username || "—"}</td>
+                  <td>{e.platform || "—"}</td>
                 </tr>
               ))}
             </tbody>
