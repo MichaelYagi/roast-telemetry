@@ -96,18 +96,24 @@ function AppShell() {
           <div className="app-title-group">
             <Link to="/" className="app-title-link">
               <img className="app-logo" src="/icon-48x48.png" alt="" width="28" height="28" />
-              <h1>Roast Telemetry</h1>
+              {/* Wraps the title and status dot together so they stay one
+                  grid item at phone width (see the app-title-text rules in
+                  styles.css) -- previously the dot had no explicit mobile
+                  grid placement and landed on its own row below the nav. */}
+              <span className="app-title-text">
+                <h1>Roast Telemetry</h1>
+                <span
+                  className={`server-status-dot server-status-dot-${serverStatus}`}
+                  title={
+                    serverStatus === "green"
+                      ? t("app.statusDot.connected")
+                      : serverStatus === "yellow"
+                        ? t("app.statusDot.notConnected")
+                        : t("app.statusDot.unreachable")
+                  }
+                />
+              </span>
             </Link>
-            <span
-              className={`server-status-dot server-status-dot-${serverStatus}`}
-              title={
-                serverStatus === "green"
-                  ? t("app.statusDot.connected")
-                  : serverStatus === "yellow"
-                    ? t("app.statusDot.notConnected")
-                    : t("app.statusDot.unreachable")
-              }
-            />
             <ThemePicker />
           </div>
           <nav>

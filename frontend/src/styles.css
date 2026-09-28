@@ -270,6 +270,17 @@ body.breakout-split-active .app-header-inner {
   text-decoration: underline;
 }
 
+/* Title + status dot as one unit -- lets the phone-width grid (below)
+   place them together in a single cell instead of the dot needing (and,
+   before this existed, not having) its own explicit grid placement.
+   min-width: 0 is what lets h1's own overflow/ellipsis rule inside it
+   actually take effect in a flex context. */
+.app-title-text {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
 .theme-picker {
   position: relative;
 }
@@ -3777,9 +3788,13 @@ button.link-neutral {
     display: contents;
   }
 
-  /* Stays transparent here too -- the icon and h1 below still need to
-     land in their own separate grid cells (columns 1 and 2), which only
-     works if this link doesn't box them together into one grid item. */
+  /* Stays transparent here too -- the icon and the title+dot group below
+     still need to land in their own separate grid cells (columns 1 and
+     2), which only works if this link doesn't box them together into one
+     grid item. .app-title-text itself is NOT display:contents, so it (and
+     the dot inside it) stays one real grid item instead of the dot
+     needing -- and not having -- its own explicit placement, which used
+     to leave it to fall into an auto-placed row 3 by itself. */
   .app-title-link {
     display: contents;
   }
@@ -3789,9 +3804,12 @@ button.link-neutral {
     grid-row: 1;
   }
 
-  .app-header h1 {
+  .app-title-text {
     grid-column: 2;
     grid-row: 1;
+  }
+
+  .app-header h1 {
     overflow: hidden;
     font-size: 1.05rem;
     text-overflow: ellipsis;
