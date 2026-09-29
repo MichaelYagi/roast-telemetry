@@ -480,14 +480,6 @@ const RoastChart = forwardRef(function RoastChart({
   // chart.update('none') itself (see startDrag below) specifically to
   // avoid a React re-render on every pixel of mouse movement.
   const dragRef = useRef(null);
-  // Whether the drag-to-pan gesture that's just starting should pan
-  // vertically instead of the default horizontal -- read by zoom.pan.mode
-  // below (a function, so chartjs-plugin-zoom re-evaluates it fresh per
-  // gesture) and set from onPanStart, off the same native event Hammer
-  // hands that callback (event.srcEvent.altKey). A ref, not state: this
-  // only needs to be current at the instant a new drag starts, never
-  // worth a React re-render.
-  const altPanRef = useRef(false);
 
   // Closes the right-click context menu on any click outside it, same
   // pattern as the chart-options popover below.
@@ -773,18 +765,13 @@ const RoastChart = forwardRef(function RoastChart({
           // disabling the gesture recognizer entirely.
           pan: {
             enabled: true,
-            // A function (not a fixed "x") so chartjs-plugin-zoom
-            // re-resolves it fresh for every new drag gesture (see
-            // getEnabledScalesByPoint in the plugin source) -- reads
-            // altPanRef, set just below from the gesture's own starting
-            // event. Alt+drag pans vertically (yTemp/yRor both, so it
-            // works regardless of which one the drag starts over) instead
-            // of the default horizontal -- lets a horizontally-zoomed-in
-            // curve that now runs above/below the fixed temp/RoR axis
-            // range (e.g. RoR dipping negative near Drop) be brought back
-            // into view without giving up the x zoom to re-zoom out.
-            mode: () => (altPanRef.current ? "y" : "x"),
-            onPanStart: ({ chart, event, point }) => {
+            // Free 2D pan -- not locked to horizontal. Was briefly
+            // horizontal-only-by-default with vertical only via an Alt
+            // modifier; dropped that after the user pointed out a plain
+            // drag should just move whichever direction you actually
+            // drag, not follow a fixed axis lock keyed to a modifier key.
+            mode: "xy",
+            onPanStart: ({ chart, point }) => {
               const hit = onRetimeEvent ? hitTestMarker(chart, events, point.x, point.y, tempUnit) : null;
               if (hit) {
                 dragRef.current = { eventId: hit.id };
@@ -794,7 +781,6 @@ const RoastChart = forwardRef(function RoastChart({
                 return false;
               }
               if (!interactive) return false; // not a marker, and panning itself is off right now (live roast)
-              altPanRef.current = Boolean(event?.srcEvent?.altKey);
               return undefined; // let normal panning proceed
             },
           },
