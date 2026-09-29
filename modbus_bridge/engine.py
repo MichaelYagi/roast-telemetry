@@ -200,12 +200,20 @@ class ModbusEngine:
         # echo below (see module docstring for the source/confidence).
         air_feedback_register: Optional[int] = 8451,
         air_feedback_divisor: float = 100.0,
+        # raw = pct * frequency_scale + frequency_offset, written to
+        # air/drum_frequency_register (see _write_vfd_drive below). 100/0
+        # on the FZ-94's Delta VFD-L; exposed for a different VFD that
+        # needs a genuinely different linear mapping.
+        air_frequency_scale: float = 100.0,
+        air_frequency_offset: float = 0.0,
         drum_slave_id: int = 1,
         drum_control_register: Optional[int] = 8192,
         drum_frequency_register: Optional[int] = 8193,
         drum_range: tuple[float, float] = (0, 70),
         drum_feedback_register: Optional[int] = 8451,
         drum_feedback_divisor: float = 100.0,
+        drum_frequency_scale: float = 100.0,
+        drum_frequency_offset: float = 0.0,
         dry_end_c: Optional[float] = 160.0,
         fc_start_c: Optional[float] = 196.0,
         # Opt-in -- off by default, matching real hardware meaning a real
@@ -239,12 +247,16 @@ class ModbusEngine:
         self.air_range = air_range
         self.air_feedback_register = air_feedback_register
         self.air_feedback_divisor = air_feedback_divisor or 1.0
+        self.air_frequency_scale = air_frequency_scale
+        self.air_frequency_offset = air_frequency_offset
         self.drum_slave_id = drum_slave_id
         self.drum_control_register = drum_control_register
         self.drum_frequency_register = drum_frequency_register
         self.drum_range = drum_range
         self.drum_feedback_register = drum_feedback_register
         self.drum_feedback_divisor = drum_feedback_divisor or 1.0
+        self.drum_frequency_scale = drum_frequency_scale
+        self.drum_frequency_offset = drum_frequency_offset
 
         # Everything above is kept exactly as before (including every
         # individual attribute -- tests assert on e.g. engine.bt_slave_id
@@ -265,9 +277,11 @@ class ModbusEngine:
             air_slave_id=self.air_slave_id, air_control_register=self.air_control_register,
             air_frequency_register=self.air_frequency_register, air_range=self.air_range,
             air_feedback_register=self.air_feedback_register, air_feedback_divisor=self.air_feedback_divisor,
+            air_frequency_scale=self.air_frequency_scale, air_frequency_offset=self.air_frequency_offset,
             drum_slave_id=self.drum_slave_id, drum_control_register=self.drum_control_register,
             drum_frequency_register=self.drum_frequency_register, drum_range=self.drum_range,
             drum_feedback_register=self.drum_feedback_register, drum_feedback_divisor=self.drum_feedback_divisor,
+            drum_frequency_scale=self.drum_frequency_scale, drum_frequency_offset=self.drum_frequency_offset,
         )
 
         self._dry_end_c = dry_end_c
@@ -297,7 +311,9 @@ class ModbusEngine:
         *, bt_slave_id, bt_register, bt_divisor, et_slave_id, et_register, et_divisor,
         dt_slave_id, dt_register, dt_divisor, burner_slave_id, burner_register, burner_divisor, burner_sv_range_c,
         air_slave_id, air_control_register, air_frequency_register, air_range, air_feedback_register, air_feedback_divisor,
+        air_frequency_scale, air_frequency_offset,
         drum_slave_id, drum_control_register, drum_frequency_register, drum_range, drum_feedback_register, drum_feedback_divisor,
+        drum_frequency_scale, drum_frequency_offset,
     ) -> tuple[list[ModbusTempChannel], list[ModbusControlChannel]]:
         """Translates the legacy flat FZ-94-shaped constructor args into
         the same two generic lists from_profile() builds directly from a
@@ -319,13 +335,15 @@ class ModbusEngine:
         if air_control_register is not None and air_frequency_register is not None:
             control_channels.append(ModbusControlChannel(
                 maps_to="fan_pct", kind=ModbusControlKind.VFD_DRIVE, slave_id=air_slave_id,
-                control_register=air_control_register, frequency_register=air_frequency_register, frequency_scale=100.0,
+                control_register=air_control_register, frequency_register=air_frequency_register,
+                frequency_scale=air_frequency_scale, frequency_offset=air_frequency_offset,
                 feedback_register=air_feedback_register, feedback_divisor=air_feedback_divisor, value_range=air_range,
             ))
         if drum_control_register is not None and drum_frequency_register is not None:
             control_channels.append(ModbusControlChannel(
                 maps_to="drum_speed_pct", kind=ModbusControlKind.VFD_DRIVE, slave_id=drum_slave_id,
-                control_register=drum_control_register, frequency_register=drum_frequency_register, frequency_scale=100.0,
+                control_register=drum_control_register, frequency_register=drum_frequency_register,
+                frequency_scale=drum_frequency_scale, frequency_offset=drum_frequency_offset,
                 feedback_register=drum_feedback_register, feedback_divisor=drum_feedback_divisor, value_range=drum_range,
             ))
         return temp_channels, control_channels
@@ -676,7 +694,7 @@ class ModbusEngine:
             logger.debug("write slave=%s reg=%s <- %s (run_state)", ch.slave_id, ch.control_register, run_state)
             run_result = self._control_client.write_register(ch.control_register, run_state, device_id=ch.slave_id)
             if clamped > 0:
-                freq_raw = int(round(clamped * ch.frequency_scale))
+                freq_raw = int(round(clamped * ch.frequency_scale + ch.frequency_offset))
                 logger.debug("write slave=%s reg=%s <- %s (frequency)", ch.slave_id, ch.frequency_register, freq_raw)
                 freq_result = self._control_client.write_register(
                     ch.frequency_register, freq_raw, device_id=ch.slave_id

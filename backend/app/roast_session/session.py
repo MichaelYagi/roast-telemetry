@@ -79,9 +79,9 @@ def _modbus_register_overrides(request: RoastCreateRequest) -> dict:
         "modbus_dt_slave_id", "modbus_dt_register", "modbus_dt_divisor",
         "modbus_burner_slave_id", "modbus_burner_register", "modbus_burner_divisor",
         "modbus_air_slave_id", "modbus_air_control_register", "modbus_air_frequency_register",
-        "modbus_air_feedback_register",
+        "modbus_air_feedback_register", "modbus_air_frequency_scale", "modbus_air_frequency_offset",
         "modbus_drum_slave_id", "modbus_drum_control_register", "modbus_drum_frequency_register",
-        "modbus_drum_feedback_register",
+        "modbus_drum_feedback_register", "modbus_drum_frequency_scale", "modbus_drum_frequency_offset",
     )
     for field in single_value_fields:
         value = getattr(request, field)

@@ -209,12 +209,16 @@ export default function LiveRoastView() {
     modbus_air_feedback_register: "",
     modbus_air_min_pct: "",
     modbus_air_max_pct: "",
+    modbus_air_frequency_scale: "",
+    modbus_air_frequency_offset: "",
     modbus_drum_slave_id: "",
     modbus_drum_control_register: "",
     modbus_drum_frequency_register: "",
     modbus_drum_feedback_register: "",
     modbus_drum_min_pct: "",
     modbus_drum_max_pct: "",
+    modbus_drum_frequency_scale: "",
+    modbus_drum_frequency_offset: "",
     modbus_burner_sv_min_c: "",
     modbus_burner_sv_max_c: "",
   });
@@ -741,12 +745,16 @@ export default function LiveRoastView() {
       payload.modbus_air_feedback_register = numOrNull(form.modbus_air_feedback_register);
       payload.modbus_air_min_pct = numOrNull(form.modbus_air_min_pct);
       payload.modbus_air_max_pct = numOrNull(form.modbus_air_max_pct);
+      payload.modbus_air_frequency_scale = numOrNull(form.modbus_air_frequency_scale);
+      payload.modbus_air_frequency_offset = numOrNull(form.modbus_air_frequency_offset);
       payload.modbus_drum_slave_id = numOrNull(form.modbus_drum_slave_id);
       payload.modbus_drum_control_register = numOrNull(form.modbus_drum_control_register);
       payload.modbus_drum_frequency_register = numOrNull(form.modbus_drum_frequency_register);
       payload.modbus_drum_feedback_register = numOrNull(form.modbus_drum_feedback_register);
       payload.modbus_drum_min_pct = numOrNull(form.modbus_drum_min_pct);
       payload.modbus_drum_max_pct = numOrNull(form.modbus_drum_max_pct);
+      payload.modbus_drum_frequency_scale = numOrNull(form.modbus_drum_frequency_scale);
+      payload.modbus_drum_frequency_offset = numOrNull(form.modbus_drum_frequency_offset);
       payload.modbus_burner_sv_min_c = numOrNull(form.modbus_burner_sv_min_c);
       payload.modbus_burner_sv_max_c = numOrNull(form.modbus_burner_sv_max_c);
       payload.alarms = form.alarmRules || [];
@@ -980,12 +988,16 @@ export default function LiveRoastView() {
       modbus_air_feedback_register: c.modbus_air_feedback_register ?? "",
       modbus_air_min_pct: c.modbus_air_min_pct ?? "",
       modbus_air_max_pct: c.modbus_air_max_pct ?? "",
+      modbus_air_frequency_scale: c.modbus_air_frequency_scale ?? "",
+      modbus_air_frequency_offset: c.modbus_air_frequency_offset ?? "",
       modbus_drum_slave_id: c.modbus_drum_slave_id ?? "",
       modbus_drum_control_register: c.modbus_drum_control_register ?? "",
       modbus_drum_frequency_register: c.modbus_drum_frequency_register ?? "",
       modbus_drum_feedback_register: c.modbus_drum_feedback_register ?? "",
       modbus_drum_min_pct: c.modbus_drum_min_pct ?? "",
       modbus_drum_max_pct: c.modbus_drum_max_pct ?? "",
+      modbus_drum_frequency_scale: c.modbus_drum_frequency_scale ?? "",
+      modbus_drum_frequency_offset: c.modbus_drum_frequency_offset ?? "",
       modbus_burner_sv_min_c: c.modbus_burner_sv_min_c ?? "",
       modbus_burner_sv_max_c: c.modbus_burner_sv_max_c ?? "",
       alarmRules: c.alarms || [],
@@ -1581,6 +1593,24 @@ export default function LiveRoastView() {
                       />
                     </label>
                     <label>
+                      {t("liveRoast.modbus.factor", { ch: "Fan" })}
+                      <input
+                        type="number"
+                        placeholder="100"
+                        value={form.modbus_air_frequency_scale}
+                        onChange={(e) => setForm({ ...form, modbus_air_frequency_scale: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      {t("liveRoast.modbus.offset", { ch: "Fan" })}
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={form.modbus_air_frequency_offset}
+                        onChange={(e) => setForm({ ...form, modbus_air_frequency_offset: e.target.value })}
+                      />
+                    </label>
+                    <label>
                       {t("liveRoast.modbus.minRpm", { ch: "Fan" })}
                       <input
                         type="number"
@@ -1634,6 +1664,24 @@ export default function LiveRoastView() {
                         placeholder="8451"
                         value={form.modbus_drum_feedback_register}
                         onChange={(e) => setForm({ ...form, modbus_drum_feedback_register: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      {t("liveRoast.modbus.factor", { ch: "Drum" })}
+                      <input
+                        type="number"
+                        placeholder="100"
+                        value={form.modbus_drum_frequency_scale}
+                        onChange={(e) => setForm({ ...form, modbus_drum_frequency_scale: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      {t("liveRoast.modbus.offset", { ch: "Drum" })}
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={form.modbus_drum_frequency_offset}
+                        onChange={(e) => setForm({ ...form, modbus_drum_frequency_offset: e.target.value })}
                       />
                     </label>
                     <label>
@@ -1780,30 +1828,30 @@ export default function LiveRoastView() {
                 </span>
               </label>
               <label>
-                {/* "RPM" matches the FZ-94's own real VFD drives; aillio_live's
-                    Fan/Drum are a small device-native scale (remapped from
-                    this same 0-100% field server-side, see
-                    aillio_bridge/r1.py), not RPM, so it gets the generic "%"
-                    label instead rather than a unit that isn't true for it. */}
-                {form.mode === "modbus_live" ? t("liveRoast.airRpmAtStart") : t("liveRoast.fanPctAtStart")}
+                {/* Every live mode's Fan/Drum is a 0-100% share of the
+                    drive's own max speed -- the FZ-94's VFD registers,
+                    Aillio's small device-native scale (remapped from this
+                    same field server-side, see aillio_bridge/r1.py) -- so
+                    this no longer needs a mode-specific label/suffix. */}
+                {t("liveRoast.fanPctAtStart")}
                 <span className="input-suffix-group">
                   <input
                     type="number" min="0" max="100"
                     value={form.fan_pct}
                     onChange={(e) => setForm({ ...form, fan_pct: e.target.value })}
                   />
-                  <span className="input-suffix">{form.mode === "modbus_live" ? "RPM" : "%"}</span>
+                  <span className="input-suffix">%</span>
                 </span>
               </label>
               <label>
-                {form.mode === "modbus_live" ? t("liveRoast.drumRpmAtStart") : t("liveRoast.drumPctAtStart")}
+                {t("liveRoast.drumPctAtStart")}
                 <span className="input-suffix-group">
                   <input
                     type="number" min="0" max="100"
                     value={form.drum_speed_pct}
                     onChange={(e) => setForm({ ...form, drum_speed_pct: e.target.value })}
                   />
-                  <span className="input-suffix">{form.mode === "modbus_live" ? "RPM" : "%"}</span>
+                  <span className="input-suffix">%</span>
                 </span>
               </label>
               <p className="hint" style={{ flexBasis: "100%" }}>

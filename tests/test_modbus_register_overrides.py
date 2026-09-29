@@ -31,7 +31,11 @@ def test_modbus_live_session_applies_register_overrides():
         modbus_air_feedback_register=102,
         modbus_air_min_pct=5.0,
         modbus_air_max_pct=95.0,
+        modbus_air_frequency_scale=50.0,
+        modbus_air_frequency_offset=1000.0,
         modbus_drum_slave_id=8,
+        modbus_drum_frequency_scale=10.0,
+        modbus_drum_frequency_offset=-50.0,
         modbus_burner_sv_min_c=120.0,
         modbus_burner_sv_max_c=200.0,
     )
@@ -49,7 +53,11 @@ def test_modbus_live_session_applies_register_overrides():
     assert engine.air_frequency_register == 101
     assert engine.air_feedback_register == 102
     assert engine.air_range == (5.0, 95.0)
+    assert engine.air_frequency_scale == 50.0
+    assert engine.air_frequency_offset == 1000.0
     assert engine.drum_slave_id == 8
+    assert engine.drum_frequency_scale == 10.0
+    assert engine.drum_frequency_offset == -50.0
     assert engine.burner_sv_range_c == (120.0, 200.0)
 
     # Untouched fields keep ModbusEngine's own defaults.
@@ -81,6 +89,10 @@ def test_modbus_live_session_defaults_match_modbus_engine_when_nothing_overridde
     assert engine.burner_register == 5
     assert engine.air_slave_id == 2
     assert engine.drum_slave_id == 1
+    assert engine.air_frequency_scale == 100.0
+    assert engine.air_frequency_offset == 0.0
+    assert engine.drum_frequency_scale == 100.0
+    assert engine.drum_frequency_offset == 0.0
     assert engine.burner_sv_range_c == (100.0, 260.0)
 
 

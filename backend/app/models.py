@@ -294,7 +294,10 @@ class ModbusControlChannel(BaseModel):
     # vfd_drive
     control_register: Optional[int] = None
     frequency_register: Optional[int] = None
-    frequency_scale: float = Field(default=100.0, description="raw = pct * frequency_scale; FZ-94's Delta VFD-L uses 100.")
+    frequency_scale: float = Field(
+        default=100.0, description="raw = pct * frequency_scale + frequency_offset; FZ-94's Delta VFD-L uses 100/0."
+    )
+    frequency_offset: float = Field(default=0.0, description="See frequency_scale. 0 on every profile shipped so far.")
     # direct_register
     write_register: Optional[int] = None
     write_scale: float = 1.0
@@ -469,12 +472,16 @@ class RoastCreateRequest(BaseModel):
     modbus_air_feedback_register: Optional[int] = Field(default=None, description="modbus_live, advanced: Air VFD actual-speed readback register. Default 8451.")
     modbus_air_min_pct: Optional[float] = Field(default=None, description="modbus_live, advanced: Air minimum %, paired with modbus_air_max_pct (both required together). Default 0.")
     modbus_air_max_pct: Optional[float] = Field(default=None, description="modbus_live, advanced: Air maximum %, paired with modbus_air_min_pct (both required together). Default 100.")
+    modbus_air_frequency_scale: Optional[float] = Field(default=None, description="modbus_live, advanced: Air VFD frequency-register factor (raw = pct * factor + offset). Default 100.")
+    modbus_air_frequency_offset: Optional[float] = Field(default=None, description="modbus_live, advanced: Air VFD frequency-register offset. See modbus_air_frequency_scale. Default 0.")
     modbus_drum_slave_id: Optional[int] = Field(default=None, description="modbus_live, advanced: Drum VFD Modbus slave ID. Default 1 (Air is 2).")
     modbus_drum_control_register: Optional[int] = Field(default=None, description="modbus_live, advanced: Drum VFD run/stop register. Default 8192.")
     modbus_drum_frequency_register: Optional[int] = Field(default=None, description="modbus_live, advanced: Drum VFD frequency-command register. Default 8193.")
     modbus_drum_feedback_register: Optional[int] = Field(default=None, description="modbus_live, advanced: Drum VFD actual-speed readback register. Default 8451.")
     modbus_drum_min_pct: Optional[float] = Field(default=None, description="modbus_live, advanced: Drum minimum %, paired with modbus_drum_max_pct (both required together). Default 0.")
     modbus_drum_max_pct: Optional[float] = Field(default=None, description="modbus_live, advanced: Drum maximum %, paired with modbus_drum_min_pct (both required together). Default 70.")
+    modbus_drum_frequency_scale: Optional[float] = Field(default=None, description="modbus_live, advanced: Drum VFD frequency-register factor (raw = pct * factor + offset). Default 100.")
+    modbus_drum_frequency_offset: Optional[float] = Field(default=None, description="modbus_live, advanced: Drum VFD frequency-register offset. See modbus_drum_frequency_scale. Default 0.")
     modbus_burner_sv_min_c: Optional[float] = Field(default=None, description="modbus_live, advanced: low end of the heater_pct(0%)->SV-temperature mapping, paired with modbus_burner_sv_max_c (both required together). Default 100.")
     modbus_burner_sv_max_c: Optional[float] = Field(default=None, description="modbus_live, advanced: high end of the heater_pct(100%)->SV-temperature mapping, paired with modbus_burner_sv_min_c (both required together). Default 250.")
     ms6514_port: Optional[str] = Field(default=None, description="Required when mode=ms6514_live: serial port the Mastech MS6514 is on, e.g. 'COM5'")

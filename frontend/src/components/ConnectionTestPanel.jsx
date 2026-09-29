@@ -11,33 +11,34 @@ const SAMPLE_INTERVAL_MS = 250; // just samples the already-live `latest` prop -
 // Per-(mode, channel) metadata for whichever channel(s) that mode's
 // write-test/nudge flow actually uses. fan_pct/drum_speed_pct mean
 // genuinely different things depending on which device is on the other
-// end -- Modbus's Fan/Drum are real RPM-reporting VFD drives (register
-// writes, see modbus_bridge/engine.py's own docstring: same registers
-// 8192/8193/8451, same blog-sourced-only origin, just different slave
-// IDs -- Drum is a genuine differential test if Fan's nudge doesn't
-// visibly move anything, not a "more trustworthy" alternative); Aillio's
-// Fan/Drum are a small device-native 0-100% scale sent as raw USB
-// command packets, not registers at all (see aillio_bridge/r1.py --
-// Heater/Fan move via relative +1/-1 packets, Drum via one absolute
-// packet). TC4's Heater (OT1, plain 0-100% PWM duty) has no feedback
-// register/poll at all, unlike the other two -- so it's the only one
-// that can't use the round-trip write-check below, only the nudge.
+// end -- Modbus's Fan/Drum are a 0-100% share of the VFD drives' max
+// frequency (register writes, see modbus_bridge/engine.py's own
+// docstring: same registers 8192/8193/8451, same blog-sourced-only
+// origin, just different slave IDs -- Drum is a genuine differential
+// test if Fan's nudge doesn't visibly move anything, not a "more
+// trustworthy" alternative); Aillio's Fan/Drum are also a small
+// device-native 0-100% scale, but sent as raw USB command packets, not
+// registers at all (see aillio_bridge/r1.py -- Heater/Fan move via
+// relative +1/-1 packets, Drum via one absolute packet). TC4's Heater
+// (OT1, plain 0-100% PWM duty) has no feedback register/poll at all,
+// unlike the other two -- so it's the only one that can't use the
+// round-trip write-check below, only the nudge.
 // A flat, channel-name-only map can't express this (fan_pct would mean
 // three different things), so this is keyed by mode first.
 const CHANNEL_META = {
   modbus_live: {
-    fan_pct: { label: "Fan", unit: "RPM", nudgeMax: 100, nudgeAmount: 5, nudgeHoldMs: 2000, moverLabel: "fan" },
-    drum_speed_pct: { label: "Drum", unit: "RPM", nudgeMax: 70, nudgeAmount: 5, nudgeHoldMs: 2000, moverLabel: "drum motor" },
+    fan_pct: { label: "Fan", unit: "%", nudgeMax: 100, nudgeAmount: 5, nudgeHoldMs: 2000, moverLabel: "fan" },
+    drum_speed_pct: { label: "Drum", unit: "%", nudgeMax: 70, nudgeAmount: 5, nudgeHoldMs: 2000, moverLabel: "drum motor" },
   },
   aillio_live: {
     fan_pct: { label: "Fan", unit: "%", nudgeMax: 100, nudgeAmount: 10, nudgeHoldMs: 2000, moverLabel: "fan" },
     drum_speed_pct: { label: "Drum", unit: "%", nudgeMax: 100, nudgeAmount: 10, nudgeHoldMs: 2000, moverLabel: "drum motor" },
   },
   tc4_live: {
-    // A 5-unit bump is plenty to visibly move an RPM/%-of-a-drive
-    // reading, but 5% OT1 duty for 2 seconds is unlikely to move BT/ET
-    // at all (thermal lag) -- Heater gets a bigger, longer nudge so
-    // there's actually something to notice.
+    // A 5-unit bump is plenty to visibly move a %-of-a-drive reading,
+    // but 5% OT1 duty for 2 seconds is unlikely to move BT/ET at all
+    // (thermal lag) -- Heater gets a bigger, longer nudge so there's
+    // actually something to notice.
     heater_pct: { label: "Heater", unit: "%", nudgeMax: 100, nudgeAmount: 25, nudgeHoldMs: 4000, moverLabel: "heater (SSR/element click or glow)" },
   },
 };

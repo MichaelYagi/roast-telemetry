@@ -69,7 +69,7 @@
       <tr><td>ET</td><td>13</td><td>0</td><td>Same convention</td></tr>
       <tr><td>DT</td><td>12</td><td>0</td><td>Same convention</td></tr>
       <tr><td>Burner</td><td>12 (shares DT's slave)</td><td>5</td><td>Same ×10 convention (confirmed on a real unit)</td></tr>
-      <tr><td>Drum</td><td>1</td><td>control 8192, frequency 8193, feedback 8451</td><td>Value = RPM × 100 (a real RPM reading, confirmed against a live unit -- not a percentage despite the app's internal drum_speed_pct/fan_pct field names)</td></tr>
+      <tr><td>Drum</td><td>1</td><td>control 8192, frequency 8193, feedback 8451</td><td>Value = percent × 100 of the drive's max frequency (matching the app's internal drum_speed_pct/fan_pct field names -- the drum's own rotation speed roughly tracks its own percentage number too, per a real unit, but the register itself is a percentage, not a direct RPM reading)</td></tr>
       <tr><td>Air</td><td>2</td><td>control 8192, frequency 8193, feedback 8451</td><td>Same convention, own slave</td></tr>
     </tbody>
   </table>
@@ -217,8 +217,8 @@ PYTHONPATH=. uvicorn backend.app.main:app --port 8000</code></pre>
 
   <h3>Suggested manual test settings</h3>
   <p>
-    Right after clicking START, set <strong>Burner=85%, Air=15 RPM</strong>
-    (Drum at the default 50 RPM) using the vertical control sliders beside
+    Right after clicking START, set <strong>Burner=85%, Air=15%</strong>
+    (Drum at the default 50%) using the vertical control sliders beside
     the chart. Every milestone is a
     manual click by default for <code>modbus_live</code> (real hardware
     means a real operator marking them by hand, not an algorithm guessing

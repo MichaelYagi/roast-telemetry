@@ -81,9 +81,11 @@
       helps clear smoke; less airflow holds heat in. The Air slider
       always shows what the fan is <em>actually</em> doing right now,
       read back from the hardware itself, not just a memory of the last
-      command sent. On the FZ-94 this is a real RPM value (confirmed
-      against a live unit), not a percentage, despite the app's internal
-      <code>fan_pct</code> field name.
+      command sent. On the FZ-94 this is a percentage of the fan drive's
+      max speed (matching the app's internal <code>fan_pct</code> field
+      name) — the drum's own rotation speed roughly tracks its own
+      percentage number too, but the value itself is a percentage, not a
+      direct RPM reading.
     </dd>
   </dl>
 
@@ -225,9 +227,11 @@
       One of the three things this app can control on a real roaster —
       how fast the drum rotates, which tumbles the beans so they roast
       evenly. Not to be confused with <a href="#term-dt"><strong>DT</strong></a>,
-      a temperature reading, not a control. On the FZ-94 this is a real
-      RPM value (confirmed against a live unit), not a percentage,
-      despite the app's internal <code>drum_speed_pct</code> field name.
+      a temperature reading, not a control. On the FZ-94 this is a
+      percentage of the drum drive's max speed (matching the app's
+      internal <code>drum_speed_pct</code> field name) — the drum's own
+      rotation speed roughly tracks its own percentage number too, but
+      the value itself is a percentage, not a direct RPM reading.
     </dd>
     <dt id="term-dt">DT (Drum Temperature)</dt>
     <dd>

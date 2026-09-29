@@ -4,12 +4,18 @@
 // sides. drum_speed_pct/fan_pct are always shown regardless of settings
 // (see VerticalControlPanel's own comment); heater_pct/burner_sv_c are the
 // two configurable ones.
-// drum_speed_pct/fan_pct are real RPM values on the FZ-94 (confirmed
-// against a live unit), not percentages, despite the "_pct" field names
-// -- their 0-100/0-70 range is just this machine's actual RPM range.
+// drum_speed_pct/fan_pct genuinely are percentages -- of the FZ-94's VFD
+// drives' max frequency, per a Modbus register (control/frequency 8192/
+// 8193) that's 0-10000 = 0-100.00% (see docs/modbus/fz-94-usb.html). Drum
+// is capped at 0-70 for safety, a subset of that same 0-100 scale, not a
+// different unit. An earlier version of this file called these "RPM"
+// based on real-hardware feedback that the drum's spin roughly matched
+// its percentage number -- true, but that's the physical *result* of a
+// percentage-of-max-frequency setting on this machine's specific
+// motor/pulley, not evidence the register itself is RPM.
 export const VERTICAL_CONTROL_ITEMS = [
-  { key: "drum_speed_pct", label: "Drum", unit: " RPM", color: "#16a34a", mandatory: true },
-  { key: "fan_pct", label: "Fan", unit: " RPM", color: "#0891b2", mandatory: true },
+  { key: "drum_speed_pct", label: "Drum", unit: "%", color: "#16a34a", mandatory: true },
+  { key: "fan_pct", label: "Fan", unit: "%", color: "#0891b2", mandatory: true },
   { key: "heater_pct", label: "Burner", unit: "%", color: "#f59e0b", mandatory: false },
   { key: "burner_sv_c", label: "SV", unit: "°C", color: "#92400e", mandatory: false },
 ];

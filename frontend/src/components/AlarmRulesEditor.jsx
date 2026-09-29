@@ -10,8 +10,8 @@ const EVENT_TRIGGER_OPTIONS = EVENT_BUTTONS.map((b) => b.type);
 function summarizeCommand(rule, t) {
   const parts = [];
   if (rule.heater_pct != null) parts.push(t("common.alarmRulesEditor.burnerArrow", { pct: rule.heater_pct }));
-  if (rule.fan_pct != null) parts.push(t("common.alarmRulesEditor.airArrow", { rpm: rule.fan_pct }));
-  if (rule.drum_speed_pct != null) parts.push(t("common.alarmRulesEditor.drumArrow", { rpm: rule.drum_speed_pct }));
+  if (rule.fan_pct != null) parts.push(t("common.alarmRulesEditor.airArrow", { pct: rule.fan_pct }));
+  if (rule.drum_speed_pct != null) parts.push(t("common.alarmRulesEditor.drumArrow", { pct: rule.drum_speed_pct }));
   if (rule.message) parts.push(t("common.alarmRulesEditor.bannerLabel", { message: rule.message }));
   if (rule.mark_milestone) parts.push(t("common.alarmRulesEditor.markMilestone", { milestone: rule.mark_milestone.replace("_", " ") }));
   return parts.join(", ") || t("common.alarmRulesEditor.nothingSet");

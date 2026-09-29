@@ -200,6 +200,27 @@ def test_apply_command_fan_and_drum_write_run_and_frequency_to_control_client():
     assert primary.writes == []
 
 
+def test_apply_command_fan_and_drum_honor_configured_frequency_scale_and_offset():
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine(
+        "PRIMARY",
+        control_port="CONTROL",
+        client_cls=client_cls,
+        air_frequency_scale=50.0,
+        air_frequency_offset=1000.0,
+        drum_frequency_scale=10.0,
+        drum_frequency_offset=-50.0,
+    )
+    control = instances["CONTROL"]
+
+    engine.apply_command({"fan_pct": 60.0, "drum_speed_pct": 40.0})
+
+    # Air: raw = 60*50 + 1000 = 4000 (would be 6000 at the FZ-94 default of scale=100/offset=0)
+    assert (8193, 4000, 2) in control.writes
+    # Drum: raw = 40*10 + (-50) = 350 (would be 4000 at the default)
+    assert (8193, 350, 1) in control.writes
+
+
 def test_apply_command_zero_drive_value_sends_stop_not_run():
     client_cls, instances = _make_fake_client_cls()
     engine = ModbusEngine("PRIMARY", control_port="CONTROL", client_cls=client_cls)

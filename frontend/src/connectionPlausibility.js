@@ -2,23 +2,24 @@
 
 // Every channel worth checking on a full modbus_live connection -- ms6514
 // only ever has bt/et, tc4_live only has bt/et/dt (see channelsForMode
-// below), everything else (Burner SV, Fan/Drum RPM) is FZ-94/Modbus-
-// specific and doesn't exist on those other devices at all. Ranges are
-// deliberately generous (this is a sanity check against "reading garbage/
-// nothing," not a real calibration check) -- a real BT/ET/DT for a coffee
-// roaster, hot or cold, comfortably fits 0-300C; Burner SV is a
-// configurable setpoint range but 0-400C safely bounds any sane
-// configuration; Fan/Drum are real RPM readings (confirmed against a live
-// FZ-94), not percentages, despite the fan_pct/drum_speed_pct field names
-// -- 0-100/0-70 there is this specific machine's actual RPM range, not a
-// 0-100% scale.
+// below), everything else (Burner SV, Fan/Drum) is FZ-94/Modbus-specific
+// and doesn't exist on those other devices at all. Ranges are deliberately
+// generous (this is a sanity check against "reading garbage/nothing," not
+// a real calibration check) -- a real BT/ET/DT for a coffee roaster, hot
+// or cold, comfortably fits 0-300C; Burner SV is a configurable setpoint
+// range but 0-400C safely bounds any sane configuration; Fan/Drum are
+// genuinely a 0-100.00% share of the VFD drives' max frequency (register
+// 8193, 0-10000 raw -- see docs/modbus/fz-94-usb.html), matching the
+// fan_pct/drum_speed_pct field names -- Drum's real *operating* range is
+// capped at 0-70 for safety, still the same 0-100% scale, not a
+// different unit.
 export const READ_CHANNELS = [
   { key: "bt", label: "BT", unit: "°", min: -10, max: 300 },
   { key: "et", label: "ET", unit: "°", min: -10, max: 300 },
   { key: "dt", label: "DT", unit: "°", min: -10, max: 300 },
   { key: "burner_sv_c", label: "Burner SV", unit: "°", min: 0, max: 400 },
-  { key: "fan_pct", label: "Fan RPM", unit: " RPM", min: 0, max: 100 },
-  { key: "drum_speed_pct", label: "Drum RPM", unit: " RPM", min: 0, max: 100 },
+  { key: "fan_pct", label: "Fan", unit: "%", min: 0, max: 100 },
+  { key: "drum_speed_pct", label: "Drum", unit: "%", min: 0, max: 100 },
 ];
 
 export function channelsForMode(mode) {
@@ -30,20 +31,13 @@ export function channelsForMode(mode) {
   // actually working.
   if (mode === "tc4_live") return READ_CHANNELS.filter((c) => ["bt", "et", "dt"].includes(c.key));
   // aillio_live: no Burner SV concept at all (always null -- see
-  // aillio_bridge/engine.py's own comment), and Fan/Drum are a small
-  // device-native 0-100% scale, not the FZ-94's real RPM-reporting VFD
-  // drives -- reusing READ_CHANNELS' "Fan RPM"/"Drum RPM" entries as-is
-  // would be a wrong unit label, not just a generic one. Genuinely
-  // polled device feedback though (see AillioEngine.tick()'s _poll()),
-  // not write-only like TC4 -- these get real "pass"/"fail" plausibility
-  // checks, just against a 0-100% bound instead of RPM.
-  if (mode === "aillio_live") {
-    return [
-      ...READ_CHANNELS.filter((c) => ["bt", "et", "dt"].includes(c.key)),
-      { key: "fan_pct", label: "Fan %", unit: "%", min: 0, max: 100 },
-      { key: "drum_speed_pct", label: "Drum %", unit: "%", min: 0, max: 100 },
-    ];
-  }
+  // aillio_bridge/engine.py's own comment). Fan/Drum are also a 0-100%
+  // scale here (a small device-native range, not the FZ-94's VFD
+  // frequency register, but the same unit either way), so those two
+  // reuse READ_CHANNELS' own entries unchanged. Genuinely polled device
+  // feedback (see AillioEngine.tick()'s _poll()), not write-only like
+  // TC4 -- these get real "pass"/"fail" plausibility checks.
+  if (mode === "aillio_live") return READ_CHANNELS.filter((c) => ["bt", "et", "dt", "fan_pct", "drum_speed_pct"].includes(c.key));
   return READ_CHANNELS;
 }
 
