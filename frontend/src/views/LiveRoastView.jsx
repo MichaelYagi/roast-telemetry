@@ -1963,21 +1963,24 @@ export default function LiveRoastView() {
                   Settings > Small Readout) -- always shown regardless of
                   showSplitLayout, since it's the user's own separate
                   choice of what goes here, not an automatic duplicate of
-                  the big panel. Renders nothing (via BreakoutPanel's own
-                  empty-list check) if nothing's enabled, same as before
-                  Small Readout existed as a concept -- used to be a
-                  hardcoded ET/BT/DT/deltaBT legend instead. */}
-              <div className="small-readout-col">
-                <BreakoutPanel
-                  enabledKeys={smallReadoutPanels}
-                  latest={latest}
-                  milestones={milestones}
-                  elapsedLabel={elapsedLabel}
-                  roast={roast}
-                  colorOverrides={panelColors}
-                  tempUnit={tempUnit}
-                />
-              </div>
+                  the big panel. The wrapper itself (not just BreakoutPanel
+                  inside it) is skipped when nothing's enabled -- otherwise
+                  its fixed width (.small-readout-col in styles.css) sits
+                  there empty and .scope-chart's flex: 1 never gets to
+                  reclaim that space. */}
+              {smallReadoutPanels.length > 0 && (
+                <div className="small-readout-col">
+                  <BreakoutPanel
+                    enabledKeys={smallReadoutPanels}
+                    latest={latest}
+                    milestones={milestones}
+                    elapsedLabel={elapsedLabel}
+                    roast={roast}
+                    colorOverrides={panelColors}
+                    tempUnit={tempUnit}
+                  />
+                </div>
+              )}
             </div>
             {/* Moved out of .scope-chart -- as a sibling spanning the whole
                 .scope-body row, this line (and the drag handle) now runs
