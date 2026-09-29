@@ -449,7 +449,7 @@
       "hideEventLabels": "イベントラベルを非表示",
       "hideEventLabelsHint": "CHARGE / Turning Point / Dry End などのコールアウトボックスを非表示にします",
       "resetZoom": "ズームをリセット",
-      "zoomHint": "{{modifier}}+スクロールでズーム、ドラッグでパン",
+      "zoomHint": "{{modifier}}+スクロールでズーム、ドラッグでパン、{{modifier}}+ドラッグで垂直方向にパン",
       "deleteMilestone": "マイルストーンを削除",
       "axisMins": "分"
     },

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client.js";
@@ -183,25 +183,41 @@ export default function RoastDetailView() {
   // "event_deleted"/"event_updated" message to pick up, so these mutate
   // `roast.events` directly on success, same direct-mutation pattern
   // handleSaveGreenWeight/handleSaveRoastedWeight above already use.
-  async function handleDeleteMilestone(eventId) {
-    setMilestoneError(null);
-    try {
-      await api.deleteEvent(id, eventId);
-      setRoast((r) => (r ? { ...r, events: r.events.filter((e) => e.id !== eventId) } : r));
-    } catch (err) {
-      setMilestoneError(err.message);
-    }
-  }
+  // useCallback (not a plain function) -- these are handed to RoastChart
+  // as onDeleteEvent/onRetimeEvent, which flow into its own memoized
+  // `options` object (via handleDragMove/handleDragEnd's own deps). A new
+  // function identity here on *every* render -- even one triggered by
+  // something unrelated, like typing in the Add Tag box -- gave `options`
+  // a new identity too, which made react-chartjs-2 call chart.update()
+  // and reapply the x-axis's fixed min/max from options, silently
+  // discarding whatever zoom/pan the user had applied. Confirmed live:
+  // zooming in, then typing into the unrelated tag input, reset the
+  // chart's visible range back to the full roast every time.
+  const handleDeleteMilestone = useCallback(
+    async (eventId) => {
+      setMilestoneError(null);
+      try {
+        await api.deleteEvent(id, eventId);
+        setRoast((r) => (r ? { ...r, events: r.events.filter((e) => e.id !== eventId) } : r));
+      } catch (err) {
+        setMilestoneError(err.message);
+      }
+    },
+    [id]
+  );
 
-  async function handleRetimeMilestone(eventId, timeS) {
-    setMilestoneError(null);
-    try {
-      const updated = await api.retimeEvent(id, eventId, timeS);
-      setRoast((r) => (r ? { ...r, events: r.events.map((e) => (e.id === eventId ? updated : e)) } : r));
-    } catch (err) {
-      setMilestoneError(err.message);
-    }
-  }
+  const handleRetimeMilestone = useCallback(
+    async (eventId, timeS) => {
+      setMilestoneError(null);
+      try {
+        const updated = await api.retimeEvent(id, eventId, timeS);
+        setRoast((r) => (r ? { ...r, events: r.events.map((e) => (e.id === eventId ? updated : e)) } : r));
+      } catch (err) {
+        setMilestoneError(err.message);
+      }
+    },
+    [id]
+  );
 
   // Pulls the same numbers the Roast Stats/Numbers panels below already
   // show (they're separate GETs, not part of the Roast object itself),

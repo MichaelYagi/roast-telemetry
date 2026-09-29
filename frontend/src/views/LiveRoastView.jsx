@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { activeRoastStreamUrl, api, settingsStreamUrl } from "../api/client.js";
@@ -887,23 +887,35 @@ export default function LiveRoastView() {
   // backend publishes those the same way it already does for "event"/
   // "note" on every other roast mutation. Errors still surface via the
   // same error banner every other action on this page uses.
-  async function handleDeleteMilestone(eventId) {
-    if (!roastId) return;
-    try {
-      await api.deleteEvent(roastId, eventId);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
+  // useCallback -- see RoastDetailView.jsx's identical comment on its own
+  // handleDeleteMilestone/handleRetimeMilestone for why: a fresh function
+  // identity here on every render (even one unrelated to the chart)
+  // cascades into RoastChart's memoized `options` object, which makes
+  // react-chartjs-2 reapply the x-axis's fixed bounds and silently wipe
+  // out the user's zoom/pan.
+  const handleDeleteMilestone = useCallback(
+    async (eventId) => {
+      if (!roastId) return;
+      try {
+        await api.deleteEvent(roastId, eventId);
+      } catch (err) {
+        setError(err.message);
+      }
+    },
+    [roastId]
+  );
 
-  async function handleRetimeMilestone(eventId, timeS) {
-    if (!roastId) return;
-    try {
-      await api.retimeEvent(roastId, eventId, timeS);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
+  const handleRetimeMilestone = useCallback(
+    async (eventId, timeS) => {
+      if (!roastId) return;
+      try {
+        await api.retimeEvent(roastId, eventId, timeS);
+      } catch (err) {
+        setError(err.message);
+      }
+    },
+    [roastId]
+  );
 
   async function handleSavePreset() {
     if (!presetName.trim()) return;
