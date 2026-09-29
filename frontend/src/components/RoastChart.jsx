@@ -194,12 +194,28 @@ const scopeBandsPlugin = {
     const scale = scales.yTemp;
     if (!chartArea || !scale) return;
     const ticks = scale.ticks;
+    if (ticks.length < 2) return;
+    const step = ticks[1].value - ticks[0].value;
+    if (!step) return;
     ctx.save();
-    for (let i = 0; i < ticks.length - 1; i++) {
-      if (i % 2 !== 0) continue;
-      const yTop = scale.getPixelForTick(i + 1);
-      const yBottom = scale.getPixelForTick(i);
-      ctx.fillStyle = "rgba(15, 23, 42, 0.035)";
+    ctx.fillStyle = "rgba(15, 23, 42, 0.035)";
+    // Which band a given temperature falls in, and whether *that* band is
+    // shaded, has to be a fixed property of the temperature itself (band
+    // index computed from an absolute value, parity-normalized so a
+    // negative index still alternates correctly) -- not of the currently
+    // visible tick array's own position (the previous version's `i % 2`
+    // on ticks.length). Vertical panning (see zoom.pan.mode's Alt+drag
+    // above) slides that array by a tick at a time, which shifted every
+    // index by one and flipped every band's shaded/unshaded state each
+    // time -- confirmed live: the same 150-200C band toggled between
+    // shaded and unshaded as you dragged, which is what actually read as
+    // "shaky", not the bands simply moving (they're supposed to move).
+    const start = Math.floor(scale.min / step) * step;
+    for (let value = start; value < scale.max; value += step) {
+      const bandIndex = Math.round(value / step);
+      if (((bandIndex % 2) + 2) % 2 !== 0) continue;
+      const yTop = scale.getPixelForValue(value + step);
+      const yBottom = scale.getPixelForValue(value);
       ctx.fillRect(chartArea.left, yTop, chartArea.right - chartArea.left, yBottom - yTop);
     }
     ctx.restore();
