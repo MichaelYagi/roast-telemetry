@@ -680,7 +680,12 @@ class RoastSession:
         if self._task is not None and self._task is not asyncio.current_task():
             await self._task
         if self.status not in (RoastStatus.COMPLETE, RoastStatus.STOPPED, RoastStatus.ABORTED):
-            self.control.release()
+            # to_thread, not a direct call -- release() can write to the
+            # real device (heater off) if one's still on, and this runs on
+            # the shared event loop -- see RoastControl.enter_safe_state's
+            # own comment on why a blocking device write here freezes the
+            # whole server, not just this one roast.
+            await asyncio.to_thread(self.control.release)
             if self._recorded:
                 await self._finish(RoastStatus.STOPPED)
             else:

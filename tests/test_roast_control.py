@@ -4,6 +4,7 @@ tests use a recording fake in place of the roaster."""
 from __future__ import annotations
 
 import asyncio
+import time
 
 import pytest
 
@@ -191,8 +192,17 @@ class FakeDevice:
     def __init__(self):
         self.writes = []
         self.fail = False
+        # Simulates real, blocking device I/O (a serial/Modbus write with
+        # no timeout against an unresponsive roaster) -- 0 for every
+        # existing test above, set by test_slow_device_writes_dont_freeze_
+        # the_event_loop below to prove enter_safe_state/_run_automation/
+        # _run_feedback/abort() actually offload the write instead of
+        # blocking the caller's own event loop.
+        self.write_delay_s = 0.0
 
     def write(self, command):
+        if self.write_delay_s:
+            time.sleep(self.write_delay_s)
         if self.fail:
             raise RuntimeError("cable unplugged")
         self.writes.append(dict(command))
@@ -268,6 +278,90 @@ def test_emergency_stop_reports_when_it_could_not_reach_the_roaster():
 
     assert asyncio.run(body()) is False
     assert any("couldn't reach" in e["label"] for e in session.events)
+
+
+# -- the write itself must never block the shared event loop -----------------
+# Reported live: an unresponsive real device made Emergency Stop hang
+# forever, and froze the *entire* server -- every other request, including
+# an unrelated page refresh -- right along with it, since a synchronous
+# device.write() was called directly inside an async function instead of
+# through asyncio.to_thread. enter_safe_state (manual e-stop + every
+# fail-safe), abort()'s release(), and the per-tick automation writes
+# (_run_automation/_run_feedback) all had this bug; this proves the fix by
+# running a slow write concurrently with unrelated async work and checking
+# the unrelated work actually got to run *during* the slow write, not only
+# after it finished.
+
+
+async def _slow_write_does_not_block(trigger):
+    """Shared by the tests below: runs `trigger` (some async operation that
+    performs one real device write via a FakeDevice whose write_delay_s is
+    set) concurrently with a plain counter loop, and asserts the counter
+    advanced *before* the write finished -- which is only possible if the
+    write actually ran off the event loop."""
+    progressed = []
+
+    async def counter():
+        for i in range(20):
+            await asyncio.sleep(0.01)
+            progressed.append(i)
+
+    write_task = asyncio.create_task(trigger())
+    counter_task = asyncio.create_task(counter())
+    await write_task
+    counter_task.cancel()
+    # 0.2s of slow write vs. 20 * 0.01s = 0.2s of counter ticks, run
+    # concurrently -- a blocked event loop would starve the counter
+    # entirely until the write finally finished, landing this at 0 (or
+    # very close to it) instead of having advanced well into the loop.
+    assert len(progressed) >= 5, f"counter only advanced {len(progressed)} ticks -- the write blocked the event loop"
+
+
+def test_emergency_stop_does_not_block_the_event_loop():
+    session = make_session()
+    session.device.write_delay_s = 0.2
+    feed(session, 0)
+
+    async def trigger():
+        await session.control.emergency_stop(username="test-admin", platform="Chrome on Windows")
+
+    asyncio.run(_slow_write_does_not_block(trigger))
+
+
+def test_a_fail_safe_trip_does_not_block_the_event_loop():
+    session = make_session()
+    session.device.write_delay_s = 0.2
+    feed(session, 0)
+
+    async def trigger():
+        await session.control.enter_safe_state("lost the temperature reading during target control")
+
+    asyncio.run(_slow_write_does_not_block(trigger))
+
+
+def test_abort_releasing_the_heater_does_not_block_the_event_loop():
+    session = make_session()
+    session.device.write_delay_s = 0.2
+    feed(session, 0)
+    session.control._last_written["heater_pct"] = 50.0  # so release() actually has something to write
+
+    async def trigger():
+        await session.abort()
+
+    asyncio.run(_slow_write_does_not_block(trigger))
+
+
+def test_program_automation_writes_do_not_block_the_event_loop():
+    session = make_session()
+    session.device.write_delay_s = 0.2
+    feed(session, 0)
+    mark_charge(session)
+    session.control.start_program([ProgramStep(time_s=0, heater_pct=80)], "test")
+
+    async def trigger():
+        await session.control.tick(feed(session, 1), recording=True)
+
+    asyncio.run(_slow_write_does_not_block(trigger))
 
 
 # -- safety_disabled: the master kill switch -----------------------------------------

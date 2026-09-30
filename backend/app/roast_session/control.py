@@ -7,6 +7,7 @@ One `RoastControl` belongs to each `RoastSession`.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import TYPE_CHECKING, Optional
@@ -141,7 +142,20 @@ class RoastControl:
         written = False
         try:
             command = safe_state_command(self.limits)
-            self.session.device.write(command)
+            # asyncio.to_thread, not a direct call -- this runs on the
+            # shared event loop (called from the emergency-stop endpoint
+            # and every fail-safe), and a real device's write can block
+            # for a long time (a serial/Modbus read with no timeout, an
+            # unresponsive or disconnected roaster) -- confirmed live:
+            # an unresponsive device froze this call indefinitely, which
+            # froze the *entire* server (every other request, on every
+            # other roast, including a plain page refresh) right along
+            # with it, since nothing else could run on the same blocked
+            # loop. See the sibling fix in abort()/_run_automation/
+            # _run_feedback below for the other call sites with the same
+            # bug -- this one path isn't actually the only way to trigger
+            # it (ordinary per-tick automation writes can too).
+            await asyncio.to_thread(self.session.device.write, command)
             for key, value in command.items():
                 self._last_written[key] = float(value)
             written = True
@@ -287,7 +301,10 @@ class RoastControl:
         if self.program is not None:
             command = self.program.due(t)
             if command:
-                self.write(command, source="program")
+                # to_thread -- see enter_safe_state's own comment. This
+                # runs once per tick while a program is active, straight
+                # off the main session loop's shared event loop.
+                await asyncio.to_thread(self.write, command, source="program")
 
     async def _run_feedback(self, sample: dict, t: float) -> None:
         measured = sample.get(self.feedback.config.variable)
@@ -302,7 +319,8 @@ class RoastControl:
         if output is None:
             return
         if self._feedback_last_sent is None or abs(output - self._feedback_last_sent) >= 0.5:
-            self.write({"heater_pct": output}, source="feedback")
+            # to_thread -- see enter_safe_state's own comment.
+            await asyncio.to_thread(self.write, {"heater_pct": output}, source="feedback")
             self._feedback_last_sent = output
 
     # -- reporting ------------------------------------------------------------
