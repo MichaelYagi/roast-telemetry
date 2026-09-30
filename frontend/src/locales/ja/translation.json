@@ -692,7 +692,7 @@
       "statusRoasting": "焙煎中",
       "statusCooling": "冷却中",
       "statusComplete": "完了",
-      "statusStopped": "停止",
+      "statusStopped": "終了",
       "statusAborted": "中止",
       "tag": "タグ",
       "roastedBy": "焙煎者",

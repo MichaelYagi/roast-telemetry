@@ -702,7 +702,7 @@
       "statusRoasting": "Roasting",
       "statusCooling": "Cooling",
       "statusComplete": "Complete",
-      "statusStopped": "Stopped",
+      "statusStopped": "Finished",
       "statusAborted": "Aborted",
       "tag": "Tag",
       "roastedBy": "Roasted by",
