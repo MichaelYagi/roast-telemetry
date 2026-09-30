@@ -148,14 +148,32 @@ def roast_to_native_alog_dict(
 
     # Real .alog files always have a brief pre-charge lead-in, so index 0
     # being reserved as "not recorded" never collides with a real milestone
-    # there. This app's own roasts don't -- recording starts *at* Charge,
-    # so Charge is almost always sample 0 -- which would otherwise make
-    # every exported roast's own Charge marker indistinguishable from "not
-    # recorded" the moment it's read back. A single synthetic flat sample
-    # one tick before the first real one sidesteps that ambiguity instead
-    # of just accepting a broken Charge marker on every export.
+    # there. This app's own *fresh* roasts don't -- recording starts *at*
+    # Charge, so Charge is almost always sample 0 -- which would otherwise
+    # make the Charge marker indistinguishable from "not recorded" the
+    # moment it's read back. A single synthetic flat sample one tick before
+    # the first real one sidesteps that.
+    #
+    # Only added when actually needed, though: a roast that's already been
+    # through this export once (a cold-roast milestone edit rewrites the
+    # .alog from its own freshly-*parsed* profile/events -- see
+    # RoastSessionManager._rewrite_cold_alog) already has that lead-in
+    # sample sitting in `profile[0]`, with Charge's own event time still
+    # correctly pointing at the *real* first sample after it. Adding
+    # another one unconditionally on every rewrite compounded without
+    # bound -- confirmed live: Charge drifted a further second earlier on
+    # every single edit, and every other milestone's nearest-sample match
+    # (and thus its recorded value) shifted by one slot right along with
+    # it, purely from repeated editing, not from anything the edits
+    # themselves changed. `needs_lead_in` below is the idempotency check:
+    # only true when Charge's own time doesn't already resolve to a real
+    # index >= 1 in the untouched `profile`.
+    charge_event = next((e for e in events if e.get("type") == "CHARGE"), None)
+    needs_lead_in = bool(profile) and (
+        charge_event is None or _nearest_index([p["time_s"] for p in profile], charge_event["time_s"]) <= 0
+    )
     export_profile = profile
-    if profile:
+    if needs_lead_in:
         lead_in = dict(profile[0])
         lead_in["time_s"] = profile[0]["time_s"] - 1.0
         export_profile = [lead_in, *profile]
@@ -176,22 +194,24 @@ def roast_to_native_alog_dict(
         e = milestone_events.get(event_type)
         if e is None or not timex:
             return 0  # the format's "not recorded" sentinel
-        if event_type == "CHARGE":
-            # Charge is always "the start of recording" in this app's
-            # data model once it's actually been marked -- export_profile[1]
-            # (the first real sample, right after the single synthetic
-            # lead-in point), not something to nearest-match by timestamp
-            # like every other milestone. Live-bridge/simulator sessions
-            # fire Charge synchronously (resetting the clock) but only
-            # append the first profile sample once a full tick interval
-            # has elapsed, so Charge's own recorded time can legitimately
-            # predate profile[0] -- a plain nearest-time search then hits
-            # an exact tie between the lead-in and profile[0] whenever
-            # that gap equals the lead-in's own 1-tick offset, and
-            # _nearest_index's tie-break silently picked the lead-in slot
-            # (index 0, the format's "not recorded" sentinel), losing the
-            # Charge marker entirely on every affected roast. Confirmed
-            # live with the simulator's default 1-second sample interval.
+        if event_type == "CHARGE" and needs_lead_in:
+            # Only while a lead-in was actually (re)added this export --
+            # export_profile[1] (the first real sample, right after it),
+            # not a nearest-match by timestamp like every other milestone.
+            # Live-bridge/simulator sessions fire Charge synchronously
+            # (resetting the clock) but only append the first profile
+            # sample once a full tick interval has elapsed, so Charge's
+            # own recorded time can legitimately predate profile[0] -- a
+            # plain nearest-time search then hits an exact tie between the
+            # lead-in and profile[0] whenever that gap equals the lead-in's
+            # own 1-tick offset, and _nearest_index's tie-break silently
+            # picks the lead-in slot (index 0, the format's "not recorded"
+            # sentinel), losing the Charge marker entirely. Confirmed live
+            # with the simulator's default 1-second sample interval. Once
+            # a lead-in already exists from a prior export (needs_lead_in
+            # False), Charge's own time is already a real, stable sample
+            # with nothing to tie against, so the generic nearest-match
+            # below is exact and safe.
             return 1 if len(timex) > 1 else 0
         return _nearest_index(timex, e["time_s"])
 

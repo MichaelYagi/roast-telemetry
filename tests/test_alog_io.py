@@ -386,3 +386,117 @@ def test_celsius_dict_to_fahrenheit_converts_real_temps_but_not_percentages():
     assert back["temp2"] == data["temp2"]
     assert back["extratemp1"] == data["extratemp1"]
     assert back["extratemp2"] == data["extratemp2"]
+
+
+# -- cold-roast edit round-tripping (write -> read -> edit -> write -> read,
+# repeated) -- roast_to_native_alog_dict used to prepend a *new* synthetic
+# lead-in sample on every single call, including a re-export of an
+# already-round-tripped profile that already had one from the export
+# before. Each cold milestone edit (RoastSessionManager.delete_event/
+# retime_event -- see session.py's _rewrite_cold_alog) re-parses the file
+# it's about to rewrite, so this compounded without bound: Charge drifted
+# a further second earlier on every edit, and every other milestone's
+# nearest-sample match (and so its recorded value) silently shifted by one
+# slot right along with it -- confirmed live via the exact repro below.
+
+
+def _round_trip_edit_roast(tmp_path, edits_count: int = 1):
+    """One finished roast, round-tripped through export/import `edits_count`
+    times (each one simulating a cold milestone edit's own read-modify-
+    rewrite cycle, minus the actual edit) -- the shared setup for the tests
+    below. Returns the final parsed dict."""
+    profile = [{"time_s": float(i), "bt": 20.0 + i, "et": 25.0 + i} for i in range(30)]
+    events = [
+        {"id": "e1", "time_s": 0.0, "type": "CHARGE", "label": "Charge", "value": 20.0},
+        {"id": "e2", "time_s": 5.0, "type": "DRY_END", "label": "Dry End", "value": 25.0},
+        {"id": "e3", "time_s": 10.0, "type": "FC_START", "label": "FC Start", "value": 30.0},
+        {"id": "e4", "time_s": 20.0, "type": "DROP", "label": "Drop", "value": 40.0},
+    ]
+    path = str(tmp_path / "roast.alog")
+    p, e = profile, events
+    for _ in range(edits_count):
+        d = roast_to_native_alog_dict(title="T", profile=p, events=e, notes=[])
+        save_native_alog(path, d)
+        parsed = alog_dict_to_points(load_alog(path))
+        p, e = parsed["profile"], parsed["events"]
+    return {"profile": p, "events": e}
+
+
+def test_repeated_cold_rewrites_leave_charge_unmoved(tmp_path):
+    result = _round_trip_edit_roast(tmp_path, edits_count=5)
+    charge = next(ev for ev in result["events"] if ev["type"] == "CHARGE")
+    assert charge["time_s"] == 0.0
+
+
+def test_repeated_cold_rewrites_leave_every_milestone_and_its_value_unchanged(tmp_path):
+    result = _round_trip_edit_roast(tmp_path, edits_count=5)
+    by_type = {ev["type"]: ev for ev in result["events"]}
+    assert by_type["DRY_END"]["time_s"] == 5.0 and by_type["DRY_END"]["value"] == 25.0
+    assert by_type["FC_START"]["time_s"] == 10.0 and by_type["FC_START"]["value"] == 30.0
+    assert by_type["DROP"]["time_s"] == 20.0 and by_type["DROP"]["value"] == 40.0
+
+
+def test_repeated_cold_rewrites_leave_the_profile_stable(tmp_path):
+    once = _round_trip_edit_roast(tmp_path, edits_count=1)
+    five_times = _round_trip_edit_roast(tmp_path, edits_count=5)
+    # Same length and same (time_s, bt, et) values after 1 rewrite vs. 5 --
+    # a single lead-in sample was added once (matching the original
+    # profile, never regrown) and every real sample's own time/value is
+    # exactly what was originally recorded.
+    assert len(once["profile"]) == len(five_times["profile"])
+    assert [(round(p["time_s"], 6), p["bt"], p["et"]) for p in once["profile"]] == [
+        (round(p["time_s"], 6), p["bt"], p["et"]) for p in five_times["profile"]
+    ]
+
+
+def test_deleting_a_milestone_then_rewriting_leaves_everything_else_unchanged(tmp_path):
+    once = _round_trip_edit_roast(tmp_path, edits_count=1)
+    p, e = once["profile"], once["events"]
+    dry_end = next(ev for ev in e if ev["type"] == "DRY_END")
+    e = [ev for ev in e if ev["id"] != dry_end["id"]]  # the edit itself
+
+    path = str(tmp_path / "after_delete.alog")
+    save_native_alog(path, roast_to_native_alog_dict(title="T", profile=p, events=e, notes=[]))
+    reparsed = alog_dict_to_points(load_alog(path))
+
+    assert [(round(x["time_s"], 6), x["bt"], x["et"]) for x in reparsed["profile"]] == [
+        (round(x["time_s"], 6), x["bt"], x["et"]) for x in p
+    ]
+    by_type = {ev["type"]: ev for ev in reparsed["events"]}
+    assert "DRY_END" not in by_type  # the actual edit took effect
+    assert by_type["CHARGE"]["time_s"] == 0.0  # untouched by an edit to a different milestone
+    assert by_type["FC_START"]["time_s"] == 10.0 and by_type["FC_START"]["value"] == 30.0
+    assert by_type["DROP"]["time_s"] == 20.0 and by_type["DROP"]["value"] == 40.0
+
+
+def test_retiming_a_milestone_then_rewriting_leaves_everything_else_unchanged(tmp_path):
+    once = _round_trip_edit_roast(tmp_path, edits_count=1)
+    p, e = once["profile"], once["events"]
+    fc_start = next(ev for ev in e if ev["type"] == "FC_START")
+    fc_start["time_s"] = 12.0  # the edit itself
+    fc_start["value"] = next(x["bt"] for x in p if x["time_s"] == 12.0)
+
+    path = str(tmp_path / "after_retime.alog")
+    save_native_alog(path, roast_to_native_alog_dict(title="T", profile=p, events=e, notes=[]))
+    reparsed = alog_dict_to_points(load_alog(path))
+
+    assert [(round(x["time_s"], 6), x["bt"], x["et"]) for x in reparsed["profile"]] == [
+        (round(x["time_s"], 6), x["bt"], x["et"]) for x in p
+    ]
+    by_type = {ev["type"]: ev for ev in reparsed["events"]}
+    assert by_type["FC_START"]["time_s"] == 12.0  # the actual edit took effect
+    assert by_type["CHARGE"]["time_s"] == 0.0
+    assert by_type["DRY_END"]["time_s"] == 5.0 and by_type["DRY_END"]["value"] == 25.0
+    assert by_type["DROP"]["time_s"] == 20.0 and by_type["DROP"]["value"] == 40.0
+
+
+def test_milestone_ids_stay_the_same_across_repeated_cold_rewrites(tmp_path):
+    """A client holding an id from an earlier GET must still be able to use
+    it on a later edit -- see test_roast_event_editing.py's
+    test_two_sequential_cold_edits_reuse_ids_from_the_first_get for the
+    full API-level version of this."""
+    once = _round_trip_edit_roast(tmp_path, edits_count=1)
+    five_times = _round_trip_edit_roast(tmp_path, edits_count=5)
+    ids_once = {ev["type"]: ev["id"] for ev in once["events"]}
+    ids_five = {ev["type"]: ev["id"] for ev in five_times["events"]}
+    assert ids_once == ids_five

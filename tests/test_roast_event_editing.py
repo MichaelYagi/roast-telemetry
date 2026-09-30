@@ -269,6 +269,51 @@ def test_delete_event_via_api_rejects_turning_point(client):
     client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 
+def test_two_sequential_cold_edits_reuse_ids_from_the_first_get(client):
+    # A client (e.g. the mobile app) that fetches a cold roast once, then
+    # makes two edits in a row against the *same* ids from that one GET --
+    # without refetching between them -- must not have the second edit
+    # rejected with "event not found" just because the first edit rewrote
+    # the .alog file. Confirmed this used to fail: repeated cold rewrites
+    # compounded a synthetic lead-in sample (see alog_io.py's
+    # roast_to_native_alog_dict), which silently shifted milestones'
+    # nearest-sample matches enough that a roast with several milestones
+    # close together could lose/reassign one between rewrites.
+    resp = client.post("/api/v1/roasts", json={"title": "Multi-Edit Roast", "mode": "simulator"})
+    roast_id = resp.json()["id"]
+    for event_type in ("DRY_END", "FC_START", "FC_END"):
+        time.sleep(1.1)
+        client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": event_type, "label": event_type})
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
+    session_manager.sessions.pop(roast_id, None)
+
+    resp = client.get(f"/api/v1/roasts/{roast_id}")
+    events_by_type = {e["type"]: e for e in resp.json()["events"]}
+    dry_end_id = events_by_type["DRY_END"]["id"]
+    fc_end_id = events_by_type["FC_END"]["id"]
+    fc_start_time = events_by_type["FC_START"]["time_s"]
+    fc_end_time = events_by_type["FC_END"]["time_s"]
+    # A whole second (matching the simulator's 1s sample interval) so it
+    # lands exactly on a real sample -- avoids the unrelated, pre-existing
+    # "retime snaps to the nearest recorded sample" behavior muddying what
+    # this test is actually checking.
+    new_fc_end_time = float(round((fc_start_time + fc_end_time) / 2))
+
+    # Edit #1, using the id from the one GET above.
+    resp = client.delete(f"/api/v1/roasts/{roast_id}/events/{dry_end_id}")
+    assert resp.status_code == 204
+
+    # Edit #2, using an id from that *same* original GET -- not a fresh
+    # one fetched after edit #1's rewrite.
+    resp = client.patch(f"/api/v1/roasts/{roast_id}/events/{fc_end_id}", json={"time_s": new_fc_end_time})
+    assert resp.status_code == 200, resp.json()
+
+    resp = client.get(f"/api/v1/roasts/{roast_id}")
+    final = {e["type"]: e for e in resp.json()["events"]}
+    assert "DRY_END" not in final
+    assert final["FC_END"]["time_s"] == new_fc_end_time
+
+
 def test_events_endpoints_404_for_unknown_roast(client):
     resp = client.delete("/api/v1/roasts/does-not-exist/events/also-does-not-exist")
     assert resp.status_code == 404
