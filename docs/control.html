@@ -138,6 +138,19 @@
     it happens every time (a fresh simulated roaster every roast); on real
     hardware, only the heater is affected, and only if it was on.
   </p>
+  <p>
+    Ending a roast with OFF always saves it with status
+    <strong>Stopped</strong> in History &mdash; regardless of how the
+    roast actually went, even a perfect one you followed all the way to
+    Cool End on purpose. <strong>Complete</strong> never appears for a
+    live or simulated roast at all; it's reserved for replaying an
+    uploaded <code>.alog</code> file once playback reaches its last
+    recorded sample, a "ran out of data" condition a live roast has no
+    equivalent of. See the <a href="glossary.html#term-status">Status</a>
+    glossary entry for the full picture, including
+    <strong>Aborted</strong> (an error ended the recording instead of a
+    deliberate OFF).
+  </p>
 
   <h2 id="activity-log">Activity log</h2>
   <p>

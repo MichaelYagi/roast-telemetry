@@ -421,6 +421,22 @@
       — confirm against your own machine rather than trusting either
       default.
     </dd>
+    <dt id="term-status">Status <span class="glossary-tag">History</span></dt>
+    <dd>
+      What ended a roast — not how well it went. A live roast (real
+      hardware or the simulator) has no "done" signal of its own, so it
+      can only end one of two ways: <strong>Stopped</strong> (you clicked
+      OFF, on purpose — this is normal, and applies just as much to a
+      roast you followed all the way to Cool End as one you cut short)
+      or <strong>Aborted</strong> (an unexpected error ended the
+      recording instead, not a deliberate click — the roaster is put in
+      its safe state first either way). <strong>Complete</strong> only
+      appears for a roast replaying an uploaded <code>.alog</code> file
+      once playback reaches the last recorded sample — a genuine "ran out
+      of data" condition a live roast can't have. A perfect, fully
+      intentional live roast still shows Stopped, not Complete — that's
+      expected, not a bug.
+    </dd>
     <dt id="term-stop-bits">Stop bits <span class="glossary-tag">Modbus / FZ-94</span></dt>
     <dd>
       Another piece of the serial "both ends must agree" framing (along
