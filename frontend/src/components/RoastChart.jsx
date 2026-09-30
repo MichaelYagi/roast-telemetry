@@ -481,6 +481,29 @@ const RoastChart = forwardRef(function RoastChart({
   // avoid a React re-render on every pixel of mouse movement.
   const dragRef = useRef(null);
 
+  // Chart.js reapplies an axis's config min/max on every chart.update()
+  // that a new `options` object triggers -- including one that only
+  // toggled a series checkbox or hideEventLabels, nothing to do with the
+  // axis range itself -- which silently discarded any zoom/pan the user
+  // had applied (confirmed live). Below (in the `options` useMemo), each
+  // interactive-only axis's min/max is computed via this instead of used
+  // directly: it remembers the last *genuinely new* default range (a
+  // different roast, a tempUnit switch) per axis, and while that hasn't
+  // changed, hands back whatever the live chart's own current (possibly
+  // panned/zoomed) range already is instead of the freshly recomputed
+  // default -- so only an actual reason to reset the view resets it.
+  const axisRangeRef = useRef({});
+  function stableAxisRange(axisId, computedMin, computedMax) {
+    const key = `${computedMin}:${computedMax}`;
+    const cached = axisRangeRef.current[axisId];
+    const chart = chartRef.current;
+    if (cached && cached.key === key && chart && chart.scales[axisId]) {
+      return { min: chart.scales[axisId].min, max: chart.scales[axisId].max };
+    }
+    axisRangeRef.current[axisId] = { key };
+    return { min: computedMin, max: computedMax };
+  }
+
   // Closes the right-click context menu on any click outside it, same
   // pattern as the chart-options popover below.
   useEffect(() => {
@@ -713,8 +736,16 @@ const RoastChart = forwardRef(function RoastChart({
     setContextMenu({ eventId: hit.id, x: e.clientX, y: e.clientY });
   }
 
-  const options = useMemo(
-    () => ({
+  const options = useMemo(() => {
+    const xRange = interactive
+      ? stableAxisRange("x", timeAxis.min, timeAxis.max)
+      : { min: timeAxis.min, max: timeAxis.max };
+    const tempRange = interactive
+      ? stableAxisRange("yTemp", tempAxisMin(), tempAxisMax(tempUnit, tempDataMax))
+      : { min: tempAxisMin(), max: tempAxisMax(tempUnit, tempDataMax) };
+    const rorDefault = rorAxisRange(tempUnit);
+    const rorRange = interactive ? stableAxisRange("yRor", rorDefault.min, rorDefault.max) : rorDefault;
+    return {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
@@ -794,8 +825,8 @@ const RoastChart = forwardRef(function RoastChart({
       scales: {
         x: {
           type: "linear",
-          min: timeAxis.min,
-          ...(timeAxis.max != null ? { max: timeAxis.max } : { suggestedMax: timeAxis.suggestedMax }),
+          min: xRange.min,
+          ...(xRange.max != null ? { max: xRange.max } : { suggestedMax: timeAxis.suggestedMax }),
           grid: { color: "#e7e5e4" },
           title: { display: true, text: t("common.roastChart.axisMins"), color: "#78716c" },
           ticks: { callback: (value) => formatTime(value), color: "#78716c", maxTicksLimit: 8, includeBounds: false },
@@ -810,9 +841,9 @@ const RoastChart = forwardRef(function RoastChart({
           // data's own min (e.g. ~82C at Turning Point), starting the
           // axis mid-way up rather than at a real baseline. 0 in both
           // units: the control lines (0-100) sit in the low band of this axis.
-          min: tempAxisMin(),
+          min: tempRange.min,
           // 350 C / 527 F unless the roast runs hotter (then the next 50 up).
-          max: tempAxisMax(tempUnit, tempDataMax),
+          max: tempRange.max,
         },
         yRor: {
           type: "linear",
@@ -825,12 +856,12 @@ const RoastChart = forwardRef(function RoastChart({
           // roasting-chart default, so a single transient spike -- e.g. the
           // huge RoR right after charge -- can't stretch the axis and flatten
           // the rest of the roast's curve into an unreadable line near zero.
-          min: rorAxisRange(tempUnit).min,
-          max: rorAxisRange(tempUnit).max,
+          min: rorRange.min,
+          max: rorRange.max,
         },
       },
-    }),
-    [events, phases, showTemp, showRor, showControl, tempUnit, tempDataMax, timeAxis.min, timeAxis.max, hideEventLabels, interactive, onRetimeEvent, handleDragMove, handleDragEnd, t]
+    };
+  }, [events, phases, showTemp, showRor, showControl, tempUnit, tempDataMax, timeAxis.min, timeAxis.max, hideEventLabels, interactive, onRetimeEvent, handleDragMove, handleDragEnd, t]
   );
 
   return (
