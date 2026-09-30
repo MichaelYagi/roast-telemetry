@@ -737,8 +737,22 @@ const RoastChart = forwardRef(function RoastChart({
   }
 
   const options = useMemo(() => {
+    // Default to just the Dry/Maillard/Dev span when one or more of those
+    // phase bands are actually showing (computePhases -- each band needs
+    // its own two boundary milestones, so this is always the visible
+    // bands' own combined start/end, never a wider guess) -- a finished
+    // roast is usually more interesting to review without the flat
+    // pre-Charge lead-in and post-Drop cooling tail eating chart space by
+    // default. Finished roasts only (interactive) -- a live roast's Dev
+    // band can't exist until Drop actually happens, so this would
+    // otherwise freeze the live view at Maillard's end for the whole
+    // First Crack/Development stretch. Falls back to the full recording
+    // when no phase is computable yet (e.g. Charge or Drop never marked).
+    const phaseSpan = interactive && phases.length
+      ? { min: Math.min(...phases.map((p) => p.start)), max: Math.max(...phases.map((p) => p.end)) }
+      : null;
     const xRange = interactive
-      ? stableAxisRange("x", timeAxis.min, timeAxis.max)
+      ? stableAxisRange("x", phaseSpan ? phaseSpan.min : timeAxis.min, phaseSpan ? phaseSpan.max : timeAxis.max)
       : { min: timeAxis.min, max: timeAxis.max };
     const tempRange = interactive
       ? stableAxisRange("yTemp", tempAxisMin(), tempAxisMax(tempUnit, tempDataMax))
