@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import BreakoutSettingsEditor from "../components/BreakoutSettingsEditor.jsx";
+import ColorsSettingsEditor from "../components/ColorsSettingsEditor.jsx";
 import VerticalControlSettingsEditor from "../components/VerticalControlSettingsEditor.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 
@@ -12,9 +13,10 @@ export default function SettingsView() {
   const [url, setUrl] = useState("");
   const [model, setModel] = useState("");
   const [brokenOutPanels, setBrokenOutPanels] = useState([]); // ordered -- display order == array order
-  // Shared by both editors below -- colors are a property of the item
-  // (e.g. "bt" is the same blue everywhere it's shown), not something
-  // that should drift between the Big and Small readouts. Only holds
+  // Colors are a property of the item (e.g. "bt" is the same blue
+  // everywhere it's shown) -- edited once in the Colors section below,
+  // read here and passed down to whatever else draws that item (the
+  // chart itself, in RoastChart.jsx's own settings fetch). Only holds
   // items overridden from their built-in default.
   const [panelColors, setPanelColors] = useState({});
   // Independent from the Big Readout Panel above -- its own ordered
@@ -211,14 +213,15 @@ export default function SettingsView() {
       </div>
 
       <div className="panel">
+        <h2>{t("settings.colors.heading")}</h2>
+        <p className="hint">{t("settings.colors.hint")}</p>
+        <ColorsSettingsEditor colors={panelColors} setColors={setPanelColors} />
+      </div>
+
+      <div className="panel">
         <h2>{t("settings.bigReadoutPanel.heading")}</h2>
         <p className="hint">{t("settings.bigReadoutPanel.hint")}</p>
-        <BreakoutSettingsEditor
-          enabledKeys={brokenOutPanels}
-          setEnabledKeys={setBrokenOutPanels}
-          colors={panelColors}
-          setColors={setPanelColors}
-        />
+        <BreakoutSettingsEditor enabledKeys={brokenOutPanels} setEnabledKeys={setBrokenOutPanels} />
       </div>
 
       <div className="panel">
@@ -227,8 +230,6 @@ export default function SettingsView() {
         <BreakoutSettingsEditor
           enabledKeys={smallReadoutPanels}
           setEnabledKeys={setSmallReadoutPanels}
-          colors={panelColors}
-          setColors={setPanelColors}
           excludeKeys={SMALL_READOUT_EXCLUDED_KEYS}
         />
       </div>

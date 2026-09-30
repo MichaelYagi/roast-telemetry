@@ -42,6 +42,25 @@ const CONTINUOUS_FIELD_BY_CHANNEL = {
 
 // One entry per toggleable curve. `axis` names a scale defined in
 // `options.scales` below; `source` says how to build its data.
+// Lets a channel's color be customized in one place (Settings > Colors,
+// which writes breakout_panel_colors -- the same setting the Big/Small
+// Readout panels already read for their own boxes) and have it apply here
+// too, instead of a second, separate chart-only color setting. Only
+// channels with a real Colors-section equivalent are mapped; Damper (and
+// the background/extra series below, which are roast-specific, not a
+// fixed channel) have no such entry to borrow a color from, so they keep
+// their own SERIES_DEFS default untouched.
+const SERIES_KEY_TO_BREAKOUT_KEY = {
+  BT: "bt",
+  ET: "et",
+  DT: "dt",
+  ROR_BT: "ror_bt",
+  ROR_ET: "ror_et",
+  Burner: "heater",
+  Air: "fan",
+  Drum: "drum",
+};
+
 const SERIES_DEFS = [
   { key: "BT", label: "BT", color: "#1d4ed8", axis: "yTemp", source: "profile", field: "bt", defaultOn: true },
   { key: "ET", label: "ET", color: "#be123c", axis: "yTemp", source: "profile", field: "et", defaultOn: true },
@@ -443,6 +462,15 @@ const RoastChart = forwardRef(function RoastChart({
   const [visible, setVisible] = useState(() =>
     Object.fromEntries(SERIES_DEFS.map((s) => [s.key, s.defaultOn]))
   );
+  // key -> hex override, from the same breakout_panel_colors setting the
+  // Big/Small Readout panels already use (see SERIES_KEY_TO_BREAKOUT_KEY
+  // above) -- {} until settings load, same as every other saved-setting
+  // field on this component.
+  const [channelColors, setChannelColors] = useState({});
+  function colorFor(seriesDef) {
+    const breakoutKey = SERIES_KEY_TO_BREAKOUT_KEY[seriesDef.key];
+    return (breakoutKey && channelColors[breakoutKey]) || seriesDef.color;
+  }
   // Holds the *full* settings object (not just chart_series_visible) --
   // PUT /api/settings has no partial-update semantics, it overwrites
   // every field with whatever the request body provides (see
@@ -461,6 +489,7 @@ const RoastChart = forwardRef(function RoastChart({
       // version) still gets its own correct defaultOn instead of being
       // forced off by an absent key.
       setVisible((prev) => ({ ...prev, ...s.chart_series_visible }));
+      setChannelColors(s.breakout_panel_colors || {});
     });
     return () => {
       cancelled = true;
@@ -633,8 +662,8 @@ const RoastChart = forwardRef(function RoastChart({
         // Control channels (Burner/Fan/Drum/Damper, 0-100) are drawn low on the
         // temperature axis, in its 0-100 band, rather than on an axis of their own.
         isControl: s.axis === "yControl",
-        borderColor: s.color,
-        backgroundColor: s.color,
+        borderColor: colorFor(s),
+        backgroundColor: colorFor(s),
         pointRadius: 0,
         borderWidth: seriesLineWidth(s.key, s.axis),
         borderDash: s.source === "background" ? [6, 3] : undefined,
@@ -644,7 +673,7 @@ const RoastChart = forwardRef(function RoastChart({
       };
     });
     return { datasets };
-  }, [seriesDefs, profile, events, background, visible, endTime, tempUnit]);
+  }, [seriesDefs, profile, events, background, visible, endTime, tempUnit, channelColors]);
 
   // The highest temperature on the chart, so the axis can grow past its default top.
   const tempDataMax = useMemo(() => {
@@ -893,7 +922,7 @@ const RoastChart = forwardRef(function RoastChart({
             title={availability[s.key] ? undefined : t("common.roastChart.noDataForChannel")}
           >
             <input type="checkbox" checked={!!visible[s.key]} onChange={() => toggle(s.key)} />
-            <span className="toggle-swatch" style={{ background: s.color }} />
+            <span className="toggle-swatch" style={{ background: colorFor(s) }} />
             <span title={TERM_TOOLTIPS[s.label]}>{s.label}</span>
           </label>
         ))}

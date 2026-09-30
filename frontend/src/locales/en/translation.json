@@ -46,6 +46,10 @@
       "celsius": "Celsius (°C)",
       "fahrenheit": "Fahrenheit (°F)"
     },
+    "colors": {
+      "heading": "Colors",
+      "hint": "Pick each channel's color once here -- it applies everywhere that channel shows up: the roast chart's line, the Big Readout Panel, and the Small Readout Panel."
+    },
     "bigReadoutPanel": {
       "heading": "Big Readout Panel",
       "hint": "Pick which live values also show large in a dedicated panel next to the chart on the Live Roast screen (only above ~1400px wide), alongside (not instead of) their normal small display. Off by default. Changes here apply to an already-open Live Roast tab within a few seconds, no refresh needed."
