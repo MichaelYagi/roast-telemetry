@@ -166,6 +166,13 @@ class RoastControl:
             "safety", "safe_state", username=username, platform=platform, roast_id=self.session.id, roast_title=self.session.title,
             message=f'Safety stop on "{self.session.title}": {reason}',
         )
+        if reason == "emergency stop":
+            # Scoped to the literal manual-button reason, not every
+            # fail-safe trip -- a persistent, post-hoc "this roast had an
+            # emergency stop" flag (History, roast detail), distinct from
+            # the live-only tripped_reason banner that resets once the
+            # session ends.
+            storage.mark_roast_emergency_stopped(self.session.id)
         return written
 
     def release(self) -> None:

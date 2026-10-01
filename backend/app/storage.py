@@ -304,6 +304,20 @@ def init_db() -> None:
         # purely to make them findable.
         if "notes_text" not in existing_cols:
             c.execute("ALTER TABLE roasts ADD COLUMN notes_text TEXT")
+        # Idempotent migration for DBs created before roasts carried
+        # whether Emergency Stop was ever clicked on them, and whether they
+        # reached Drop before ending -- see RoastControl.enter_safe_state /
+        # RoastSession._finish. had_emergency_stop defaults false for every
+        # existing row (nothing to reconstruct). reached_drop deliberately
+        # has NO default -- it stays NULL ("unknown") for every row that
+        # existed before this column did, rather than falsely flagging
+        # every already-finished historical roast as having ended early;
+        # only a roast that finishes *after* this column exists gets an
+        # explicit 0/1 from _finish().
+        if "had_emergency_stop" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN had_emergency_stop INTEGER NOT NULL DEFAULT 0")
+        if "reached_drop" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN reached_drop INTEGER")
         # Idempotent migration for DBs created before roast_presets carried
         # control-channel starting values.
         preset_cols = {row[1] for row in c.execute("PRAGMA table_info(roast_presets)")}
@@ -378,6 +392,20 @@ def update_roast(roast_id: str, **fields) -> None:
     with _conn() as c:
         set_clause = ", ".join(f"{k} = :{k}" for k in fields)
         c.execute(f"UPDATE roasts SET {set_clause} WHERE id = :id", {**fields, "id": roast_id})
+
+
+def mark_roast_emergency_stopped(roast_id: str) -> None:
+    """Fire-and-forget, same reasoning as log_activity -- the manual
+    Emergency Stop button (RoastControl.enter_safe_state, reason ==
+    "emergency stop") is reachable from plain unit tests that build a
+    RoastSession directly with no DB row, and even no schema at all (see
+    tests/test_roast_control.py's make_session(), under the autouse
+    _default_db_isolation fixture) -- a failed write here must never break
+    the actual safety response."""
+    try:
+        update_roast(roast_id, had_emergency_stop=True)
+    except Exception:
+        logging.getLogger(__name__).exception("couldn't mark roast %s as emergency-stopped", roast_id)
 
 
 def _locate_alog(row: dict) -> dict:

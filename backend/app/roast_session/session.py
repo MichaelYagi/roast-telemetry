@@ -101,6 +101,21 @@ def _modbus_register_overrides(request: RoastCreateRequest) -> dict:
 OUTCOME_KEYS = ("color_agtron", "cupping_score", "rating", "tasting_notes", "bean_id")
 
 
+def _persistent_flags_from_row(row: dict) -> dict:
+    """had_emergency_stop/reached_drop are also written straight to the
+    database (RoastControl.enter_safe_state / RoastSession._finish), not
+    tracked on the live in-memory session -- same "overlay from the DB
+    row" reasoning as OUTCOME_KEYS above, just needing an explicit
+    int->bool coercion (unlike OUTCOME_KEYS' naturally-matching types)
+    since SQLite hands back a plain 0/1/None. reached_drop stays None
+    ("unknown"), not False, when the column itself is NULL."""
+    reached_drop = row.get("reached_drop")
+    return {
+        "had_emergency_stop": bool(row.get("had_emergency_stop")),
+        "reached_drop": bool(reached_drop) if reached_drop is not None else None,
+    }
+
+
 def roast_duration_s(profile: list, events: list) -> float:
     """A roast's duration is Charge to Drop -- the same span the phase
     percentages use, and what "roast time" means when roasting. Without
@@ -657,7 +672,8 @@ class RoastSession:
             self.status = RoastStatus.ABORTED
             self._cancel_pending_alarms()
             if self._recorded:
-                storage.update_roast(self.id, status=self.status.value)
+                reached_drop = any(e["type"] == RoastEventType.DROP.value for e in self.events)
+                storage.update_roast(self.id, status=self.status.value, reached_drop=reached_drop)
             await pubsub.publish(self.id, {"type": "error", "roast_id": self.id, "message": str(exc)})
 
     def _cancel_pending_alarms(self) -> None:
@@ -733,6 +749,12 @@ class RoastSession:
         )
         save_native_alog(self.alog_path, alog_dict)
 
+        # Whether Drop ever got marked before this roast ended -- a
+        # persistent, post-hoc "ended before all milestones" signal for
+        # History/roast detail. Explicit True/False from here on, not just
+        # the NULL every roast finished before this column existed stays
+        # at (see storage.py's own migration comment on why that matters).
+        reached_drop = any(e["type"] == RoastEventType.DROP.value for e in self.events)
         storage.update_roast(
             self.id,
             status=self.status.value,
@@ -740,6 +762,7 @@ class RoastSession:
             weight_roasted_g=self.weight_roasted_g,
             alog_path=self.alog_path,
             playback_speed=self.playback_speed,
+            reached_drop=reached_drop,
         )
         await pubsub.publish(self.id, {"type": "finished", "roast_id": self.id, "status": self.status.value})
 
@@ -1238,6 +1261,8 @@ class RoastSessionManager:
             if row is not None:
                 for key in OUTCOME_KEYS:
                     setattr(roast, key, row.get(key))
+                for key, value in _persistent_flags_from_row(row).items():
+                    setattr(roast, key, value)
             return roast
 
         row = storage.get_roast_row(roast_id)
@@ -1268,6 +1293,7 @@ class RoastSessionManager:
             ms6514_port=row.get("ms6514_port"),
             aillio_model=row.get("aillio_model"),
             tc4_port=row.get("tc4_port"),
+            **_persistent_flags_from_row(row),
             profile=parsed["profile"],
             events=parsed["events"],
             notes=parsed["notes"],
@@ -1498,6 +1524,7 @@ class RoastSessionManager:
                 duration_s=r["duration_s"], alog_path=r["alog_path"],
                 created_by_username=r.get("created_by_username"),
                 **{key: r.get(key) for key in OUTCOME_KEYS},
+                **_persistent_flags_from_row(r),
             )
             for r in rows
         ]

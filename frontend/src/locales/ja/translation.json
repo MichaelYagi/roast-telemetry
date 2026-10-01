@@ -724,7 +724,11 @@
       "selectRoast": "{{title}} を選択",
       "pagePrev": "← 前へ",
       "pageNext": "次へ →",
-      "pageOf_other": "{{page}} / {{totalPages}} ページ（{{count}}件のロースト）"
+      "pageOf_other": "{{page}} / {{totalPages}} ページ（{{count}}件のロースト）",
+      "emergencyStoppedIcon": "緊急停止",
+      "emergencyStoppedTitle": "このローストでは緊急停止が使用されました",
+      "endedBeforeDropIcon": "未完了",
+      "endedBeforeDropTitle": "このローストはDropが記録される前に終了しました"
     },
     "selection": {
       "selected": "{{count}}件選択中",
@@ -758,6 +762,10 @@
     },
     "simulatedBadge": "シミュレーション",
     "simulatedBadgeTitle": "内蔵のシミュレーションデバイスで記録されました",
+    "emergencyStoppedBadge": "緊急停止",
+    "emergencyStoppedBadgeTitle": "このローストでは緊急停止が使用されました",
+    "endedBeforeDropBadge": "未完了",
+    "endedBeforeDropBadgeTitle": "このローストはDropが記録される前に終了しました",
     "downloads": {
       "download": "ダウンロード",
       "spreadsheetNote": "（表計算ソフト用、タブ区切り）",

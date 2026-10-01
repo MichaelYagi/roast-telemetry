@@ -8,6 +8,7 @@ import SavedViews from "../components/SavedViews.jsx";
 import { useConfirm, useNotify } from "../components/DialogProvider.jsx";
 import ServerFileChooser from "../components/ServerFileChooser.jsx";
 import { formatSeconds } from "../lib/metricFormat.js";
+import { endedBeforeDrop, isEmergencyStopped } from "../roastFlags.js";
 
 // What the Import box accepts, and (for the browser file picker) the "accept"
 // list -- .alog and .json go through the native reader, .csv/.tsv/.xlsx
@@ -718,6 +719,16 @@ export default function HistoryDashboard() {
                     <td className="cell-mode">{r.mode === "alog_playback" && !r.source_alog_path ? t("history.modeLabels.uploadedLog") : MODE_LABELS[r.mode] || r.mode}</td>
                     <td className="cell-status">
                       <span className={`status-pill status-${r.status}`}>{STATUS_LABELS[r.status] || r.status}</span>
+                      {isEmergencyStopped(r) && (
+                        <span className="row-flag row-flag-emergency-stop" title={t("history.table.emergencyStoppedTitle")}>
+                          {t("history.table.emergencyStoppedIcon")}
+                        </span>
+                      )}
+                      {endedBeforeDrop(r) && (
+                        <span className="row-flag row-flag-incomplete" title={t("history.table.endedBeforeDropTitle")}>
+                          {t("history.table.endedBeforeDropIcon")}
+                        </span>
+                      )}
                     </td>
                     <td className="cell-duration">{formatSeconds(r.duration_s)}</td>
                     <td className="cell-tags">

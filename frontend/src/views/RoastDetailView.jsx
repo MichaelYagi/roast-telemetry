@@ -5,6 +5,7 @@ import { api } from "../api/client.js";
 import RoastChart from "../components/RoastChart.jsx";
 import RoastReviewCard from "../components/RoastReviewCard.jsx";
 import { isSimulatedRoast } from "../simulated.js";
+import { endedBeforeDrop, isEmergencyStopped } from "../roastFlags.js";
 import RoastStatsPanel from "../components/RoastStatsPanel.jsx";
 import RoastNumbers from "../components/RoastNumbers.jsx";
 import OutcomePanel from "../components/OutcomePanel.jsx";
@@ -294,6 +295,16 @@ export default function RoastDetailView() {
           {isSimulatedRoast(roast) && (
             <span className="simulated-badge" title={t("roastDetail.simulatedBadgeTitle")}>
               {t("roastDetail.simulatedBadge")}
+            </span>
+          )}
+          {isEmergencyStopped(roast) && (
+            <span className="emergency-stop-badge" title={t("roastDetail.emergencyStoppedBadgeTitle")}>
+              {t("roastDetail.emergencyStoppedBadge")}
+            </span>
+          )}
+          {endedBeforeDrop(roast) && (
+            <span className="incomplete-badge" title={t("roastDetail.endedBeforeDropBadgeTitle")}>
+              {t("roastDetail.endedBeforeDropBadge")}
             </span>
           )}
         </h2>

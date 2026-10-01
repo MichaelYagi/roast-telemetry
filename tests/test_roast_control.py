@@ -280,6 +280,53 @@ def test_emergency_stop_reports_when_it_could_not_reach_the_roaster():
     assert any("couldn't reach" in e["label"] for e in session.events)
 
 
+def test_emergency_stop_persists_had_emergency_stop_on_the_roast_row(isolated_db):
+    session = make_session()
+    session._persist_new_roast_row()
+    feed(session, 0)
+
+    async def body():
+        return await session.control.emergency_stop(username="test-admin", platform="Chrome on Windows")
+
+    asyncio.run(body())
+    assert isolated_db.get_roast_row(session.id)["had_emergency_stop"] == 1
+
+
+def test_a_fail_safe_trip_does_not_mark_had_emergency_stop(isolated_db):
+    # Scoped to the literal manual-button reason -- an automatic fail-safe
+    # trip (no username, a different reason string) must not set this.
+    session = make_session()
+    session._persist_new_roast_row()
+    feed(session, 0)
+
+    async def body():
+        await session.control.enter_safe_state("lost the temperature reading during target control")
+
+    asyncio.run(body())
+    assert isolated_db.get_roast_row(session.id)["had_emergency_stop"] == 0
+
+
+def test_finish_persists_reached_drop_true_when_drop_was_marked(isolated_db):
+    session = make_session()
+    session._persist_new_roast_row()
+    feed(session, 0)
+    mark_charge(session)
+    session.events.append({"id": "d", "type": "DROP", "time_s": 10.0, "label": "Drop", "value": None})
+
+    asyncio.run(session._finish(RoastStatus.STOPPED))
+    assert isolated_db.get_roast_row(session.id)["reached_drop"] == 1
+
+
+def test_finish_persists_reached_drop_false_when_stopped_before_drop(isolated_db):
+    session = make_session()
+    session._persist_new_roast_row()
+    feed(session, 0)
+    mark_charge(session)
+
+    asyncio.run(session._finish(RoastStatus.STOPPED))
+    assert isolated_db.get_roast_row(session.id)["reached_drop"] == 0
+
+
 # -- the write itself must never block the shared event loop -----------------
 # Reported live: an unresponsive real device made Emergency Stop hang
 # forever, and froze the *entire* server -- every other request, including

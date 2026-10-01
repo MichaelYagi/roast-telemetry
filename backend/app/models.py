@@ -555,6 +555,16 @@ class RoastSummary(BaseModel):
     aillio_model: Optional[str] = None
     # tc4_live only, same reasoning again.
     tc4_port: Optional[str] = None
+    # Persistent, post-hoc flags (History, roast detail) -- distinct from
+    # the live-only "Stopped for safety: ..." banner (RoastControl's own
+    # tripped_reason), which resets once the session ends. had_emergency_stop
+    # is set the moment the manual Emergency Stop button fires (see
+    # RoastControl.enter_safe_state), independent of how the roast later
+    # ends. reached_drop is set once, when the roast finishes (see
+    # RoastSession._finish) -- None means "unknown" (every roast recorded
+    # before this field existed, or one still in progress), not "no".
+    had_emergency_stop: bool = False
+    reached_drop: Optional[bool] = None
 
 
 class Roast(RoastSummary):

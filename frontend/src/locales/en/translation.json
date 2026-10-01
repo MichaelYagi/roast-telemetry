@@ -735,7 +735,11 @@
       "pagePrev": "← Prev",
       "pageNext": "Next →",
       "pageOf_one": "Page {{page}} of {{totalPages}} ({{count}} roast)",
-      "pageOf_other": "Page {{page}} of {{totalPages}} ({{count}} roasts)"
+      "pageOf_other": "Page {{page}} of {{totalPages}} ({{count}} roasts)",
+      "emergencyStoppedIcon": "E-stop",
+      "emergencyStoppedTitle": "Emergency Stop was used during this roast",
+      "endedBeforeDropIcon": "Incomplete",
+      "endedBeforeDropTitle": "This roast ended before Drop was marked"
     },
     "selection": {
       "selected": "{{count}} selected",
@@ -771,6 +775,10 @@
     },
     "simulatedBadge": "Simulated",
     "simulatedBadgeTitle": "Recorded from a built-in simulated device",
+    "emergencyStoppedBadge": "E-stop",
+    "emergencyStoppedBadgeTitle": "Emergency Stop was used during this roast",
+    "endedBeforeDropBadge": "Incomplete",
+    "endedBeforeDropBadgeTitle": "This roast ended before Drop was marked",
     "downloads": {
       "download": "Download",
       "spreadsheetNote": "(spreadsheet, tab-separated)",
