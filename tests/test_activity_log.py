@@ -233,7 +233,7 @@ def test_logout_with_no_live_session_is_not_logged(anon_client):
 
 def test_api_key_client_connect_and_disconnect_are_logged(anon_client):
     anon_client.post("/api/v1/auth/register", json={"username": "alice", "password": "a-fine-password"})
-    key = anon_client.post("/api/v1/auth/api-key").json()["api_key"]
+    key = anon_client.post("/api/v1/auth/api-keys", json={"name": "Phone"}).json()["api_key"]
     anon_client.cookies.clear()  # the app has only its key, no session
     app = {"X-API-Key": key, "X-Client-Platform": "Roast Telemetry app 1.0.0 on Android 14", "User-Agent": "okhttp/4.12.0"}
 

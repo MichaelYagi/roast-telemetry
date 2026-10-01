@@ -508,18 +508,20 @@
         "submit": "Change password"
       },
       "apiKey": {
-        "heading": "API key",
+        "heading": "API keys",
         "hintPrefix": "Lets a script, a Home Assistant integration, or curl call the API directly with an",
-        "hintSuffix": "header, instead of logging in through the browser. Not required for using this app normally.",
+        "hintSuffix": "header, instead of logging in through the browser. Not required for using this app normally. Give each integration its own key, so revoking one never affects the others.",
         "copyNowWarning": "Copy this now -- it won't be shown again.",
         "copied": "Copied",
         "copy": "Copy",
-        "active": "A key is active (hidden -- regenerate to see a new one).",
-        "none": "No key yet.",
+        "empty": "No API keys yet.",
+        "namePlaceholder": "Name this key, e.g. \"Home Assistant\"",
+        "add": "Add key",
+        "created": "Created {{date}}",
+        "lastUsed": "Last used {{date}}",
+        "neverUsed": "Never used",
         "revoke": "Revoke",
-        "revokeConfirm": "Turn off API key access? This can't be undone -- you'd need to generate a new key to use the API directly again.",
-        "regenerate": "Regenerate",
-        "generate": "Generate API key"
+        "revokeConfirm": "Revoke \"{{name}}\"? This can't be undone -- anything still using this key will stop working immediately."
       }
     },
     "modal": {

@@ -106,12 +106,10 @@ CREATE TABLE IF NOT EXISTS roast_reviews (
 
 -- The first row ever inserted (by created_at) is the admin, auto-allowed;
 -- every account after that starts 'pending' (see api/auth.py's register()).
--- api_key_hash is NULL until the user generates one (see api/auth.py's
--- POST/DELETE /auth/api-key) -- a hash, never the plaintext key itself,
--- same reasoning as password_hash. Uniqueness is a separate index below
--- (not an inline UNIQUE here) since SQLite's ALTER TABLE ADD COLUMN --
--- needed for the idempotent migration path, see init_db() -- can't add a
--- UNIQUE column after the fact, only a plain one.
+-- api_key_hash is legacy -- a single pre-multi-key column, carried forward
+-- read-only by init_db()'s migration into the api_keys table below (see
+-- its own comment); no code writes this column anymore, see
+-- POST/DELETE /auth/api-keys instead.
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,
@@ -195,6 +193,24 @@ CREATE TABLE IF NOT EXISTS activity_log (
 );
 CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_activity_log_roast_id ON activity_log(roast_id);
+
+-- One row per named API key, replacing users.api_key_hash's single-key
+-- model -- see init_db()'s own migration for how an existing single key
+-- carries forward. key_hash is unique (same sha256-of-the-token scheme
+-- as before, see auth.hash_api_key) so auth can look a request up by
+-- hash alone; user_id is a plain column, not a FK, same reasoning as
+-- every other user_id/created_by column in this file (stays queryable
+-- even if user deletion is ever added).
+CREATE TABLE IF NOT EXISTS api_keys (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    key_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id);
 """
 
 # How many of the newest activity_log rows survive each write -- trimmed in
@@ -316,6 +332,18 @@ def init_db() -> None:
         activity_cols = {row[1] for row in c.execute("PRAGMA table_info(activity_log)")}
         if "platform" not in activity_cols:
             c.execute("ALTER TABLE activity_log ADD COLUMN platform TEXT")
+        # Carries forward anyone's pre-upgrade single key into the new
+        # api_keys table -- upgrading must never invalidate an
+        # already-issued key. Idempotent via the hash uniqueness check
+        # (not just "run once"), so this is safe to leave running on
+        # every startup rather than needing a one-shot migration flag.
+        for row in c.execute("SELECT id, api_key_hash, created_at FROM users WHERE api_key_hash IS NOT NULL"):
+            exists = c.execute("SELECT 1 FROM api_keys WHERE key_hash = ?", (row[1],)).fetchone()
+            if not exists:
+                c.execute(
+                    "INSERT INTO api_keys (id, user_id, name, key_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (str(uuid.uuid4()), row[0], "Migrated key", row[1], row[2]),
+                )
 
 
 def alog_path_for(roast_id: str) -> str:
@@ -949,18 +977,58 @@ def set_user_status(user_id: str, status: str) -> None:
         c.execute("UPDATE users SET status = ? WHERE id = ?", (status, user_id))
 
 
-def set_user_api_key_hash(user_id: str, api_key_hash: Optional[str]) -> None:
-    """None clears it (revoke) -- see api/auth.py's DELETE /auth/api-key.
-    A regenerate is just this same call with a new hash, no separate
-    "clear first" step needed."""
+def create_api_key(user_id: str, name: str, key_hash: str) -> dict:
+    row = {"id": str(uuid.uuid4()), "user_id": user_id, "name": name, "key_hash": key_hash,
+           "created_at": datetime.now(timezone.utc).isoformat(), "last_used_at": None}
     with _conn() as c:
-        c.execute("UPDATE users SET api_key_hash = ? WHERE id = ?", (api_key_hash, user_id))
+        c.execute(
+            "INSERT INTO api_keys (id, user_id, name, key_hash, created_at, last_used_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (row["id"], row["user_id"], row["name"], row["key_hash"], row["created_at"], row["last_used_at"]),
+        )
+    return row
+
+
+def list_api_keys(user_id: str) -> list[dict]:
+    """id/name/created_at/last_used_at only -- key_hash deliberately
+    included here too (callers that need the plaintext-adjacent fields
+    strip it; see api/auth.py's ApiKeyPublic, which just never declares
+    the field) rather than a second narrower query, since this is
+    already never sent to a client un-filtered through a response_model."""
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM api_keys WHERE user_id = ? ORDER BY created_at ASC", (user_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_api_key(user_id: str, key_id: str) -> bool:
+    """Scoped to user_id, not just id -- so one account can never revoke
+    another's key even if it somehow learned the id. Returns whether a
+    row was actually deleted, so the caller can 404 on a no-op."""
+    with _conn() as c:
+        cur = c.execute("DELETE FROM api_keys WHERE id = ? AND user_id = ?", (key_id, user_id))
+        return cur.rowcount > 0
 
 
 def get_user_by_api_key_hash(api_key_hash: str) -> Optional[dict]:
     with _conn() as c:
-        row = c.execute("SELECT * FROM users WHERE api_key_hash = ?", (api_key_hash,)).fetchone()
-        return dict(row) if row else None
+        row = c.execute(
+            "SELECT users.* FROM users JOIN api_keys ON api_keys.user_id = users.id "
+            "WHERE api_keys.key_hash = ?",
+            (api_key_hash,),
+        ).fetchone()
+        if row is None:
+            return None
+        # Best-effort -- see log_activity's own fire-and-forget reasoning:
+        # a failed timestamp touch must never break authentication itself.
+        try:
+            c.execute(
+                "UPDATE api_keys SET last_used_at = ? WHERE key_hash = ?",
+                (datetime.now(timezone.utc).isoformat(), api_key_hash),
+            )
+        except Exception:
+            logging.getLogger(__name__).exception("couldn't update api_keys.last_used_at")
+        return dict(row)
 
 
 def set_user_password_hash(user_id: str, password_hash: str) -> None:

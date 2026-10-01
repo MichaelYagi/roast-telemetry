@@ -239,26 +239,35 @@ def test_logout_clears_the_session_so_the_gate_blocks_again(anon_client):
 # -- API keys (X-API-Key) ----------------------------------------------------
 
 
-def test_generating_an_api_key_returns_it_once_and_reports_has_api_key(anon_client):
-    register(anon_client, "alice")
-    assert anon_client.get("/api/v1/auth/me").json()["has_api_key"] is False
-
-    resp = anon_client.post("/api/v1/auth/api-key")
+def _create_key(client, name="My key"):
+    resp = client.post("/api/v1/auth/api-keys", json={"name": name})
     assert resp.status_code == 200
-    key = resp.json()["api_key"]
+    return resp.json()
+
+
+def test_creating_a_key_returns_it_once_and_lists_it_without_the_secret(anon_client):
+    register(anon_client, "alice")
+    assert anon_client.get("/api/v1/auth/api-keys").json() == []
+
+    issued = _create_key(anon_client, "Laptop")
+    key = issued["api_key"]
     assert len(key) > 20  # secrets.token_urlsafe(32) -- not a short/guessable value
     assert key.startswith("rt_")
+    assert issued["name"] == "Laptop"
 
-    # The key itself is never echoed back anywhere else -- only whether one exists.
-    me = anon_client.get("/api/v1/auth/me").json()
-    assert me["has_api_key"] is True
-    assert "api_key" not in me
-    assert "api_key_hash" not in me
+    # The plaintext key is never echoed back anywhere else -- only the list metadata.
+    listed = anon_client.get("/api/v1/auth/api-keys").json()
+    assert len(listed) == 1
+    assert listed[0]["id"] == issued["id"]
+    assert listed[0]["name"] == "Laptop"
+    assert listed[0]["last_used_at"] is None
+    assert "api_key" not in listed[0]
+    assert "key_hash" not in listed[0]
 
 
 def test_api_key_header_authenticates_like_a_session_cookie(anon_client):
     register(anon_client, "alice")
-    key = anon_client.post("/api/v1/auth/api-key").json()["api_key"]
+    key = _create_key(anon_client)["api_key"]
 
     # Drop the session cookie entirely -- only the header should carry auth now.
     anon_client.cookies.clear()
@@ -270,38 +279,91 @@ def test_api_key_header_authenticates_like_a_session_cookie(anon_client):
 
 def test_wrong_api_key_is_rejected(anon_client):
     register(anon_client, "alice")
-    anon_client.post("/api/v1/auth/api-key")
+    _create_key(anon_client)
     anon_client.cookies.clear()
 
     resp = anon_client.get("/api/v1/roasts", headers={"X-API-Key": "not-the-real-key"})
     assert resp.status_code == 401
 
 
-def test_regenerating_an_api_key_invalidates_the_previous_one(anon_client):
+def test_two_keys_authenticate_independently_and_show_distinct_names(anon_client):
     register(anon_client, "alice")
-    old_key = anon_client.post("/api/v1/auth/api-key").json()["api_key"]
-    new_key = anon_client.post("/api/v1/auth/api-key").json()["api_key"]
-    assert new_key != old_key
+    laptop = _create_key(anon_client, "Laptop")
+    phone = _create_key(anon_client, "Phone")
+
+    names = {k["name"] for k in anon_client.get("/api/v1/auth/api-keys").json()}
+    assert names == {"Laptop", "Phone"}
 
     anon_client.cookies.clear()
-    assert anon_client.get("/api/v1/roasts", headers={"X-API-Key": old_key}).status_code == 401
-    assert anon_client.get("/api/v1/roasts", headers={"X-API-Key": new_key}).status_code == 200
+    assert anon_client.get("/api/v1/roasts", headers={"X-API-Key": laptop["api_key"]}).status_code == 200
+    assert anon_client.get("/api/v1/roasts", headers={"X-API-Key": phone["api_key"]}).status_code == 200
 
 
-def test_revoking_an_api_key_turns_off_access_without_issuing_a_new_one(anon_client):
+def test_deleting_one_key_leaves_the_other_still_valid(anon_client):
     register(anon_client, "alice")
-    key = anon_client.post("/api/v1/auth/api-key").json()["api_key"]
+    laptop = _create_key(anon_client, "Laptop")
+    phone = _create_key(anon_client, "Phone")
 
-    resp = anon_client.delete("/api/v1/auth/api-key")
+    resp = anon_client.delete(f"/api/v1/auth/api-keys/{laptop['id']}")
     assert resp.status_code == 204
-    assert anon_client.get("/api/v1/auth/me").json()["has_api_key"] is False
+    assert [k["name"] for k in anon_client.get("/api/v1/auth/api-keys").json()] == ["Phone"]
 
     anon_client.cookies.clear()
-    assert anon_client.get("/api/v1/roasts", headers={"X-API-Key": key}).status_code == 401
+    assert anon_client.get("/api/v1/roasts", headers={"X-API-Key": laptop["api_key"]}).status_code == 401
+    assert anon_client.get("/api/v1/roasts", headers={"X-API-Key": phone["api_key"]}).status_code == 200
+
+
+def test_deleting_someone_elses_key_404s_and_does_not_delete_it(anon_client):
+    register(anon_client, "alice")  # admin, auto-allowed
+    alices_key = _create_key(anon_client, "Alice's key")
+    anon_client.post("/api/v1/auth/logout")
+    register(anon_client, "bob", password="bobs-password")
+    anon_client.post("/api/v1/auth/logout")
+    _login(anon_client, "alice", "a-fine-password")
+    bob_id = next(u for u in anon_client.get("/api/v1/auth/users").json() if u["username"] == "bob")["id"]
+    anon_client.post(f"/api/v1/auth/users/{bob_id}/allow")
+    anon_client.post("/api/v1/auth/logout")
+    _login(anon_client, "bob", "bobs-password")
+
+    resp = anon_client.delete(f"/api/v1/auth/api-keys/{alices_key['id']}")
+    assert resp.status_code == 404
+
+    anon_client.cookies.clear()
+    assert anon_client.get("/api/v1/roasts", headers={"X-API-Key": alices_key["api_key"]}).status_code == 200
+
+
+def test_last_used_at_is_populated_after_an_authenticated_request(anon_client):
+    register(anon_client, "alice")
+    issued = _create_key(anon_client, "Laptop")
+
+    anon_client.get("/api/v1/roasts", headers={"X-API-Key": issued["api_key"]})
+
+    listed = anon_client.get("/api/v1/auth/api-keys").json()
+    assert listed[0]["last_used_at"] is not None
+
+
+def test_migration_carries_forward_a_pre_upgrade_single_key(anon_client, isolated_db):
+    register(anon_client, "alice")
+    me = anon_client.get("/api/v1/auth/me").json()
+    # Simulates a pre-upgrade row: a key hash sitting directly in
+    # users.api_key_hash, bypassing the new api_keys-table endpoints
+    # entirely (the only way such a row could exist before this
+    # migration shipped).
+    import sqlite3
+
+    with sqlite3.connect(isolated_db.DB_PATH) as conn:
+        conn.execute("UPDATE users SET api_key_hash = ? WHERE id = ?", ("pre-upgrade-hash", me["id"]))
+        conn.commit()
+
+    isolated_db.init_db()  # re-run the idempotent migration
+
+    assert isolated_db.get_user_by_api_key_hash("pre-upgrade-hash")["id"] == me["id"]
+    names = [k["name"] for k in isolated_db.list_api_keys(me["id"])]
+    assert "Migrated key" in names
 
 
 def test_api_key_still_gated_by_allowed_status(anon_client):
-    # A key generated while ALLOWED shouldn't keep working if the account
+    # A key created while ALLOWED shouldn't keep working if the account
     # is later denied -- the same status check the cookie path gets.
     register(anon_client, "alice")
     admin_client = anon_client
@@ -312,7 +374,7 @@ def test_api_key_still_gated_by_allowed_status(anon_client):
     admin_client.post(f"/api/v1/auth/users/{bob_id}/allow")
     admin_client.post("/api/v1/auth/logout")
     _login(admin_client, "bob", "bobs-password")
-    key = admin_client.post("/api/v1/auth/api-key").json()["api_key"]
+    key = _create_key(admin_client)["api_key"]
 
     admin_client.post("/api/v1/auth/logout")
     _login(admin_client, "alice", "a-fine-password")

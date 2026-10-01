@@ -503,16 +503,18 @@
       "apiKey": {
         "heading": "APIキー",
         "hintPrefix": "スクリプト、Home Assistant連携、curlなどからブラウザでのログインなしに",
-        "hintSuffix": "ヘッダーで直接APIを呼び出せるようになります。通常のアプリ利用には不要です。",
+        "hintSuffix": "ヘッダーで直接APIを呼び出せるようになります。通常のアプリ利用には不要です。連携ごとに別々のキーを発行すれば、一つを無効化しても他には影響しません。",
         "copyNowWarning": "今すぐコピーしてください -- 二度と表示されません。",
         "copied": "コピーしました",
         "copy": "コピー",
-        "active": "キーは有効です（非表示 -- 新しいキーを見るには再生成してください）。",
-        "none": "まだキーがありません。",
+        "empty": "まだAPIキーがありません。",
+        "namePlaceholder": "このキーの名前（例: 「Home Assistant」）",
+        "add": "キーを追加",
+        "created": "作成日: {{date}}",
+        "lastUsed": "最終使用: {{date}}",
+        "neverUsed": "未使用",
         "revoke": "無効化",
-        "revokeConfirm": "APIキーへのアクセスを無効化しますか？この操作は取り消せません -- 再度APIを直接利用するには新しいキーを生成する必要があります。",
-        "regenerate": "再生成",
-        "generate": "APIキーを生成"
+        "revokeConfirm": "「{{name}}」を無効化しますか？この操作は取り消せません -- このキーを使用している連携はすぐに動作しなくなります。"
       }
     },
     "modal": {

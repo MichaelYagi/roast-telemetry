@@ -30,7 +30,7 @@ export default function App() {
 
 function AppShell() {
   const { t } = useTranslation();
-  const { user, loading, logout, refresh } = useAuth();
+  const { user, loading, logout } = useAuth();
   const [accountOpen, setAccountOpen] = useState(false);
   // The OS/version/LAN address the server is actually running on --
   // useful in the footer since this app runs self-hosted (Windows/WSL2/
@@ -143,7 +143,7 @@ function AppShell() {
           </div>
         </div>
       </header>
-      <AccountModal open={accountOpen} onClose={() => setAccountOpen(false)} user={user} onUserChange={refresh} />
+      <AccountModal open={accountOpen} onClose={() => setAccountOpen(false)} user={user} />
       <main className="app-main">
         <Routes>
           <Route path="/" element={<LiveRoastView />} />

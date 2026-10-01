@@ -381,31 +381,53 @@ def test_concurrent_same_username_registration_one_wins_one_is_duplicate(isolate
     assert outcomes == ["duplicate", "ok"]  # never both "ok" (two rows), never both erroring unhandled
 
 
-def test_api_key_hash_roundtrip_and_null_by_default(isolated_db):
+def test_api_key_roundtrip_and_empty_by_default(isolated_db):
     user = {
         "id": str(uuid.uuid4()), "username": "alice",
         "password_hash": "x", "created_at": "2026-01-01T00:00:00",
     }
     isolated_db.insert_user_and_check_first(user)
 
-    assert isolated_db.get_user_by_api_key_hash("some-hash") is None  # nothing set yet
+    assert isolated_db.get_user_by_api_key_hash("some-hash") is None  # nothing created yet
+    assert isolated_db.list_api_keys(user["id"]) == []
 
-    isolated_db.set_user_api_key_hash(user["id"], "some-hash")
+    created = isolated_db.create_api_key(user["id"], "Laptop", "some-hash")
+    assert created["last_used_at"] is None
     found = isolated_db.get_user_by_api_key_hash("some-hash")
     assert found["id"] == user["id"]
+    # get_user_by_api_key_hash touches last_used_at as a side effect.
+    assert isolated_db.list_api_keys(user["id"])[0]["last_used_at"] is not None
 
-    isolated_db.set_user_api_key_hash(user["id"], None)  # revoke
+    assert isolated_db.delete_api_key(user["id"], created["id"]) is True
     assert isolated_db.get_user_by_api_key_hash("some-hash") is None
+    assert isolated_db.list_api_keys(user["id"]) == []
 
 
-def test_multiple_users_can_each_have_no_api_key_at_once(isolated_db):
-    # NULL api_key_hash must not collide against the unique index -- SQLite
-    # treats each NULL as distinct for UNIQUE purposes, but worth nailing
-    # down explicitly since this column's uniqueness is a separate index,
-    # not an inline column constraint (see storage.py's own comment on why).
-    for name in ("alice", "bob", "carol"):
-        isolated_db.insert_user_and_check_first({
-            "id": str(uuid.uuid4()), "username": name,
-            "password_hash": "x", "created_at": "2026-01-01T00:00:00",
-        })
-    assert len(isolated_db.list_users()) == 3
+def test_multiple_keys_per_user_are_independent(isolated_db):
+    user = {
+        "id": str(uuid.uuid4()), "username": "alice",
+        "password_hash": "x", "created_at": "2026-01-01T00:00:00",
+    }
+    isolated_db.insert_user_and_check_first(user)
+    laptop = isolated_db.create_api_key(user["id"], "Laptop", "hash-laptop")
+    phone = isolated_db.create_api_key(user["id"], "Phone", "hash-phone")
+
+    assert {k["name"] for k in isolated_db.list_api_keys(user["id"])} == {"Laptop", "Phone"}
+
+    # Revoking one leaves the other authenticating fine -- the actual
+    # regression the whole api_keys table exists to fix.
+    isolated_db.delete_api_key(user["id"], laptop["id"])
+    assert isolated_db.get_user_by_api_key_hash("hash-laptop") is None
+    assert isolated_db.get_user_by_api_key_hash("hash-phone")["id"] == user["id"]
+    assert [k["name"] for k in isolated_db.list_api_keys(user["id"])] == ["Phone"]
+
+
+def test_delete_api_key_is_scoped_to_its_own_user(isolated_db):
+    alice = {"id": str(uuid.uuid4()), "username": "alice", "password_hash": "x", "created_at": "2026-01-01T00:00:00"}
+    bob = {"id": str(uuid.uuid4()), "username": "bob", "password_hash": "x", "created_at": "2026-01-01T00:00:00"}
+    isolated_db.insert_user_and_check_first(alice)
+    isolated_db.insert_user_and_check_first(bob)
+    alices_key = isolated_db.create_api_key(alice["id"], "Alice's key", "hash-alice")
+
+    assert isolated_db.delete_api_key(bob["id"], alices_key["id"]) is False  # not bob's to delete
+    assert isolated_db.get_user_by_api_key_hash("hash-alice") is not None  # still there

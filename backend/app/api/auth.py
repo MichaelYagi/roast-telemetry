@@ -14,14 +14,22 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from .. import auth, storage
-from ..models import ApiKeyIssued, ChangePasswordRequest, LoginRequest, RegisterRequest, UserPublic, UserStatus
+from ..models import (
+    ApiKeyCreateRequest,
+    ApiKeyIssued,
+    ApiKeyPublic,
+    ChangePasswordRequest,
+    LoginRequest,
+    RegisterRequest,
+    UserPublic,
+    UserStatus,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _public(user: dict) -> UserPublic:
     return UserPublic(
-        has_api_key=bool(user.get("api_key_hash")),
         **{k: v for k, v in user.items() if k not in ("password_hash", "api_key_hash")},
     )
 
@@ -132,28 +140,29 @@ def change_password(payload: ChangePasswordRequest, request: Request) -> None:
         storage.delete_other_sessions_for_user(user["id"], token)
 
 
-@router.post("/api-key", response_model=ApiKeyIssued)
-def generate_api_key(request: Request) -> ApiKeyIssued:
-    """Generate or regenerate -- same action either way (a regenerate is
-    just "make a new one," the old one's hash is simply overwritten, no
-    separate revoke-then-generate step needed). The plaintext key is
-    returned exactly once, right here -- only its hash is ever stored
-    (see auth.hash_api_key), so even this app itself can't show it again
-    after this response."""
+@router.get("/api-keys", response_model=list[ApiKeyPublic])
+def list_api_keys(request: Request) -> list[dict]:
+    return storage.list_api_keys(request.state.user["id"])
+
+
+@router.post("/api-keys", response_model=ApiKeyIssued)
+def create_api_key(payload: ApiKeyCreateRequest, request: Request) -> ApiKeyIssued:
+    """One of possibly several named keys per account -- e.g. a phone and
+    a script can each have their own, so revoking one never breaks the
+    other. The plaintext key is returned exactly once, right here -- only
+    its hash is ever stored (see auth.hash_api_key), so even this app
+    itself can't show it again after this response."""
     user = request.state.user
     key = auth.generate_api_key()
-    storage.set_user_api_key_hash(user["id"], auth.hash_api_key(key))
-    return ApiKeyIssued(api_key=key)
+    row = storage.create_api_key(user["id"], payload.name.strip() or "Unnamed key", auth.hash_api_key(key))
+    return ApiKeyIssued(id=row["id"], name=row["name"], api_key=key)
 
 
-@router.delete("/api-key", status_code=204)
-def revoke_api_key(request: Request) -> None:
-    """Turns off API-key access entirely, without issuing a replacement --
-    distinct from regenerate (POST above) for exactly the case regenerate
-    doesn't cover: "I don't want a live key right now at all," e.g. a
-    suspected leak with no new integration ready to configure."""
+@router.delete("/api-keys/{key_id}", status_code=204)
+def delete_api_key(key_id: str, request: Request) -> None:
     user = request.state.user
-    storage.set_user_api_key_hash(user["id"], None)
+    if not storage.delete_api_key(user["id"], key_id):
+        raise HTTPException(404, "No such API key")
 
 
 @router.get("/users", response_model=list[UserPublic])

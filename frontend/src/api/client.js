@@ -43,8 +43,9 @@ export const api = {
   listUsers: () => request("/auth/users"),
   changePassword: (currentPassword, newPassword) =>
     request("/auth/change-password", { method: "POST", body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }) }),
-  generateApiKey: () => request("/auth/api-key", { method: "POST" }),
-  revokeApiKey: () => request("/auth/api-key", { method: "DELETE" }),
+  listApiKeys: () => request("/auth/api-keys"),
+  createApiKey: (name) => request("/auth/api-keys", { method: "POST", body: JSON.stringify({ name }) }),
+  deleteApiKey: (id) => request(`/auth/api-keys/${id}`, { method: "DELETE" }),
   allowUser: (id) => request(`/auth/users/${id}/allow`, { method: "POST" }),
   denyUser: (id) => request(`/auth/users/${id}/deny`, { method: "POST" }),
   resetUserToPending: (id) => request(`/auth/users/${id}/reset-to-pending`, { method: "POST" }),

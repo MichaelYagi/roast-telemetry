@@ -502,9 +502,39 @@ body.breakout-split-active .app-header-inner {
   user-select: all;
 }
 
-.account-key-actions {
+.account-key-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.account-key-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+}
+
+.account-key-list-row p.hint {
+  margin: 0.15rem 0 0;
+}
+
+.account-key-add {
+  display: flex;
+  gap: 0.5rem;
   margin-top: 1rem;
-  justify-content: flex-start;
+}
+
+.account-key-add input {
+  flex: 1;
+  min-width: 0;
 }
 
 .account-password-form {

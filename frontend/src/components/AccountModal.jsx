@@ -1,24 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import { useConfirm } from "./DialogProvider.jsx";
 import Modal from "./Modal.jsx";
 
 // Opened by clicking the username in the header (App.jsx). API key
-// management lives here: Generate (first time), Regenerate (swap for a
-// new one, old stops working immediately), Revoke (turn off entirely,
-// no replacement -- distinct from Regenerate for the "I don't want a
-// live key right now at all" case, e.g. a suspected leak with no new
-// integration ready). The plaintext key is only ever shown once, right
-// after Generate/Regenerate -- neither this component nor the backend
-// can recover it afterward (only its hash is stored).
-export default function AccountModal({ open, onClose, user, onUserChange }) {
+// management lives here: each key is independently named, created, and
+// revoked -- revoking one never affects any other integration's key
+// (see storage.py's api_keys table). The plaintext key is only ever
+// shown once, right after it's created -- neither this component nor
+// the backend can recover it afterward (only its hash is stored).
+export default function AccountModal({ open, onClose, user }) {
   const { t } = useTranslation();
   const confirm = useConfirm();
-  const [revealedKey, setRevealedKey] = useState(null); // cleared on close
+  const [keys, setKeys] = useState([]);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [revealedKey, setRevealedKey] = useState(null); // cleared on close; the just-created key only
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    api.listApiKeys().then(setKeys).catch((err) => setError(err.message));
+  }, [open]);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -31,6 +36,7 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
     setRevealedKey(null);
     setCopied(false);
     setError(null);
+    setNewKeyName("");
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
@@ -70,14 +76,18 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
     }
   }
 
-  async function handleGenerate() {
+  async function handleCreate(e) {
+    e.preventDefault();
+    const name = newKeyName.trim();
+    if (!name) return;
     setBusy(true);
     setError(null);
     setCopied(false);
     try {
-      const { api_key } = await api.generateApiKey();
-      setRevealedKey(api_key);
-      onUserChange?.();
+      const created = await api.createApiKey(name);
+      setRevealedKey(created.api_key);
+      setNewKeyName("");
+      setKeys(await api.listApiKeys());
     } catch (err) {
       setError(err.message);
     } finally {
@@ -85,16 +95,16 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
     }
   }
 
-  async function handleRevoke() {
-    if (!(await confirm(t("common.accountModal.apiKey.revokeConfirm"), { confirmLabel: t("common.accountModal.apiKey.revoke") }))) {
-      return;
-    }
+  async function handleRevoke(key) {
+    const confirmed = await confirm(t("common.accountModal.apiKey.revokeConfirm", { name: key.name }), {
+      confirmLabel: t("common.accountModal.apiKey.revoke"),
+    });
+    if (!confirmed) return;
     setBusy(true);
     setError(null);
     try {
-      await api.revokeApiKey();
-      setRevealedKey(null);
-      onUserChange?.();
+      await api.deleteApiKey(key.id);
+      setKeys(await api.listApiKeys());
     } catch (err) {
       setError(err.message);
     } finally {
@@ -204,7 +214,7 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
         {t("common.accountModal.apiKey.hintPrefix")} <code>X-API-Key</code> {t("common.accountModal.apiKey.hintSuffix")}
       </p>
 
-      {revealedKey ? (
+      {revealedKey && (
         <div className="account-key-reveal">
           <p className="hint account-key-warning">{t("common.accountModal.apiKey.copyNowWarning")}</p>
           <div className="account-key-row">
@@ -214,22 +224,45 @@ export default function AccountModal({ open, onClose, user, onUserChange }) {
             </button>
           </div>
         </div>
-      ) : (
-        <p className="hint">{user?.has_api_key ? t("common.accountModal.apiKey.active") : t("common.accountModal.apiKey.none")}</p>
+      )}
+
+      {keys.length === 0 && !revealedKey && <p className="hint">{t("common.accountModal.apiKey.empty")}</p>}
+
+      {keys.length > 0 && (
+        <ul className="account-key-list">
+          {keys.map((key) => (
+            <li key={key.id} className="account-key-list-row">
+              <div>
+                <strong>{key.name}</strong>
+                <p className="hint">
+                  {t("common.accountModal.apiKey.created", { date: new Date(key.created_at).toLocaleDateString() })}
+                  {" · "}
+                  {key.last_used_at
+                    ? t("common.accountModal.apiKey.lastUsed", { date: new Date(key.last_used_at).toLocaleString() })
+                    : t("common.accountModal.apiKey.neverUsed")}
+                </p>
+              </div>
+              <button type="button" className="danger" onClick={() => handleRevoke(key)} disabled={busy}>
+                {t("common.accountModal.apiKey.revoke")}
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
       {error && <p className="error">{error}</p>}
 
-      <div className="dialog-actions account-key-actions">
-        {user?.has_api_key && !revealedKey && (
-          <button type="button" className="danger" onClick={handleRevoke} disabled={busy}>
-            {t("common.accountModal.apiKey.revoke")}
-          </button>
-        )}
-        <button type="button" onClick={handleGenerate} disabled={busy}>
-          {user?.has_api_key ? t("common.accountModal.apiKey.regenerate") : t("common.accountModal.apiKey.generate")}
+      <form className="account-key-add" onSubmit={handleCreate}>
+        <input
+          type="text"
+          value={newKeyName}
+          onChange={(e) => setNewKeyName(e.target.value)}
+          placeholder={t("common.accountModal.apiKey.namePlaceholder")}
+        />
+        <button type="submit" disabled={busy || !newKeyName.trim()}>
+          {t("common.accountModal.apiKey.add")}
         </button>
-      </div>
+      </form>
     </Modal>
   );
 }
