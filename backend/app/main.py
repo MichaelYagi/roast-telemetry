@@ -152,9 +152,13 @@ async def require_login(request: Request, call_next):
     # absent, so the two credentials are simply alternatives, not layered.
     user = None
     auth_method = "api_key"
+    api_key_id = None
     api_key = request.headers.get("X-API-Key")
     if api_key:
-        user = storage.get_user_by_api_key_hash(auth.hash_api_key(api_key))
+        key_hash = auth.hash_api_key(api_key)
+        user = storage.get_user_by_api_key_hash(key_hash)
+        if user is not None:
+            api_key_id = storage.get_api_key_id_by_hash(key_hash)
     if user is None:
         user = auth.get_user_for_token(request.cookies.get(auth.SESSION_COOKIE))
         auth_method = "password"
@@ -164,6 +168,10 @@ async def require_login(request: Request, call_next):
     # Which credential actually got this request in -- for the activity
     # log's sign-in entries (see api/auth.py's /connect).
     request.state.auth_method = auth_method
+    # None on a cookie-authenticated request -- only set when an API key
+    # got this request in, so GET /auth/api-keys can mark that one row
+    # "current" (see storage.get_api_key_id_by_hash's own comment).
+    request.state.api_key_id = api_key_id
     return await call_next(request)
 
 

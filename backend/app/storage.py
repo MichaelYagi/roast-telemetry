@@ -1010,6 +1010,19 @@ def delete_api_key(user_id: str, key_id: str) -> bool:
         return cur.rowcount > 0
 
 
+def get_api_key_id_by_hash(api_key_hash: str) -> Optional[str]:
+    """Just the row id, no user join or last_used_at touch -- a second,
+    separate lookup alongside get_user_by_api_key_hash so main.py's auth
+    middleware can stash which row this *specific* request authenticated
+    with (request.state.api_key_id), for GET /auth/api-keys to mark that
+    one row "current" (ApiKeyPublic.current) -- e.g. the mobile app's own
+    key, so its own Account screen can label that row "This device" and
+    warn harder before letting it revoke the key it's using right now."""
+    with _conn() as c:
+        row = c.execute("SELECT id FROM api_keys WHERE key_hash = ?", (api_key_hash,)).fetchone()
+        return row["id"] if row else None
+
+
 def get_user_by_api_key_hash(api_key_hash: str) -> Optional[dict]:
     with _conn() as c:
         row = c.execute(

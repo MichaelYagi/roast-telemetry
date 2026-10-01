@@ -342,6 +342,21 @@ def test_last_used_at_is_populated_after_an_authenticated_request(anon_client):
     assert listed[0]["last_used_at"] is not None
 
 
+def test_current_flag_marks_only_the_key_that_authenticated_this_request(anon_client):
+    register(anon_client, "alice")
+    laptop = _create_key(anon_client, "Laptop")
+    phone = _create_key(anon_client, "Phone")
+
+    # A cookie-authenticated call (the browser's own session) -- neither
+    # key is "current" here, since no API key authenticated this request.
+    listed = anon_client.get("/api/v1/auth/api-keys").json()
+    assert {k["id"]: k["current"] for k in listed} == {laptop["id"]: False, phone["id"]: False}
+
+    # Authenticating with the phone's key marks only its own row.
+    listed = anon_client.get("/api/v1/auth/api-keys", headers={"X-API-Key": phone["api_key"]}).json()
+    assert {k["id"]: k["current"] for k in listed} == {laptop["id"]: False, phone["id"]: True}
+
+
 def test_migration_carries_forward_a_pre_upgrade_single_key(anon_client, isolated_db):
     register(anon_client, "alice")
     me = anon_client.get("/api/v1/auth/me").json()

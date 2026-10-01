@@ -118,7 +118,7 @@
       <tr><td>POST</td><td><code>/auth/login</code></td><td>Public</td></tr>
       <tr><td>POST</td><td><code>/auth/logout</code></td><td>Public — clears the session cookie</td></tr>
       <tr><td>GET</td><td><code>/auth/me</code></td><td>The logged-in user's own account</td></tr>
-      <tr><td>GET</td><td><code>/auth/api-keys</code></td><td>List your own API keys (name, created/last-used — never the key itself)</td></tr>
+      <tr><td>GET</td><td><code>/auth/api-keys</code></td><td>List your own API keys (name, created/last-used, and which one — if any — authenticated this request — never the key itself)</td></tr>
       <tr><td>POST</td><td><code>/auth/api-keys</code></td><td>Create a new named API key — the plaintext is returned exactly once; only its hash is stored</td></tr>
       <tr><td>DELETE</td><td><code>/auth/api-keys/{id}</code></td><td>Revoke one of your own API keys without affecting any other</td></tr>
       <tr><td>GET</td><td><code>/auth/users</code></td><td>Admin only: list every account</td></tr>

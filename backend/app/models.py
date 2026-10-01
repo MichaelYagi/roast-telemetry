@@ -910,12 +910,17 @@ class ApiKeyIssued(BaseModel):
 
 class ApiKeyPublic(BaseModel):
     """The GET /auth/api-keys list shape -- never the hash or plaintext,
-    just enough to tell keys apart and decide what's safe to revoke."""
+    just enough to tell keys apart and decide what's safe to revoke.
+    current is true on at most one row: the key this specific request
+    authenticated with (always false for a cookie-authenticated request,
+    e.g. every browser call) -- lets a single-key client like the mobile
+    app point at its own row without ever seeing another key's value."""
 
     id: str
     name: str
     created_at: str
     last_used_at: Optional[str] = None
+    current: bool = False
 
 
 class SerialPortInfo(BaseModel):

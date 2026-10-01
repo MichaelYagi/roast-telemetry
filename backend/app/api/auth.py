@@ -142,7 +142,15 @@ def change_password(payload: ChangePasswordRequest, request: Request) -> None:
 
 @router.get("/api-keys", response_model=list[ApiKeyPublic])
 def list_api_keys(request: Request) -> list[dict]:
-    return storage.list_api_keys(request.state.user["id"])
+    # request.state.api_key_id is only set when *this* request itself
+    # came in via X-API-Key (see main.py's require_login) -- None for a
+    # browser's cookie-authenticated call, so every row's "current" stays
+    # false there, which is correct: a browser session isn't any key.
+    current_id = getattr(request.state, "api_key_id", None)
+    rows = storage.list_api_keys(request.state.user["id"])
+    for row in rows:
+        row["current"] = row["id"] == current_id
+    return rows
 
 
 @router.post("/api-keys", response_model=ApiKeyIssued)
