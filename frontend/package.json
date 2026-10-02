@@ -2,7 +2,7 @@
   "name": "roast-telemetry-frontend",
   "private": true,
   "license": "AGPL-3.0-or-later",
-  "version": "1.3.12",
+  "version": "1.3.13",
   "type": "module",
   "scripts": {
     "dev": "vite",
