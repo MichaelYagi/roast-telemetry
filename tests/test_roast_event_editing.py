@@ -483,6 +483,49 @@ def test_add_milestone_to_a_finished_roast_cold(client):
     charge = next(e for e in cold["events"] if e["type"] == "CHARGE")
     assert drop["id"] == "milestone-DROP" and drop["time_s"] == last
     assert cold["duration_s"] == round(last - charge["time_s"], 1)  # Charge to the new Drop
+    # It didn't reach Drop live (this roast was stopped with only Charge
+    # and Dry End marked) -- adding Drop by hand afterward should clear
+    # the "Incomplete" badge live, not leave it stuck at whatever
+    # _finish() decided at the time.
+    assert cold["reached_drop"] is True
+
+
+def test_add_milestone_drop_sets_reached_drop_warm(client):
+    roast_id, roast = _finished_roast(client)  # stopped with only Charge + Dry End marked
+    assert client.get(f"/api/v1/roasts/{roast_id}").json()["reached_drop"] is False
+    last = roast["profile"][-1]["time_s"]
+
+    resp = client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": "DROP", "label": "x", "time_s": last})
+    assert resp.status_code == 200
+
+    assert client.get(f"/api/v1/roasts/{roast_id}").json()["reached_drop"] is True
+
+
+def test_deleting_drop_resets_reached_drop_warm(client):
+    resp = client.post("/api/v1/roasts", json={"title": "Reached Drop Roast", "mode": "simulator"})
+    roast_id = resp.json()["id"]
+    drop = client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": "DROP", "label": "Drop"}).json()
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
+    assert client.get(f"/api/v1/roasts/{roast_id}").json()["reached_drop"] is True
+
+    resp = client.delete(f"/api/v1/roasts/{roast_id}/events/{drop['id']}")
+    assert resp.status_code == 204
+
+    assert client.get(f"/api/v1/roasts/{roast_id}").json()["reached_drop"] is False
+
+
+def test_deleting_drop_resets_reached_drop_cold(client):
+    resp = client.post("/api/v1/roasts", json={"title": "Reached Drop Roast", "mode": "simulator"})
+    roast_id = resp.json()["id"]
+    client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": "DROP", "label": "Drop"})
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
+    session_manager.sessions.pop(roast_id, None)  # as after a server restart
+    cold_drop_id = next(e for e in client.get(f"/api/v1/roasts/{roast_id}").json()["events"] if e["type"] == "DROP")["id"]
+
+    resp = client.delete(f"/api/v1/roasts/{roast_id}/events/{cold_drop_id}")
+    assert resp.status_code == 204
+
+    assert client.get(f"/api/v1/roasts/{roast_id}").json()["reached_drop"] is False
 
 
 def test_marking_without_a_time_still_needs_a_recording_roast(client):

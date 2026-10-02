@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import RoastChart from "../components/RoastChart.jsx";
+import AddMilestoneControl from "../components/AddMilestoneControl.jsx";
 import RoastReviewCard from "../components/RoastReviewCard.jsx";
 import { isSimulatedRoast } from "../simulated.js";
 import { endedBeforeDrop, isEmergencyStopped } from "../roastFlags.js";
@@ -181,9 +182,13 @@ export default function RoastDetailView() {
 
   // No websocket on this page (one-time REST fetch, see the effect
   // above) -- unlike LiveRoastView.jsx, there's no server-pushed
-  // "event_deleted"/"event_updated" message to pick up, so these mutate
-  // `roast.events` directly on success, same direct-mutation pattern
-  // handleSaveGreenWeight/handleSaveRoastedWeight above already use.
+  // "event_deleted"/"event_updated" message to pick up. A milestone edit
+  // can change more than just the events list though -- duration and
+  // reached_drop both get recomputed server-side (RoastSession.
+  // _refresh_duration/_refresh_reached_drop), and the separate Stats/
+  // Numbers panels below are their own GETs keyed off the milestones --
+  // so on success this refetches the whole roast rather than hand-
+  // patching `events` alone, and bumps numbersKey so those panels follow.
   // useCallback (not a plain function) -- these are handed to RoastChart
   // as onDeleteEvent/onRetimeEvent, which flow into its own memoized
   // `options` object (via handleDragMove/handleDragEnd's own deps). A new
@@ -193,31 +198,60 @@ export default function RoastDetailView() {
   // and reapply the x-axis's fixed min/max from options, silently
   // discarding whatever zoom/pan the user had applied. Confirmed live:
   // zooming in, then typing into the unrelated tag input, reset the
-  // chart's visible range back to the full roast every time.
+  // chart's visible range back to the full roast every time -- so this
+  // (and everything it depends on) has to stay referentially stable too.
+  const reloadAfterMilestoneEdit = useCallback(async () => {
+    try {
+      setRoast(await api.getRoast(id));
+    } catch (err) {
+      setMilestoneError(err.message);
+    }
+    setNumbersKey((k) => k + 1);
+  }, [id]);
+
   const handleDeleteMilestone = useCallback(
     async (eventId) => {
       setMilestoneError(null);
       try {
         await api.deleteEvent(id, eventId);
-        setRoast((r) => (r ? { ...r, events: r.events.filter((e) => e.id !== eventId) } : r));
+        await reloadAfterMilestoneEdit();
       } catch (err) {
         setMilestoneError(err.message);
       }
     },
-    [id]
+    [id, reloadAfterMilestoneEdit]
   );
 
   const handleRetimeMilestone = useCallback(
     async (eventId, timeS) => {
       setMilestoneError(null);
       try {
-        const updated = await api.retimeEvent(id, eventId, timeS);
-        setRoast((r) => (r ? { ...r, events: r.events.map((e) => (e.id === eventId ? updated : e)) } : r));
+        await api.retimeEvent(id, eventId, timeS);
+        await reloadAfterMilestoneEdit();
       } catch (err) {
         setMilestoneError(err.message);
       }
     },
-    [id]
+    [id, reloadAfterMilestoneEdit]
+  );
+
+  // Returns whether it succeeded (rather than just swallowing the error
+  // like the two above) so AddMilestoneControl knows to collapse back to
+  // its closed state -- a failed add should leave the picker open with
+  // whatever was chosen, not reset it.
+  const handleAddMilestone = useCallback(
+    async (eventType, timeS) => {
+      setMilestoneError(null);
+      try {
+        await api.addEvent(id, { type: eventType, label: eventType, time_s: timeS });
+        await reloadAfterMilestoneEdit();
+        return true;
+      } catch (err) {
+        setMilestoneError(err.message);
+        return false;
+      }
+    },
+    [id, reloadAfterMilestoneEdit]
   );
 
   // Pulls the same numbers the Roast Stats/Numbers panels below already
@@ -371,6 +405,7 @@ export default function RoastDetailView() {
           onDeleteEvent={handleDeleteMilestone}
           onRetimeEvent={handleRetimeMilestone}
         />
+        {["complete", "stopped", "aborted"].includes(roast.status) && <AddMilestoneControl roast={roast} onAdd={handleAddMilestone} />}
         {milestoneError && <p className="error no-print">{milestoneError}</p>}
       </div>
 
@@ -525,7 +560,7 @@ export default function RoastDetailView() {
 
         <div className="panel">
           <h3>{t("roastDetail.roastStatsHeading")}</h3>
-          <RoastStatsPanel roastId={roast.id} />
+          <RoastStatsPanel roastId={roast.id} refreshKey={numbersKey} />
         </div>
 
         <div className="panel">

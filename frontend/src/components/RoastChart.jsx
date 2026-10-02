@@ -298,21 +298,50 @@ function markerPosition(chart, ev, tempUnit, dragPreviewTimeS) {
   return { x, dotY, timeS, displayValue };
 }
 
-// Where a milestone's label box (callout) sits, and its text -- shared by
-// the drawing below and by hitTestLabel, so a click lands on exactly the
-// box that's drawn.
-function calloutGeometry(chart, ev, tempUnit, dragPreviewTimeS) {
+// Lays out every milestone's label box together, nudging an overlapping
+// one up or down until it clears the ones already placed -- ported from
+// roast-telemetry-mobile's own layoutCallouts (src/components/chart/
+// RoastChart.tsx), which solves the exact same problem (FC Start/FC End/
+// Drop landing close together stacks their boxes on top of each other).
+// Called once per draw and once per hit-test (see eventMarkersPlugin and
+// hitTestLabel below) instead of computing each box independently, so
+// the two can never disagree about where a box actually is -- the whole
+// reason this is one function, not the old calloutGeometry's one call
+// per event.
+function layoutCallouts(chart, events, tempUnit, dragPreview) {
   const { ctx, chartArea } = chart;
-  const { x, dotY, timeS, displayValue } = markerPosition(chart, ev, tempUnit, dragPreviewTimeS);
-  const lines = [ev.label, formatTime(timeS), displayValue != null ? `${displayValue.toFixed(1)}${unitSuffix(tempUnit)}` : null].filter(Boolean);
-  ctx.save();
-  ctx.font = "9px system-ui, sans-serif";
-  const boxWidth = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 14;
-  ctx.restore();
-  const boxHeight = lines.length * 11 + 6;
-  const boxY = Math.max(chartArea.top + 2, dotY - boxHeight - 14);
-  const boxX = Math.min(Math.max(x - boxWidth / 2, chartArea.left), chartArea.right - boxWidth);
-  return { x, dotY, lines, boxX, boxY, boxWidth, boxHeight };
+  const placed = [];
+  const overlaps = (a, b) =>
+    a.boxX < b.boxX + b.boxWidth + 2 &&
+    b.boxX < a.boxX + a.boxWidth + 2 &&
+    a.boxY < b.boxY + b.boxHeight + 2 &&
+    b.boxY < a.boxY + a.boxHeight + 2;
+
+  for (const ev of [...events].sort((a, b) => a.time_s - b.time_s)) {
+    const dragging = Boolean(dragPreview && dragPreview.eventId === ev.id);
+    const { x, dotY, timeS, displayValue } = markerPosition(chart, ev, tempUnit, dragging ? dragPreview.timeS : null);
+    if (x < chartArea.left || x > chartArea.right) continue;
+    const lines = [ev.label, formatTime(timeS), displayValue != null ? `${displayValue.toFixed(1)}${unitSuffix(tempUnit)}` : null].filter(Boolean);
+    ctx.save();
+    ctx.font = "9px system-ui, sans-serif";
+    const boxWidth = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 14;
+    ctx.restore();
+    const boxHeight = lines.length * 11 + 6;
+    const boxX = Math.min(Math.max(x - boxWidth / 2, chartArea.left), chartArea.right - boxWidth);
+    const preferred = Math.max(chartArea.top + 2, dotY - boxHeight - 14);
+
+    const candidates = [preferred];
+    for (let k = 1; k <= 6; k++) {
+      candidates.push(preferred - k * (boxHeight + 3), preferred + k * (boxHeight + 3));
+    }
+    const fit = candidates
+      .filter((boxY) => boxY >= chartArea.top + 2 && boxY + boxHeight <= chartArea.bottom - 2)
+      .map((boxY) => ({ ev, dragging, x, dotY, lines, boxX, boxY, boxWidth, boxHeight }))
+      .find((c) => !placed.some((p) => overlaps(c, p)));
+
+    placed.push(fit ?? { ev, dragging, x, dotY, lines, boxX, boxY: preferred, boxWidth, boxHeight });
+  }
+  return placed;
 }
 
 // Dark rounded-rectangle callouts (label / time / value) anchored to each
@@ -328,12 +357,9 @@ const eventMarkersPlugin = {
     if (!events.length) return;
     const tempUnit = opts?.tempUnit || "c";
     const dragPreview = chart.$dragPreview;
-    const { ctx, chartArea } = chart;
+    const { ctx } = chart;
     ctx.save();
-    events.forEach((ev) => {
-      const dragging = dragPreview && dragPreview.eventId === ev.id;
-      const { x, dotY, lines, boxX, boxY, boxWidth, boxHeight } = calloutGeometry(chart, ev, tempUnit, dragging ? dragPreview.timeS : null);
-      if (x < chartArea.left || x > chartArea.right) return;
+    layoutCallouts(chart, events, tempUnit, dragPreview).forEach(({ ev, dragging, x, dotY, lines, boxX, boxY, boxWidth, boxHeight }) => {
       const color = EVENT_COLORS[ev.type] || EVENT_COLORS.CUSTOM;
 
       ctx.strokeStyle = color;
@@ -341,7 +367,10 @@ const eventMarkersPlugin = {
       ctx.setLineDash(dragging ? [3, 3] : []);
       ctx.beginPath();
       ctx.moveTo(x, dotY);
-      ctx.lineTo(x, boxY + boxHeight);
+      // The box can land above *or* below the dot now that overlapping
+      // ones get nudged -- connect the stem to whichever edge is nearer
+      // the dot, same as the mobile chart's own rendering.
+      ctx.lineTo(x, boxY > dotY ? boxY : boxY + boxHeight);
       ctx.stroke();
       ctx.setLineDash([]);
 
@@ -415,18 +444,19 @@ function hitTestMarker(chart, events, x, y, tempUnit) {
 // Finds the editable milestone whose label box contains the given
 // canvas-relative point -- a much bigger target than the dot, which sits
 // among the curves. Boxes can overlap; the one drawn last (on top) wins.
+// Uses the exact same layoutCallouts as the draw path (non-CUSTOM events,
+// no drag preview, since this runs on mouse-down before a drag starts),
+// so a click always lands on the box that's actually visible.
 const LABEL_HIT_PAD_PX = 2;
 function hitTestLabel(chart, events, x, y, tempUnit) {
-  const { chartArea } = chart;
-  for (const ev of [...events].reverse()) {
+  const layout = layoutCallouts(chart, events.filter((e) => e.type !== "CUSTOM"), tempUnit, null);
+  for (const { ev, boxX, boxY, boxWidth, boxHeight } of [...layout].reverse()) {
     if (!isEditableMilestone(ev)) continue;
-    const box = calloutGeometry(chart, ev, tempUnit, null);
-    if (box.x < chartArea.left || box.x > chartArea.right) continue;
     if (
-      x >= box.boxX - LABEL_HIT_PAD_PX &&
-      x <= box.boxX + box.boxWidth + LABEL_HIT_PAD_PX &&
-      y >= box.boxY - LABEL_HIT_PAD_PX &&
-      y <= box.boxY + box.boxHeight + LABEL_HIT_PAD_PX
+      x >= boxX - LABEL_HIT_PAD_PX &&
+      x <= boxX + boxWidth + LABEL_HIT_PAD_PX &&
+      y >= boxY - LABEL_HIT_PAD_PX &&
+      y <= boxY + boxHeight + LABEL_HIT_PAD_PX
     ) {
       return ev;
     }
@@ -765,9 +795,12 @@ const RoastChart = forwardRef(function RoastChart({
     // resolves -- the marker visually reverts to its stored position
     // right away, then jumps to the new one once onRetimeEvent's own
     // state update lands. If the backend rejects the move (crosses a
-    // neighboring milestone, say), that's the whole error UI: it just
-    // never moves from the reverted position, same as a native
-    // drag-and-drop rejection.
+    // neighboring milestone, say), the marker just never moves from the
+    // reverted position -- but the reason isn't silent: onRetimeEvent
+    // (RoastDetailView's handleRetimeMilestone) sets its own
+    // milestoneError on failure and never rethrows, so the .catch()
+    // below is only a last-resort net for some other failure in
+    // onRetimeEvent itself, not the normal "crossed a neighbor" case.
     chart.$dragPreview = null;
     chart.update("none");
     if (preview && onRetimeEvent) {

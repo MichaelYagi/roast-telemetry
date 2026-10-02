@@ -1117,6 +1117,19 @@ class RoastSession:
             self.duration_s = roast_duration_s(self.profile, self.events)
             storage.update_roast(self.id, duration_s=self.duration_s)
 
+    def _refresh_reached_drop(self) -> None:
+        """Adding or deleting Drop after the roast finished should move the
+        "Incomplete" badge live, not just leave it as whatever _finish()
+        decided at the time -- recomputed fresh from self.events (not
+        toggled by event type) so it's correct regardless of which
+        milestone changed. Same status gate as _refresh_duration: only
+        meaningful once the roast has actually finished; _finish() is the
+        authoritative setter otherwise and will recompute this itself
+        once the roast really ends."""
+        if self.status in (RoastStatus.COMPLETE, RoastStatus.STOPPED, RoastStatus.ABORTED):
+            reached_drop = any(e["type"] == RoastEventType.DROP.value for e in self.events)
+            storage.update_roast(self.id, reached_drop=reached_drop)
+
     def set_weight_roasted(self, grams: Optional[float]) -> None:
         # The natural workflow is: roast finishes, beans cool, *then* get
         # weighed -- by that point _finish() has already run and this
@@ -1160,6 +1173,7 @@ class RoastSession:
         self.events.remove(event)
         self._rewrite_alog()
         self._refresh_duration()
+        self._refresh_reached_drop()
         return event
 
     def add_milestone_at(self, event_type: RoastEventType, time_s: float) -> dict:
@@ -1171,6 +1185,7 @@ class RoastSession:
         event = _add_milestone_at(self.events, self.profile, event_type, time_s)
         self._rewrite_alog()
         self._refresh_duration()
+        self._refresh_reached_drop()
         return event
 
     def retime_event(self, event_id: str, new_time_s: float) -> dict:
@@ -1436,7 +1451,8 @@ class RoastSessionManager:
         row, parsed = self._cold_roast_row_and_parsed(roast_id)
         event, _ = _find_editable_milestone(parsed["events"], event_id)
         parsed["events"].remove(event)
-        storage.update_roast(roast_id, duration_s=roast_duration_s(parsed["profile"], parsed["events"]))
+        reached_drop = any(e["type"] == RoastEventType.DROP.value for e in parsed["events"])
+        storage.update_roast(roast_id, duration_s=roast_duration_s(parsed["profile"], parsed["events"]), reached_drop=reached_drop)
         self._rewrite_cold_alog(row, parsed)
         return event
 
@@ -1458,7 +1474,8 @@ class RoastSessionManager:
             return session.add_milestone_at(event_type, time_s)
         row, parsed = self._cold_roast_row_and_parsed(roast_id)
         event = _add_milestone_at(parsed["events"], parsed["profile"], event_type, time_s)
-        storage.update_roast(roast_id, duration_s=roast_duration_s(parsed["profile"], parsed["events"]))
+        reached_drop = any(e["type"] == RoastEventType.DROP.value for e in parsed["events"])
+        storage.update_roast(roast_id, duration_s=roast_duration_s(parsed["profile"], parsed["events"]), reached_drop=reached_drop)
         self._rewrite_cold_alog(row, parsed)
         # The id a client will see when it next loads this cold roast
         # (see alog_io._extract_named_milestones), not a throwaway one.

@@ -537,6 +537,34 @@ body.breakout-split-active .app-header-inner {
   min-width: 0;
 }
 
+/* AddMilestoneControl.jsx -- "+ Add milestone" under a finished roast's
+   chart (RoastDetailView.jsx). */
+.add-milestone-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.add-milestone-control label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.add-milestone-control input[type="range"] {
+  width: 180px;
+}
+
+.add-milestone-time-readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 2.5em;
+}
+
 .account-password-form {
   margin-bottom: 1.25rem;
   padding-bottom: 1.25rem;

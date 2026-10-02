@@ -766,6 +766,23 @@
     "emergencyStoppedBadgeTitle": "このローストでは緊急停止が使用されました",
     "endedBeforeDropBadge": "未完了",
     "endedBeforeDropBadgeTitle": "このローストはDropが記録される前に終了しました",
+    "addMilestone": {
+      "open": "+ マイルストーンを追加",
+      "milestone": "マイルストーン",
+      "time": "時間",
+      "add": "追加",
+      "cancel": "キャンセル",
+      "names": {
+        "CHARGE": "Charge",
+        "DRY_END": "Dry End",
+        "FC_START": "FC Start",
+        "FC_END": "FC End",
+        "SC_START": "SC Start",
+        "SC_END": "SC End",
+        "DROP": "Drop",
+        "COOL_END": "Cool End"
+      }
+    },
     "downloads": {
       "download": "ダウンロード",
       "spreadsheetNote": "（表計算ソフト用、タブ区切り）",

@@ -779,6 +779,23 @@
     "emergencyStoppedBadgeTitle": "Emergency Stop was used during this roast",
     "endedBeforeDropBadge": "Incomplete",
     "endedBeforeDropBadgeTitle": "This roast ended before Drop was marked",
+    "addMilestone": {
+      "open": "+ Add milestone",
+      "milestone": "Milestone",
+      "time": "Time",
+      "add": "Add",
+      "cancel": "Cancel",
+      "names": {
+        "CHARGE": "Charge",
+        "DRY_END": "Dry End",
+        "FC_START": "FC Start",
+        "FC_END": "FC End",
+        "SC_START": "SC Start",
+        "SC_END": "SC End",
+        "DROP": "Drop",
+        "COOL_END": "Cool End"
+      }
+    },
     "downloads": {
       "download": "Download",
       "spreadsheetNote": "(spreadsheet, tab-separated)",
