@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TERM_TOOLTIPS } from "../termTooltips.js";
-import { normalizeLayout, verticalControlItem } from "../verticalControl.js";
+import { normalizeLayout, verticalControlItem, CONTROL_KEY_TO_BREAKOUT_KEY } from "../verticalControl.js";
 import { celsiusToUnit, unitToCelsius, unitSuffix } from "../tempUnits.js";
 
 // Replaces the old horizontal Controls panel entirely -- no fallback
@@ -39,7 +39,7 @@ function useIsMobileViewport() {
   return isMobile;
 }
 
-export default function VerticalControlPanel({ disabled, onSend, initial, layout, arrows, svRangeC, tempUnit = "c" }) {
+export default function VerticalControlPanel({ disabled, onSend, initial, layout, arrows, svRangeC, tempUnit = "c", colorOverrides }) {
   const { t } = useTranslation();
   const isMobile = useIsMobileViewport();
   const normalizedGroups = normalizeLayout(layout, { svAvailable: svRangeC != null });
@@ -196,6 +196,7 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
     const item = verticalControlItem(key);
     const ch = CHANNELS[key];
     if (!item || !ch) return null;
+    const color = colorOverrides?.[CONTROL_KEY_TO_BREAKOUT_KEY[key]] || item.color;
     const unit = key === "burner_sv_c" ? unitSuffix(tempUnit) : item.unit;
     const unknown = ch.value == null;
     const displayValue = unknown ? ch.min : ch.value;
@@ -219,7 +220,7 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
     }
 
     return (
-      <div className={`vertical-slider-col${isOn ? "" : " vertical-slider-col-off"}`} key={key} style={{ "--item-color": item.color }}>
+      <div className={`vertical-slider-col${isOn ? "" : " vertical-slider-col-off"}`} key={key} style={{ "--item-color": color }}>
         <div className="vertical-slider-value">{unknown ? "—" : `${Math.round(displayValue)}${unit}`}</div>
         {showArrows && (
           <button type="button" className="vertical-slider-arrow" disabled={isDisabled} onClick={() => nudge(1)} title={`+${arrowStep}${unit}`}>

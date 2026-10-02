@@ -1955,6 +1955,7 @@ export default function LiveRoastView() {
                   arrows={verticalControlArrows}
                   svRangeC={roast?.burner_sv_range_c || null}
                   tempUnit={tempUnit}
+                  colorOverrides={panelColors}
                 />
               )}
               <div className="scope-chart" ref={scopeChartRef}>

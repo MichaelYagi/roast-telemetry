@@ -31,6 +31,21 @@ export function verticalControlItem(key) {
   return VERTICAL_CONTROL_ITEMS.find((i) => i.key === key);
 }
 
+// Maps each control key to its Settings > Colors key (breakout_panel_colors)
+// -- the same color already shared by the chart line/step-curve and the
+// Big/Small Readout Panel boxes for that channel (see RoastChart.jsx's own
+// SERIES_KEY_TO_BREAKOUT_KEY). VerticalControlPanel uses this so a slider
+// always matches whatever was picked in Settings, instead of carrying its
+// own separate, uncustomizable copy of VERTICAL_CONTROL_ITEMS' `color`
+// (which only matched by coincidence -- same default hex values -- until
+// Settings > Colors was changed).
+export const CONTROL_KEY_TO_BREAKOUT_KEY = {
+  drum_speed_pct: "drum",
+  fan_pct: "fan",
+  heater_pct: "heater",
+  burner_sv_c: "burner_sv",
+};
+
 // Flattens the settings' ordered-groups shape (string[][], a group with 1
 // key = siloed/full-height, 2+ = a shared lane split into stacked top/
 // bottom (and so on) segments -- see AppSettings.vertical_control_layout's
