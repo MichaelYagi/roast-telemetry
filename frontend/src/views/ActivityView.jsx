@@ -5,7 +5,7 @@ import { api } from "../api/client.js";
 
 const ACTIONS = [
   "create", "import", "delete", "set_tags", "set_weight", "set_outcome", "set_beans",
-  "add_note", "update_note", "delete_note", "delete_event", "retime_event",
+  "add_note", "update_note", "delete_note", "add_event", "delete_event", "retime_event",
   "safe_state", "automation_started", "automation_stopped", "automation_rule_fired",
   "safety_disabled", "safety_enabled",
   "login", "logout",

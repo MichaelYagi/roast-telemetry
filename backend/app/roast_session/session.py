@@ -26,6 +26,7 @@ from alog_playback import (
     roast_to_native_alog_dict,
     save_native_alog,
 )
+from alog_playback.alog_io import TIMEINDEX_LABELS
 from mock_device import MockDevice
 from modbus_bridge import ModbusEngine
 from ms6514_bridge import MS6514Engine
@@ -57,6 +58,11 @@ from ..models import (
 from ..ws_manager import active_roast_pubsub, pubsub
 
 logger = logging.getLogger(__name__)
+
+# How a roast's .alog file names each milestone it stores ("First Crack
+# Start") -- a milestone added to a finished roast gets this label, so it
+# reads the same as one loaded back from the file.
+ALOG_MILESTONE_LABELS = dict(TIMEINDEX_LABELS)
 
 
 class RoastSessionError(RuntimeError):
@@ -172,6 +178,56 @@ def _find_editable_milestone(events: list, event_id: str) -> tuple[dict, "RoastE
     return event, event_type
 
 
+def _check_milestone_order(events: list, event_type: "RoastEventType", time_s: float, verb: str) -> None:
+    """A milestone has to sit strictly between whichever milestones before
+    and after it in MILESTONE_SEQUENCE are already marked -- for moving
+    one (verb "moved") and for adding one to a finished roast ("added")."""
+    idx = MILESTONE_SEQUENCE.index(event_type)
+    by_type = {RoastEventType(e["type"]): e for e in events if e["type"] != RoastEventType.CUSTOM.value}
+    for earlier_type in reversed(MILESTONE_SEQUENCE[:idx]):
+        if earlier_type in by_type:
+            if time_s <= by_type[earlier_type]["time_s"]:
+                raise RoastSessionError(f"{milestone_name(event_type)} can't be {verb} before {milestone_name(earlier_type)}")
+            break
+    for later_type in MILESTONE_SEQUENCE[idx + 1:]:
+        if later_type in by_type:
+            if time_s >= by_type[later_type]["time_s"]:
+                raise RoastSessionError(f"{milestone_name(event_type)} can't be {verb} past {milestone_name(later_type)}")
+            break
+
+
+def _add_milestone_at(events: list, profile: list, event_type: "RoastEventType", time_s: float) -> dict:
+    """Adds a milestone that was never marked to a finished roast, at a
+    chosen time -- e.g. FC Start that nobody clicked. Shared by a finished
+    RoastSession and RoastSessionManager's cold-roast path, like
+    _retime_milestone. Lands on the nearest sample, as a retime does,
+    and is labelled the way the roast's .alog file names it, so it reads
+    the same before and after a restart."""
+    if event_type == RoastEventType.CUSTOM:
+        raise RoastSessionError("Custom events aren't milestones -- nothing to add")
+    if event_type in ALWAYS_AUTO_EVENT_TYPES:
+        raise RoastSessionError(f"{milestone_name(event_type)} is detected automatically -- it can't be added by hand")
+    if any(e["type"] == event_type.value for e in events):
+        raise RoastSessionError(f"{milestone_name(event_type)} is already marked on this roast -- move it instead")
+    if not profile:
+        raise RoastSessionError("this roast has no recording to put a milestone on")
+    if not (0.0 <= time_s <= profile[-1]["time_s"]):
+        raise RoastSessionError(f"time_s {time_s} is outside this roast's recorded range (0-{profile[-1]['time_s']})")
+
+    nearest = min(profile, key=lambda p: abs(p["time_s"] - time_s))
+    _check_milestone_order(events, event_type, nearest["time_s"], "added")
+
+    event = {
+        "id": str(uuid.uuid4()),
+        "time_s": nearest["time_s"],
+        "type": event_type.value,
+        "label": ALOG_MILESTONE_LABELS[event_type.value],
+        "value": nearest.get("bt"),
+    }
+    events.append(event)
+    return event
+
+
 def _retime_milestone(events: list, profile: list, event_id: str, new_time_s: float) -> dict:
     """Validates and applies a milestone retime in place (bounds-checks
     against the roast's own recorded range and against whichever
@@ -191,18 +247,7 @@ def _retime_milestone(events: list, profile: list, event_id: str, new_time_s: fl
     if nearest is not None:
         new_time_s = nearest["time_s"]
 
-    idx = MILESTONE_SEQUENCE.index(event_type)
-    by_type = {RoastEventType(e["type"]): e for e in events if e["type"] != RoastEventType.CUSTOM.value}
-    for earlier_type in reversed(MILESTONE_SEQUENCE[:idx]):
-        if earlier_type in by_type:
-            if new_time_s <= by_type[earlier_type]["time_s"]:
-                raise RoastSessionError(f"{milestone_name(event_type)} can't be moved before {milestone_name(earlier_type)}")
-            break
-    for later_type in MILESTONE_SEQUENCE[idx + 1:]:
-        if later_type in by_type:
-            if new_time_s >= by_type[later_type]["time_s"]:
-                raise RoastSessionError(f"{milestone_name(event_type)} can't be moved past {milestone_name(later_type)}")
-            break
+    _check_milestone_order(events, event_type, new_time_s, "moved")
 
     event["time_s"] = new_time_s
     event["value"] = nearest.get("bt") if nearest is not None else None
@@ -1117,6 +1162,17 @@ class RoastSession:
         self._refresh_duration()
         return event
 
+    def add_milestone_at(self, event_type: RoastEventType, time_s: float) -> dict:
+        """Adds a never-marked milestone to this roast after it finished --
+        see _add_milestone_at. While it's still recording, milestones come
+        from the buttons (add_event), stamped at the current time."""
+        if self.status not in (RoastStatus.COMPLETE, RoastStatus.STOPPED, RoastStatus.ABORTED):
+            raise RoastSessionError("this roast is still recording -- mark milestones with the buttons")
+        event = _add_milestone_at(self.events, self.profile, event_type, time_s)
+        self._rewrite_alog()
+        self._refresh_duration()
+        return event
+
     def retime_event(self, event_id: str, new_time_s: float) -> dict:
         """Moves an already-marked milestone to a different point on the
         elapsed-time axis -- for correcting a click that landed too early
@@ -1395,6 +1451,19 @@ class RoastSessionManager:
             _, parsed = self._cold_roast_row_and_parsed(roast_id)
             events = parsed["events"]
         return next((e["time_s"] for e in events if e["id"] == event_id), None)
+
+    def add_milestone_at(self, roast_id: str, event_type: RoastEventType, time_s: float) -> dict:
+        session = self.get(roast_id)
+        if session is not None:
+            return session.add_milestone_at(event_type, time_s)
+        row, parsed = self._cold_roast_row_and_parsed(roast_id)
+        event = _add_milestone_at(parsed["events"], parsed["profile"], event_type, time_s)
+        storage.update_roast(roast_id, duration_s=roast_duration_s(parsed["profile"], parsed["events"]))
+        self._rewrite_cold_alog(row, parsed)
+        # The id a client will see when it next loads this cold roast
+        # (see alog_io._extract_named_milestones), not a throwaway one.
+        event["id"] = f"milestone-{event_type.value}"
+        return event
 
     def retime_event(self, roast_id: str, event_id: str, new_time_s: float) -> dict:
         session = self.get(roast_id)

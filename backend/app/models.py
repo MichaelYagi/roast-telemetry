@@ -973,6 +973,13 @@ class EventCreateRequest(BaseModel):
     type: RoastEventType
     label: str
     value: Optional[float] = None
+    time_s: Optional[float] = Field(
+        default=None,
+        description="Leave out while recording: the milestone is stamped at the current time. Set it to add a "
+        "milestone that was never marked to a finished roast, at that elapsed time -- it lands on the nearest "
+        "sample, between the milestones already marked either side of it; label and value then come from the "
+        "server (value is BT at that sample).",
+    )
 
 
 class EventUpdateRequest(BaseModel):

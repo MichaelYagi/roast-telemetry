@@ -401,3 +401,93 @@ def test_activity_log_names_the_milestone_and_times(client):
     messages = [r["message"] for r in storage.list_activity() if r["roast_id"] == roast_id]
     assert f'Moved Dry End from {mmss(dry_end["time_s"])} to {mmss(target)} on "Editable Roast"' in messages
     assert f'Deleted Dry End (was at {mmss(target)}) on "Editable Roast"' in messages
+
+
+# -- adding a milestone to a finished roast ---------------------------------
+
+
+def test_add_milestone_rejected_while_recording():
+    session = make_session()  # ROASTING
+    feed_profile(session)
+
+    try:
+        session.add_milestone_at(RoastEventType.FC_START, 90.0)
+        assert False, "expected RoastSessionError"
+    except RoastSessionError as exc:
+        assert "still recording" in str(exc)
+
+
+def test_add_milestone_checks_type_and_order():
+    from backend.app.roast_session.session import _add_milestone_at
+
+    profile = [{"time_s": float(t * 30), "bt": 90.0 + t * 5} for t in range(10)]  # 0..270
+    events = [
+        {"id": "a", "type": "DRY_END", "time_s": 60.0, "label": "Dry End", "value": None},
+        {"id": "b", "type": "FC_END", "time_s": 180.0, "label": "FC End", "value": None},
+        {"id": "c", "type": "TURNING_POINT", "time_s": 30.0, "label": "Turning Point", "value": None},
+    ]
+    for event_type, time_s, message in [
+        (RoastEventType.TURNING_POINT, 90.0, "Turning Point is detected automatically -- it can't be added by hand"),
+        (RoastEventType.DRY_END, 90.0, "Dry End is already marked on this roast -- move it instead"),
+        (RoastEventType.FC_START, 210.0, "FC Start can't be added past FC End"),
+        (RoastEventType.FC_START, 40.0, "FC Start can't be added before Dry End"),
+    ]:
+        try:
+            _add_milestone_at(events, profile, event_type, time_s)
+            assert False, f"expected RoastSessionError for {event_type}"
+        except RoastSessionError as exc:
+            assert str(exc) == message
+
+    added = _add_milestone_at(events, profile, RoastEventType.FC_START, 100.0)  # nearest sample: 90 s
+    assert (added["time_s"], added["value"], added["label"]) == (90.0, 105.0, "First Crack Start")
+    assert added in events
+
+
+def _finished_roast(client) -> tuple[str, dict]:
+    roast_id, _ = _create_and_mark(client)  # Charge (auto) + Dry End
+    time.sleep(2.2)
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
+    return roast_id, client.get(f"/api/v1/roasts/{roast_id}").json()
+
+
+def test_add_milestone_to_a_finished_roast_warm(client):
+    roast_id, roast = _finished_roast(client)
+    last = roast["profile"][-1]["time_s"]
+
+    resp = client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": "FC_START", "label": "x", "time_s": last})
+    assert resp.status_code == 200
+    assert resp.json()["label"] == "First Crack Start"  # the server names it, not the request
+    assert resp.json()["time_s"] == last
+
+    events = client.get(f"/api/v1/roasts/{roast_id}").json()["events"]
+    assert [e["time_s"] for e in events if e["type"] == "FC_START"] == [last]
+    messages = [r["message"] for r in storage.list_activity() if r["roast_id"] == roast_id]
+    minutes, seconds = divmod(int(round(last)), 60)
+    assert f'Added FC Start at {minutes}:{seconds:02d} on "Editable Roast"' in messages
+
+    again = client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": "FC_START", "label": "x", "time_s": last})
+    assert again.status_code == 409
+
+
+def test_add_milestone_to_a_finished_roast_cold(client):
+    roast_id, roast = _finished_roast(client)
+    last = roast["profile"][-1]["time_s"]
+    session_manager.sessions.pop(roast_id, None)  # as after a server restart
+
+    resp = client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": "DROP", "label": "Drop", "time_s": last})
+    assert resp.status_code == 200
+    assert resp.json()["id"] == "milestone-DROP"  # the id the next GET will show
+
+    cold = client.get(f"/api/v1/roasts/{roast_id}").json()
+    drop = next(e for e in cold["events"] if e["type"] == "DROP")
+    charge = next(e for e in cold["events"] if e["type"] == "CHARGE")
+    assert drop["id"] == "milestone-DROP" and drop["time_s"] == last
+    assert cold["duration_s"] == round(last - charge["time_s"], 1)  # Charge to the new Drop
+
+
+def test_marking_without_a_time_still_needs_a_recording_roast(client):
+    roast_id, _ = _finished_roast(client)
+    session_manager.sessions.pop(roast_id, None)
+
+    resp = client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": "FC_START", "label": "FC Start"})
+    assert resp.status_code == 404

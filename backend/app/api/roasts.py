@@ -527,7 +527,9 @@ async def delete_note(roast_id: str, note_id: str, http_request: Request) -> Non
 
 
 @router.post("/{roast_id}/events")
-async def add_event(roast_id: str, event: EventCreateRequest) -> dict:
+async def add_event(roast_id: str, event: EventCreateRequest, http_request: Request) -> dict:
+    if event.time_s is not None:
+        return await _add_milestone_after(roast_id, event, http_request)
     session = session_manager.get(roast_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found or not active")
@@ -539,6 +541,25 @@ async def add_event(roast_id: str, event: EventCreateRequest) -> dict:
     return created
 
 
+async def _add_milestone_after(roast_id: str, event: EventCreateRequest, http_request: Request) -> dict:
+    """POST /events with a time_s: a milestone that was never marked, added
+    to a finished roast -- warm or cold, like delete_event/retime_event."""
+    _require_roast_exists(roast_id)
+    try:
+        created = session_manager.add_milestone_at(roast_id, event.type, event.time_s)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await pubsub.publish(roast_id, {"type": "event", "roast_id": roast_id, "event": created})
+    row = storage.get_roast_row(roast_id)
+    title = row["title"] if row else roast_id
+    storage.log_activity(
+        "roast", "add_event", **auth.actor(http_request), roast_id=roast_id,
+        roast_title=row["title"] if row else None,
+        message=f'Added {milestone_name(event.type)} at {_mmss(created["time_s"])} on "{title}"',
+    )
+    return created
+
+
 def _mmss(seconds: float) -> str:
     """Elapsed roast time as the apps show it (9:30), for Activity log
     messages."""
@@ -547,10 +568,10 @@ def _mmss(seconds: float) -> str:
 
 
 def _require_roast_exists(roast_id: str) -> None:
-    # Unlike add_event/add_note above, delete_event/retime_event work on
-    # a roast whose in-memory session no longer exists too (a genuinely
-    # historical roast from before the last backend restart), reading/
-    # writing its .alog file directly -- so there's no single
+    # Unlike add_event's live path, delete_event/retime_event (and a timed
+    # add_event) work on a roast whose in-memory session no longer exists
+    # too (a genuinely historical roast from before the last backend
+    # restart), reading/writing its .alog file directly -- so there's no single
     # session_manager.get() call to 404 on. Check both places explicitly
     # instead of string-matching exception messages for status codes.
     if session_manager.get(roast_id) is not None:

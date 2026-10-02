@@ -298,6 +298,23 @@ function markerPosition(chart, ev, tempUnit, dragPreviewTimeS) {
   return { x, dotY, timeS, displayValue };
 }
 
+// Where a milestone's label box (callout) sits, and its text -- shared by
+// the drawing below and by hitTestLabel, so a click lands on exactly the
+// box that's drawn.
+function calloutGeometry(chart, ev, tempUnit, dragPreviewTimeS) {
+  const { ctx, chartArea } = chart;
+  const { x, dotY, timeS, displayValue } = markerPosition(chart, ev, tempUnit, dragPreviewTimeS);
+  const lines = [ev.label, formatTime(timeS), displayValue != null ? `${displayValue.toFixed(1)}${unitSuffix(tempUnit)}` : null].filter(Boolean);
+  ctx.save();
+  ctx.font = "9px system-ui, sans-serif";
+  const boxWidth = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 14;
+  ctx.restore();
+  const boxHeight = lines.length * 11 + 6;
+  const boxY = Math.max(chartArea.top + 2, dotY - boxHeight - 14);
+  const boxX = Math.min(Math.max(x - boxWidth / 2, chartArea.left), chartArea.right - boxWidth);
+  return { x, dotY, lines, boxX, boxY, boxWidth, boxHeight };
+}
+
 // Dark rounded-rectangle callouts (label / time / value) anchored to each
 // named milestone's point on the BT curve, with a stem + dot down to the
 // actual point. Manual control-channel (CUSTOM) events are excluded here
@@ -315,16 +332,9 @@ const eventMarkersPlugin = {
     ctx.save();
     events.forEach((ev) => {
       const dragging = dragPreview && dragPreview.eventId === ev.id;
-      const { x, dotY, timeS, displayValue } = markerPosition(chart, ev, tempUnit, dragging ? dragPreview.timeS : null);
+      const { x, dotY, lines, boxX, boxY, boxWidth, boxHeight } = calloutGeometry(chart, ev, tempUnit, dragging ? dragPreview.timeS : null);
       if (x < chartArea.left || x > chartArea.right) return;
       const color = EVENT_COLORS[ev.type] || EVENT_COLORS.CUSTOM;
-
-      const lines = [ev.label, formatTime(timeS), displayValue != null ? `${displayValue.toFixed(1)}${unitSuffix(tempUnit)}` : null].filter(Boolean);
-      ctx.font = "9px system-ui, sans-serif";
-      const boxWidth = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 14;
-      const boxHeight = lines.length * 11 + 6;
-      const boxY = Math.max(chartArea.top + 2, dotY - boxHeight - 14);
-      const boxX = Math.min(Math.max(x - boxWidth / 2, chartArea.left), chartArea.right - boxWidth);
 
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
@@ -400,6 +410,28 @@ function hitTestMarker(chart, events, x, y, tempUnit) {
     }
   }
   return best;
+}
+
+// Finds the editable milestone whose label box contains the given
+// canvas-relative point -- a much bigger target than the dot, which sits
+// among the curves. Boxes can overlap; the one drawn last (on top) wins.
+const LABEL_HIT_PAD_PX = 2;
+function hitTestLabel(chart, events, x, y, tempUnit) {
+  const { chartArea } = chart;
+  for (const ev of [...events].reverse()) {
+    if (!isEditableMilestone(ev)) continue;
+    const box = calloutGeometry(chart, ev, tempUnit, null);
+    if (box.x < chartArea.left || box.x > chartArea.right) continue;
+    if (
+      x >= box.boxX - LABEL_HIT_PAD_PX &&
+      x <= box.boxX + box.boxWidth + LABEL_HIT_PAD_PX &&
+      y >= box.boxY - LABEL_HIT_PAD_PX &&
+      y <= box.boxY + box.boxHeight + LABEL_HIT_PAD_PX
+    ) {
+      return ev;
+    }
+  }
+  return null;
 }
 
 // forwardRef so a parent (the PDF report -- see RoastDetailView.jsx) can pull
@@ -759,7 +791,9 @@ const RoastChart = forwardRef(function RoastChart({
     const chart = chartRef.current;
     if (!chart || !onDeleteEvent) return;
     const rect = chart.canvas.getBoundingClientRect();
-    const hit = hitTestMarker(chart, events, e.clientX - rect.left, e.clientY - rect.top, tempUnit);
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const hit = hitTestMarker(chart, events, x, y, tempUnit) || (!hideEventLabels && hitTestLabel(chart, events, x, y, tempUnit));
     if (!hit) return; // not on an editable marker -- let the browser's own context menu through
     e.preventDefault();
     setContextMenu({ eventId: hit.id, x: e.clientX, y: e.clientY });
@@ -845,8 +879,15 @@ const RoastChart = forwardRef(function RoastChart({
             // drag should just move whichever direction you actually
             // drag, not follow a fixed axis lock keyed to a modifier key.
             mode: "xy",
-            onPanStart: ({ chart, point }) => {
-              const hit = onRetimeEvent ? hitTestMarker(chart, events, point.x, point.y, tempUnit) : null;
+            onPanStart: ({ chart, event, point }) => {
+              // Alt (Option) + drag on a milestone's label moves it -- far
+              // easier to grab than the dot. A plain drag on a label still
+              // pans the chart, as anywhere else. The dot itself drags
+              // without Alt, as before.
+              const altDrag = event?.srcEvent?.altKey && !hideEventLabels;
+              const hit = onRetimeEvent
+                ? (altDrag && hitTestLabel(chart, events, point.x, point.y, tempUnit)) || hitTestMarker(chart, events, point.x, point.y, tempUnit)
+                : null;
               if (hit) {
                 dragRef.current = { eventId: hit.id };
                 chart.$dragPreview = { eventId: hit.id, timeS: hit.time_s };

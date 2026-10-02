@@ -459,7 +459,7 @@
       "hideEventLabels": "Hide event labels",
       "hideEventLabelsHint": "Hides the CHARGE / Turning Point / Dry End / etc. callout boxes drawn on the curves",
       "resetZoom": "Reset zoom",
-      "zoomHint": "{{modifier}}+scroll to zoom, drag to pan",
+      "zoomHint": "{{modifier}}+scroll to zoom, drag to pan, {{modifier}}+drag a milestone's label to move it",
       "deleteMilestone": "Delete milestone",
       "axisMins": "mins"
     },
