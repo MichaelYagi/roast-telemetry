@@ -73,3 +73,19 @@ def test_moving_drop_updates_the_saved_duration(client, tmp_path):
     drop = next(e for e in events if e["type"] == "DROP")
     assert client.patch(f"/api/v1/roasts/{roast_id}/events/{drop['id']}", json={"time_s": 50.0}).status_code == 200
     assert storage.get_roast_row(roast_id)["duration_s"] == 50.0
+
+
+def test_resync_fixes_durations_once(client, tmp_path):
+    path = tmp_path / "r.alog"
+    _write_alog(path, drop_at=40.0)
+    roast_id = client.post("/api/v1/roasts/import", params={"path": str(path)}).json()["id"]
+    storage.update_roast(roast_id, duration_s=41.0)  # stored before milestones matched the file
+    storage.set_schema_version(4)
+
+    session_manager.resync_durations()
+    assert storage.get_roast_row(roast_id)["duration_s"] == 40.0
+    assert storage.get_schema_version() == 5
+
+    storage.update_roast(roast_id, duration_s=99.0)
+    session_manager.resync_durations()  # already done -- leaves it alone
+    assert storage.get_roast_row(roast_id)["duration_s"] == 99.0

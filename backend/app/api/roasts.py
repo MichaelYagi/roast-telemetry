@@ -34,6 +34,7 @@ from ..models import (
     ReviewStatus,
     Roast,
     RoastCreateRequest,
+    RoastEventType,
     RoastMode,
     RoastReview,
     RoastStats,
@@ -46,6 +47,7 @@ from ..roast_control import program_from_profile
 from ..roast_metrics import alog_metrics, build_row
 from ..roast_review import build_prompt, build_summary
 from ..roast_session import RoastSessionError, session_manager
+from ..roast_session.session import milestone_name
 from ..roast_session.control import RoastControlError
 from ..roast_stats import compute_roast_stats
 from ..ws_manager import active_roast_pubsub, pubsub
@@ -537,6 +539,13 @@ async def add_event(roast_id: str, event: EventCreateRequest) -> dict:
     return created
 
 
+def _mmss(seconds: float) -> str:
+    """Elapsed roast time as the apps show it (9:30), for Activity log
+    messages."""
+    total = int(round(seconds))
+    return f"{total // 60}:{total % 60:02d}"
+
+
 def _require_roast_exists(roast_id: str) -> None:
     # Unlike add_event/add_note above, delete_event/retime_event work on
     # a roast whose in-memory session no longer exists too (a genuinely
@@ -555,14 +564,17 @@ def _require_roast_exists(roast_id: str) -> None:
 async def delete_event(roast_id: str, event_id: str, http_request: Request) -> None:
     _require_roast_exists(roast_id)
     try:
-        session_manager.delete_event(roast_id, event_id)
+        deleted = session_manager.delete_event(roast_id, event_id)
     except RoastSessionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     await pubsub.publish(roast_id, {"type": "event_deleted", "roast_id": roast_id, "event_id": event_id})
     row = storage.get_roast_row(roast_id)
+    title = row["title"] if row else roast_id
     storage.log_activity(
         "roast", "delete_event", **auth.actor(http_request), roast_id=roast_id,
-        roast_title=row["title"] if row else None, message=f'Deleted a milestone on "{row["title"] if row else roast_id}"',
+        roast_title=row["title"] if row else None,
+        message=f'Deleted {milestone_name(RoastEventType(deleted["type"]))} '
+        f'(was at {_mmss(deleted["time_s"])}) on "{title}"',
     )
 
 
@@ -570,15 +582,19 @@ async def delete_event(roast_id: str, event_id: str, http_request: Request) -> N
 async def retime_event(roast_id: str, event_id: str, update: EventUpdateRequest, http_request: Request) -> dict:
     _require_roast_exists(roast_id)
     try:
+        previous_time_s = session_manager.event_time_s(roast_id, event_id)
         updated = session_manager.retime_event(roast_id, event_id, update.time_s)
     except RoastSessionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     await pubsub.publish(roast_id, {"type": "event_updated", "roast_id": roast_id, "event": updated})
     row = storage.get_roast_row(roast_id)
+    title = row["title"] if row else roast_id
     storage.log_activity(
         "roast", "retime_event", **auth.actor(http_request), roast_id=roast_id,
         roast_title=row["title"] if row else None,
-        message=f'Retimed a milestone to {update.time_s:.0f}s on "{row["title"] if row else roast_id}"',
+        message=f'Moved {milestone_name(RoastEventType(updated["type"]))} '
+        f'{f"from {_mmss(previous_time_s)} " if previous_time_s is not None else ""}'
+        f'to {_mmss(updated["time_s"])} on "{title}"',
     )
     return updated
 

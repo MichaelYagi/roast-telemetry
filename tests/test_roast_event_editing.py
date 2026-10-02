@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import time
 
+from backend.app import storage
 from backend.app.models import EventCreateRequest, RoastCreateRequest, RoastEventType, RoastMode, RoastStatus
 from backend.app.roast_session.session import RoastSession, RoastSessionError, session_manager
 
@@ -320,3 +321,83 @@ def test_events_endpoints_404_for_unknown_roast(client):
 
     resp = client.patch("/api/v1/roasts/does-not-exist/events/also-does-not-exist", json={"time_s": 0.0})
     assert resp.status_code == 404
+
+
+# -- the same milestones before and after a restart ------------------------
+
+
+def test_finished_roast_shows_the_same_milestones_before_and_after_a_restart(client):
+    # The simulator fires Charge at 0.0 s, before its first sample (1.0 s)
+    # exists, and the .alog file can only store a milestone as a sample --
+    # so the file holds Charge at 1.0 s. A finished roast must show what
+    # the file holds from the start, not change when the server restarts.
+    roast_id, _ = _create_and_mark(client)
+    time.sleep(1.2)
+    client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": "DROP", "label": "Drop"})
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
+    warm = client.get(f"/api/v1/roasts/{roast_id}").json()
+
+    session_manager.sessions.pop(roast_id, None)
+    cold = client.get(f"/api/v1/roasts/{roast_id}").json()
+
+    def milestones(roast):
+        return {e["type"]: (e["time_s"], e["value"]) for e in roast["events"] if e["type"] != "CUSTOM"}
+
+    assert milestones(warm) == milestones(cold)
+    assert {"CHARGE", "DRY_END", "DROP"} <= milestones(warm).keys()
+    assert warm["duration_s"] == cold["duration_s"]
+    assert storage.get_roast_row(roast_id)["duration_s"] == cold["duration_s"]
+
+
+def test_retime_snaps_to_the_nearest_sample():
+    session = make_session()
+    feed_profile(session)  # samples every 30 s
+    event = session.add_event(EventCreateRequest(type=RoastEventType.DRY_END, label="Dry End"))
+
+    updated = session.retime_event(event["id"], 100.0)
+
+    assert updated["time_s"] == 90.0
+    assert updated["value"] == 105.0
+
+
+def test_retime_error_names_the_milestones():
+    session = make_session()
+    feed_profile(session)
+    dry_end = session.add_event(EventCreateRequest(type=RoastEventType.DRY_END, label="Dry End"))
+    dry_end["time_s"] = 60.0
+    fc_start = session.add_event(EventCreateRequest(type=RoastEventType.FC_START, label="FC Start"))
+    fc_start["time_s"] = 180.0
+
+    try:
+        session.retime_event(dry_end["id"], 210.0)
+        assert False, "expected RoastSessionError"
+    except RoastSessionError as exc:
+        assert str(exc) == "Dry End can't be moved past FC Start"
+
+
+def test_turning_point_error_names_it():
+    session = make_session()
+    mark_auto(session, RoastEventType.TURNING_POINT)
+
+    try:
+        session.delete_event(session.events[0]["id"])
+        assert False, "expected RoastSessionError"
+    except RoastSessionError as exc:
+        assert str(exc) == "Turning Point is detected automatically -- it can't be edited"
+
+
+def test_activity_log_names_the_milestone_and_times(client):
+    roast_id, event_id = _create_and_mark(client)
+    client.post(f"/api/v1/roasts/{roast_id}/stop")
+    dry_end = next(e for e in client.get(f"/api/v1/roasts/{roast_id}").json()["events"] if e["id"] == event_id)
+    target = dry_end["time_s"] - 1.0
+
+    assert client.patch(f"/api/v1/roasts/{roast_id}/events/{event_id}", json={"time_s": target}).status_code == 200
+    assert client.delete(f"/api/v1/roasts/{roast_id}/events/{event_id}").status_code == 204
+
+    def mmss(t):
+        return f"{int(round(t)) // 60}:{int(round(t)) % 60:02d}"
+
+    messages = [r["message"] for r in storage.list_activity() if r["roast_id"] == roast_id]
+    assert f'Moved Dry End from {mmss(dry_end["time_s"])} to {mmss(target)} on "Editable Roast"' in messages
+    assert f'Deleted Dry End (was at {mmss(target)}) on "Editable Roast"' in messages

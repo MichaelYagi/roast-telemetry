@@ -145,6 +145,15 @@ def _find_note(notes: list, note_id: str) -> dict:
     return note
 
 
+def milestone_name(event_type: "RoastEventType") -> str:
+    """How a milestone is named in a message a person reads ("Dry End",
+    not "DRY_END") -- error messages the apps show as they are, and the
+    Activity log."""
+    if event_type == RoastEventType.TURNING_POINT:
+        return "Turning Point"
+    return MILESTONE_LABELS.get(event_type, event_type.value)
+
+
 def _find_editable_milestone(events: list, event_id: str) -> tuple[dict, "RoastEventType"]:
     """Shared by RoastSession.delete_event/retime_event (a live session's
     own self.events) and RoastSessionManager's cold-roast path (a plain
@@ -157,9 +166,9 @@ def _find_editable_milestone(events: list, event_id: str) -> tuple[dict, "RoastE
         raise RoastSessionError(f"event {event_id!r} not found")
     event_type = RoastEventType(event["type"])
     if event_type in ALWAYS_AUTO_EVENT_TYPES:
-        raise RoastSessionError(f"{event_type.value} is always auto-detected -- it can't be edited")
+        raise RoastSessionError(f"{milestone_name(event_type)} is detected automatically -- it can't be edited")
     if event_type == RoastEventType.CUSTOM:
-        raise RoastSessionError("CUSTOM events aren't milestones -- nothing to edit")
+        raise RoastSessionError("Custom events aren't milestones -- nothing to edit")
     return event, event_type
 
 
@@ -174,26 +183,29 @@ def _retime_milestone(events: list, profile: list, event_id: str, new_time_s: fl
     if profile and not (0.0 <= new_time_s <= profile[-1]["time_s"]):
         raise RoastSessionError(f"time_s {new_time_s} is outside this roast's recorded range (0-{profile[-1]['time_s']})")
 
+    # A milestone can only sit on a sample -- that's all the .alog file can
+    # store (see RoastSession._match_events_to_alog) -- so snap to the
+    # nearest one first, and check the order against where it will
+    # actually land.
+    nearest = min(profile, key=lambda p: abs(p["time_s"] - new_time_s)) if profile else None
+    if nearest is not None:
+        new_time_s = nearest["time_s"]
+
     idx = MILESTONE_SEQUENCE.index(event_type)
     by_type = {RoastEventType(e["type"]): e for e in events if e["type"] != RoastEventType.CUSTOM.value}
     for earlier_type in reversed(MILESTONE_SEQUENCE[:idx]):
         if earlier_type in by_type:
             if new_time_s <= by_type[earlier_type]["time_s"]:
-                raise RoastSessionError(f"can't move {event_type.value} before {earlier_type.value}")
+                raise RoastSessionError(f"{milestone_name(event_type)} can't be moved before {milestone_name(earlier_type)}")
             break
     for later_type in MILESTONE_SEQUENCE[idx + 1:]:
         if later_type in by_type:
             if new_time_s >= by_type[later_type]["time_s"]:
-                raise RoastSessionError(f"can't move {event_type.value} past {later_type.value}")
+                raise RoastSessionError(f"{milestone_name(event_type)} can't be moved past {milestone_name(later_type)}")
             break
 
-    nearest_bt = None
-    if profile:
-        nearest = min(profile, key=lambda p: abs(p["time_s"] - new_time_s))
-        nearest_bt = nearest.get("bt")
-
     event["time_s"] = new_time_s
-    event["value"] = nearest_bt
+    event["value"] = nearest.get("bt") if nearest is not None else None
     return event
 
 
@@ -725,7 +737,6 @@ class RoastSession:
     async def _finish(self, status: RoastStatus) -> None:
         self._stop_requested.set()
         self.status = status
-        self.duration_s = roast_duration_s(self.profile, self.events)
         self.control.stop_automation("the roast finished")
         await asyncio.to_thread(self.device.disconnect)
         if isinstance(self._engine, (ModbusEngine, MS6514Engine, TC4Engine)):
@@ -748,6 +759,8 @@ class RoastSession:
             roastdate=self.created_at,
         )
         save_native_alog(self.alog_path, alog_dict)
+        self._match_events_to_alog()
+        self.duration_s = roast_duration_s(self.profile, self.events)
 
         # Whether Drop ever got marked before this roast ended -- a
         # persistent, post-hoc "ended before all milestones" signal for
@@ -832,7 +845,7 @@ class RoastSession:
             if self.status not in (RoastStatus.ROASTING, RoastStatus.COOLING):
                 raise RoastSessionError(f"roast {self.id} isn't recording yet (status={self.status.value}) -- press START first")
             if req.type in ALWAYS_AUTO_EVENT_TYPES:
-                raise RoastSessionError(f"{req.type.value} is always auto-detected -- it can't be marked manually")
+                raise RoastSessionError(f"{milestone_name(req.type)} is detected automatically -- it can't be marked by hand")
             existing_types = {RoastEventType(e["type"]) for e in self.events if e["type"] != RoastEventType.CUSTOM.value}
             if req.type in existing_types:
                 raise RoastSessionError(f"{req.type.value} has already been marked for this roast")
@@ -1028,6 +1041,28 @@ class RoastSession:
                 roastdate=self.created_at,
             )
             save_native_alog(self.alog_path, alog_dict)
+            self._match_events_to_alog()
+
+    def _match_events_to_alog(self) -> None:
+        """Makes this session's milestones exactly what its .alog file now
+        holds. The file stores each milestone as an index into its samples,
+        not as a time, so reading it back lands a milestone on the nearest
+        sample and takes that sample's BT -- and a simulator or live bridge
+        can fire Charge at 0.0 s, before its first sample exists, which the
+        file can only store as that first sample (1.0 s). Without this, the
+        roast showed one set of times until the server restarted and another
+        after (read from the file), and its duration changed with them."""
+        try:
+            stored = alog_dict_to_points(load_alog(self.alog_path))["events"]
+        except Exception:  # noqa: BLE001 -- the file was just written; leave the session as it is
+            logger.exception("couldn't read back %s", self.alog_path)
+            return
+        by_type = {e["type"]: e for e in stored if e["type"] != RoastEventType.CUSTOM.value}
+        for event in self.events:
+            match = by_type.get(event["type"]) if event["type"] != RoastEventType.CUSTOM.value else None
+            if match is not None:
+                event["time_s"] = match["time_s"]
+                event["value"] = match["value"]
 
     def _refresh_duration(self) -> None:
         """Moving or removing Charge/Drop changes the roast's duration --
@@ -1068,7 +1103,7 @@ class RoastSession:
         self.tags = tags
         storage.set_roast_tags(self.id, tags)
 
-    def delete_event(self, event_id: str) -> None:
+    def delete_event(self, event_id: str) -> dict:
         """Removes an already-marked milestone entirely, so it can be
         re-marked fresh via the normal add_event() flow (its own
         already-marked check only looks at what's currently in
@@ -1078,8 +1113,9 @@ class RoastSession:
         it only removes this one event marker."""
         event, _ = _find_editable_milestone(self.events, event_id)
         self.events.remove(event)
-        self._refresh_duration()
         self._rewrite_alog()
+        self._refresh_duration()
+        return event
 
     def retime_event(self, event_id: str, new_time_s: float) -> dict:
         """Moves an already-marked milestone to a different point on the
@@ -1088,8 +1124,8 @@ class RoastSession:
         recompute logic, shared with RoastSessionManager's cold-roast
         path."""
         event = _retime_milestone(self.events, self.profile, event_id, new_time_s)
-        self._refresh_duration()
         self._rewrite_alog()
+        self._refresh_duration()
         return event
 
     # -- serialization ----------------------------------------------------
@@ -1337,16 +1373,28 @@ class RoastSessionManager:
         )
         save_native_alog(row["alog_path"], alog_dict)
 
-    def delete_event(self, roast_id: str, event_id: str) -> None:
+    def delete_event(self, roast_id: str, event_id: str) -> dict:
         session = self.get(roast_id)
         if session is not None:
-            session.delete_event(event_id)
-            return
+            return session.delete_event(event_id)
         row, parsed = self._cold_roast_row_and_parsed(roast_id)
         event, _ = _find_editable_milestone(parsed["events"], event_id)
         parsed["events"].remove(event)
         storage.update_roast(roast_id, duration_s=roast_duration_s(parsed["profile"], parsed["events"]))
         self._rewrite_cold_alog(row, parsed)
+        return event
+
+    def event_time_s(self, roast_id: str, event_id: str) -> Optional[float]:
+        """Where an event sits right now, before an edit moves it -- for the
+        Activity log's "from" time. None when there's no such event (the
+        edit itself then says why)."""
+        session = self.get(roast_id)
+        if session is not None:
+            events = session.events
+        else:
+            _, parsed = self._cold_roast_row_and_parsed(roast_id)
+            events = parsed["events"]
+        return next((e["time_s"] for e in events if e["id"] == event_id), None)
 
     def retime_event(self, roast_id: str, event_id: str, new_time_s: float) -> dict:
         session = self.get(roast_id)
@@ -1464,6 +1512,26 @@ class RoastSessionManager:
             if row.get("duration_s") is None or abs(new_duration - row["duration_s"]) > 0.05:
                 storage.update_roast(row["id"], duration_s=new_duration)
         storage.set_schema_version(1)
+
+    def resync_durations(self) -> None:
+        """One-time: a roast that finished before its milestones were
+        matched to its saved file (see RoastSession._match_events_to_alog)
+        may have stored a duration up to one sample off from what its own
+        file gives -- recompute it from the file, as backfill_durations
+        did once before."""
+        if storage.get_schema_version() >= 5:
+            return
+        for row in storage.list_roast_rows(limit=100000):
+            if not row.get("alog_path") or not os.path.exists(row["alog_path"]):
+                continue
+            try:
+                parsed = alog_dict_to_points(load_alog(row["alog_path"]))
+                new_duration = roast_duration_s(parsed["profile"], parsed["events"])
+            except Exception:
+                continue
+            if row.get("duration_s") is None or abs(new_duration - row["duration_s"]) > 0.05:
+                storage.update_roast(row["id"], duration_s=new_duration)
+        storage.set_schema_version(5)
 
     def backfill_beans(self) -> None:
         """One-time: roasts that have a beans name typed on them but no Beans
