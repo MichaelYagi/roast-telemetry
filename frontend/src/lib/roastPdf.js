@@ -50,16 +50,26 @@ const MILESTONE_COLORS = {
   FC_END: "#b91c1c", SC_START: "#9333ea", SC_END: "#7e22ce", DROP: "#16a34a", COOL_END: "#334155", CUSTOM: "#64748b",
 };
 
+// Same defaults as breakoutPanels.js's own bt/et entries -- used whenever
+// the caller doesn't have (or hasn't loaded) the user's Settings > Colors
+// overrides yet, so this never renders with no color at all.
+const DEFAULT_CURVE_COLORS = { bt: "#1d4ed8", et: "#be123c" };
+
 // A plain, non-interactive BT/ET curve with milestone dots, drawn on a
 // detached canvas and handed back as a PNG data URL -- used for a bulk
 // export, where the roast being drawn isn't the one open on screen. Doesn't
 // attempt to match every option the live chart has (zoom, extra devices, a
 // background overlay); it's a static picture for a report, not a re-creation
-// of the interactive view.
-export async function renderChartImage(profile, events, tempUnit, { width = 900, height = 380 } = {}) {
+// of the interactive view. `colors` is breakout_panel_colors (Settings >
+// Colors) -- same bt/et keys as the live chart's own SERIES_KEY_TO_BREAKOUT_KEY,
+// so a bulk-exported report's curve colors match what the user actually
+// sees on screen instead of always the original defaults.
+export async function renderChartImage(profile, events, tempUnit, { width = 900, height = 380, colors = {} } = {}) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
+  const btColor = colors.bt || DEFAULT_CURVE_COLORS.bt;
+  const etColor = colors.et || DEFAULT_CURVE_COLORS.et;
   const toUnit = (c) => (c == null ? null : celsiusToUnit(c, tempUnit));
   const bt = profile.filter((p) => p.bt != null).map((p) => ({ x: p.time_s, y: toUnit(p.bt) }));
   const et = profile.filter((p) => p.et != null).map((p) => ({ x: p.time_s, y: toUnit(p.et) }));
@@ -71,8 +81,8 @@ export async function renderChartImage(profile, events, tempUnit, { width = 900,
     type: "line",
     data: {
       datasets: [
-        { data: bt, borderColor: "#1d4ed8", borderWidth: 2, pointRadius: 0, parsing: false, tension: 0.15 },
-        { data: et, borderColor: "#be123c", borderWidth: 2, pointRadius: 0, parsing: false, tension: 0.15 },
+        { data: bt, borderColor: btColor, borderWidth: 2, pointRadius: 0, parsing: false, tension: 0.15 },
+        { data: et, borderColor: etColor, borderWidth: 2, pointRadius: 0, parsing: false, tension: 0.15 },
         {
           data: milestonePoints, showLine: false, pointRadius: 4, parsing: false,
           borderColor: (ctx) => milestonePoints[ctx.dataIndex]?.color, backgroundColor: (ctx) => milestonePoints[ctx.dataIndex]?.color,
@@ -268,8 +278,9 @@ export function printRoastPdf(roast, tempUnit, chartImage, extra) {
 
 // For a bulk export: renders its own chart image (no on-screen chart to
 // borrow), and returns the PDF as a Blob instead of downloading it directly.
-export async function buildRoastPdfBlob(roast, tempUnit, extra) {
-  const chartImage = roast.profile?.length ? await renderChartImage(roast.profile, roast.events || [], tempUnit) : null;
+// `colors` is breakout_panel_colors -- see renderChartImage's own comment.
+export async function buildRoastPdfBlob(roast, tempUnit, extra, colors) {
+  const chartImage = roast.profile?.length ? await renderChartImage(roast.profile, roast.events || [], tempUnit, { colors }) : null;
   const doc = buildDoc(roast, tempUnit, chartImage, extra);
   return doc.output("blob");
 }

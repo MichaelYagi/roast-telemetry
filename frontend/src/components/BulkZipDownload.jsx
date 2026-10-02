@@ -59,13 +59,20 @@ export default function BulkZipDownload({ params, tempUnit = "c" }) {
       const zip = await JSZip.loadAsync(await zipRes.arrayBuffer());
 
       const metricsMeta = await api.getAnalysisMetrics().catch(() => []);
+      // Settings > Colors -- so a bulk-exported report's BT/ET curve colors
+      // match what's actually shown on screen (RoastChart.jsx) instead of
+      // renderChartImage's own hardcoded defaults. Fetched here, not on
+      // mount, since this whole PDF path only runs when the user actually
+      // asks for it.
+      const settings = await api.getSettings().catch(() => null);
+      const colors = settings?.breakout_panel_colors || {};
       const used = new Set();
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         setBusy(t("common.bulkZipDownload.buildingPdf", { current: i + 1, total: rows.length }));
         try {
           const [roast, stats] = await Promise.all([api.getRoast(row.id), api.getRoastStats(row.id).catch(() => null)]);
-          const blob = await buildRoastPdfBlob(roast, tempUnit, { stats, numbersRow: row, metricsMeta });
+          const blob = await buildRoastPdfBlob(roast, tempUnit, { stats, numbersRow: row, metricsMeta }, colors);
           let name = pdfFilename(roast.title, roast.created_at);
           if (used.has(name)) name = pdfFilename(roast.title, roast.created_at, row.id.slice(0, 8));
           used.add(name);
