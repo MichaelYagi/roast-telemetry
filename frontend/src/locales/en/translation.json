@@ -123,8 +123,8 @@
     "customAdvancedFields": "Custom (advanced fields below)",
     "builtIn": " (built-in)",
     "usingProfileHint": "Using the \"{{name}}\" register map -- the advanced fields below don't apply while a profile is selected. Pick \"Custom\" above to go back to setting individual registers by hand.",
-    "fahrenheitNative": "Controller reports Fahrenheit, not Celsius",
-    "fahrenheitNativeHint": "Some installers configure the roaster's own PID controllers in °F instead of °C -- this is a setting on the controller itself, independent of which register map/device profile is selected above. Leave unchecked unless you've confirmed your controller's own display is in Fahrenheit (e.g. it matches a reference that's set to °F).",
+    "fahrenheitNative": "Controller reports °F — convert its readings to °C",
+    "fahrenheitNativeHint": "Only check this if you've confirmed the controller's own display is in Fahrenheit.",
     "fahrenheitNativeShort": "°F-native controller",
     "advancedModbusHint": "Leave any of these blank to use the FZ-94 defaults above. Only worth touching once you've confirmed your own unit's actual register map differs (see the VFD's own nameplate/front-panel parameters, or a real probe's slave ID). BT/ET/DT/Burner are confirmed against a shipped FZ-94 machine preset and its interpreting source code — exposed here for a genuinely different Modbus roaster, not because a real FZ-94 should need them changed. Fan/Drum (control+feedback registers, operating range) and the Burner SV°C range are that engine's least-confirmed, blog-sourced defaults.",
     "modbus": {
