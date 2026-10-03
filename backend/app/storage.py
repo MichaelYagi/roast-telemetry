@@ -278,6 +278,8 @@ def init_db() -> None:
             c.execute("ALTER TABLE roasts ADD COLUMN modbus_tcp_port INTEGER")
         if "modbus_device_profile_name" not in existing_cols:
             c.execute("ALTER TABLE roasts ADD COLUMN modbus_device_profile_name TEXT")
+        if "modbus_fahrenheit_native" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN modbus_fahrenheit_native INTEGER NOT NULL DEFAULT 0")
         if "ms6514_port" not in existing_cols:
             c.execute("ALTER TABLE roasts ADD COLUMN ms6514_port TEXT")
         if "aillio_model" not in existing_cols:
@@ -371,16 +373,16 @@ def insert_roast(summary: dict) -> None:
                (id, title, mode, status, created_at, beans,
                 weight_green_g, weight_roasted_g, duration_s, alog_path, source_alog_path, playback_speed,
                 created_by_username, modbus_transport, modbus_port, modbus_host, modbus_tcp_port,
-                modbus_device_profile_name, ms6514_port, aillio_model, tc4_port, bean_id, notes_text)
+                modbus_device_profile_name, modbus_fahrenheit_native, ms6514_port, aillio_model, tc4_port, bean_id, notes_text)
                VALUES (:id, :title, :mode, :status, :created_at, :beans,
                        :weight_green_g, :weight_roasted_g, :duration_s, :alog_path, :source_alog_path,
                        :playback_speed, :created_by_username, :modbus_transport, :modbus_port, :modbus_host,
-                       :modbus_tcp_port, :modbus_device_profile_name, :ms6514_port, :aillio_model, :tc4_port,
+                       :modbus_tcp_port, :modbus_device_profile_name, :modbus_fahrenheit_native, :ms6514_port, :aillio_model, :tc4_port,
                        :bean_id, :notes_text)""",
             {
                 "source_alog_path": None, "playback_speed": None, "created_by_username": None,
                 "modbus_transport": None, "modbus_port": None, "modbus_host": None, "modbus_tcp_port": None,
-                "modbus_device_profile_name": None, "ms6514_port": None, "aillio_model": None, "tc4_port": None,
+                "modbus_device_profile_name": None, "modbus_fahrenheit_native": False, "ms6514_port": None, "aillio_model": None, "tc4_port": None,
                 "bean_id": None, "notes_text": None, **summary,
             },
         )

@@ -74,6 +74,21 @@
     </tbody>
   </table>
   <p>
+    <strong>The ×10 convention above is confirmed Celsius on one real
+    unit — not necessarily yours.</strong> BT/ET/DT/Burner are each a
+    separate, generic PID controller (a MaxWell MTA-48 on the units
+    seen so far), and whether that controller's own display/registers
+    are configured in °C or °F is a setting the installer picked, not
+    something the FZ-94 or this app fixes. If your readings look
+    plausible but shifted (a drum-heat-limit setpoint that matches your
+    controller's own panel number but seems too low to reach a real
+    roasting temperature, say), your unit is likely °F-native — check
+    "Controller reports Fahrenheit, not Celsius" on the Configure Roast
+    form's Device tab; it converts every BT/ET/DT/Burner-SV reading and
+    write accordingly, independent of which device profile is
+    selected.
+  </p>
+  <p>
     <strong>Burner is a drum-temperature <em>setpoint</em>, not a power
     percentage.</strong> The roaster's own bang-bang PID switches its 3
     heating elements around this setpoint — the FZ-94's user manual

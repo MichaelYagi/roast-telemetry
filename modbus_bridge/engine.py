@@ -156,6 +156,22 @@ class ModbusEngineError(RuntimeError):
     pass
 
 
+def _native_to_celsius(native: float, fahrenheit_native: bool) -> float:
+    """Converts a value already divided out of its raw register (so it's
+    in whatever unit the controller itself natively reports) into the
+    Celsius this app always works in internally. A no-op when the
+    controller is Celsius-native, which is every profile's default --
+    see ModbusEngine.fahrenheit_native's own docstring for why this is
+    a per-roast setting, not baked into the register map."""
+    return (native - 32.0) * 5.0 / 9.0 if fahrenheit_native else native
+
+
+def _celsius_to_native(celsius: float, fahrenheit_native: bool) -> float:
+    """The inverse of _native_to_celsius, for writing a setpoint back out
+    to the wire in whatever unit the controller actually expects."""
+    return celsius * 9.0 / 5.0 + 32.0 if fahrenheit_native else celsius
+
+
 class ModbusEngine:
     def __init__(
         self,
@@ -224,8 +240,15 @@ class ModbusEngine:
         # calls, which keep the detector's own state in sync either way so
         # a manual override never also produces a duplicate auto-fired copy).
         detect_milestones: bool = False,
+        # See from_profile's own docstring for why this is a per-roast
+        # override, not part of the register map -- applies here too for
+        # the same reason, even though the flat constructor's own
+        # defaults (this file's module docstring) were confirmed
+        # Celsius-native on the specific unit that confirmation came from.
+        fahrenheit_native: bool = False,
         client_cls=ModbusSerialClient,  # injectable for testing without real hardware
     ):
+        self._fahrenheit_native = fahrenheit_native
         self.port = port
         self.control_port = control_port
         self.bt_slave_id = bt_slave_id
@@ -371,6 +394,7 @@ class ModbusEngine:
         dry_end_c: Optional[float] = 160.0,
         fc_start_c: Optional[float] = 196.0,
         detect_milestones: bool = False,
+        fahrenheit_native: bool = False,
         client_cls=ModbusSerialClient,
     ) -> "ModbusEngine":
         """The profile-driven way in -- builds the same two generic
@@ -382,12 +406,23 @@ class ModbusEngine:
         Every named flat attribute (self.bt_slave_id etc.) that only the
         legacy constructor's own tests/internals ever read is left unset
         here -- nothing in tick()/apply_command() touches them; they only
-        exist for the flat-constructor compatibility path above."""
+        exist for the flat-constructor compatibility path above.
+
+        fahrenheit_native: a per-roast override, not part of the profile
+        itself -- the same register map (same slave IDs/addresses/
+        divisors) can be wired to a controller configured in either unit
+        depending on how that specific installer set it up (confirmed:
+        two real FZ-94s, same confirmed register map, one reporting
+        Celsius and one reporting Fahrenheit raw). Orthogonal to which
+        registers get read/written, so it applies on top of any profile
+        -- built-in or custom -- the same way dry_end_c/fc_start_c
+        already do, not folded into the register map itself."""
         self = cls.__new__(cls)
         self.port = port if transport != "tcp" else f"{host}:{tcp_port}"
         self.control_port = control_port
         self.temp_channels = list(profile.temp_channels)
         self.control_channels = list(profile.control_channels)
+        self._fahrenheit_native = fahrenheit_native
 
         self._dry_end_c = dry_end_c
         self._fc_start_c = fc_start_c
@@ -518,7 +553,9 @@ class ModbusEngine:
 
     def _read_temp_channel(self, ch: ModbusTempChannel, *, is_heartbeat: bool = False) -> Optional[float]:
         raw = self._read_register(ch.register_address, ch.slave_id, is_heartbeat=is_heartbeat)
-        return (raw / (ch.divisor or 1.0)) if raw is not None else None
+        if raw is None:
+            return None
+        return _native_to_celsius(raw / (ch.divisor or 1.0), self._fahrenheit_native)
 
     def _read_control_feedback(self, ch: ModbusControlChannel) -> tuple[Optional[float], Optional[float]]:
         """Returns (pct_feedback, raw_sv_c). raw_sv_c is only ever
@@ -539,7 +576,7 @@ class ModbusEngine:
             raw = self._read_register(ch.register_address, ch.slave_id)
             if raw is None:
                 return None, None
-            sv_c = raw / (ch.divisor or 1.0)
+            sv_c = _native_to_celsius(raw / (ch.divisor or 1.0), self._fahrenheit_native)
             sv_lo, sv_hi = ch.sv_range_c or (0.0, 100.0)
             pct = max(0.0, min(100.0, (sv_c - sv_lo) / (sv_hi - sv_lo) * 100.0)) if sv_hi != sv_lo else None
             return pct, sv_c
@@ -663,7 +700,8 @@ class ModbusEngine:
         differs. `pct` is stashed in _last_values so tick()'s heater_pct
         feedback (and the other write path) both stay in sync regardless
         of which unit was actually written."""
-        raw = int(round(sv_c * (ch.divisor or 1.0)))
+        native = _celsius_to_native(sv_c, self._fahrenheit_native)
+        raw = int(round(native * (ch.divisor or 1.0)))
         logger.debug("write slave=%s reg=%s <- %s (sv_c=%.2f)", ch.slave_id, ch.register_address, raw, sv_c)
         try:
             result = self._client.write_register(ch.register_address, raw, device_id=ch.slave_id)

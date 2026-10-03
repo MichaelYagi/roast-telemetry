@@ -176,17 +176,49 @@ class RoastControl:
         return written
 
     def release(self) -> None:
-        """Called when the operator ends the roast: automation stops and, if
-        the heater is on, it's turned off -- the app shouldn't let go of a
-        roaster that's still heating. The fan and drum are left as they are."""
+        """Called when the operator ends the roast: automation stops and
+        heater/fan/drum are all turned off, whichever of them the device
+        can write to and are currently non-zero. Reversed from an
+        earlier design that only zeroed the heater and left fan/drum
+        reading back whatever the roaster still physically had -- real-
+        hardware testing showed that just made OFF look like it wasn't
+        doing anything for fan/drum, not like a deliberate choice to
+        preserve operator-set state. See reset_to_idle below for the
+        mirror-image case (a new connection's own starting state)."""
         self.stop_automation("the roast ended")
-        heater = self.current().get("heater_pct")
-        if self.can_write and heater and heater > 0:
-            try:
-                self.session.device.write({"heater_pct": 0.0})
-                self._last_written["heater_pct"] = 0.0
-            except Exception:
-                logger.exception("couldn't turn the heater off when the roast ended")
+        if not self.can_write:
+            return
+        current = self.current()
+        command = {key: 0.0 for key in CONTROL_KEYS if current.get(key)}
+        if not command:
+            return
+        try:
+            self.session.device.write(command)
+            for key in command:
+                self._last_written[key] = 0.0
+        except Exception:
+            logger.exception("couldn't turn the roaster off when the roast ended")
+
+    def reset_to_idle(self) -> None:
+        """Called when a new connection starts (RoastSession.connect()) --
+        explicitly zeroes fan/drum rather than trusting whatever the
+        roaster physically still has from a previous session or a manual
+        panel adjustment. A deliberate, predictable starting point beats
+        silently inheriting physical state -- the mirror image of
+        release() above, for the opposite moment. Heater deliberately
+        excluded, unlike release()'s own symmetric zeroing -- reconnecting
+        to a roaster that already has the heater legitimately on (an
+        operator's own preheat, or picking back up after a dropped
+        connection mid-roast) shouldn't silently kill it the instant the
+        app reattaches; only fan/drum were ever reported as not resetting."""
+        if not self.can_write:
+            return
+        try:
+            self.session.device.write({"fan_pct": 0.0, "drum_speed_pct": 0.0})
+            self._last_written["fan_pct"] = 0.0
+            self._last_written["drum_speed_pct"] = 0.0
+        except Exception:
+            logger.exception("couldn't zero fan/drum on connect")
 
     async def emergency_stop(self, *, username: str, platform: str) -> bool:
         return await self.enter_safe_state("emergency stop", username=username, platform=platform)

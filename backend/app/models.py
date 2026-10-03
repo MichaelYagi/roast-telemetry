@@ -484,6 +484,10 @@ class RoastCreateRequest(BaseModel):
     modbus_drum_frequency_offset: Optional[float] = Field(default=None, description="modbus_live, advanced: Drum VFD frequency-register offset. See modbus_drum_frequency_scale. Default 0.")
     modbus_burner_sv_min_c: Optional[float] = Field(default=None, description="modbus_live, advanced: low end of the heater_pct(0%)->SV-temperature mapping, paired with modbus_burner_sv_max_c (both required together). Default 100.")
     modbus_burner_sv_max_c: Optional[float] = Field(default=None, description="modbus_live, advanced: high end of the heater_pct(100%)->SV-temperature mapping, paired with modbus_burner_sv_min_c (both required together). Default 250.")
+    modbus_fahrenheit_native: bool = Field(
+        default=False,
+        description="modbus_live only: the connected controller's own PID display/registers are configured in Fahrenheit, not Celsius. Applies whether or not modbus_device_profile_id is set -- a register map's own addresses/scaling are the same regardless of which unit an installer configured that specific controller to use, so this is a separate, orthogonal setting, not folded into the profile. Every BT/ET/DT/burner-SV reading and write is converted accordingly; off (the default) is today's behavior, confirmed correct on at least one real Celsius-configured FZ-94 -- but that confirmation doesn't extend to every installation (same reasoning as this app's own Air/Drum slave-ID wiring, which is also known to vary by installation).",
+    )
     ms6514_port: Optional[str] = Field(default=None, description="Required when mode=ms6514_live: serial port the Mastech MS6514 is on, e.g. 'COM5'")
     aillio_model: Optional[str] = Field(default=None, description="Required when mode=aillio_live: which Aillio Bullet model, e.g. 'r1' (see aillio_bridge.engine.PROTOCOLS for the known set). A raw USB device, not a port/host -- there's nothing else to configure per-install.")
     tc4_port: Optional[str] = Field(default=None, description="Required when mode=tc4_live: serial port the TC4+ shield is on, e.g. 'COM5'")
@@ -548,6 +552,7 @@ class RoastSummary(BaseModel):
     modbus_host: Optional[str] = None
     modbus_tcp_port: Optional[int] = None
     modbus_device_profile_name: Optional[str] = None
+    modbus_fahrenheit_native: bool = False
     # ms6514_live only, same "freeze what was configured" reasoning as
     # the modbus_* fields above.
     ms6514_port: Optional[str] = None

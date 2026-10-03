@@ -105,7 +105,7 @@
       <tr><td>An error stops the roast (for example the connection to the roaster breaks)</td><td>The app tries to switch the heater off before it lets go, then ends the roast as aborted.</td></tr>
       <tr><td>Target control loses the bean-temperature reading for more than 10 seconds</td><td>Safe state: it won't keep heating blind.</td></tr>
       <tr><td>A write during automatic control fails</td><td>Safe state.</td></tr>
-      <tr><td>You end the roast (OFF) with the heater on</td><td>The heater is switched off; the fan and drum are left as they are.</td></tr>
+      <tr><td>You end the roast (OFF)</td><td>Heater, fan and drum are all switched off, whichever of them were on.</td></tr>
     </tbody>
   </table>
   <p>
@@ -127,16 +127,19 @@
     after a test roast, so here's exactly what each step does:
   </p>
   <ul>
-    <li><strong>OFF</strong> switches the heater off <em>if it was on</em> &mdash; one write, the same fact as the last row of the fail-safes table above &mdash; and stops any automatic control. The fan and drum are left exactly as they were; nothing is sent for them. The app then disconnects, and no further commands go out after that.</li>
+    <li><strong>OFF</strong> switches heater, fan and drum off &mdash; whichever of them were on &mdash; and stops any automatic control. The app then disconnects, and no further commands go out after that.</li>
     <li><strong>Reset</strong> (the button OFF turns into once a roast is finished) only clears the finished roast's view and blanks the Configure Roast form for a new one. It never talks to the roaster.</li>
-    <li><strong>ON again, on real hardware,</strong> reconnects to the same physical roaster: the heater reads back as 0 (from OFF, above), and the fan and drum read back as whatever they still physically are &mdash; the roaster's own registers don't reset just because the app disconnected.</li>
-    <li><strong>ON again, on a <a href="#trying-it-without-a-roaster">simulated device</a>,</strong> is different: a brand new simulated roaster is created for the new roast, with its own starting heater/fan/drum &mdash; not whatever the previous simulated roast was last set to. There's no physical machine underneath to remember anything between roasts.</li>
+    <li><strong>ON again, on real hardware,</strong> reconnects to the same physical roaster and explicitly writes fan/drum to 0 right away, rather than reading back whatever they still physically are from a previous session or a manual panel adjustment &mdash; a deliberate, predictable starting point every time. The heater is the one exception: it's left exactly as it reads back, since reattaching to a roaster someone already has preheating (or picking a dropped connection back up mid-roast) shouldn't silently kill the heat the instant the app reconnects.</li>
+    <li><strong>ON again, on a <a href="#trying-it-without-a-roaster">simulated device</a>,</strong> is similar in effect for a different reason: a brand new simulated roaster is created for the new roast, with its own starting heater/fan/drum &mdash; not whatever the previous simulated roast was last set to. There's no physical machine underneath to remember anything between roasts.</li>
   </ul>
   <p class="hint">
-    If you set the sliders to something during a test roast, ended it, and
-    found them different next time: that's this, not a bug. On the simulator
-    it happens every time (a fresh simulated roaster every roast); on real
-    hardware, only the heater is affected, and only if it was on.
+    Earlier versions left fan/drum untouched by OFF and read back real
+    physical state on reconnecting -- real-hardware testing showed that
+    just made OFF look like it wasn't doing anything for fan/drum, and a
+    new connection inherit a previous session's (or someone's manual
+    panel adjustment's) settings instead of starting clean. Fan and drum
+    now reset to 0 on both ends consistently; the heater stays excluded
+    from reconnecting specifically, for the reason above.
   </p>
   <p>
     Ending a roast with OFF always saves it with status

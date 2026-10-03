@@ -182,6 +182,64 @@ def test_apply_command_burner_sv_c_is_a_noop_when_burner_register_disabled():
     assert primary.writes == []
 
 
+def test_fahrenheit_native_converts_temp_reads_to_celsius():
+    # Confirmed live (2026-10-02): a real FZ-94's generic PID controllers
+    # can be installer-configured in either unit -- the register map/
+    # divisor is identical either way, only the raw number's *meaning*
+    # differs. 960 raw / 10 = 96.0, native Fahrenheit here -> (96-32)*5/9
+    # = 35.56C internally (this app always works in Celsius).
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls, fahrenheit_native=True)
+    primary = instances["PRIMARY"]
+    primary.register_values[(11, 0)] = 960
+
+    sample = engine.tick(1.0)
+
+    assert sample["bt"] == pytest.approx((96.0 - 32.0) * 5.0 / 9.0)
+
+
+def test_fahrenheit_native_off_by_default_matches_existing_behavior():
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls)  # fahrenheit_native defaults False
+    primary = instances["PRIMARY"]
+    primary.register_values[(11, 0)] = 960
+
+    sample = engine.tick(1.0)
+
+    assert sample["bt"] == pytest.approx(96.0)  # no conversion -- today's confirmed-Celsius behavior
+
+
+def test_fahrenheit_native_converts_burner_sv_read_to_celsius():
+    # Same raw value as test_tick_reads_burner_sv_back_as_heater_pct_not_
+    # just_last_command above (2360), but now interpreted as native
+    # Fahrenheit: 236.0F -> 113.33C internally, then the heater_pct %
+    # mapping still applies against the (Celsius) default 100-260C range.
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls, fahrenheit_native=True)
+    primary = instances["PRIMARY"]
+    primary.register_values[(12, 5)] = 2360
+
+    sample = engine.tick(1.0)
+
+    expected_c = (236.0 - 32.0) * 5.0 / 9.0
+    assert sample["burner_sv_c"] == pytest.approx(expected_c)
+    assert sample["heater_pct"] == pytest.approx((expected_c - 100.0) / 160.0 * 100.0)
+
+
+def test_fahrenheit_native_converts_burner_sv_write_to_native():
+    # The inverse of the read-side test above: an internal 180C setpoint
+    # (same figure test_apply_command_burner_sv_c_writes_degrees_directly
+    # writes when fahrenheit_native is off) should go out on the wire as
+    # its Fahrenheit equivalent -- 356F -> x10 -> 3560 -- not 1800.
+    client_cls, instances = _make_fake_client_cls()
+    engine = ModbusEngine("PRIMARY", client_cls=client_cls, fahrenheit_native=True)
+    primary = instances["PRIMARY"]
+
+    engine.apply_command({"burner_sv_c": 180.0})
+
+    assert (5, 3560, 12) in primary.writes
+
+
 def test_apply_command_fan_and_drum_write_run_and_frequency_to_control_client():
     client_cls, instances = _make_fake_client_cls()
     engine = ModbusEngine("PRIMARY", control_port="CONTROL", client_cls=client_cls)

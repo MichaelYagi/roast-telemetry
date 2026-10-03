@@ -587,6 +587,44 @@ def test_ending_the_roast_turns_a_running_heater_off():
     assert not session.control.automation_active()
 
 
+def test_ending_the_roast_also_turns_off_fan_and_drum_if_they_were_on():
+    # Reversed from an earlier design that only zeroed the heater and left
+    # fan/drum reading back whatever the roaster still physically had --
+    # confirmed live (2026-10-02) that just made OFF look like it wasn't
+    # doing anything for fan/drum.
+    session = make_session()
+    feed(session, 0, heater_pct=70.0, fan_pct=55.0, drum_speed_pct=40.0)
+    session.control.release()
+    assert session.device.writes[-1] == {"heater_pct": 0.0, "fan_pct": 0.0, "drum_speed_pct": 0.0}
+
+
+def test_ending_the_roast_is_a_no_op_when_everything_is_already_off():
+    session = make_session()
+    session.control.release()
+    assert session.device.writes == []
+
+
+def test_reset_to_idle_zeroes_fan_and_drum_but_not_heater_on_connect():
+    # The mirror image of release() above, for RoastSession.connect()'s
+    # own "new connection" moment -- a predictable 0 instead of trusting
+    # whatever a previous session or a manual panel adjustment left.
+    # Heater deliberately excluded -- reconnecting to a roaster with a
+    # legitimately-running heater (an operator's own preheat, or picking
+    # back up after a dropped connection) shouldn't silently kill it.
+    session = make_session()
+    feed(session, 0, heater_pct=30.0, fan_pct=55.0, drum_speed_pct=40.0)
+    session.control.reset_to_idle()
+    assert session.device.writes[-1] == {"fan_pct": 0.0, "drum_speed_pct": 0.0}
+    assert session.control.current() == {"heater_pct": 30.0, "fan_pct": 0.0, "drum_speed_pct": 0.0}
+
+
+def test_reset_to_idle_is_a_no_op_on_a_read_only_device():
+    session = make_session()
+    session.mode = RoastMode.MS6514_LIVE
+    session.control.reset_to_idle()
+    assert session.device.writes == []
+
+
 def test_a_failing_write_during_automation_trips_the_fail_safe():
     session = make_session()
     mark_charge(session, 0.0)

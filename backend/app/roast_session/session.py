@@ -311,11 +311,13 @@ class RoastSession:
         self.modbus_host: Optional[str] = None
         self.modbus_tcp_port: Optional[int] = None
         self.modbus_device_profile_name: Optional[str] = None
+        self.modbus_fahrenheit_native: bool = False
         if request.mode == RoastMode.MODBUS_LIVE:
             self.modbus_transport = request.modbus_transport
             self.modbus_port = request.modbus_port
             self.modbus_host = request.modbus_host
             self.modbus_tcp_port = request.modbus_tcp_port
+            self.modbus_fahrenheit_native = request.modbus_fahrenheit_native
 
         # ms6514_live only -- same reasoning as the modbus_* fields above.
         self.ms6514_port: Optional[str] = None
@@ -394,6 +396,7 @@ class RoastSession:
                             dry_end_c=request.dry_end_c,
                             fc_start_c=request.fc_start_c,
                             detect_milestones=request.auto_detect_milestones,
+                            fahrenheit_native=request.modbus_fahrenheit_native,
                             client_cls=ModbusTcpClient if is_tcp else ModbusSerialClient,
                         )
                     elif is_tcp:
@@ -414,6 +417,7 @@ class RoastSession:
                             dry_end_c=request.dry_end_c,
                             fc_start_c=request.fc_start_c,
                             detect_milestones=request.auto_detect_milestones,
+                            fahrenheit_native=request.modbus_fahrenheit_native,
                             **_modbus_register_overrides(request),
                         )
                 except ValueError as exc:
@@ -593,6 +597,7 @@ class RoastSession:
             "modbus_host": self.modbus_host,
             "modbus_tcp_port": self.modbus_tcp_port,
             "modbus_device_profile_name": self.modbus_device_profile_name,
+            "modbus_fahrenheit_native": self.modbus_fahrenheit_native,
             "ms6514_port": self.ms6514_port,
             "aillio_model": self.aillio_model,
             "tc4_port": self.tc4_port,
@@ -626,8 +631,12 @@ class RoastSession:
         _run_loop() below runs it in preview mode: samples stream out live
         but nothing is recorded), without creating a DB row or touching
         storage at all. See begin_recording() for the separate START
-        action that actually starts recording what's already flowing."""
+        action that actually starts recording what's already flowing.
+        Explicitly zeroes heater/fan/drum right after connecting (see
+        RoastControl.reset_to_idle) rather than letting the first feedback
+        read just report back whatever the roaster was last left at."""
         await asyncio.to_thread(self.device.connect)
+        await asyncio.to_thread(self.control.reset_to_idle)
         self._task = asyncio.create_task(self._run_loop())
 
     async def begin_recording(self) -> None:
@@ -1226,6 +1235,7 @@ class RoastSession:
             modbus_host=self.modbus_host,
             modbus_tcp_port=self.modbus_tcp_port,
             modbus_device_profile_name=self.modbus_device_profile_name,
+            modbus_fahrenheit_native=self.modbus_fahrenheit_native,
             ms6514_port=self.ms6514_port,
             aillio_model=self.aillio_model,
             tc4_port=self.tc4_port,
@@ -1397,6 +1407,7 @@ class RoastSessionManager:
             modbus_host=row.get("modbus_host"),
             modbus_tcp_port=row.get("modbus_tcp_port"),
             modbus_device_profile_name=row.get("modbus_device_profile_name"),
+            modbus_fahrenheit_native=bool(row.get("modbus_fahrenheit_native")),
             ms6514_port=row.get("ms6514_port"),
             aillio_model=row.get("aillio_model"),
             tc4_port=row.get("tc4_port"),

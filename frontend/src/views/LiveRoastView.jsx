@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { activeRoastStreamUrl, api, settingsStreamUrl } from "../api/client.js";
 import { useRoastStream } from "../api/ws.js";
 import SimulatedDeviceHint from "../components/SimulatedDeviceHint.jsx";
+import SerialPortHints from "../components/SerialPortHints.jsx";
 import { isSimulatedForm, isSimulatedRoast } from "../simulated.js";
 import RoastToolbar from "../components/RoastToolbar.jsx";
 import useAwayAlarm from "../useAwayAlarm.js";
@@ -164,6 +165,11 @@ export default function LiveRoastView() {
     // Any other value is a DeviceProfile id, which takes over instead
     // (see buildConfigFromForm below) and hides the advanced section.
     modbus_device_profile_id: "",
+    // Whether the connected controller's own PID display/registers are
+    // configured in Fahrenheit -- an installer-set option on the
+    // controller itself, independent of which register map/profile is
+    // selected (see backend/app/models.py's RoastCreateRequest.modbus_fahrenheit_native).
+    modbus_fahrenheit_native: false,
     ms6514_port: "",
     // aillio_live only -- a raw USB device, not a port/host, so this is
     // the whole "connection config" (see backend's
@@ -727,6 +733,7 @@ export default function LiveRoastView() {
         payload.modbus_control_baudrate = Number(form.modbus_control_baudrate) || 19200;
       }
       payload.modbus_device_profile_id = form.modbus_device_profile_id || null;
+      payload.modbus_fahrenheit_native = Boolean(form.modbus_fahrenheit_native);
       payload.modbus_bt_slave_id = numOrNull(form.modbus_bt_slave_id);
       payload.modbus_bt_register = numOrNull(form.modbus_bt_register);
       payload.modbus_bt_divisor = numOrNull(form.modbus_bt_divisor);
@@ -973,6 +980,7 @@ export default function LiveRoastView() {
       modbus_host: c.modbus_host || "",
       modbus_tcp_port: c.modbus_tcp_port ?? 502,
       modbus_device_profile_id: c.modbus_device_profile_id || "",
+      modbus_fahrenheit_native: Boolean(c.modbus_fahrenheit_native),
       ms6514_port: c.ms6514_port || "",
       aillio_model: c.aillio_model || "r1",
       tc4_port: c.tc4_port || "",
@@ -1398,6 +1406,7 @@ export default function LiveRoastView() {
                     {portsFor("modbus_live").every((p) => p.simulated) && !serialPortsLoading && (
                       <span className="hint">{t("liveRoast.noSerialPortsDetected")}</span>
                     )}
+                    <SerialPortHints ports={portsFor("modbus_live")} onPick={(device) => setForm({ ...form, modbus_port: device })} />
                     <SimulatedDeviceHint kind="fz94" value={form.modbus_port} onChange={(v) => setForm({ ...form, modbus_port: v })} />
                   </label>
                   <label>
@@ -1451,6 +1460,15 @@ export default function LiveRoastView() {
                   })}
                 </p>
               )}
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={form.modbus_fahrenheit_native}
+                  onChange={(e) => setForm({ ...form, modbus_fahrenheit_native: e.target.checked })}
+                />
+                {t("liveRoast.fahrenheitNative")}
+              </label>
+              <p className="hint">{t("liveRoast.fahrenheitNativeHint")}</p>
               <DeviceProfileEditor onChange={refreshDeviceProfiles} />
               {form.modbus_transport !== "tcp" && !form.modbus_device_profile_id && (
                 <div className="advanced-modbus-fields">
@@ -1757,6 +1775,7 @@ export default function LiveRoastView() {
                     <option key={p.device} value={p.device} label={p.description || undefined} />
                   ))}
                 </datalist>
+                <SerialPortHints ports={portsFor("ms6514_live")} onPick={(device) => setForm({ ...form, ms6514_port: device })} />
                 <SimulatedDeviceHint kind="ms6514" value={form.ms6514_port} onChange={(v) => setForm({ ...form, ms6514_port: v })} />
               </label>
               <p className="hint">{t("liveRoast.ms6514Hint")}</p>
@@ -1791,6 +1810,7 @@ export default function LiveRoastView() {
                     <option key={p.device} value={p.device} label={p.description || undefined} />
                   ))}
                 </datalist>
+                <SerialPortHints ports={portsFor("tc4_live")} onPick={(device) => setForm({ ...form, tc4_port: device })} />
                 <SimulatedDeviceHint kind="tc4" value={form.tc4_port} onChange={(v) => setForm({ ...form, tc4_port: v })} />
               </label>
               <p className="hint">{t("liveRoast.tc4Hint")}</p>
@@ -2068,6 +2088,7 @@ export default function LiveRoastView() {
                           ? `${roast.modbus_host}:${roast.modbus_tcp_port}`
                           : roast.modbus_port}
                         {roast.modbus_device_profile_name ? ` — ${roast.modbus_device_profile_name}` : ""}
+                        {roast.modbus_fahrenheit_native ? ` (${t("liveRoast.fahrenheitNativeShort")})` : ""}
                       </span>
                     </li>
                   )}
