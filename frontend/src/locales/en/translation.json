@@ -843,7 +843,8 @@
     },
     "roastStatsHeading": "Roast Stats",
     "numbersHeading": "Numbers",
-    "eventsHeading": "Events"
+    "eventsHeading": "Events",
+    "resizeChartHandle": "Drag down to make the chart taller"
   },
   "analysis": {
     "hint": "Every finished roast, recorded or uploaded, is one point. Pick what to plot and what to group by. Roasts made on simulated devices, and replays of a saved log (which just repeat its data), are left out unless you ask.",

@@ -76,6 +76,16 @@ function otherFilename(title, createdAt, ext) {
   return `${safeTitle}_${timestamp}${ext.startsWith("_") ? ext : `.${ext}`}`;
 }
 
+// The chart's height, saved per browser (same idea as LiveRoastView's own
+// chart height). Whatever height the page loads with is the minimum for
+// that visit -- the handle under the chart can only make it taller.
+const DETAIL_CHART_HEIGHT_KEY = "roast-telemetry:roastDetailChartHeight";
+const DETAIL_CHART_DEFAULT_HEIGHT = 420;
+function readSavedDetailChartHeight() {
+  const saved = typeof window !== "undefined" && Number(localStorage.getItem(DETAIL_CHART_HEIGHT_KEY));
+  return saved >= 200 ? saved : DETAIL_CHART_DEFAULT_HEIGHT;
+}
+
 export default function RoastDetailView() {
   const { t } = useTranslation();
   const { id } = useParams();
@@ -95,6 +105,29 @@ export default function RoastDetailView() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState(null);
   const chartRef = useRef(null); // gives the PDF button a toImage() of exactly what's on screen
+  const [chartMinHeight] = useState(readSavedDetailChartHeight);
+  const [chartHeight, setChartHeight] = useState(chartMinHeight);
+  const chartDragRef = useRef(null);
+
+  function handleChartResizePointerDown(e) {
+    chartDragRef.current = { startY: e.clientY, startHeight: chartHeight };
+    e.currentTarget.classList.add("dragging");
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handleChartResizePointerMove(e) {
+    if (!chartDragRef.current) return;
+    const { startY, startHeight } = chartDragRef.current;
+    setChartHeight(Math.max(chartMinHeight, startHeight + (e.clientY - startY)));
+  }
+
+  function handleChartResizePointerUp(e) {
+    if (!chartDragRef.current) return;
+    chartDragRef.current = null;
+    e.currentTarget.classList.remove("dragging");
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    localStorage.setItem(DETAIL_CHART_HEIGHT_KEY, String(chartHeight));
+  }
 
   useEffect(() => {
     api
@@ -403,8 +436,16 @@ export default function RoastDetailView() {
           extraUnits={roast.extra_units}
           events={roast.events}
           tempUnit={tempUnit}
+          height={chartHeight}
           onDeleteEvent={handleDeleteMilestone}
           onRetimeEvent={handleRetimeMilestone}
+        />
+        <div
+          className="scope-chart-resize-handle no-print"
+          title={t("roastDetail.resizeChartHandle")}
+          onPointerDown={handleChartResizePointerDown}
+          onPointerMove={handleChartResizePointerMove}
+          onPointerUp={handleChartResizePointerUp}
         />
         {["complete", "stopped", "aborted"].includes(roast.status) && <AddMilestoneControl roast={roast} onAdd={handleAddMilestone} />}
         {milestoneError && <p className="error no-print">{milestoneError}</p>}
