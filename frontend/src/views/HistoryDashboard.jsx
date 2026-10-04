@@ -76,6 +76,7 @@ export default function HistoryDashboard() {
   const [loading, setLoading] = useState(true);
   const [importPath, setImportPath] = useState("");
   const [importError, setImportError] = useState(null);
+  const [importSummary, setImportSummary] = useState(null);
   const [importing, setImporting] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(null); // e.g. "Uploading 2 of 5…"
@@ -315,6 +316,7 @@ export default function HistoryDashboard() {
       return;
     }
     setImportError(null);
+    setImportSummary(null);
     setImporting(true);
     const done = [];
     const failed = [];
@@ -342,9 +344,7 @@ export default function HistoryDashboard() {
       refreshTrends();
     }
     setImportError(failed.length ? failed.join("\n") : null);
-    if (done.length > 1 || (done.length && failed.length)) {
-      notify(t("history.import.importedRoasts", { count: done.length }), { title: t("history.import.importFinishedTitle") });
-    }
+    setImportSummary(done.length > 1 || (done.length && failed.length) ? t("history.import.importedRoasts", { count: done.length }) : null);
   }
 
   async function handleDelete(id, title) {
@@ -505,6 +505,7 @@ export default function HistoryDashboard() {
         </button>
         {importShown && (
           <div className="import-body">
+            {importSummary && <p className="hint import-summary">{importSummary}</p>}
             {importError && <p className="error import-error">{importError}</p>}
             <div className="upload-drop">
               <span>{t("history.import.dropFilesHere", { extensions: IMPORTABLE_EXTENSIONS.join(", ") })}</span>
