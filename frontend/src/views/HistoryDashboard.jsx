@@ -631,7 +631,7 @@ export default function HistoryDashboard() {
           {selectedIds.size > 0 && (
             <div className="table-toolbar selection-bar">
               <span>
-                <strong>{selectedIds.size}</strong> {t("history.selection.selected")}
+                <strong>{t("history.selection.selected", { count: selectedIds.size })}</strong>
                 {offPageSelected > 0 ? t("history.selection.offPage", { count: offPageSelected }) : ""}
               </span>
               {selectedIds.size > maxCompare && <span className="hint">{t("history.selection.compareLimitHint", { max: maxCompare })}</span>}
