@@ -813,6 +813,7 @@ class RoastSession:
             roastdate=self.created_at,
         )
         save_native_alog(self.alog_path, alog_dict)
+        storage.add_known_extra_channels({label for p in self.profile for label in (p.get("extra") or {})})
         self._match_events_to_alog()
         self.duration_s = roast_duration_s(self.profile, self.events)
 
@@ -1433,9 +1434,12 @@ class RoastSessionManager:
                 f"the recording file for this roast is missing from the data folder ({os.path.basename(path)})"
             )
         try:
-            return alog_dict_to_points(load_alog(path))
+            parsed = alog_dict_to_points(load_alog(path))
         except Exception as exc:  # noqa: BLE001 -- any parse failure should read as a message, not a crash
             raise RoastSessionError(f"the recording file for this roast couldn't be read ({exc})") from exc
+        # So Settings > Colors can offer a color for each (see AppSettings.extra_channels).
+        storage.add_known_extra_channels(parsed.get("extra_units") or {})
+        return parsed
 
     def _cold_roast_row_and_parsed(self, roast_id: str) -> tuple[dict, dict]:
         """Loads a roast with no live session purely from storage+.alog --
@@ -1637,6 +1641,22 @@ class RoastSessionManager:
                 storage.update_roast(row["id"], duration_s=new_duration)
         storage.set_schema_version(5)
 
+    def backfill_extra_channels(self) -> None:
+        """One-time: note the extra-channel names of every roast already
+        saved (see storage.add_known_extra_channels), so Settings > Colors
+        lists them without each roast having to be opened first."""
+        if storage.get_schema_version() >= 6:
+            return
+        for row in storage.list_roast_rows(limit=100000):
+            if not row.get("alog_path") or not os.path.exists(row["alog_path"]):
+                continue
+            try:
+                parsed = alog_dict_to_points(load_alog(row["alog_path"]))
+            except Exception:
+                continue
+            storage.add_known_extra_channels(parsed.get("extra_units") or {})
+        storage.set_schema_version(6)
+
     def backfill_beans(self) -> None:
         """One-time: roasts that have a beans name typed on them but no Beans
         record get one (matched by name, ignoring case), so the Beans list
@@ -1715,6 +1735,7 @@ class RoastSessionManager:
         os.makedirs(os.path.dirname(os.path.abspath(dest_path)), exist_ok=True)
         shutil.copyfile(source_path, dest_path)
         parsed = alog_dict_to_points(data)
+        storage.add_known_extra_channels(parsed.get("extra_units") or {})
         duration_s = roast_duration_s(parsed["profile"], parsed["events"])
         bean = storage.ensure_bean(parsed["beans"])
         summary = {

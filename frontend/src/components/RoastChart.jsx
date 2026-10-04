@@ -12,24 +12,13 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import { useTranslation } from "react-i18next";
 import { Line } from "react-chartjs-2";
 import { api } from "../api/client.js";
+import { EXTRA_CHANNEL_COLORS, PHASE_COLORS, eventColor, extraChannelColor, phaseColor } from "../chartColors.js";
 import { formatTime, rorAxisRange, seriesLineWidth, tempAxisMax, tempAxisMin, timeAxisFor } from "../chartDefaults.js";
 import { celsiusToUnit, unitSuffix } from "../tempUnits.js";
 import { TERM_TOOLTIPS } from "../termTooltips.js";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, zoomPlugin);
 
-const EVENT_COLORS = {
-  CHARGE: "#2563eb",
-  TURNING_POINT: "#0891b2",
-  DRY_END: "#ca8a04",
-  FC_START: "#dc2626",
-  FC_END: "#b91c1c",
-  SC_START: "#9333ea",
-  SC_END: "#7e22ce",
-  DROP: "#16a34a",
-  COOL_END: "#334155",
-  CUSTOM: "#64748b",
-};
 
 // Continuous simulator control channels that map onto the same named
 // channels used for manual burner/air/drum/damper events in .alog files.
@@ -51,6 +40,9 @@ const CONTINUOUS_FIELD_BY_CHANNEL = {
 // fixed channel) have no such entry to borrow a color from, so they keep
 // their own SERIES_DEFS default untouched.
 const SERIES_KEY_TO_BREAKOUT_KEY = {
+  Damper: "damper",
+  BG_BT: "bg_bt",
+  BG_ET: "bg_et",
   BT: "bt",
   ET: "et",
   DT: "dt",
@@ -111,14 +103,15 @@ function backgroundSeriesDefs(label) {
 // since which extra channels exist -- if any -- depends entirely on
 // which device profile this roast used), not part of the static
 // SERIES_DEFS list, so they never show up as an empty toggle otherwise.
-const EXTRA_CHANNEL_COLORS = ["#0d9488", "#b45309", "#7c3aed", "#be185d"];
 function extraSeriesDefs(labels, extraUnits = {}) {
   return labels.map((label, i) => {
     const kind = extraUnits[label] || "temp";
     return {
       key: `EXTRA_${label}`,
       label,
+      // The default only; colorFor resolves the saved color (see chartColors.js).
       color: EXTRA_CHANNEL_COLORS[i % EXTRA_CHANNEL_COLORS.length],
+      extraIndex: i,
       // A non-temperature goes in the 0-100 band with Burner/Fan/Drum.
       axis: kind === "temp" ? "yTemp" : "yControl",
       valueSuffix: kind === "temp" ? undefined : kind === "percent" ? "%" : "",
@@ -134,9 +127,9 @@ function extraSeriesDefs(labels, extraUnits = {}) {
 // milestone events. Colors follow the common green/yellow/red convention
 // (drying / Maillard-browning / development).
 const PHASE_DEFS = [
-  { key: "dry", label: "Dry", color: "#6ee7b7", fromType: "CHARGE", toType: "DRY_END" },
-  { key: "maillard", label: "Maillard", color: "#fde68a", fromType: "DRY_END", toType: "FC_START" },
-  { key: "dev", label: "Dev", color: "#fca5a5", fromType: "FC_START", toType: "DROP" },
+  { key: "dry", label: "Dry", color: PHASE_COLORS.dry, fromType: "CHARGE", toType: "DRY_END" },
+  { key: "maillard", label: "Maillard", color: PHASE_COLORS.maillard, fromType: "DRY_END", toType: "FC_START" },
+  { key: "dev", label: "Dev", color: PHASE_COLORS.dev, fromType: "FC_START", toType: "DROP" },
 ];
 
 function computePhases(events) {
@@ -371,7 +364,7 @@ const eventMarkersPlugin = {
     const { ctx } = chart;
     ctx.save();
     layoutCallouts(chart, events, tempUnit, dragPreview).forEach(({ ev, dragging, x, dotY, lines, boxX, boxY, boxWidth, boxHeight }) => {
-      const color = EVENT_COLORS[ev.type] || EVENT_COLORS.CUSTOM;
+      const color = eventColor(opts?.colors, ev.type);
 
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
@@ -545,6 +538,7 @@ const RoastChart = forwardRef(function RoastChart({
   // field on this component.
   const [channelColors, setChannelColors] = useState({});
   function colorFor(seriesDef) {
+    if (seriesDef.source === "extra") return extraChannelColor(channelColors, seriesDef.field, seriesDef.extraIndex);
     const breakoutKey = SERIES_KEY_TO_BREAKOUT_KEY[seriesDef.key];
     return (breakoutKey && channelColors[breakoutKey]) || seriesDef.color;
   }
@@ -900,8 +894,8 @@ const RoastChart = forwardRef(function RoastChart({
             },
           },
         },
-        eventMarkers: { events: hideEventLabels ? [] : events, tempUnit },
-        phaseBands: { phases },
+        eventMarkers: { events: hideEventLabels ? [] : events, tempUnit, colors: channelColors },
+        phaseBands: { phases: phases.map((p) => ({ ...p, color: phaseColor(channelColors, p.key) })) },
         axisUnitLabels: { leftUnit: showTemp ? unitSuffix(tempUnit) : null, rightUnit: showRor ? `${unitSuffix(tempUnit)}/min` : null },
         // Time-axis only (not the temp/RoR/control y-axes) -- this is a
         // time-series chart with three differently-scaled y-axes already
@@ -1000,7 +994,7 @@ const RoastChart = forwardRef(function RoastChart({
         },
       },
     };
-  }, [events, phases, showTemp, showRor, showControl, tempUnit, tempDataMax, timeAxis.min, timeAxis.max, hideEventLabels, interactive, onRetimeEvent, handleDragMove, handleDragEnd, t]
+  }, [events, phases, showTemp, showRor, showControl, tempUnit, tempDataMax, timeAxis.min, timeAxis.max, hideEventLabels, interactive, onRetimeEvent, handleDragMove, handleDragEnd, t, channelColors]
   );
 
   return (

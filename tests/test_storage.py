@@ -34,6 +34,7 @@ def test_settings_roundtrip_including_panel_list(isolated_db):
         "bulk_import_limit": 500,
         "bulk_export_limit": 500,
         "away_alarm_enabled": True,
+        "extra_channels": [],
         "language": "en",
         "control": {},
     }
@@ -91,6 +92,7 @@ def test_get_settings_defaults_on_empty_db(isolated_db):
         "bulk_import_limit": 500,
         "bulk_export_limit": 500,
         "away_alarm_enabled": True,
+        "extra_channels": [],
         "language": "en",
         "control": {},
     }

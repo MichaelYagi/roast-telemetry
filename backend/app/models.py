@@ -644,6 +644,27 @@ BREAKOUT_PANEL_KEYS = {
     "heater", "fan", "drum", "burner_sv", "playback_speed",
 }
 
+# Everything else on the roast chart that has a color, saved in the same
+# AppSettings.breakout_panel_colors map as the readout items above (one
+# place for every color). Fixed keys here; an extra channel -- a roast's
+# own "Drum Heat", "Fan Speed", ... (see Roast.extra_units) -- is
+# "extra:<label>", for any label.
+CHART_COLOR_KEYS = (
+    {"damper", "bg_bt", "bg_et"}  # the Damper line; a background roast's BT/ET
+    | {f"event:{t.value}" for t in RoastEventType}  # milestone markers
+    | {"phase:dry", "phase:maillard", "phase:dev"}  # the phase bands
+)
+EXTRA_COLOR_KEY_PREFIX = "extra:"
+MAX_EXTRA_LABEL_LENGTH = 80
+
+
+def is_color_key(key: str) -> bool:
+    if key in BREAKOUT_PANEL_KEYS or key in CHART_COLOR_KEYS:
+        return True
+    label = key[len(EXTRA_COLOR_KEY_PREFIX):] if key.startswith(EXTRA_COLOR_KEY_PREFIX) else ""
+    return 0 < len(label) <= MAX_EXTRA_LABEL_LENGTH
+
+
 # Valid keys for AppSettings.chart_series_visible -- the live chart's own
 # legend checkboxes (frontend/src/components/RoastChart.jsx's SERIES_DEFS).
 # Only the static, always-present curves -- background-roast overlay
@@ -721,7 +742,15 @@ class AppSettings(BaseModel):
     # are a property of the item -- e.g. "bt" is the same blue everywhere
     # it's shown -- not something that should drift between two panels
     # showing the same value).
+    # The same map also holds every other color on the roast chart (see
+    # CHART_COLOR_KEYS/is_color_key): "damper", "bg_bt"/"bg_et", milestone
+    # markers ("event:FC_START"), phase bands ("phase:dry") and extra
+    # channels by name ("extra:Drum Heat").
     breakout_panel_colors: dict[str, str] = {}
+    # Read-only: the names of every extra channel seen in any roast so far
+    # (an imported log's "Drum Heat", a device profile's extra probe), so
+    # Settings > Colors can offer a color for each. Ignored on save.
+    extra_channels: list[str] = []
     # Independent from broken_out_panels above -- same BREAKOUT_PANEL_ITEMS
     # registry and the same breakout_panel_colors, but its own ordered
     # enabled list, rendered as a compact scaled column beside the chart at

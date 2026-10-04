@@ -4661,3 +4661,10 @@ button.link-neutral {
   align-items: center;
   gap: 0.3rem;
 }
+
+/* Settings > Colors: a heading above each further group of colors (other
+   chart lines, extra channels, milestone markers, phase bands). */
+.colors-group-heading {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.95rem;
+}

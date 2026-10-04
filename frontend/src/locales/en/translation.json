@@ -48,7 +48,12 @@
     },
     "colors": {
       "heading": "Colors",
-      "hint": "Pick each channel's color once here -- it applies everywhere that channel shows up: the roast chart's line, the Big Readout Panel, and the Small Readout Panel."
+      "hint": "Pick each color once here -- it applies everywhere that channel shows up: the roast chart's line, the Big Readout Panel, and the Small Readout Panel. Further down: the chart's other lines, every extra channel your roasts have, the milestone markers and the phase bands.",
+      "otherLines": "Other chart lines",
+      "extraChannels": "Extra channels",
+      "extraChannelsHint": "Channels that come with a roast -- an imported log's extra devices, or a device profile's extra probes. One with the same name as a channel above (SV, DT) follows that channel's color unless you pick its own here.",
+      "milestones": "Milestone markers",
+      "phases": "Phase bands"
     },
     "bigReadoutPanel": {
       "heading": "Big Readout Panel",

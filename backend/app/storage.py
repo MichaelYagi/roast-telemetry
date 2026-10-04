@@ -244,6 +244,8 @@ def set_schema_version(version: int) -> None:
 
 
 def init_db() -> None:
+    global _known_extra_channels
+    _known_extra_channels = None  # a different database may be behind _conn() now
     with _conn() as c:
         c.executescript(_SCHEMA)
         # Idempotent migrations for DBs created before these columns
@@ -898,7 +900,49 @@ def get_settings() -> dict:
         "away_alarm_enabled": away_alarm_enabled,
         "language": values.get("language") or "en",
         "control": control,
+        "extra_channels": _decode_extra_channels(values.get(_KNOWN_EXTRA_CHANNELS_KEY)),
     }
+
+
+# The names of every extra channel seen in any roast (see
+# AppSettings.extra_channels) -- one row in the settings table, not part of
+# what a settings save writes, so saving settings never clears it.
+_KNOWN_EXTRA_CHANNELS_KEY = "known_extra_channels"
+_known_extra_channels: Optional[set[str]] = None  # this process's copy, so a roast read doesn't hit the DB
+
+
+def _decode_extra_channels(raw) -> list[str]:
+    try:
+        names = json.loads(raw) if raw else []
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return [n for n in names if isinstance(n, str)] if isinstance(names, list) else []
+
+
+def get_known_extra_channels() -> list[str]:
+    global _known_extra_channels
+    if _known_extra_channels is None:
+        with _conn() as c:
+            row = c.execute("SELECT value FROM settings WHERE key = ?", (_KNOWN_EXTRA_CHANNELS_KEY,)).fetchone()
+        _known_extra_channels = set(_decode_extra_channels(row["value"] if row else None))
+    return sorted(_known_extra_channels)
+
+
+def add_known_extra_channels(labels) -> None:
+    """Remembers any extra-channel names not seen before. Called whenever a
+    roast's recording is read or saved; a no-op (no DB write) once a name
+    is known, which is nearly every call."""
+    global _known_extra_channels
+    known = set(get_known_extra_channels())
+    new = {str(label) for label in labels if label} - known
+    if not new:
+        return
+    _known_extra_channels = known | new
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO settings (key, value) VALUES (:key, :value) ON CONFLICT(key) DO UPDATE SET value = :value",
+            {"key": _KNOWN_EXTRA_CHANNELS_KEY, "value": json.dumps(sorted(_known_extra_channels))},
+        )
 
 
 def set_settings(**kv) -> None:

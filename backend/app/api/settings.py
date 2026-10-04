@@ -8,7 +8,7 @@ from fastapi import APIRouter, Request
 from sse_starlette.sse import EventSourceResponse
 
 from .. import auth, ollama_client, storage
-from ..models import BREAKOUT_PANEL_KEYS, CHART_SERIES_KEYS, VERTICAL_CONTROL_KEYS, AppSettings, OllamaStatus
+from ..models import BREAKOUT_PANEL_KEYS, CHART_SERIES_KEYS, VERTICAL_CONTROL_KEYS, AppSettings, OllamaStatus, is_color_key
 from ..ws_manager import settings_pubsub
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -26,7 +26,7 @@ def _filter_panels(keys: list[str]) -> list[str]:
 
 
 def _filter_colors(colors: dict[str, str]) -> dict[str, str]:
-    return {k: v for k, v in colors.items() if k in BREAKOUT_PANEL_KEYS and _HEX_COLOR_RE.match(v)}
+    return {k: v for k, v in colors.items() if is_color_key(k) and _HEX_COLOR_RE.match(v)}
 
 
 def _filter_vertical_layout(groups: list[list[str]]) -> list[list[str]]:
@@ -181,6 +181,7 @@ async def update_settings(settings: AppSettings, http_request: Request) -> AppSe
         away_alarm_enabled=settings.away_alarm_enabled,
         language=language,
         control=control,
+        extra_channels=storage.get_known_extra_channels(),
     )
     await settings_pubsub.publish(result.model_dump_json())
     return result

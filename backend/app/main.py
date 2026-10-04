@@ -79,6 +79,7 @@ async def lifespan(app: FastAPI):
     session_manager.backfill_beans()
     session_manager.clean_bean_records()
     session_manager.resync_durations()
+    session_manager.backfill_extra_channels()
     storage.seed_default_presets([
         {
             "id": p["id"],

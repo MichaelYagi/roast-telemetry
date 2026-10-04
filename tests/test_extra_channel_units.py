@@ -71,3 +71,40 @@ def test_editing_an_imported_log_keeps_all_its_extra_channels(client, tmp_path):
     assert after["profile"][2]["extra"].keys() == before["profile"][2]["extra"].keys()
     for label, value in before["profile"][2]["extra"].items():
         assert round(after["profile"][2]["extra"][label], 6) == round(value, 6), label
+
+
+# -- every chart color is saved in one place --------------------------------
+
+
+def _save_colors(client, colors: dict) -> dict:
+    settings = client.get("/api/v1/settings").json()
+    return client.put("/api/v1/settings", json={**settings, "breakout_panel_colors": colors}).json()
+
+
+def test_settings_keep_a_color_for_every_part_of_the_chart(client):
+    wanted = {
+        "bt": "#112233",                 # a readout item, as before
+        "damper": "#223344",             # the Damper line
+        "bg_bt": "#334455",              # a background roast's BT
+        "event:FC_START": "#445566",     # a milestone marker
+        "phase:maillard": "#556677",     # a phase band
+        "extra:Drum Heat": "#667788",    # an extra channel, by name
+    }
+    saved = _save_colors(client, {**wanted, "nonsense": "#000000", "event:NOPE": "#000000", "extra:": "#000000",
+                                  "phase:dry": "red"})
+
+    assert saved["breakout_panel_colors"] == wanted
+    assert client.get("/api/v1/settings").json()["breakout_panel_colors"] == wanted
+
+
+def test_settings_list_every_extra_channel_seen(client, tmp_path):
+    assert client.get("/api/v1/settings").json()["extra_channels"] == []
+
+    _import_fahrenheit_log(client, tmp_path)
+
+    names = ["Drum Heat", "Drum Speed", "Fan Speed", "SV"]
+    assert client.get("/api/v1/settings").json()["extra_channels"] == names
+    # Saving settings neither clears the list nor lets a client overwrite it.
+    saved = client.put("/api/v1/settings", json={**client.get("/api/v1/settings").json(), "extra_channels": ["x"]}).json()
+    assert saved["extra_channels"] == names
+    assert client.get("/api/v1/settings").json()["extra_channels"] == names

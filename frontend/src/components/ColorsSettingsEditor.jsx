@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BREAKOUT_PANEL_ITEMS } from "../breakoutPanels.js";
+import { EVENT_ITEMS, OTHER_LINE_ITEMS, PHASE_ITEMS, extraChannelDefaultColor } from "../chartColors.js";
 
 // The web's own preset swatches -- same list BreakoutSettingsEditor used
 // to carry before color-picking moved out of it and into this dedicated
@@ -14,12 +15,13 @@ const PRESET_COLORS = [
   "#a855f7", "#d946ef", "#ec4899", "#64748b",
 ];
 
-// Every colorable channel/stat, regardless of whether it's currently
-// enabled in the Big or Small Readout Panel (or on the chart, for the
-// subset that's a real series) -- color is independent of visibility now,
-// so this always lists the full BREAKOUT_PANEL_ITEMS registry, not just
-// whatever's currently toggled on somewhere.
-export default function ColorsSettingsEditor({ colors, setColors }) {
+// Every color there is, in one place: each channel/stat (regardless of
+// whether it's currently enabled in the Big or Small Readout Panel, or on
+// the chart -- color is independent of visibility), then everything else
+// the roast chart draws -- its other lines, every extra channel any roast
+// has (`extraChannels`, from the server's settings.extra_channels), the
+// milestone markers and the phase bands. See chartColors.js.
+export default function ColorsSettingsEditor({ colors, setColors, extraChannels = [] }) {
   const { t } = useTranslation();
   const [paletteOpenFor, setPaletteOpenFor] = useState(null);
   const paletteRef = useRef(null);
@@ -53,9 +55,34 @@ export default function ColorsSettingsEditor({ colors, setColors }) {
     });
   }
 
+  const groups = [
+    { heading: null, items: BREAKOUT_PANEL_ITEMS },
+    { heading: t("settings.colors.otherLines"), items: OTHER_LINE_ITEMS },
+    {
+      heading: t("settings.colors.extraChannels"),
+      hint: t("settings.colors.extraChannelsHint"),
+      items: extraChannels.map((label, i) => ({ key: `extra:${label}`, label, color: extraChannelDefaultColor(colors, label, i) })),
+    },
+    { heading: t("settings.colors.milestones"), items: EVENT_ITEMS },
+    { heading: t("settings.colors.phases"), items: PHASE_ITEMS },
+  ].filter((g) => g.items.length);
+
   return (
+    <>
+      {groups.map((group) => (
+        <div key={group.heading || "channels"}>
+          {group.heading && <h3 className="colors-group-heading">{group.heading}</h3>}
+          {group.hint && <p className="hint">{group.hint}</p>}
+          {renderList(group.items)}
+        </div>
+      ))}
+    </>
+  );
+
+  function renderList(items) {
+    return (
     <ul className="breakout-order-list">
-      {BREAKOUT_PANEL_ITEMS.map((item) => {
+      {items.map((item) => {
         const key = item.key;
         const color = colors[key] || item.color;
         const isCustom = Boolean(colors[key]);
@@ -114,5 +141,6 @@ export default function ColorsSettingsEditor({ colors, setColors }) {
         );
       })}
     </ul>
-  );
+    );
+  }
 }

@@ -19,6 +19,8 @@ export default function SettingsView() {
   // chart itself, in RoastChart.jsx's own settings fetch). Only holds
   // items overridden from their built-in default.
   const [panelColors, setPanelColors] = useState({});
+  // Read-only: every extra channel any roast has, for the Colors section.
+  const [extraChannels, setExtraChannels] = useState([]);
   // Independent from the Big Readout Panel above -- its own ordered
   // enabled list, rendered beside the chart at any width (not gated to
   // the Big Readout Panel's >=1400px split-layout threshold). Both
@@ -50,6 +52,7 @@ export default function SettingsView() {
       setModel(s.ollama_model || "");
       setBrokenOutPanels(s.broken_out_panels || []);
       setPanelColors(s.breakout_panel_colors || {});
+      setExtraChannels(s.extra_channels || []);
       setSmallReadoutPanels(s.small_readout_panels || []);
       setTemperatureUnit(s.temperature_unit || "c");
       setVerticalControlLayout(s.vertical_control_layout || []);
@@ -221,7 +224,7 @@ export default function SettingsView() {
       <div className="panel">
         <h2>{t("settings.colors.heading")}</h2>
         <p className="hint">{t("settings.colors.hint")}</p>
-        <ColorsSettingsEditor colors={panelColors} setColors={setPanelColors} />
+        <ColorsSettingsEditor colors={panelColors} setColors={setPanelColors} extraChannels={extraChannels} />
       </div>
 
       <div className="panel">

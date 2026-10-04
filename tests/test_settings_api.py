@@ -103,6 +103,7 @@ def test_get_settings_defaults(client):
         "bulk_import_limit": 500,
         "bulk_export_limit": 500,
         "away_alarm_enabled": True,
+        "extra_channels": [],
         "language": "en",
         "control": {
             "heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0,
