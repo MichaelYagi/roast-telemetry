@@ -89,6 +89,7 @@ export default function HistoryDashboard() {
   // `dragging` from plain dragover/dragleave handlers can't tell.
   const dragDepth = useRef(0);
   const fileInputRef = useRef(null);
+  const folderInputRef = useRef(null);
   // The ticked roasts. A comparison in the address (?compare=id,id,...) starts them
   // off ticked, so a reload or a shared link brings the same comparison back.
   const [selectedIds, setSelectedIds] = useState(
@@ -307,6 +308,12 @@ export default function HistoryDashboard() {
       setImportError(skipped ? t("history.import.unsupportedFormat", { extensions: IMPORTABLE_EXTENSIONS.join(", ") }) : null);
       return;
     }
+    const settings = await api.getSettings().catch(() => null);
+    const maxFiles = settings?.bulk_import_limit || 500;
+    if (files.length > maxFiles) {
+      setImportError(t("history.import.tooManyFiles", { count: files.length, max: maxFiles }));
+      return;
+    }
     setImportError(null);
     setImporting(true);
     const done = [];
@@ -317,7 +324,8 @@ export default function HistoryDashboard() {
         try {
           done.push(await api.uploadAlog(files[i]));
         } catch (err) {
-          failed.push(`${files[i].name}: ${err.message}`);
+          // 409 = this exact file was already imported; skipped, not a failure.
+          failed.push(err.status === 409 ? t("history.import.alreadyImported", { name: files[i].name }) : `${files[i].name}: ${err.message}`);
         }
       }
     } finally {
@@ -513,6 +521,21 @@ export default function HistoryDashboard() {
               />
               <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing}>
                 {t("history.import.chooseFiles")}
+              </button>
+              <input
+                ref={folderInputRef}
+                type="file"
+                webkitdirectory=""
+                directory=""
+                multiple
+                hidden
+                onChange={(e) => {
+                  handleUploadFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <button type="button" onClick={() => folderInputRef.current?.click()} disabled={importing}>
+                {t("history.import.chooseFolder")}
               </button>
               {uploadStatus && <span className="hint">{uploadStatus}</span>}
             </div>

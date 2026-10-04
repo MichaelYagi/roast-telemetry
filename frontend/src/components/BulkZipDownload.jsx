@@ -11,7 +11,6 @@ import { buildRoastPdfBlob, pdfFilename } from "../lib/roastPdf.js";
 // per roast), so the PDF checkbox is refused rather than silently only
 // PDF-ing the first N -- a zip that quietly doesn't match "every filtered
 // roast" is worse than an error asking to narrow the filters.
-const MAX_PDF_ROASTS = 150;
 
 // "Download all (.zip)" plus a small, closed-by-default set of checkboxes for
 // which extra per-roast formats to include besides .alog (always in the zip).
@@ -48,8 +47,10 @@ export default function BulkZipDownload({ params, tempUnit = "c" }) {
         setError(t("common.bulkZipDownload.noRoastsMatch"));
         return;
       }
-      if (rows.length > MAX_PDF_ROASTS) {
-        setError(t("common.bulkZipDownload.tooManyForPdf", { count: rows.length, max: MAX_PDF_ROASTS }));
+      const settings = await api.getSettings().catch(() => null);
+      const maxPdfRoasts = settings?.bulk_export_limit || 500;
+      if (rows.length > maxPdfRoasts) {
+        setError(t("common.bulkZipDownload.tooManyForPdf", { count: rows.length, max: maxPdfRoasts }));
         return;
       }
 
@@ -61,10 +62,7 @@ export default function BulkZipDownload({ params, tempUnit = "c" }) {
       const metricsMeta = await api.getAnalysisMetrics().catch(() => []);
       // Settings > Colors -- so a bulk-exported report's BT/ET curve colors
       // match what's actually shown on screen (RoastChart.jsx) instead of
-      // renderChartImage's own hardcoded defaults. Fetched here, not on
-      // mount, since this whole PDF path only runs when the user actually
-      // asks for it.
-      const settings = await api.getSettings().catch(() => null);
+      // renderChartImage's own hardcoded defaults.
       const colors = settings?.breakout_panel_colors || {};
       const used = new Set();
       for (let i = 0; i < rows.length; i++) {

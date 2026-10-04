@@ -100,6 +100,8 @@ def test_get_settings_defaults(client):
         "chart_series_visible": {},
         "history_page_size": 100,
         "max_compare": 20,
+        "bulk_import_limit": 500,
+        "bulk_export_limit": 500,
         "away_alarm_enabled": True,
         "language": "en",
         "control": {

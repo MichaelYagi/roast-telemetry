@@ -316,6 +316,13 @@ def init_db() -> None:
         # every already-finished historical roast as having ended early;
         # only a roast that finishes *after* this column exists gets an
         # explicit 0/1 from _finish().
+        # SHA-256 of the raw file an import came from -- lets a repeat import
+        # of the same file be refused instead of silently duplicating it.
+        # NULL for roasts imported before this existed (no source file to
+        # hash), and for anything not imported from a file at all.
+        if "source_sha256" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN source_sha256 TEXT")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_roasts_source_sha256 ON roasts(source_sha256)")
         if "had_emergency_stop" not in existing_cols:
             c.execute("ALTER TABLE roasts ADD COLUMN had_emergency_stop INTEGER NOT NULL DEFAULT 0")
         if "reached_drop" not in existing_cols:
@@ -386,6 +393,12 @@ def insert_roast(summary: dict) -> None:
                 "bean_id": None, "notes_text": None, **summary,
             },
         )
+
+
+def find_roast_by_source_sha256(digest: str) -> Optional[dict]:
+    with _conn() as c:
+        row = c.execute("SELECT id, title FROM roasts WHERE source_sha256 = ? LIMIT 1", (digest,)).fetchone()
+        return dict(row) if row else None
 
 
 def update_roast(roast_id: str, **fields) -> None:
@@ -844,6 +857,14 @@ def get_settings() -> dict:
     except (TypeError, ValueError):
         history_page_size = 100
     try:
+        bulk_import_limit = int(values["bulk_import_limit"]) if values.get("bulk_import_limit") else 500
+    except (TypeError, ValueError):
+        bulk_import_limit = 500
+    try:
+        bulk_export_limit = int(values["bulk_export_limit"]) if values.get("bulk_export_limit") else 500
+    except (TypeError, ValueError):
+        bulk_export_limit = 500
+    try:
         max_compare = int(values["max_compare"]) if values.get("max_compare") else 20
     except (TypeError, ValueError):
         max_compare = 20
@@ -872,6 +893,8 @@ def get_settings() -> dict:
         "chart_series_visible": chart_series_visible,
         "history_page_size": history_page_size,
         "max_compare": max_compare,
+        "bulk_import_limit": bulk_import_limit,
+        "bulk_export_limit": bulk_export_limit,
         "away_alarm_enabled": away_alarm_enabled,
         "language": values.get("language") or "en",
         "control": control,

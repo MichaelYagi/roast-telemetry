@@ -65,7 +65,9 @@
     "history": {
       "heading": "履歴",
       "resultsPerPage": "1ページあたりの件数",
-      "maxCompare": "一度に比較できる最大ロースト数"
+      "maxCompare": "一度に比較できる最大ロースト数",
+      "bulkImportLimit": "フォルダ/複数ファイル取り込みの最大ファイル数",
+      "bulkExportLimit": "一括PDF書き出しの最大ロースト数"
     },
     "aiRoastReview": {
       "heading": "AIロースト評価 (Ollama)",
@@ -687,7 +689,10 @@
       "unsupportedFormat": "インポートできるのは {{extensions}} ファイルのみです。",
       "skippedFiles_other": "{{count}}件のファイルはサポートされていない形式のためスキップされました。",
       "importedRoasts_other": "{{count}}件のローストをインポートしました。",
-      "importFinishedTitle": "インポート完了"
+      "importFinishedTitle": "インポート完了",
+      "chooseFolder": "フォルダを選択…",
+      "tooManyFiles": "このフォルダには取り込める ファイルが {{count}} 件あります。1回の取り込みの上限は {{max}} 件です。設定で上限を上げるか、小さいフォルダを選んでください。",
+      "alreadyImported": "{{name}}: 取り込み済みのためスキップしました"
     },
     "filters": {
       "search": "検索",

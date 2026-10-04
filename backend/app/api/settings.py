@@ -72,6 +72,10 @@ def _clamp_max_compare(n: int) -> int:
     return max(3, min(100000, n))
 
 
+def _clamp_bulk_limit(n: int) -> int:
+    return max(1, min(5000, n))
+
+
 @router.get("/stream")
 async def stream_settings() -> EventSourceResponse:
     """Pushes the current settings immediately, then again on every save
@@ -117,6 +121,8 @@ async def update_settings(settings: AppSettings, http_request: Request) -> AppSe
     series_visible = _filter_series_visible(settings.chart_series_visible)
     history_page_size = _clamp_history_page_size(settings.history_page_size)
     max_compare = _clamp_max_compare(settings.max_compare)
+    bulk_import_limit = _clamp_bulk_limit(settings.bulk_import_limit)
+    bulk_export_limit = _clamp_bulk_limit(settings.bulk_export_limit)
     # A client that never sends `control` (an older cached page) must not
     # reset the saved safety limits back to the defaults.
     was_safety_disabled = AppSettings(**storage.get_settings()).control.safety_disabled
@@ -136,6 +142,8 @@ async def update_settings(settings: AppSettings, http_request: Request) -> AppSe
         chart_series_visible=series_visible,
         history_page_size=history_page_size,
         max_compare=max_compare,
+        bulk_import_limit=bulk_import_limit,
+        bulk_export_limit=bulk_export_limit,
         away_alarm_enabled=settings.away_alarm_enabled,
         language=language,
         control=control.model_dump(),
@@ -168,6 +176,8 @@ async def update_settings(settings: AppSettings, http_request: Request) -> AppSe
         chart_series_visible=series_visible,
         history_page_size=history_page_size,
         max_compare=max_compare,
+        bulk_import_limit=bulk_import_limit,
+        bulk_export_limit=bulk_export_limit,
         away_alarm_enabled=settings.away_alarm_enabled,
         language=language,
         control=control,

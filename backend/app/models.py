@@ -759,6 +759,12 @@ class AppSettings(BaseModel):
     # api/settings.py's update_settings -- 500 matches GET /roasts'
     # own existing `limit` query param cap.
     history_page_size: int = 100
+    # Caps on a single bulk action: how many files one folder/multi-file
+    # import may send (History's import box), and how many roasts one bulk
+    # PDF export may build (Analysis/History's Download all). Clamped
+    # server-side in api/settings.py's update_settings, same as the page size.
+    bulk_import_limit: int = 500
+    bulk_export_limit: int = 500
     # How many ticked roasts HistoryDashboard.jsx's Compare button will
     # actually open at once (the rest are left out, see LeftOut). Clamped
     # server-side in api/settings.py's update_settings to 3-100000 -- under

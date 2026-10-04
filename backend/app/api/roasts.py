@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import hashlib
 import io
 import json
 import os
@@ -1093,10 +1094,19 @@ async def import_alog_upload(
     data = b"".join(chunks)
     if not data.strip():
         raise HTTPException(status_code=400, detail=f"{label} is empty.")
-    return await run_in_threadpool(
+    digest = hashlib.sha256(data).hexdigest()
+    existing = storage.find_roast_by_source_sha256(digest)
+    if existing is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f'{label} was already imported as "{existing["title"]}" -- not imported again.',
+        )
+    summary = await run_in_threadpool(
         _import_uploaded_bytes, data, filename=filename, title=title,
         created_by_username=request.state.user["username"], platform=auth.client_platform(request),
     )
+    storage.update_roast(summary.id, source_sha256=digest)
+    return summary
 
 
 @router.websocket("/{roast_id}/stream")

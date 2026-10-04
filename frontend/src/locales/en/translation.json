@@ -65,7 +65,9 @@
     "history": {
       "heading": "History",
       "resultsPerPage": "Results per page",
-      "maxCompare": "Max roasts to compare at once"
+      "maxCompare": "Max roasts to compare at once",
+      "bulkImportLimit": "Max files per folder/multi-file import",
+      "bulkExportLimit": "Max roasts per bulk PDF export"
     },
     "aiRoastReview": {
       "heading": "AI Roast Review (Ollama)",
@@ -591,7 +593,7 @@
       "chooseFormats": "Choose extra formats to include",
       "findingRoasts": "Finding matching roasts…",
       "noRoastsMatch": "No roasts match those filters.",
-      "tooManyForPdf": "{{count}} roasts match -- PDF export in the zip is limited to {{max}} at once. Narrow the filters, or uncheck PDF.",
+      "tooManyForPdf": "{{count}} roasts match -- PDF export in the zip is limited to {{max}} at once. Narrow the filters, uncheck PDF, or raise the limit in Settings.",
       "fetchingZip": "Fetching the .alog/other-format zip…",
       "buildingPdf": "Building PDF {{current}} of {{total}}…",
       "zipping": "Zipping…",
@@ -697,7 +699,10 @@
       "skippedFiles_other": "{{count}} files were not a supported format and was skipped.",
       "importedRoasts_one": "Imported {{count}} roast.",
       "importedRoasts_other": "Imported {{count}} roasts.",
-      "importFinishedTitle": "Import finished"
+      "importFinishedTitle": "Import finished",
+      "chooseFolder": "Choose folder…",
+      "tooManyFiles": "That folder has {{count}} importable files — the limit is {{max}} per import. Raise it in Settings, or pick a smaller folder.",
+      "alreadyImported": "{{name}}: already imported, skipped"
     },
     "filters": {
       "search": "Search",

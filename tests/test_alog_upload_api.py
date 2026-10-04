@@ -46,10 +46,20 @@ def test_the_upload_is_recorded_against_the_signed_in_user(client):
     assert resp.json().get("created_by_username")
 
 
-def test_the_same_file_can_be_uploaded_twice_as_two_roasts(client):
-    a = _upload(client, _alog_bytes(), filename="roast.alog").json()["id"]
-    b = _upload(client, _alog_bytes(), filename="roast.alog").json()["id"]
-    assert a != b and len(client.get("/api/v1/roasts").json()) == 2
+def test_the_same_file_uploaded_twice_is_refused_the_second_time(client):
+    data = _alog_bytes()  # one fixed byte string -- _alog_bytes() itself isn't deterministic
+    _upload(client, data, filename="roast.alog")
+    resp = _upload(client, data, filename="roast.alog")
+    assert resp.status_code == 409
+    assert '"Uploaded roast" -- not imported again' in resp.json()["detail"]
+    assert len(client.get("/api/v1/roasts").json()) == 1
+
+
+def test_a_different_file_with_the_same_title_is_still_imported(client):
+    _upload(client, _alog_bytes(n=40), filename="roast.alog")
+    resp = _upload(client, _alog_bytes(n=41), filename="roast.alog")
+    assert resp.status_code == 201
+    assert len(client.get("/api/v1/roasts").json()) == 2
 
 
 @pytest.mark.parametrize("data", [b"", b"   \n  "], ids=["empty", "blank"])
@@ -141,3 +151,13 @@ def test_uploaded_roasts_notes_are_immediately_searchable(client):
 
     ids = [r["id"] for r in client.get("/api/v1/roasts", params={"q": "first crack sounded"}).json()]
     assert resp.json()["id"] in ids
+
+
+def test_the_bulk_limits_default_to_500_and_clamp_to_a_sane_range(client):
+    assert client.get("/api/v1/settings").json()["bulk_import_limit"] == 500
+    assert client.get("/api/v1/settings").json()["bulk_export_limit"] == 500
+    current = client.get("/api/v1/settings").json()
+    current.update(bulk_import_limit=0, bulk_export_limit=999999)
+    saved = client.put("/api/v1/settings", json=current).json()
+    assert saved["bulk_import_limit"] == 1
+    assert saved["bulk_export_limit"] == 5000

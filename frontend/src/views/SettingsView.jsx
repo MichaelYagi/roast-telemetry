@@ -31,6 +31,8 @@ export default function SettingsView() {
   const [verticalControlArrows, setVerticalControlArrows] = useState({});
   const [historyPageSize, setHistoryPageSize] = useState(100);
   const [maxCompare, setMaxCompare] = useState(20);
+  const [bulkImportLimit, setBulkImportLimit] = useState(500);
+  const [bulkExportLimit, setBulkExportLimit] = useState(500);
   const [awayAlarmEnabled, setAwayAlarmEnabled] = useState(true);
   const [language, setLanguage] = useState("en");
   const [control, setControl] = useState({
@@ -53,6 +55,8 @@ export default function SettingsView() {
       setVerticalControlLayout(s.vertical_control_layout || []);
       setVerticalControlArrows(s.vertical_control_arrows || {});
       setHistoryPageSize(s.history_page_size || 100);
+      setBulkImportLimit(s.bulk_import_limit || 500);
+      setBulkExportLimit(s.bulk_export_limit || 500);
       setMaxCompare(s.max_compare || 20);
       // Not `?? true`/`|| true` -- those would force it back on whenever
       // the saved value is false, since false is falsy too.
@@ -97,6 +101,8 @@ export default function SettingsView() {
         vertical_control_arrows: verticalControlArrows,
         history_page_size: historyPageSize,
         max_compare: maxCompare,
+        bulk_import_limit: bulkImportLimit,
+        bulk_export_limit: bulkExportLimit,
         away_alarm_enabled: awayAlarmEnabled,
         language,
         control,
@@ -266,6 +272,26 @@ export default function SettingsView() {
               max="100000"
               value={maxCompare}
               onChange={(e) => setMaxCompare(Number(e.target.value) || 20)}
+            />
+          </label>
+          <label>
+            {t("settings.history.bulkImportLimit")}
+            <input
+              type="number"
+              min="1"
+              max="5000"
+              value={bulkImportLimit}
+              onChange={(e) => setBulkImportLimit(Number(e.target.value) || 500)}
+            />
+          </label>
+          <label>
+            {t("settings.history.bulkExportLimit")}
+            <input
+              type="number"
+              min="1"
+              max="5000"
+              value={bulkExportLimit}
+              onChange={(e) => setBulkExportLimit(Number(e.target.value) || 500)}
             />
           </label>
         </div>
