@@ -1981,6 +1981,7 @@ export default function LiveRoastView() {
               <div className="scope-chart" ref={scopeChartRef}>
                 <RoastChart
                   profile={roast?.profile || []}
+                  extraUnits={roast?.extra_units}
                   events={roast?.events || []}
                   background={backgroundProfile}
                   backgroundLabel={backgroundLabel}

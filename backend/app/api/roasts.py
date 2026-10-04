@@ -103,7 +103,9 @@ def roast_to_csv(roast: Roast, temperature_unit: str = "c") -> str:
     Column headers say which unit (bt_c/bt_f, ...) rather than leaving it
     ambiguous -- this format has no separate metadata line to carry a
     Unit tag the way roastlog.csv does. heater_pct/fan_pct/drum_speed_pct
-    are percentages, never converted, regardless of temperature_unit."""
+    are percentages, never converted, regardless of temperature_unit --
+    and so is an extra channel that isn't a temperature (extra_<label>_pct,
+    or plain extra_<label> when its unit is unknown)."""
     to_native = (lambda c: c) if temperature_unit != "f" else _c_to_f
     to_rate = (lambda c: c) if temperature_unit != "f" else (lambda c: None if c is None else c * 9.0 / 5.0)
     suffix = "f" if temperature_unit == "f" else "c"
@@ -112,6 +114,14 @@ def roast_to_csv(roast: Roast, temperature_unit: str = "c") -> str:
         for label in p.extra or {}:
             if label not in extra_labels:
                 extra_labels.append(label)
+
+    # Only a temperature channel is converted and named _c/_f; an imported
+    # log's "Fan Speed" is a percentage (see Roast.extra_units).
+    def is_temp(label: str) -> bool:
+        return roast.extra_units.get(label, "temp") == "temp"
+
+    def extra_suffix(label: str) -> str:
+        return f"_{suffix}" if is_temp(label) else ("_pct" if roast.extra_units.get(label) == "percent" else "")
 
     sample_times = [p.time_s for p in roast.profile]
     events_by_time: dict[float, list[str]] = {}
@@ -128,7 +138,7 @@ def roast_to_csv(roast: Roast, temperature_unit: str = "c") -> str:
             "time_s", "event", f"bt_{suffix}", f"et_{suffix}", f"dt_{suffix}", f"ror_bt_{suffix}", f"ror_et_{suffix}",
             "heater_pct", "fan_pct", "drum_speed_pct", f"burner_sv_{suffix}",
         ]
-        + [f"extra_{label}_{suffix}" for label in extra_labels]
+        + [f"extra_{label}{extra_suffix(label)}" for label in extra_labels]
     )
     for p in roast.profile:
         writer.writerow(
@@ -143,7 +153,10 @@ def roast_to_csv(roast: Roast, temperature_unit: str = "c") -> str:
                 p.heater_pct, p.fan_pct, p.drum_speed_pct,
                 to_native(p.burner_sv_c) if p.burner_sv_c is not None else None,
             ]
-            + [(to_native(p.extra.get(label)) if p.extra.get(label) is not None else None) for label in extra_labels]
+            + [
+                (to_native(p.extra[label]) if is_temp(label) else p.extra[label]) if p.extra.get(label) is not None else None
+                for label in extra_labels
+            ]
         )
     return buffer.getvalue()
 

@@ -400,6 +400,7 @@ export default function RoastDetailView() {
         <RoastChart
           ref={chartRef}
           profile={roast.profile}
+          extraUnits={roast.extra_units}
           events={roast.events}
           tempUnit={tempUnit}
           onDeleteEvent={handleDeleteMilestone}

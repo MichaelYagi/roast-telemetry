@@ -5,7 +5,9 @@ import uuid
 from enum import Enum
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from alog_playback.alog_io import extra_channel_kind
 
 
 class RoastMode(str, Enum):
@@ -574,8 +576,24 @@ class RoastSummary(BaseModel):
 
 class Roast(RoastSummary):
     profile: list[RoastProfilePoint] = []
+    extra_units: dict[str, str] = Field(
+        default={},
+        description="What each extra channel in `profile[].extra` measures, by label: 'temp' (Celsius -- convert "
+        "and show in degrees, like BT/ET), 'percent' (0-100, never converted -- e.g. an imported log's 'Drum "
+        "Speed'/'Fan Speed'), or 'number' (not a temperature, unit unknown). Every label present has an entry.",
+    )
     events: list[RoastEvent] = []
     notes: list[RoastNote] = []
+
+    @model_validator(mode="after")
+    def _fill_extra_units(self) -> "Roast":
+        # A live session (and anything else that doesn't say) gets each
+        # channel's kind from its label, the same rule a saved file uses.
+        for point in self.profile:
+            for label in point.extra or {}:
+                if label not in self.extra_units:
+                    self.extra_units[label] = extra_channel_kind(label)
+        return self
 
 
 class RoastPresetCreateRequest(BaseModel):

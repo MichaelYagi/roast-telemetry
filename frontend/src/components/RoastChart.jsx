@@ -99,24 +99,35 @@ function backgroundSeriesDefs(label) {
   ];
 }
 
-// Any role=EXTRA temperature channels a DeviceProfile declares (see the
-// backend's ModbusTempChannel/RoastProfilePoint.extra) -- e.g. a roaster
-// with a flue probe beyond BT/ET/DT. Same reasoning as
+// Any extra channels this roast has (the backend's
+// RoastProfilePoint.extra): a DeviceProfile's role=EXTRA probes -- e.g. a
+// flue probe beyond BT/ET/DT -- or an imported log's own extra devices.
+// Not all of those are temperatures: the roast's `extra_units` says, per
+// label, "temp" (Celsius; converted and shown in degrees), "percent"
+// ("Drum Speed", "Fan Speed" -- 0-100, never converted, shown with %) or
+// "number" (not a temperature, unit unknown). Only the server decides
+// which; a label it doesn't list is a temperature. Same reasoning as
 // backgroundSeriesDefs above: built dynamically (there's no fixed list,
 // since which extra channels exist -- if any -- depends entirely on
 // which device profile this roast used), not part of the static
 // SERIES_DEFS list, so they never show up as an empty toggle otherwise.
 const EXTRA_CHANNEL_COLORS = ["#0d9488", "#b45309", "#7c3aed", "#be185d"];
-function extraSeriesDefs(labels) {
-  return labels.map((label, i) => ({
-    key: `EXTRA_${label}`,
-    label,
-    color: EXTRA_CHANNEL_COLORS[i % EXTRA_CHANNEL_COLORS.length],
-    axis: "yTemp",
-    source: "extra",
-    field: label,
-    defaultOn: true,
-  }));
+function extraSeriesDefs(labels, extraUnits = {}) {
+  return labels.map((label, i) => {
+    const kind = extraUnits[label] || "temp";
+    return {
+      key: `EXTRA_${label}`,
+      label,
+      color: EXTRA_CHANNEL_COLORS[i % EXTRA_CHANNEL_COLORS.length],
+      // A non-temperature goes in the 0-100 band with Burner/Fan/Drum.
+      axis: kind === "temp" ? "yTemp" : "yControl",
+      valueSuffix: kind === "temp" ? undefined : kind === "percent" ? "%" : "",
+      isTemperature: kind === "temp",
+      source: "extra",
+      field: label,
+      defaultOn: true,
+    };
+  });
 }
 
 // The three classic roast phases, each bounded by a pair of named
@@ -475,6 +486,9 @@ const RoastChart = forwardRef(function RoastChart({
   height = 420,
   title,
   tempUnit = "c",
+  // The roast's extra_units ({label: "temp" | "percent" | "number"}) --
+  // see extraSeriesDefs.
+  extraUnits = {},
   // False only on LiveRoastView while a roast is actively roasting/cooling
   // -- zoom/pan and the hide-labels control are for reviewing a finished
   // curve, not for fighting with a chart whose x-axis is still growing
@@ -512,14 +526,15 @@ const RoastChart = forwardRef(function RoastChart({
 
   // Static live channels plus, only while a background roast is actually
   // loaded, its two reference curves (see backgroundSeriesDefs above),
-  // plus any extra temperature channels this roast's own profile data
+  // plus any extra channels this roast's own profile data
   // actually has (see extraSeriesDefs above).
+  const extraUnitsKey = JSON.stringify(extraUnits || {});
   const seriesDefs = useMemo(() => {
     let defs = SERIES_DEFS;
     if (background.length) defs = [...defs, ...backgroundSeriesDefs(backgroundLabel)];
-    if (extraLabelsKey) defs = [...defs, ...extraSeriesDefs(extraLabelsKey.split("|"))];
+    if (extraLabelsKey) defs = [...defs, ...extraSeriesDefs(extraLabelsKey.split("|"), JSON.parse(extraUnitsKey))];
     return defs;
-  }, [background.length, backgroundLabel, extraLabelsKey]);
+  }, [background.length, backgroundLabel, extraLabelsKey, extraUnitsKey]);
 
   const [visible, setVisible] = useState(() =>
     Object.fromEntries(SERIES_DEFS.map((s) => [s.key, s.defaultOn]))
@@ -700,7 +715,10 @@ const RoastChart = forwardRef(function RoastChart({
         // trick, no extra alignment needed.
         points = background.map((p) => ({ x: p.time_s, y: p[s.field] == null ? null : celsiusToUnit(p[s.field], tempUnit) }));
       } else if (s.source === "extra") {
-        points = profile.map((p) => ({ x: p.time_s, y: p.extra?.[s.field] == null ? null : celsiusToUnit(p.extra[s.field], tempUnit) }));
+        points = profile.map((p) => ({
+          x: p.time_s,
+          y: p.extra?.[s.field] == null ? null : s.isTemperature ? celsiusToUnit(p.extra[s.field], tempUnit) : p.extra[s.field],
+        }));
       } else {
         const continuousField = CONTINUOUS_FIELD_BY_CHANNEL[s.key];
         const hasContinuous = continuousField && profile.some((p) => p[continuousField] != null);
@@ -724,6 +742,8 @@ const RoastChart = forwardRef(function RoastChart({
         // Control channels (Burner/Fan/Drum/Damper, 0-100) are drawn low on the
         // temperature axis, in its 0-100 band, rather than on an axis of their own.
         isControl: s.axis === "yControl",
+        // Burner/Fan/Drum/Damper are percentages; an extra channel says its own.
+        valueSuffix: s.valueSuffix ?? (s.axis === "yControl" ? "%" : undefined),
         borderColor: colorFor(s),
         backgroundColor: colorFor(s),
         pointRadius: 0,
@@ -872,7 +892,9 @@ const RoastChart = forwardRef(function RoastChart({
               // Data is already converted to tempUnit at the dataset level
               // (see the `data` useMemo above) -- only the unit suffix
               // needs to reflect that here, not the value itself.
-              const suffix = item.dataset.isControl ? "" : item.dataset.yAxisID === "yTemp" ? unitSuffix(tempUnit) : item.dataset.yAxisID === "yRor" ? `${unitSuffix(tempUnit)}/min` : "";
+              const suffix =
+                item.dataset.valueSuffix ??
+                (item.dataset.yAxisID === "yTemp" ? unitSuffix(tempUnit) : item.dataset.yAxisID === "yRor" ? `${unitSuffix(tempUnit)}/min` : "");
               const value = item.parsed.y;
               return ` ${item.dataset.label}: ${value == null ? "—" : `${value.toFixed(1)}${suffix}`}`;
             },

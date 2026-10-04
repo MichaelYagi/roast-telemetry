@@ -22,8 +22,11 @@ length as the device lists. ``EXTRA_SLOTS`` is that length.
 from __future__ import annotations
 
 # Burner/Air/Drum are the three "extra device" channels this app writes
-# (bank 1); bank 2 carries DT and any extra probes. Both banks have this
-# many slots. Anything past it doesn't round-trip through the export.
+# (bank 1); bank 2 carries DT and any extra probes. Both banks have at
+# least this many slots, and grow (see new_profile_base's `slots`) for a
+# roast with more extra channels than that -- an imported log can carry
+# four or more -- up to the format's own ceiling, _FLAG_SLOTS. Anything
+# past that doesn't round-trip through the export.
 EXTRA_SLOTS = 3
 
 # The per-slot LCD/curve flags cover the format's full set of LCD frames.
@@ -54,13 +57,16 @@ _COMPUTED_INTS = (
 )
 
 
-def new_profile_base() -> dict:
-    """A fresh, empty profile dict (a new object on every call)."""
+def new_profile_base(slots: int = EXTRA_SLOTS) -> dict:
+    """A fresh, empty profile dict (a new object on every call), with
+    `slots` extra-device slots per bank (never fewer than EXTRA_SLOTS or
+    more than _FLAG_SLOTS)."""
     computed: dict = {k: 0.0 for k in _COMPUTED_FLOATS}
     computed.update({k: 0 for k in _COMPUTED_INTS})
     computed["AUCbegin"] = ""
 
-    n = EXTRA_SLOTS
+    n = max(EXTRA_SLOTS, min(slots, _FLAG_SLOTS))
+    spare = n - EXTRA_SLOTS  # slots beyond this app's own three per bank
     return {
         "mode": "C",
         # Identity and free text.
@@ -103,11 +109,11 @@ def new_profile_base() -> dict:
         # readers must not convert them when switching to Fahrenheit.
         "extraNoneTempHint1": [True] * n,
         "extraNoneTempHint2": [False] * n,
-        "extradevicecolor1": ["#d9534f", "#5bc0de", "#8a6d3b"],
-        "extradevicecolor2": ["#5cb85c", "#f0ad4e", "#777777"],
+        "extradevicecolor1": ["#d9534f", "#5bc0de", "#8a6d3b"] + ["#777777"] * spare,
+        "extradevicecolor2": ["#5cb85c", "#f0ad4e", "#777777"] + ["#777777"] * spare,
         "extraLCDvisibility1": [False] * _FLAG_SLOTS,
         "extraLCDvisibility2": [False] * _FLAG_SLOTS,
-        "extraCurveVisibility1": [True] * n + [False] * (_FLAG_SLOTS - n),
+        "extraCurveVisibility1": [True] * EXTRA_SLOTS + [False] * (_FLAG_SLOTS - EXTRA_SLOTS),
         "extraCurveVisibility2": [False] * _FLAG_SLOTS,
         "extraDelta1": [False] * _FLAG_SLOTS,
         "extraDelta2": [False] * _FLAG_SLOTS,

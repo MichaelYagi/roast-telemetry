@@ -132,22 +132,91 @@ def test_dt_less_roast_does_not_export_a_fake_flat_dt_curve(tmp_path):
     assert all(p.get("dt") is None for p in points["profile"])
 
 
-def test_a_third_extra_channel_beyond_the_two_free_slots_does_not_export(tmp_path):
-    # Documents the real, fixed ceiling (the base profile has exactly 3
-    # extraname2 slots: DT + 2 more) rather than silently corrupting
-    # anything -- a third role=EXTRA channel just isn't in the export.
+def test_extra_channels_beyond_the_base_slots_still_export(tmp_path):
+    # The base profile has 3 extraname2 slots (DT + 2 more); a roast with
+    # more extra channels than that grows the slot lists rather than
+    # dropping the rest -- an imported log with four extra devices used to
+    # lose two of them the first time an edit rewrote its file.
     profile = [
-        {"time_s": 0.0, "bt": 20.0, "et": 25.0, "extra": {"A": 1.0, "B": 2.0, "C": 3.0}},
+        {"time_s": 0.0, "bt": 20.0, "et": 25.0, "extra": {"A": 1.0, "B": 2.0, "C": 3.0, "D": 4.0}},
     ]
     alog_dict = roast_to_native_alog_dict(title="R", profile=profile, events=[], notes=[])
     path = str(tmp_path / "roast.alog")
     save_native_alog(path, alog_dict)
 
-    points = alog_dict_to_points(load_alog(path))
-    extras = points["profile"][-1]["extra"]
-    assert extras.get("A") == 1.0
-    assert extras.get("B") == 2.0
-    assert "C" not in extras
+    assert alog_dict_to_points(load_alog(path))["profile"][-1]["extra"] == {"A": 1.0, "B": 2.0, "C": 3.0, "D": 4.0}
+    # Every per-slot list a reader indexes by device position stays the same length.
+    slots = len(alog_dict["extraname2"])
+    assert slots == 5  # DT's slot + four
+    for key in ("extradevices", "extraname1", "extratemp1", "extratemp2", "extratimex", "extraNoneTempHint1",
+                "extraNoneTempHint2", "extradevicecolor1", "extradevicecolor2", "extralinewidths1", "extradrawstyles2"):
+        assert len(alog_dict[key]) == slots, key
+
+
+def test_extra_channels_past_the_formats_own_ceiling_do_not_export(tmp_path):
+    # The format has 10 slots per bank; one is DT's, so nine extra channels fit.
+    labels = [f"X{i}" for i in range(10)]
+    profile = [{"time_s": 0.0, "bt": 20.0, "et": 25.0, "extra": {label: float(i) for i, label in enumerate(labels)}}]
+    alog_dict = roast_to_native_alog_dict(title="R", profile=profile, events=[], notes=[])
+    path = str(tmp_path / "roast.alog")
+    save_native_alog(path, alog_dict)
+
+    extras = alog_dict_to_points(load_alog(path))["profile"][-1]["extra"]
+    assert list(extras) == labels[:9]
+
+
+def _fahrenheit_log_with_plain_extras() -> dict:
+    # Shaped like a third-party export: Fahrenheit, with extra devices that
+    # are temperatures ("Drum Heat", "SV") and ones that aren't.
+    n = 5
+    return {
+        "mode": "F", "timex": [0.0, 1.0, 2.0, 3.0, 4.0], "temp1": [400.0] * n, "temp2": [300.0, 301.0, 302.0, 303.0, 304.0],
+        "timeindex": [1, 0, 0, 0, 0, 0, 3, 0],
+        "extraname1": ["Drum Heat", "Fan Speed"], "extratemp1": [[340.0] * n, [65.0] * n],
+        "extraname2": ["Drum Speed", "SV"], "extratemp2": [[55.0] * n, [470.0] * n],
+        "extratimex": [[0.0, 1.0, 2.0, 3.0, 4.0]] * 2,
+    }
+
+
+def test_extra_channel_kind():
+    from alog_playback.alog_io import extra_channel_kind
+
+    for label in ("Drum Speed", "Fan Speed", "Heater", "Damper", "Air %"):
+        assert extra_channel_kind(label) == "percent", label
+    for label in ("Drum Heat", "SV", "Burner SV", "Flue", "Air Temp", "Set Point"):
+        assert extra_channel_kind(label) == "temp", label
+    # The file's own "not a temperature" flag, for a name that doesn't say.
+    assert extra_channel_kind("AH", none_temp_hint=True) == "number"
+    assert extra_channel_kind("Fan Speed", none_temp_hint=True) == "percent"
+
+
+def test_non_temperature_extra_channels_are_not_converted_from_fahrenheit():
+    points = alog_dict_to_points(_fahrenheit_log_with_plain_extras())
+
+    assert points["extra_units"] == {"Drum Heat": "temp", "Fan Speed": "percent", "Drum Speed": "percent", "SV": "temp"}
+    extra = points["profile"][2]["extra"]
+    assert extra["Fan Speed"] == 65.0 and extra["Drum Speed"] == 55.0  # percentages: untouched
+    assert round(extra["Drum Heat"], 2) == 171.11 and round(extra["SV"], 2) == 243.33  # 340 F, 470 F
+
+
+def test_extra_channel_units_survive_a_rewrite_and_a_fahrenheit_export(tmp_path):
+    from alog_playback.alog_io import _celsius_dict_to_fahrenheit
+
+    points = alog_dict_to_points(_fahrenheit_log_with_plain_extras())
+    rewritten = roast_to_native_alog_dict(
+        title="R", profile=points["profile"], events=points["events"], notes=[], extra_units=points["extra_units"],
+    )
+    path = str(tmp_path / "roast.alog")
+    save_native_alog(path, rewritten)
+
+    again = alog_dict_to_points(load_alog(path))
+    assert again["extra_units"] == points["extra_units"]
+    assert again["profile"][2]["extra"] == points["profile"][2]["extra"]
+
+    exported = _celsius_dict_to_fahrenheit(rewritten)
+    by_name = {name: exported["extratemp2"][i][2] for i, name in enumerate(exported["extraname2"]) if name}
+    assert by_name["Fan Speed"] == 65.0 and by_name["Drum Speed"] == 55.0
+    assert round(by_name["Drum Heat"], 1) == 340.0 and round(by_name["SV"], 1) == 470.0
 
 
 def test_load_alog_parses_real_python_literal(tmp_path):

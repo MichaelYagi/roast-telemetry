@@ -128,6 +128,7 @@ def roast_to_native_alog_dict(
     weight_roasted_g: Optional[float] = None,
     roastertype: Optional[str] = None,
     roastdate: Optional[str] = None,
+    extra_units: Optional[dict] = None,
 ) -> dict:
     """Build a file other .alog readers can actually open -- this
     is the only .alog shape this app writes (see this module's own
@@ -144,7 +145,10 @@ def roast_to_native_alog_dict(
     Serialize the result with save_native_alog (Python-literal
     syntax, not JSON) -- see that function below.
     """
-    data = new_profile_base()
+    # One bank-2 slot for DT plus one per extra channel -- more slots than
+    # the base three when this roast has more extra channels than fit.
+    extra_label_count = len({label for p in profile for label in (p.get("extra") or {})})
+    data = new_profile_base(slots=1 + extra_label_count)
 
     # Real .alog files always have a brief pre-charge lead-in, so index 0
     # being reserved as "not recorded" never collides with a real milestone
@@ -295,13 +299,19 @@ def roast_to_native_alog_dict(
     # not discrete manual adjustments, so they belong here, not in
     # specialevents. All three share this roast's own timeline, so one
     # shared extratimex entry per channel is enough (no resampling needed).
+    slot_count = len(data.get("extraname2") or [])
     extraname1 = ["{3}", "{0}", "{1}"]  # Burner, Air, Drum
     extratemp1 = [
         _fill_and_floatify([p.get("heater_pct") for p in export_profile]),
         _fill_and_floatify([p.get("fan_pct") for p in export_profile]),
         _fill_and_floatify([p.get("drum_speed_pct") for p in export_profile]),
     ]
-    # Bank 2 keeps the base profile's slot count (EXTRA_SLOTS) rather than
+    # Bank 1 matches bank 2's slot count when it has grown past three (see
+    # new_profile_base): empty names, flat placeholder curves, hidden.
+    spare = max(0, slot_count - len(extraname1))
+    extraname1 += [""] * spare
+    extratemp1 += [[0.0] * len(export_profile) for _ in range(spare)]
+    # Bank 2 keeps the base profile's slot count (EXTRA_SLOTS, or more) rather than
     # being emptied -- roughly a dozen per-device lists (extradevicecolor2,
     # extraCurveVisibility2, extraNoneTempHint2, ...) are all sized to
     # match it, and readers index those by device position regardless of
@@ -312,8 +322,8 @@ def roast_to_native_alog_dict(
     # modbus_bridge/engine.py) when available; any further role=EXTRA
     # channels from a DeviceProfile (see RoastProfilePoint.extra) take the
     # remaining slots, ordered by first appearance in this roast's own
-    # profile. There are only EXTRA_SLOTS slots in total, a real, fixed
-    # ceiling; anything past that still lives in profile[i]["extra"] for
+    # profile. The slot count grows with the roast's extra channels up to
+    # the format's own ceiling; anything past that still lives in profile[i]["extra"] for
     # the live chart/readouts, it just doesn't round-trip through this
     # export. A slot with nothing in it stays a flat placeholder curve
     # (hidden by default, see extraCurveVisibility2 below).
@@ -336,6 +346,10 @@ def roast_to_native_alog_dict(
     extraname2 = list(data.get("extraname2") or [])
     extratemp2 = []
     extra2_used = []  # which slots carry real data (the rest are placeholders)
+    # Marks an extra channel that isn't a temperature (see
+    # extra_channel_kind), so no reader -- this one included -- converts it
+    # between Celsius and Fahrenheit.
+    extra2_non_temp = list(data.get("extraNoneTempHint2") or [False] * len(extraname2))
     for i in range(len(extraname2)):
         if i == 0 and has_dt:
             extraname2[0] = "DT"
@@ -344,6 +358,9 @@ def roast_to_native_alog_dict(
         elif i >= 1 and i - 1 < len(extra_labels):
             label = extra_labels[i - 1]
             extraname2[i] = label
+            kind = (extra_units or {}).get(label) or extra_channel_kind(label)
+            if i < len(extra2_non_temp):
+                extra2_non_temp[i] = kind != EXTRA_KIND_TEMP
             extratemp2.append(_fill_and_floatify([(p.get("extra") or {}).get(label) for p in export_profile]))
             extra2_used.append(True)
         else:
@@ -414,6 +431,7 @@ def roast_to_native_alog_dict(
         "extratimex": extratimex,
         # Only slots that carry real data are drawn; placeholders stay hidden.
         "extraCurveVisibility2": (extra2_used + [False] * 10)[:10],
+        "extraNoneTempHint2": extra2_non_temp,
     })
     return data
 
@@ -712,6 +730,62 @@ def _etypes_role_is_percent(match: re.Match) -> bool:
     return NATIVE_ETYPES[idx] in _CHANNEL_FIELD if 0 <= idx < len(NATIVE_ETYPES) else False
 
 
+# What an extra channel measures, which decides whether it's a temperature
+# at all: only "temp" is converted between Celsius and Fahrenheit and shown
+# in degrees. A third-party log's extra devices are often not temperatures
+# -- a Kaleido-style export carries "Drum Speed" and "Fan Speed" (percent)
+# right beside "Drum Heat" and "SV" (temperatures), all as plain labels.
+EXTRA_KIND_TEMP = "temp"
+EXTRA_KIND_PERCENT = "percent"
+EXTRA_KIND_NUMBER = "number"  # not a temperature, unit unknown
+_PERCENT_LABEL_RE = re.compile(r"speed|rpm|%|percent|pct|power|duty|fan|air|damper|heater|burner", re.IGNORECASE)
+_TEMP_LABEL_RE = re.compile(r"temp|°|deg\b|\bsv\b|set ?point", re.IGNORECASE)
+
+
+def extra_channel_kind(label: Optional[str], none_temp_hint: bool = False) -> str:
+    """"temp", "percent" or "number" for an extra channel, from its label
+    and the file's own per-channel "not a temperature" flag
+    (extraNoneTempHint1/2) when it has one. The name is checked first: the
+    flag only says "not a temperature", and many files never set it for a
+    channel that plainly isn't one ("Fan Speed")."""
+    text = str(label or "")
+    if _PERCENT_LABEL_RE.search(text) and not _TEMP_LABEL_RE.search(text):
+        return EXTRA_KIND_PERCENT
+    if none_temp_hint:
+        return EXTRA_KIND_NUMBER
+    return EXTRA_KIND_TEMP
+
+
+def _hint_at(hints, i: int) -> bool:
+    return bool(hints[i]) if isinstance(hints, list) and i < len(hints) else False
+
+
+def _non_temp_channel_indices(names: list, hints) -> set[int]:
+    """Indices in one extraname/extratemp bank that must never go through a
+    Celsius<->Fahrenheit conversion: this app's own Burner/Air/Drum percent
+    channels (see _percent_channel_indices) and any plain-labelled channel
+    that isn't a temperature (see extra_channel_kind)."""
+    indices = _percent_channel_indices(names)
+    for i, name in enumerate(names):
+        if name and not _EXTRANAME_ETYPE_RE.match(str(name)) and name != _DT_EXTRANAME_LABEL:
+            if extra_channel_kind(name, _hint_at(hints, i)) != EXTRA_KIND_TEMP:
+                indices.add(i)
+    return indices
+
+
+def _extra_units(data: dict) -> dict[str, str]:
+    """{label: kind} for every plain-labelled extra channel in the file --
+    the ones alog_dict_to_points puts in each point's `extra` dict."""
+    units: dict[str, str] = {}
+    for bank in ("1", "2"):
+        hints = data.get(f"extraNoneTempHint{bank}")
+        for i, name in enumerate(data.get(f"extraname{bank}") or []):
+            if not name or name == _DT_EXTRANAME_LABEL or _EXTRANAME_ETYPE_RE.match(str(name)) or name in units:
+                continue
+            units[name] = extra_channel_kind(name, _hint_at(hints, i))
+    return units
+
+
 def _percent_channel_indices(names: list) -> set[int]:
     """Which indices in an extraname1/extraname2 list are this app's own
     Burner/Air/Drum *percentage* channels (the `{N}` etype convention this
@@ -739,7 +813,7 @@ def _fahrenheit_file_to_celsius(data: dict) -> dict:
         out[key] = [_f_to_c(v) for v in data.get(key) or []]
     for names_key, temps_key in (("extraname1", "extratemp1"), ("extraname2", "extratemp2")):
         if data.get(temps_key):
-            skip = _percent_channel_indices(data.get(names_key) or [])
+            skip = _non_temp_channel_indices(data.get(names_key) or [], data.get(names_key.replace("extraname", "extraNoneTempHint")))
             out[temps_key] = [
                 series if (i in skip or not isinstance(series, list)) else [_f_to_c(v) for v in series]
                 for i, series in enumerate(data[temps_key])
@@ -760,14 +834,21 @@ def _celsius_dict_to_fahrenheit(data: dict) -> dict:
     plus `computed`'s own milestone temperatures and the chart's
     ymin/ymax -- none of which _fahrenheit_file_to_celsius needs to touch
     on the read side, since alog_dict_to_points below never reads any of
-    those three back into the app at all."""
+    those three back into the app at all.
+
+    A file that is already Fahrenheit is returned as it is: an imported
+    log is stored exactly as it was uploaded, so its saved file can be a
+    Fahrenheit one, and converting that again turned 300 F into 572 F in
+    every download."""
+    if str(data.get("mode", "C")).upper() == "F":
+        return data
     out = dict(data)
     out["mode"] = "F"
     for key in ("temp1", "temp2"):
         out[key] = [_c_to_f(v) for v in data.get(key) or []]
     for names_key, temps_key in (("extraname1", "extratemp1"), ("extraname2", "extratemp2")):
         if data.get(temps_key):
-            skip = _percent_channel_indices(data.get(names_key) or [])
+            skip = _non_temp_channel_indices(data.get(names_key) or [], data.get(names_key.replace("extraname", "extraNoneTempHint")))
             out[temps_key] = [
                 series if (i in skip or not isinstance(series, list)) else [_c_to_f(v) for v in series]
                 for i, series in enumerate(data[temps_key])
@@ -834,6 +915,7 @@ def alog_dict_to_points(data: dict) -> dict:
         "machine": _extract_machine(data),
         "roastdate": _extract_roastdate(data),
         "profile": profile,
+        "extra_units": {label: kind for label, kind in _extra_units(data).items() if label in extra_channels},
         "events": _extract_events(data, timex, temp2),
         "notes": _extract_notes(data),
     }

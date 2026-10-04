@@ -1242,7 +1242,12 @@ class RoastSession:
         )
 
     def to_roast(self) -> Roast:
-        return Roast(**self.summary().model_dump(), profile=self.profile, events=self.events, notes=self.notes)
+        return Roast(
+            **self.summary().model_dump(), profile=self.profile, events=self.events, notes=self.notes,
+            # A replayed log knows its extra channels' kinds before any
+            # sample exists; everything else is filled in from the labels.
+            extra_units=dict(getattr(self._engine, "extra_units", None) or {}),
+        )
 
 
 class RoastSessionManager:
@@ -1399,6 +1404,7 @@ class RoastSessionManager:
             duration_s=row["duration_s"],
             alog_path=row["alog_path"],
             created_by_username=row.get("created_by_username"),
+            extra_units=parsed.get("extra_units") or {},
             **{key: row.get(key) for key in OUTCOME_KEYS},
             source_alog_path=row.get("source_alog_path"),
             playback_speed=row.get("playback_speed"),
@@ -1452,6 +1458,7 @@ class RoastSessionManager:
             weight_green_g=row["weight_green_g"],
             weight_roasted_g=row["weight_roasted_g"],
             roastdate=row["created_at"],
+            extra_units=parsed.get("extra_units"),
         )
         save_native_alog(row["alog_path"], alog_dict)
 

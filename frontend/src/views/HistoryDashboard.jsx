@@ -303,8 +303,13 @@ export default function HistoryDashboard() {
   // Files from this computer (chosen or dropped): one request each, in order.
   // A single file opens its roast; several stay here, and any that failed are listed.
   async function handleUploadFiles(fileList) {
-    const files = [...fileList].filter((f) => IMPORTABLE_EXTENSIONS.some((ext) => f.name.toLowerCase().endsWith(ext)));
-    const skipped = fileList.length - files.length;
+    // A file whose name starts with a dot is a hidden one -- macOS adds a
+    // "._<name>" metadata twin beside every file on any folder copied or
+    // zipped from a Mac, plus .DS_Store. They aren't roast logs: every one
+    // is left out without a word, not uploaded and not counted as skipped.
+    const picked = [...fileList].filter((f) => !f.name.startsWith("."));
+    const files = picked.filter((f) => IMPORTABLE_EXTENSIONS.some((ext) => f.name.toLowerCase().endsWith(ext)));
+    const skipped = picked.length - files.length;
     if (!files.length) {
       setImportError(skipped ? t("history.import.unsupportedFormat", { extensions: IMPORTABLE_EXTENSIONS.join(", ") }) : null);
       return;

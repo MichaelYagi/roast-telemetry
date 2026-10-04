@@ -20,6 +20,9 @@ class AlogPlayer:
         self.speed = speed
         raw = load_alog(path)
         parsed = alog_dict_to_points(raw)
+        # What each extra channel measures (see alog_io.extra_channel_kind) --
+        # known up front, before the first sample is replayed.
+        self.extra_units: dict[str, str] = dict(parsed.get("extra_units") or {})
         self.meta = {
             "title": parsed["title"],
             "beans": parsed["beans"],
