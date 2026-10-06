@@ -6,9 +6,17 @@ from __future__ import annotations
 
 from typing import Optional
 
+import asyncio
+
 import httpx
 
 CONNECT_TIMEOUT_S = 3.0
+# A first lookup of a dynamic-DNS name can fail (Windows reports it as
+# "getaddrinfo failed") and succeed a moment later, so a single failed
+# connection doesn't mean the server is down. Only connection-level errors
+# are retried; an HTTP error from a server that answered is final.
+CONNECT_ATTEMPTS = 3
+CONNECT_RETRY_DELAY_S = 1.0
 # This runs in a background task (see roasts.py's _run_review), never on the
 # request path, so a generous timeout costs nothing but eventually giving up
 # on a genuinely wedged/unreachable server. 180s turned out too short for a
@@ -35,15 +43,23 @@ def _is_prompt_to_text(model: dict) -> bool:
 async def check_connection(url: str) -> dict:
     """Returns {"connected": bool, "models": [str], "error": str|None}."""
     url = url.rstrip("/")
-    try:
-        async with httpx.AsyncClient(timeout=CONNECT_TIMEOUT_S) as client:
-            resp = await client.get(f"{url}/api/tags")
-            resp.raise_for_status()
-            data = resp.json()
+    last_error: Optional[Exception] = None
+    for attempt in range(CONNECT_ATTEMPTS):
+        if attempt:
+            await asyncio.sleep(CONNECT_RETRY_DELAY_S)
+        try:
+            async with httpx.AsyncClient(timeout=CONNECT_TIMEOUT_S) as client:
+                resp = await client.get(f"{url}/api/tags")
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.ConnectError as exc:
+            last_error = exc
+            continue
+        except Exception as exc:  # noqa: BLE001 -- deliberately broad, this is a reachability probe
+            return {"connected": False, "models": [], "error": str(exc)}
         models = sorted(m["name"] for m in data.get("models", []) if "name" in m and _is_prompt_to_text(m))
         return {"connected": True, "models": models, "error": None}
-    except Exception as exc:  # noqa: BLE001 -- deliberately broad, this is a reachability probe
-        return {"connected": False, "models": [], "error": str(exc)}
+    return {"connected": False, "models": [], "error": str(last_error)}
 
 
 async def generate(url: str, model: str, prompt: str, options: Optional[dict] = None) -> str:

@@ -62,3 +62,44 @@ def test_check_connection_reports_unreachable_server(monkeypatch):
     result = asyncio.run(ollama_client.check_connection("http://localhost:11434"))
 
     assert result["connected"] is False and result["models"] == []
+
+
+def test_check_connection_retries_a_lookup_that_fails_once(monkeypatch):
+    # A dynamic-DNS name can fail its first lookup and resolve on the next try.
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise httpx.ConnectError("[Errno 11001] getaddrinfo failed")
+        return httpx.Response(200, json={"models": [{"name": "llama3.1"}]})
+
+    def fake_async_client(*args, **kwargs):
+        return _RealAsyncClient(transport=httpx.MockTransport(handler))
+
+    monkeypatch.setattr(ollama_client.httpx, "AsyncClient", fake_async_client)
+    monkeypatch.setattr(ollama_client, "CONNECT_RETRY_DELAY_S", 0)
+
+    result = asyncio.run(ollama_client.check_connection("http://example.test:11434"))
+
+    assert result["connected"] is True and result["models"] == ["llama3.1"]
+    assert calls["n"] == 3
+
+
+def test_check_connection_gives_up_after_all_attempts(monkeypatch):
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        raise httpx.ConnectError("[Errno 11001] getaddrinfo failed")
+
+    def fake_async_client(*args, **kwargs):
+        return _RealAsyncClient(transport=httpx.MockTransport(handler))
+
+    monkeypatch.setattr(ollama_client.httpx, "AsyncClient", fake_async_client)
+    monkeypatch.setattr(ollama_client, "CONNECT_RETRY_DELAY_S", 0)
+
+    result = asyncio.run(ollama_client.check_connection("http://example.test:11434"))
+
+    assert result["connected"] is False and "getaddrinfo" in result["error"]
+    assert calls["n"] == ollama_client.CONNECT_ATTEMPTS
