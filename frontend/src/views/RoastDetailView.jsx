@@ -635,9 +635,9 @@ export default function RoastDetailView() {
           notes={roast.notes}
           onReplace={(notes) => setRoast((r) => (r ? { ...r, notes } : r))}
         />
-
-        <RoastReviewCard roastId={roast.id} roastActive={roast.status === "roasting" || roast.status === "cooling"} />
       </div>
+
+      <RoastReviewCard roastId={roast.id} roastActive={roast.status === "roasting" || roast.status === "cooling"} />
     </div>
   );
 }

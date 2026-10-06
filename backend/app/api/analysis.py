@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
 from .. import analysis_insights, ollama_client, storage
-from ..roast_metrics import METRIC_KEYS, METRICS, alog_metrics, build_row, row_source
+from ..roast_metrics import METRIC_KEYS, METRICS, alog_metrics, bt_curve_from_charge, build_row, row_source
 from alog_playback.alog_io import _celsius_dict_to_fahrenheit, load_alog
 from alog_playback.roastlog import roast_to_json, save_roastlog_csv, save_roastlog_xlsx
 
@@ -52,6 +52,7 @@ def _curve_metrics(row: dict) -> Optional[dict]:
     if roast is None:
         return None
     result = alog_metrics(roast)
+    result["_bt_curve"] = bt_curve_from_charge(roast)
     # Drop older entries for the same roast so the cache doesn't grow with edits.
     for old in [k for k in _CURVE_CACHE if k[0] == row["id"]]:
         del _CURVE_CACHE[old]
@@ -411,7 +412,9 @@ async def _run_insight(job_id: str, req: InsightRequest, url: str, model: str) -
         if not data["rows"]:
             raise ValueError("no finished roasts match those filters")
         bucketed = await asyncio.to_thread(_summarise, data["rows"], req.group_by)
-        prompt = analysis_insights.build_prompt(
+        # The findings scan every roast against every other measurement, so it runs off the event loop too.
+        prompt = await asyncio.to_thread(
+            analysis_insights.build_prompt,
             groups=bucketed, rows=data["rows"], group_by=req.group_by, total=data["total"],
             truncated=data["truncated"], filters_text=_describe_filters(req), question=req.question,
         )

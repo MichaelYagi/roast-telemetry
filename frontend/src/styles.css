@@ -1442,11 +1442,6 @@ button:disabled {
   }
 }
 
-.review-card-body {
-  max-height: 320px;
-  overflow-y: auto;
-}
-
 .review-text {
   line-height: 1.5;
 }

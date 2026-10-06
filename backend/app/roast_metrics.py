@@ -136,6 +136,27 @@ def alog_metrics(roast: Roast) -> dict[str, Optional[float]]:
     return out
 
 
+# Seconds between samples of a roast's bean temperature curve, counted from Charge.
+BT_CURVE_STEP_S = 30
+
+
+def bt_curve_from_charge(roast: Roast, step_s: int = BT_CURVE_STEP_S) -> Optional[list[Optional[float]]]:
+    """Bean temperature every `step_s` seconds from Charge up to Drop (or the
+    end of the recording if Drop was never marked). None without a Charge."""
+    profile = [p.model_dump() for p in roast.profile]
+    events = events_by_type(roast)
+    charge = events.get("CHARGE")
+    if not profile or charge is None:
+        return None
+    times = [p["time_s"] for p in profile]
+    drop = events.get("DROP")
+    end = drop.time_s if drop and drop.time_s > charge.time_s else times[-1]
+    count = int((end - charge.time_s) // step_s) + 1
+    return [
+        _round(_nearest(profile, times, charge.time_s + i * step_s, "bt")) for i in range(count)
+    ]
+
+
 def _round(value: Optional[float]) -> Optional[float]:
     return None if value is None else round(value, 1)
 
@@ -151,7 +172,11 @@ def row_source(row: dict) -> str:
 
 def build_row(row: dict, curve_metrics: dict, bean: Optional[dict], tags: list[str]) -> dict:
     """One roast as a flat record: who/what/when, every metric, and the
-    fields used for grouping."""
+    fields used for grouping. `curve_metrics` may carry the roast's resampled
+    bean temperature curve under "_bt_curve"; it's kept beside the metrics,
+    not among them."""
+    curve_metrics = dict(curve_metrics)
+    bt_curve = curve_metrics.pop("_bt_curve", None)
     green, roasted = row.get("weight_green_g"), row.get("weight_roasted_g")
     loss = None
     if green and roasted is not None:
@@ -186,5 +211,6 @@ def build_row(row: dict, curve_metrics: dict, bean: Optional[dict], tags: list[s
         "tags": tags,
         "simulated": "simulated" in tags,
         "tasting_notes": row.get("tasting_notes"),
+        "bt_curve": bt_curve,
         "metrics": metrics,
     }
