@@ -59,7 +59,9 @@ CREATE TABLE IF NOT EXISTS roasts (
     modbus_device_profile_name TEXT,
     ms6514_port TEXT,
     aillio_model TEXT,
-    tc4_port TEXT
+    tc4_port TEXT,
+    plugin_kind TEXT,
+    plugin_port TEXT
 );
 
 CREATE TABLE IF NOT EXISTS roast_presets (
@@ -84,6 +86,19 @@ CREATE TABLE IF NOT EXISTS device_profiles (
     created_at TEXT NOT NULL,
     config_json TEXT NOT NULL,
     built_in INTEGER NOT NULL DEFAULT 0
+);
+
+-- Outbound notifications -- see backend/app/webhooks.py and
+-- backend/app/api/webhooks.py. events_json is a JSON array of event keys
+-- (webhooks.EVENTS) this one is subscribed to; an empty array means "every
+-- event", not "none" -- see webhooks.fire's own docstring.
+CREATE TABLE IF NOT EXISTS webhooks (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    events_json TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
 );
 
 -- Plain key/value store, currently just Ollama's base URL + model name.
@@ -288,6 +303,10 @@ def init_db() -> None:
             c.execute("ALTER TABLE roasts ADD COLUMN aillio_model TEXT")
         if "tc4_port" not in existing_cols:
             c.execute("ALTER TABLE roasts ADD COLUMN tc4_port TEXT")
+        if "plugin_kind" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN plugin_kind TEXT")
+        if "plugin_port" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN plugin_port TEXT")
         # What came out of the roast, and which saved beans it used.
         for col, decl in (
             ("color_agtron", "REAL"),
@@ -382,16 +401,18 @@ def insert_roast(summary: dict) -> None:
                (id, title, mode, status, created_at, beans,
                 weight_green_g, weight_roasted_g, duration_s, alog_path, source_alog_path, playback_speed,
                 created_by_username, modbus_transport, modbus_port, modbus_host, modbus_tcp_port,
-                modbus_device_profile_name, modbus_fahrenheit_native, ms6514_port, aillio_model, tc4_port, bean_id, notes_text)
+                modbus_device_profile_name, modbus_fahrenheit_native, ms6514_port, aillio_model, tc4_port,
+                plugin_kind, plugin_port, bean_id, notes_text)
                VALUES (:id, :title, :mode, :status, :created_at, :beans,
                        :weight_green_g, :weight_roasted_g, :duration_s, :alog_path, :source_alog_path,
                        :playback_speed, :created_by_username, :modbus_transport, :modbus_port, :modbus_host,
                        :modbus_tcp_port, :modbus_device_profile_name, :modbus_fahrenheit_native, :ms6514_port, :aillio_model, :tc4_port,
-                       :bean_id, :notes_text)""",
+                       :plugin_kind, :plugin_port, :bean_id, :notes_text)""",
             {
                 "source_alog_path": None, "playback_speed": None, "created_by_username": None,
                 "modbus_transport": None, "modbus_port": None, "modbus_host": None, "modbus_tcp_port": None,
                 "modbus_device_profile_name": None, "modbus_fahrenheit_native": False, "ms6514_port": None, "aillio_model": None, "tc4_port": None,
+                "plugin_kind": None, "plugin_port": None,
                 "bean_id": None, "notes_text": None, **summary,
             },
         )
@@ -787,6 +808,40 @@ def get_device_profile_row(profile_id: str) -> Optional[dict]:
 def delete_device_profile_row(profile_id: str) -> None:
     with _conn() as c:
         c.execute("DELETE FROM device_profiles WHERE id = ?", (profile_id,))
+
+
+def insert_webhook(webhook: dict) -> None:
+    with _conn() as c:
+        c.execute(
+            """INSERT INTO webhooks (id, name, url, events_json, enabled, created_at)
+               VALUES (:id, :name, :url, :events_json, :enabled, :created_at)""",
+            webhook,
+        )
+
+
+def update_webhook_row(webhook_id: str, webhook: dict) -> None:
+    with _conn() as c:
+        c.execute(
+            "UPDATE webhooks SET name = :name, url = :url, events_json = :events_json, enabled = :enabled WHERE id = :id",
+            {**webhook, "id": webhook_id},
+        )
+
+
+def list_webhook_rows() -> list[dict]:
+    with _conn() as c:
+        rows = c.execute("SELECT * FROM webhooks ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_webhook_row(webhook_id: str) -> Optional[dict]:
+    with _conn() as c:
+        row = c.execute("SELECT * FROM webhooks WHERE id = ?", (webhook_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def delete_webhook_row(webhook_id: str) -> None:
+    with _conn() as c:
+        c.execute("DELETE FROM webhooks WHERE id = ?", (webhook_id,))
 
 
 def get_settings() -> dict:

@@ -38,6 +38,7 @@ function modeLabel(roast, t) {
     ms6514_live: t("liveRoast.connectionOptions.ms6514"),
     aillio_live: t("liveRoast.connectionOptions.aillio"),
     tc4_live: t("liveRoast.connectionOptions.tc4"),
+    plugin_live: roast.plugin_kind ? `${t("liveRoast.connectionOptions.plugin")} (${roast.plugin_kind})` : t("liveRoast.connectionOptions.plugin"),
   };
   return MODE_LABELS[roast.mode] || roast.mode;
 }

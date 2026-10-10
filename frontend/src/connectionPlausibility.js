@@ -38,6 +38,13 @@ export function channelsForMode(mode) {
   // feedback (see AillioEngine.tick()'s _poll()), not write-only like
   // TC4 -- these get real "pass"/"fail" plausibility checks.
   if (mode === "aillio_live") return READ_CHANNELS.filter((c) => ["bt", "et", "dt", "fan_pct", "drum_speed_pct"].includes(c.key));
+  // plugin_live: an arbitrary third-party plugin (see device_plugins/README.md)
+  // -- bt/et are the only channels device_plugins.DeviceEngine's contract
+  // guarantees every plugin reports something for (even if just null), so
+  // these are the only ones checked here, same conservative reasoning as
+  // ms6514_live above. A plugin that also has dt/controls has no way to say
+  // so yet -- this only ever under-includes, never shows a misleading failure.
+  if (mode === "plugin_live") return READ_CHANNELS.filter((c) => ["bt", "et"].includes(c.key));
   return READ_CHANNELS;
 }
 

@@ -12,7 +12,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Optional
 
-from .. import storage
+from .. import storage, webhooks
 from ..models import (
     ControlSafety,
     EventCreateRequest,
@@ -77,6 +77,9 @@ class RoastControl:
 
     @property
     def can_write(self) -> bool:
+        if self.session.mode == RoastMode.PLUGIN_LIVE:
+            spec = self.session._plugin_spec
+            return not (spec and spec.read_only)
         return self.session.mode not in READ_ONLY_MODES
 
     # -- what the roaster is currently set to ---------------------------------
@@ -166,6 +169,7 @@ class RoastControl:
             "safety", "safe_state", username=username, platform=platform, roast_id=self.session.id, roast_title=self.session.title,
             message=f'Safety stop on "{self.session.title}": {reason}',
         )
+        webhooks.fire_background("e_stop", {**self.session._webhook_base_payload(), "reason": reason, "written": written})
         if reason == "emergency stop":
             # Scoped to the literal manual-button reason, not every
             # fail-safe trip -- a persistent, post-hoc "this roast had an

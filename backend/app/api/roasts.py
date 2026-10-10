@@ -280,7 +280,7 @@ async def stream_active_roast() -> EventSourceResponse:
 
 @router.post("", response_model=RoastSummary, status_code=201)
 async def create_roast(request: RoastCreateRequest, http_request: Request) -> RoastSummary:
-    """modbus_live/ms6514_live/aillio_live/tc4_live: this is the ON
+    """modbus_live/ms6514_live/aillio_live/tc4_live/plugin_live: this is the ON
     action -- connects and starts streaming live readings, but doesn't
     create a roast yet (see begin_recording below for that, the START
     action). Every other mode doesn't have a real connection worth
@@ -288,7 +288,7 @@ async def create_roast(request: RoastCreateRequest, http_request: Request) -> Ro
     in one step, exactly as before."""
     try:
         session = session_manager.create(request, created_by_username=http_request.state.user["username"])
-        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE):
+        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE, RoastMode.PLUGIN_LIVE):
             await session_manager.connect(session.id)
         else:
             await session_manager.start(session.id)

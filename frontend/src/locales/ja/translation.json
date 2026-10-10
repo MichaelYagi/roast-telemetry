@@ -87,6 +87,26 @@
       "notConnected": "未接続",
       "notConnectedError": ": {{error}}"
     },
+    "webhooks": {
+      "heading": "Webhook",
+      "hint": "ロースト中のイベントで指定したURLにJSONをPOST送信します -- ntfy、Discord/Slackの受信Webhook、Home Assistant、自作のスクリプトなど。ペイロードの詳細はbackend/app/webhooks.pyを参照してください。",
+      "name": "名前",
+      "namePlaceholder": "自分のスマホ",
+      "url": "URL",
+      "add": "Webhookを追加",
+      "saveChanges": "変更を保存",
+      "cancelEdit": "キャンセル",
+      "edit": "編集",
+      "delete": "削除",
+      "sendTest": "テスト送信",
+      "testing": "送信中…",
+      "testOk": "テスト通知を送信しました。",
+      "testFailed": "テストに失敗しました: {{error}}",
+      "allEvents": "すべてのイベント",
+      "allEventsHint": "イベントが選択されていません -- このWebhookはすべてのイベントで発火します。",
+      "nameAndUrlRequired": "名前とURLは両方とも必須です。",
+      "confirmDelete": "このWebhookを削除しますか?"
+    },
     "save": "保存",
     "saved": "保存しました。",
     "failedToSave": "保存に失敗しました: {{error}}"
@@ -110,7 +130,8 @@
       "modbusEthernet": "Direct Modbus (Ethernet)",
       "ms6514": "Direct USB（熱電対メーター）",
       "aillio": "Aillio Bullet (USB)",
-      "tc4": "TC4+ (USB, PIDファームウェア)"
+      "tc4": "TC4+ (USB, PIDファームウェア)",
+      "plugin": "プラグインデバイス"
     },
     "greenWeightG": "生豆重量 (g)",
     "alogPath": ".alog または .json ファイルパス（サーバー側）",
@@ -153,6 +174,13 @@
     "bulletR1": "Bullet R1",
     "aillioHint": "USB経由でロースターと直接通信します（ポート/ホストの設定は不要 -- アプリが独自のUSBベンダー/プロダクトIDで見つけます）。Heater/Fan/Drumはデバイス自身が最後に報告した状態を読み戻します。Direct Modbusと同じ「実際の状態を上書きしない」動作です。",
     "tc4Hint": "aArtisanQ（PID）ファームウェアを実行するTC4+シールドのダイレクトUSB読み書き、115200ボー -- USB経由でそのまま通信、他のソフトウェアは不要です。チャンネル1 → BT、チャンネル2 → ET、チャンネル3（配線されていれば）→ DT。HeaterとFanのスライダーは実際のOT1/DCFANコマンドを送信します。TC4にはDrum出力がないため、そのスライダーはここでは何もしません。",
+    "plugin": {
+      "kind": "プラグイン",
+      "choose": "プラグインを選択…",
+      "chooseHint": "上でインストール済みのデバイスプラグインを選んでください。追加するにはサーバー上のdevice_plugins/README.mdを参照 -- デフォルトでは何もインストールされていません。",
+      "hint": "「{{label}}」プラグインを使用します。マイルストーンの自動検出や制御の可否はそのプラグイン次第です。",
+      "liveHint": "「{{label}}」プラグインから読み取っています。このプラグインが自動検出しない限り、各マイルストーン（Charge、Dry End、FC Start、Dropなど）は手動クリックです -- ロースト中に自分でマークしてください。"
+    },
     "autoDetectMilestones": "BTからCharge/Dry End/FC Startを自動検出（オプトイン）",
     "dryEndThreshold": "Dry End BTしきい値（°C、空欄で無効）",
     "fcStartThreshold": "FC Start BTしきい値（°C、空欄で無効）",
@@ -677,6 +705,7 @@
       "ms6514": "MS6514",
       "aillioBullet": "Aillio Bullet",
       "tc4": "TC4+",
+      "plugin": "プラグインデバイス",
       "uploadedLog": "アップロードされたログ"
     },
     "import": {
@@ -719,7 +748,8 @@
         "modbusLive": "Modbus（ライブ）",
         "ms6514Live": "MS6514（ライブ）",
         "aillioLive": "Aillio Bullet（ライブ）",
-        "tc4Live": "TC4+（ライブ）"
+        "tc4Live": "TC4+（ライブ）",
+        "pluginLive": "プラグインデバイス（ライブ）"
       }
     },
     "table": {

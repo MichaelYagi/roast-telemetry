@@ -39,6 +39,7 @@ function modeLabel(roast) {
   const labels = {
     simulator: "Simulator", alog_playback: ".alog Playback", ms6514_live: "Direct USB (thermocouple meter)",
     aillio_live: "Aillio Bullet (USB)", tc4_live: "TC4+ (USB, PID firmware)",
+    plugin_live: roast.plugin_kind ? `Plugin device (${roast.plugin_kind})` : "Plugin device",
   };
   return labels[roast.mode] || roast.mode;
 }

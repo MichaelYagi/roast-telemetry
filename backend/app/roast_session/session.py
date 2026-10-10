@@ -12,6 +12,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import device_plugins
 from aillio_bridge import AillioEngine
 from hardware_fakes import sim as simulated_devices
 from alog_playback import (
@@ -34,7 +35,7 @@ from pymodbus.client import ModbusSerialClient, ModbusTcpClient
 from simulator import SimulatorEngine
 from tc4_bridge import TC4Engine
 
-from .. import storage
+from .. import storage, webhooks
 from ..beans_text import parse_beans_description
 from .control import RoastControl, RoastControlError
 from ..models import (
@@ -334,6 +335,16 @@ class RoastSession:
         if request.mode == RoastMode.TC4_LIVE:
             self.tc4_port = request.tc4_port
 
+        # plugin_live only -- same reasoning again. self._plugin_spec is
+        # resolved once below (in the engine-construction block) and kept
+        # for the rest of this session's life -- see _engine_needs_close().
+        self.plugin_kind: Optional[str] = None
+        self.plugin_port: Optional[str] = None
+        self._plugin_spec: Optional[device_plugins.PluginSpec] = None
+        if request.mode == RoastMode.PLUGIN_LIVE:
+            self.plugin_kind = request.plugin_kind
+            self.plugin_port = request.plugin_port
+
         # A simulated device (a "sim://..." port or host) is started here and stopped
         # with the engine -- see _start_sim below.
         self._sim: Optional[simulated_devices.SimHandle] = None
@@ -464,6 +475,30 @@ class RoastSession:
                     )
                 except ValueError as exc:
                     raise RoastSessionError(str(exc)) from exc
+            elif request.mode == RoastMode.PLUGIN_LIVE:
+                if not request.plugin_kind:
+                    raise RoastSessionError("Missing plugin -- select which device plugin to use (Device tab) before connecting.")
+                plugin_spec = device_plugins.get(request.plugin_kind)
+                if plugin_spec is None:
+                    raise RoastSessionError(f"device plugin {request.plugin_kind!r} isn't installed -- see device_plugins/README.md.")
+                self._plugin_spec = plugin_spec
+                plugin_port = request.plugin_port
+                if plugin_spec.needs_port:
+                    if not plugin_port:
+                        raise RoastSessionError(f"Missing {plugin_spec.port_hint} -- enter it (Device tab) before connecting.")
+                    if simulated_devices.is_simulated(plugin_port):
+                        plugin_port = self._start_sim(plugin_port, RoastMode.PLUGIN_LIVE).serial_url
+                else:
+                    plugin_port = None
+                try:
+                    engine = plugin_spec.connect(
+                        plugin_port,
+                        dry_end_c=request.dry_end_c,
+                        fc_start_c=request.fc_start_c,
+                        detect_milestones=request.auto_detect_milestones,
+                    )
+                except ValueError as exc:
+                    raise RoastSessionError(str(exc)) from exc
             else:  # pragma: no cover - guarded by enum
                 raise RoastSessionError(f"unsupported mode {request.mode}")
         except BaseException:
@@ -504,6 +539,13 @@ class RoastSession:
             logger.info(
                 "roast %s connecting: tc4_live port=%s connected=%s%s",
                 self.id, self.tc4_port, status.get("connected"),
+                f" error={status.get('last_error')}" if not status.get("connected") else "",
+            )
+        elif request.mode == RoastMode.PLUGIN_LIVE:
+            status = engine.status()
+            logger.info(
+                "roast %s connecting: plugin_live kind=%s port=%s connected=%s%s",
+                self.id, self.plugin_kind, self.plugin_port, status.get("connected"),
                 f" error={status.get('last_error')}" if not status.get("connected") else "",
             )
         # Exposed via summary() so the frontend's vertical control panel
@@ -564,6 +606,17 @@ class RoastSession:
             self._sim.stop()
             self._sim = None
 
+    def _engine_needs_explicit_close(self) -> bool:
+        """True for a live bridge that holds a serial port open and must be
+        told to release it -- as opposed to aillio_live, whose raw-USB
+        transport is already fully released by self.device.disconnect()
+        above, so calling engine.close() again is unnecessary. A plugin
+        needs this exactly when it asked for a port (PluginSpec.needs_port)
+        -- the same reasoning, generalized."""
+        if isinstance(self._engine, (ModbusEngine, MS6514Engine, TC4Engine)):
+            return True
+        return self.mode == RoastMode.PLUGIN_LIVE and bool(self._plugin_spec and self._plugin_spec.needs_port)
+
     def _close_engine(self) -> None:
         """Closes the live engine and, if there is one, the simulated device behind it."""
         try:
@@ -601,6 +654,8 @@ class RoastSession:
             "ms6514_port": self.ms6514_port,
             "aillio_model": self.aillio_model,
             "tc4_port": self.tc4_port,
+            "plugin_kind": self.plugin_kind,
+            "plugin_port": self.plugin_port,
         })
         if self.tags:
             storage.set_roast_tags(self.id, self.tags)
@@ -701,6 +756,7 @@ class RoastSession:
                 else:
                     self.profile.append(sample)
                     self.events.extend(events)
+                    self._fire_milestone_webhooks(events)
                     self._evaluate_ambient_alarms(sample)
                     await self.control.tick(sample, recording=True)
 
@@ -740,6 +796,7 @@ class RoastSession:
             if self._recorded:
                 reached_drop = any(e["type"] == RoastEventType.DROP.value for e in self.events)
                 storage.update_roast(self.id, status=self.status.value, reached_drop=reached_drop)
+                webhooks.fire_background("roast_finished", {**self._webhook_base_payload(), "status": self.status.value})
             await pubsub.publish(self.id, {"type": "error", "roast_id": self.id, "message": str(exc)})
 
     def _cancel_pending_alarms(self) -> None:
@@ -784,7 +841,7 @@ class RoastSession:
         self._stop_requested.set()
         self.status = RoastStatus.IDLE  # back to idle, not "stopped" -- nothing was ever actually recording
         await asyncio.to_thread(self.device.disconnect)
-        if isinstance(self._engine, (ModbusEngine, MS6514Engine, TC4Engine)):
+        if self._engine_needs_explicit_close():
             self._close_engine()  # release the serial port
         await pubsub.publish(self.id, {"type": "finished", "roast_id": self.id, "status": self.status.value})
 
@@ -793,7 +850,7 @@ class RoastSession:
         self.status = status
         self.control.stop_automation("the roast finished")
         await asyncio.to_thread(self.device.disconnect)
-        if isinstance(self._engine, (ModbusEngine, MS6514Engine, TC4Engine)):
+        if self._engine_needs_explicit_close():
             self._close_engine()  # release the serial port
 
         # Written in the native .alog shape (Python-literal syntax
@@ -832,6 +889,7 @@ class RoastSession:
             playback_speed=self.playback_speed,
             reached_drop=reached_drop,
         )
+        webhooks.fire_background("roast_finished", {**self._webhook_base_payload(), "status": self.status.value})
         await pubsub.publish(self.id, {"type": "finished", "roast_id": self.id, "status": self.status.value})
 
     # -- interaction ----------------------------------------------------
@@ -887,6 +945,23 @@ class RoastSession:
         storage.update_roast(self.id, notes_text=notes_search_text(self.notes))
         self._rewrite_alog()
 
+    def _webhook_base_payload(self) -> dict:
+        """Fields every webhooks.fire() call for this session shares -- see
+        backend/app/webhooks.py."""
+        latest = self.profile[-1] if self.profile else {}
+        return {
+            "roast_id": self.id, "roast_title": self.title, "mode": self.mode.value, "beans": self.beans,
+            "time_s": latest.get("time_s"), "bt": latest.get("bt"), "et": latest.get("et"),
+        }
+
+    def _fire_milestone_webhooks(self, events: list[dict]) -> None:
+        for event in events:
+            if event["type"] == RoastEventType.CUSTOM.value:
+                continue  # a free-text note, not a named milestone -- nothing to subscribe to by name
+            webhooks.fire_background(event["type"], {
+                **self._webhook_base_payload(), "milestone_value": event.get("value"),
+            })
+
     def add_event(self, req: EventCreateRequest) -> dict:
         if req.type in MILESTONE_SEQUENCE:
             # Guards against marking a milestone while merely connected/
@@ -916,6 +991,7 @@ class RoastSession:
             "value": req.value,
         }
         self.events.append(event)
+        self._fire_milestone_webhooks([event])
         if req.type == RoastEventType.CHARGE:
             # Turning Point stays auto-detected even when CHARGE itself is
             # a manual click -- confirmed against a real FZ-94 roast,
@@ -1240,6 +1316,8 @@ class RoastSession:
             ms6514_port=self.ms6514_port,
             aillio_model=self.aillio_model,
             tc4_port=self.tc4_port,
+            plugin_kind=self.plugin_kind,
+            plugin_port=self.plugin_port,
         )
 
     def to_roast(self) -> Roast:
@@ -1285,6 +1363,17 @@ class RoastSessionManager:
             engine_attr = "model"
         elif request.mode == RoastMode.TC4_LIVE:
             port = request.tc4_port
+        elif request.mode == RoastMode.PLUGIN_LIVE:
+            # Only for a plugin that takes a port at all, and only on the
+            # trust that it stores it on self.port, like every built-in
+            # bridge above -- see device_plugins/README.md. No reliable way
+            # to key this cleanup on anything for a needs_port=False plugin
+            # (aillio_live's own "model" equivalent isn't a plugin-wide
+            # convention), so those are simply left out of this leak check.
+            plugin_spec = device_plugins.get(request.plugin_kind) if request.plugin_kind else None
+            if plugin_spec is None or not plugin_spec.needs_port:
+                return
+            port = request.plugin_port
         else:
             return
         if not port:
@@ -1304,11 +1393,11 @@ class RoastSessionManager:
         RoastSession.start()/begin_recording()'s _persist_new_roast_row()
         calls), since a modbus_live/ms6514_live session can now sit
         connected-but-not-recording for a while first (see connect())."""
-        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE):
+        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE, RoastMode.PLUGIN_LIVE):
             self._release_stale_same_port_session(request)
         roast_id = str(uuid.uuid4())
         session = RoastSession(roast_id, request, created_by_username=created_by_username)
-        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE):
+        if request.mode in (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE, RoastMode.PLUGIN_LIVE):
             # ModbusEngine/MS6514Engine/AillioEngine/TC4Engine's __init__ already made the real
             # connect attempt above and caught/swallowed any failure into
             # last_error rather than raising -- without this check, a bad
@@ -1418,6 +1507,8 @@ class RoastSessionManager:
             ms6514_port=row.get("ms6514_port"),
             aillio_model=row.get("aillio_model"),
             tc4_port=row.get("tc4_port"),
+            plugin_kind=row.get("plugin_kind"),
+            plugin_port=row.get("plugin_port"),
             **_persistent_flags_from_row(row),
             profile=parsed["profile"],
             events=parsed["events"],

@@ -24,5 +24,5 @@ export function isSimulatedRoast(roast) {
 
 // The Configure Roast form, before anything is connected.
 export function isSimulatedForm(form) {
-  return [form.modbus_port, form.modbus_host, form.ms6514_port, form.tc4_port].some(isSimulatedValue);
+  return [form.modbus_port, form.modbus_host, form.ms6514_port, form.tc4_port, form.plugin_port].some(isSimulatedValue);
 }

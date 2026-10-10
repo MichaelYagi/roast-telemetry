@@ -58,7 +58,7 @@ function formatElapsed(seconds) {
   return `${sign}${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-const LIVE_MODES = ["modbus_live", "ms6514_live", "aillio_live", "tc4_live"];
+const LIVE_MODES = ["modbus_live", "ms6514_live", "aillio_live", "tc4_live", "plugin_live"];
 // modbus_live and aillio_live both read Heater/Fan/Drum back from the
 // device itself (genuine PLC/VFD registers or, for Aillio, the device's
 // own last-reported state -- not an echo of this app's own commands, see
@@ -177,6 +177,13 @@ export default function LiveRoastView() {
     // known value today.
     aillio_model: "r1",
     tc4_port: "",
+    // plugin_live only -- see device_plugins/README.md. plugin_kind is
+    // which installed plugin (GET /device-plugins); plugin_port is that
+    // plugin's own port/identifier field, blank until one's picked since
+    // unlike aillio_model there's no single sensible default across
+    // every possible plugin.
+    plugin_kind: "",
+    plugin_port: "",
     // Off by default -- real hardware means a real operator marking
     // milestones by hand, not an algorithm guessing, unless explicitly
     // opted in. Manual clicks still work as an override even when on
@@ -234,6 +241,15 @@ export default function LiveRoastView() {
     api.listDeviceProfiles().then(setDeviceProfiles).catch(() => {});
   }
   useEffect(refreshDeviceProfiles, []);
+
+  // Installed device plugins (see device_plugins/README.md) -- the "Plugin
+  // device" connection option only appears once this is non-empty; nothing
+  // ships installed by default, so most servers never show it at all.
+  const [devicePlugins, setDevicePlugins] = useState([]);
+  useEffect(() => {
+    api.listDevicePlugins().then(setDevicePlugins).catch(() => {});
+  }, []);
+  const selectedPlugin = devicePlugins.find((p) => p.kind === form.plugin_kind) || null;
 
   // Configure Roast form tabs -- General/Device always exist (every data
   // source has *some* Device-tab content: connection fields, an .alog
@@ -775,6 +791,10 @@ export default function LiveRoastView() {
     if (form.mode === "tc4_live") {
       payload.tc4_port = form.tc4_port;
     }
+    if (form.mode === "plugin_live") {
+      payload.plugin_kind = form.plugin_kind;
+      payload.plugin_port = form.plugin_port;
+    }
     if (LIVE_MODES.includes(form.mode)) {
       payload.auto_detect_milestones = form.auto_detect_milestones;
       payload.dry_end_c = form.dry_end_c === "" ? null : Number(form.dry_end_c);
@@ -984,6 +1004,8 @@ export default function LiveRoastView() {
       ms6514_port: c.ms6514_port || "",
       aillio_model: c.aillio_model || "r1",
       tc4_port: c.tc4_port || "",
+      plugin_kind: c.plugin_kind || "",
+      plugin_port: c.plugin_port || "",
       auto_detect_milestones: c.auto_detect_milestones ?? false,
       dry_end_c: c.dry_end_c ?? "",
       fc_start_c: c.fc_start_c ?? "",
@@ -1311,6 +1333,7 @@ export default function LiveRoastView() {
                     <option value="ms6514_live">{t("liveRoast.connectionOptions.ms6514")}</option>
                     <option value="aillio_live">{t("liveRoast.connectionOptions.aillio")}</option>
                     <option value="tc4_live">{t("liveRoast.connectionOptions.tc4")}</option>
+                    {devicePlugins.length > 0 && <option value="plugin_live">{t("liveRoast.connectionOptions.plugin")}</option>}
                   </select>
                 </label>
               </div>
@@ -1816,6 +1839,39 @@ export default function LiveRoastView() {
               <p className="hint">{t("liveRoast.tc4Hint")}</p>
             </div>
           )}
+          {activeTab === "device" && form.mode === "plugin_live" && (
+            <div className="form-row">
+              <label>
+                {t("liveRoast.plugin.kind")}
+                <select value={form.plugin_kind} onChange={(e) => setForm({ ...form, plugin_kind: e.target.value, plugin_port: "" })}>
+                  <option value="">{t("liveRoast.plugin.choose")}</option>
+                  {devicePlugins.map((p) => (
+                    <option key={p.kind} value={p.kind}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {selectedPlugin?.needs_port && (
+                <label>
+                  {selectedPlugin.port_hint}
+                  <input
+                    placeholder="COM5"
+                    list="serial-ports-plugin"
+                    value={form.plugin_port}
+                    onChange={(e) => setForm({ ...form, plugin_port: e.target.value })}
+                  />
+                  <datalist id="serial-ports-plugin">
+                    {portsFor("plugin_live").map((p) => (
+                      <option key={p.device} value={p.device} label={p.description || undefined} />
+                    ))}
+                  </datalist>
+                  <SerialPortHints ports={portsFor("plugin_live")} onPick={(device) => setForm({ ...form, plugin_port: device })} />
+                </label>
+              )}
+              <p className="hint">{selectedPlugin ? t("liveRoast.plugin.hint", { label: selectedPlugin.label }) : t("liveRoast.plugin.chooseHint")}</p>
+            </div>
+          )}
           {activeTab === "milestones" && LIVE_MODES.includes(form.mode) && (
             <div className="form-row">
               <label className="checkbox-label">
@@ -2111,6 +2167,15 @@ export default function LiveRoastView() {
                       <span className="meta-value">{roast.tc4_port}</span>
                     </li>
                   )}
+                  {roast.mode === "plugin_live" && roast.plugin_kind && (
+                    <li>
+                      <span className="meta-label">{t("liveRoast.plugin.kind")}</span>
+                      <span className="meta-value">
+                        {devicePlugins.find((p) => p.kind === roast.plugin_kind)?.label || roast.plugin_kind}
+                        {roast.plugin_port ? ` (${roast.plugin_port})` : ""}
+                      </span>
+                    </li>
+                  )}
                   {serverPlatform && (
                     <li>
                       <span className="meta-label">{t("liveRoast.server")}</span>
@@ -2286,6 +2351,11 @@ export default function LiveRoastView() {
             {activeMode === "tc4_live" && (
               <p className="hint" style={{ gridColumn: "1 / -1" }}>
                 {t("liveRoast.tc4LiveHint", { port: form.tc4_port || t("liveRoast.theSerialPort") })}
+              </p>
+            )}
+            {activeMode === "plugin_live" && (
+              <p className="hint" style={{ gridColumn: "1 / -1" }}>
+                {t("liveRoast.plugin.liveHint", { label: selectedPlugin?.label || form.plugin_kind })}
               </p>
             )}
           </div>

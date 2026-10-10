@@ -11,9 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+import device_plugins
 from . import auth, storage
 from .api import auth as auth_api
-from .api import activity, analysis, beans, device_profiles, devices, files, presets, roasts, serial_ports, settings, views
+from .api import activity, analysis, beans, device_profiles, device_plugins as device_plugins_api, devices, files, presets, roasts, serial_ports, settings, views, webhooks as webhooks_api
 from .models import DeviceProfileCreateRequest, DeviceStatus, RoastCreateRequest, RoastMode, UserStatus
 from .roast_session import RoastSessionError, session_manager
 from .version import VERSION
@@ -99,6 +100,10 @@ async def lifespan(app: FastAPI):
         }
         for p in BUILT_IN_PROFILES
     ])
+    # Third-party protocol plugins -- see device_plugins/README.md. A file
+    # that fails to import is logged and skipped there, so one broken
+    # plugin never stops the server from starting.
+    device_plugins.load_installed()
     yield
 
 
@@ -182,6 +187,8 @@ app.include_router(roasts.router, prefix="/api/v1")
 app.include_router(devices.router, prefix="/api/v1")
 app.include_router(presets.router, prefix="/api/v1")
 app.include_router(device_profiles.router, prefix="/api/v1")
+app.include_router(device_plugins_api.router, prefix="/api/v1")
+app.include_router(webhooks_api.router, prefix="/api/v1")
 app.include_router(settings.router, prefix="/api/v1")
 app.include_router(serial_ports.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
@@ -246,7 +253,7 @@ def _server_lan_ip() -> str | None:
 
 
 _CONNECTED_DEVICE_STATES = (DeviceStatus.CONNECTED.value, DeviceStatus.STREAMING.value)
-_REAL_HARDWARE_MODES = (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE)
+_REAL_HARDWARE_MODES = (RoastMode.MODBUS_LIVE, RoastMode.MS6514_LIVE, RoastMode.AILLIO_LIVE, RoastMode.TC4_LIVE, RoastMode.PLUGIN_LIVE)
 
 
 @app.get("/api/v1/health")

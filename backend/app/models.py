@@ -30,6 +30,14 @@ class RoastMode(str, Enum):
     # for the same reason aillio_live is separate: a genuinely different
     # protocol family, not just a different transport of an existing one.
     TC4_LIVE = "tc4_live"
+    # A device plugin's protocol (see device_plugins/base.py) -- one shared
+    # mode for every protocol family that isn't Modbus (a DeviceProfile
+    # already covers a new Modbus roaster with no code, see
+    # modbus_bridge/device_profiles.py) and isn't already one of the
+    # built-in bridges above. Which actual protocol is request.plugin_kind,
+    # not a new RoastMode member -- a plugin never needs its own enum
+    # value, new RoastCreateRequest fields, or new branches here.
+    PLUGIN_LIVE = "plugin_live"
 
 
 class RoastStatus(str, Enum):
@@ -493,6 +501,8 @@ class RoastCreateRequest(BaseModel):
     ms6514_port: Optional[str] = Field(default=None, description="Required when mode=ms6514_live: serial port the Mastech MS6514 is on, e.g. 'COM5'")
     aillio_model: Optional[str] = Field(default=None, description="Required when mode=aillio_live: which Aillio Bullet model, e.g. 'r1' (see aillio_bridge.engine.PROTOCOLS for the known set). A raw USB device, not a port/host -- there's nothing else to configure per-install.")
     tc4_port: Optional[str] = Field(default=None, description="Required when mode=tc4_live: serial port the TC4+ shield is on, e.g. 'COM5'")
+    plugin_kind: Optional[str] = Field(default=None, description="Required when mode=plugin_live: which installed device plugin to use (see GET /device-plugins), e.g. 'example_serial_meter'.")
+    plugin_port: Optional[str] = Field(default=None, description="mode=plugin_live only: the plugin's own port/identifier field (a serial port for most plugins; some, like aillio_live's raw-USB model, need no port at all -- see that plugin's needs_port). Required only when the chosen plugin's needs_port is true.")
     auto_detect_milestones: bool = Field(default=False, description="live-bridge modes only, opt-in: auto-fire Charge/Dry End/FC Start from the BT curve instead of manual clicks only (Turning Point stays automatic either way -- see roast_heuristics.LiveRoastDetector). Off by default -- real hardware means a real operator, not an algorithm guessing, unless explicitly turned on. Manual clicks still work as an override even when on.")
     dry_end_c: Optional[float] = Field(default=160.0, description="BT threshold for auto-detecting Dry End when auto_detect_milestones is on; live-bridge modes only. Null disables it.")
     fc_start_c: Optional[float] = Field(default=196.0, description="BT threshold for auto-detecting FC Start when auto_detect_milestones is on; live-bridge modes only. Null disables it.")
@@ -562,6 +572,9 @@ class RoastSummary(BaseModel):
     aillio_model: Optional[str] = None
     # tc4_live only, same reasoning again.
     tc4_port: Optional[str] = None
+    # plugin_live only, same reasoning again.
+    plugin_kind: Optional[str] = None
+    plugin_port: Optional[str] = None
     # Persistent, post-hoc flags (History, roast detail) -- distinct from
     # the live-only "Stopped for safety: ..." banner (RoastControl's own
     # tripped_reason), which resets once the session ends. had_emergency_stop

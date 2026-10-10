@@ -88,6 +88,26 @@
       "notConnected": "Not connected",
       "notConnectedError": ": {{error}}"
     },
+    "webhooks": {
+      "heading": "Webhooks",
+      "hint": "Sends a JSON POST to a URL of your choice on roast events -- ntfy, a Discord/Slack incoming webhook, Home Assistant, or a script of your own. See device_plugins/README.md-style docs at backend/app/webhooks.py for the exact payload shape.",
+      "name": "Name",
+      "namePlaceholder": "My phone",
+      "url": "URL",
+      "add": "Add webhook",
+      "saveChanges": "Save changes",
+      "cancelEdit": "Cancel",
+      "edit": "Edit",
+      "delete": "Delete",
+      "sendTest": "Send test",
+      "testing": "Sending…",
+      "testOk": "Test notification sent.",
+      "testFailed": "Test failed: {{error}}",
+      "allEvents": "every event",
+      "allEventsHint": "No events selected -- this webhook fires for every event.",
+      "nameAndUrlRequired": "Name and URL are both required.",
+      "confirmDelete": "Delete this webhook?"
+    },
     "save": "Save",
     "saved": "Saved.",
     "failedToSave": "Failed to save: {{error}}"
@@ -111,7 +131,8 @@
       "modbusEthernet": "Direct Modbus (Ethernet)",
       "ms6514": "Direct USB (thermocouple meter)",
       "aillio": "Aillio Bullet (USB)",
-      "tc4": "TC4+ (USB, PID firmware)"
+      "tc4": "TC4+ (USB, PID firmware)",
+      "plugin": "Plugin device"
     },
     "greenWeightG": "Green weight (g)",
     "alogPath": ".alog or .json file path (server-side)",
@@ -154,6 +175,13 @@
     "bulletR1": "Bullet R1",
     "aillioHint": "Talks directly to the roaster over USB (no port/host to configure — the app finds it by its own USB vendor/product id). Heater/Fan/Drum read back the device's own last-reported state, same \"don't clobber real state\" behavior as Direct Modbus.",
     "tc4Hint": "Direct USB read/write of a TC4+ shield running the aArtisanQ (PID) firmware, 115200 baud — talks straight over USB, no other software needed. Channel 1 → BT, channel 2 → ET, channel 3 (if wired) → DT. Heater and Fan sliders send real OT1/DCFAN commands; there's no Drum output on TC4, so that slider doesn't do anything here.",
+    "plugin": {
+      "kind": "Plugin",
+      "choose": "Choose a plugin…",
+      "chooseHint": "Pick an installed device plugin above. See device_plugins/README.md on the server to add one — nothing ships installed by default.",
+      "hint": "Uses the \"{{label}}\" plugin. Whether it auto-detects milestones or can be controlled depends on that plugin.",
+      "liveHint": "Reading from the \"{{label}}\" plugin. Every milestone (Charge, Dry End, FC Start, Drop, etc.) is a manual click unless this plugin auto-detects them — mark them yourself as the roast happens."
+    },
     "autoDetectMilestones": "Auto-detect Charge/Dry End/FC Start from BT (opt-in)",
     "dryEndThreshold": "Dry End BT threshold (°C, blank to disable)",
     "fcStartThreshold": "FC Start BT threshold (°C, blank to disable)",
@@ -685,6 +713,7 @@
       "ms6514": "MS6514",
       "aillioBullet": "Aillio Bullet",
       "tc4": "TC4+",
+      "plugin": "Plugin device",
       "uploadedLog": "Uploaded log"
     },
     "import": {
@@ -729,7 +758,8 @@
         "modbusLive": "Modbus (live)",
         "ms6514Live": "MS6514 (live)",
         "aillioLive": "Aillio Bullet (live)",
-        "tc4Live": "TC4+ (live)"
+        "tc4Live": "TC4+ (live)",
+        "pluginLive": "Plugin device (live)"
       }
     },
     "table": {

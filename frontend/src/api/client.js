@@ -146,6 +146,13 @@ export const api = {
   createDeviceProfile: (profile) => request("/device-profiles", { method: "POST", body: JSON.stringify(profile) }),
   updateDeviceProfile: (id, profile) => request(`/device-profiles/${id}`, { method: "PUT", body: JSON.stringify(profile) }),
   deleteDeviceProfile: (id) => request(`/device-profiles/${id}`, { method: "DELETE" }),
+  listDevicePlugins: () => request("/device-plugins"),
+  listWebhooks: () => request("/webhooks"),
+  listWebhookEvents: () => request("/webhooks/events"),
+  createWebhook: (webhook) => request("/webhooks", { method: "POST", body: JSON.stringify(webhook) }),
+  updateWebhook: (id, webhook) => request(`/webhooks/${id}`, { method: "PUT", body: JSON.stringify(webhook) }),
+  deleteWebhook: (id) => request(`/webhooks/${id}`, { method: "DELETE" }),
+  testWebhook: (url) => request("/webhooks/test", { method: "POST", body: JSON.stringify({ url }) }),
 
   // settings (Ollama connection for AI roast reviews)
   getSettings: () => request("/settings"),

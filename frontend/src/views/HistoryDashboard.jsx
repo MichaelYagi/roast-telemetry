@@ -43,6 +43,7 @@ export default function HistoryDashboard() {
     ms6514_live: t("history.modeLabels.ms6514"),
     aillio_live: t("history.modeLabels.aillioBullet"),
     tc4_live: t("history.modeLabels.tc4"),
+    plugin_live: t("history.modeLabels.plugin"),
   };
   const STATUS_LABELS = {
     roasting: t("history.filters.statusRoasting"),
@@ -592,6 +593,7 @@ export default function HistoryDashboard() {
             <option value="ms6514_live">{t("history.filters.modeOptions.ms6514Live")}</option>
             <option value="aillio_live">{t("history.filters.modeOptions.aillioLive")}</option>
             <option value="tc4_live">{t("history.filters.modeOptions.tc4Live")}</option>
+            <option value="plugin_live">{t("history.filters.modeOptions.pluginLive")}</option>
           </select>
         </label>
         <label>
@@ -745,7 +747,13 @@ export default function HistoryDashboard() {
                       </Link>
                       {r.beans && <span className="cell-sub">{r.beans}</span>}
                     </td>
-                    <td className="cell-mode">{r.mode === "alog_playback" && !r.source_alog_path ? t("history.modeLabels.uploadedLog") : MODE_LABELS[r.mode] || r.mode}</td>
+                    <td className="cell-mode">
+                      {r.mode === "alog_playback" && !r.source_alog_path
+                        ? t("history.modeLabels.uploadedLog")
+                        : r.mode === "plugin_live" && r.plugin_kind
+                          ? `${MODE_LABELS.plugin_live} (${r.plugin_kind})`
+                          : MODE_LABELS[r.mode] || r.mode}
+                    </td>
                     <td className="cell-status">
                       <span className={`status-pill status-${r.status}`}>{STATUS_LABELS[r.status] || r.status}</span>
                       {isEmergencyStopped(r) && (

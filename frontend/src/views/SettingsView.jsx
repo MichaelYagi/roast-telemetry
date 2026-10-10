@@ -4,6 +4,7 @@ import { api } from "../api/client.js";
 import BreakoutSettingsEditor from "../components/BreakoutSettingsEditor.jsx";
 import ColorsSettingsEditor from "../components/ColorsSettingsEditor.jsx";
 import VerticalControlSettingsEditor from "../components/VerticalControlSettingsEditor.jsx";
+import WebhooksPanel from "../components/WebhooksPanel.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 
 const CHECK_DEBOUNCE_MS = 600;
@@ -344,6 +345,8 @@ export default function SettingsView() {
                 : t("settings.aiRoastReview.notConnected") + (status?.error ? t("settings.aiRoastReview.notConnectedError", { error: status.error }) : "")}
         </p>
       </div>
+
+      <WebhooksPanel />
 
       <div className="panel">
         <button type="button" onClick={handleSave} disabled={!loaded}>
