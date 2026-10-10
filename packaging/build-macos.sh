@@ -82,9 +82,28 @@ if [[ -e "dist/Roast Telemetry.app" ]]; then
   rm -rf "dist/Roast Telemetry"
 fi
 
+# Ad-hoc signature ("-s -", no certificate, no Apple Developer account,
+# free) -- NOT the same thing as real code signing/notarization, which
+# this project deliberately doesn't do (see packaging/README.md). On
+# Intel this step is merely nice to have: an entirely unsigned app still
+# runs fine there, Gatekeeper's right-click-Open override is purely
+# advisory. On Apple Silicon it's load-bearing: arm64 macOS refuses to
+# execute *any* unsigned binary at all -- that's a kernel-level code
+# integrity check (AMFI), not a Gatekeeper policy, and it has no "Open
+# Anyway" override in Privacy & Security the way a signed-but-unnotarized
+# app does. Without this, an Apple Silicon build is simply unopenable,
+# full stop, no matter what the person downloading it tries -- confirmed
+# live (a real M1 Mac rejected an unsigned build outright; spctl -a -vv
+# just said "rejected" with no reason, and no prompt ever appeared).
+# --deep also signs whatever's nested inside the bundle, not just the
+# top-level binary.
+echo "== Ad-hoc signing (no certificate -- see this script's own comment) =="
+codesign --force --deep -s - "dist/Roast Telemetry.app"
+
 echo
 echo "Built: dist/Roast Telemetry.app"
 echo "Zip that (or use Finder's own Compress) to distribute it."
-echo "Unsigned: Gatekeeper will refuse to open it with a plain double-click the first time --"
-echo "right-click -> Open -> Open (once) is the standard way past that for an unsigned app,"
-echo "not a build error. See packaging/README.md for the full explanation to pass along to whoever you send it to."
+echo "Unsigned (ad-hoc only): Gatekeeper will refuse to open it with a plain double-click the"
+echo "first time -- right-click -> Open -> Open (once), or System Settings > Privacy & Security >"
+echo "Open Anyway on Sequoia+, is the standard way past that, not a build error. See"
+echo "packaging/README.md for the full explanation to pass along to whoever you send it to."

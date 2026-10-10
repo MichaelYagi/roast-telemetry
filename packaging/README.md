@@ -75,15 +75,26 @@ for the `pystray`/`pyserial` hidden-import fixes.
    `dist/Roast Telemetry.app`, the difference is only what's inside it.
 4. Output: `dist/Roast Telemetry.app`. Zip it (or Finder's own
    Compress) to send it somewhere else.
-5. Gatekeeper blocks a plain double-click on an unsigned app the first
-   time ("can't be opened because Apple cannot check it for malicious
+5. The script ad-hoc signs the built `.app` (`codesign --force --deep -s -`,
+   free, no certificate, no Apple Developer account -- not the same thing
+   as real code signing/notarization, see "Why unsigned" below). On Intel
+   this is just a nicety; on **Apple Silicon it's required to run at all**
+   -- arm64 macOS refuses to execute *any* unsigned binary, a kernel-level
+   check (AMFI), not a Gatekeeper dialog, and there's no "Open Anyway" in
+   Privacy & Security for a zero-signature app the way there is for a
+   signed-but-unnotarized one. Confirmed live: a real build without this
+   step was flatly rejected on an M1 Mac (`spctl -a -vv` said "rejected,"
+   no reason, no prompt at all) -- this isn't a hypothetical.
+6. Gatekeeper still blocks a plain double-click the first time
+   ("can't be opened because Apple cannot check it for malicious
    software," no "Open anyway" button on that dialog). The way past it:
    **right-click the app -> Open -> Open** (a *different* dialog that
-   does have an Open-anyway button) -- only needed once per machine.
-   After that it runs like any other app: a menu-bar icon appears
-   (no Dock icon -- this is a background utility, same as the
-   Windows tray, not a normal windowed app), click for the same
-   Start/Stop/Open in browser/Save logs menu.
+   does have an Open-anyway button) on macOS 14 and earlier, or
+   **System Settings -> Privacy & Security -> Open Anyway** on macOS 15+
+   -- only needed once per machine. After that it runs like any other
+   app: a menu-bar icon appears (no Dock icon -- this is a background
+   utility, same as the Windows tray, not a normal windowed app), click
+   for the same Start/Stop/Open in browser/Save logs menu.
 
 ## Linux
 
@@ -127,6 +138,13 @@ machine -- not a functional limitation, and not something a build
 config can fix without an actual certificate. Worth revisiting if this
 ever gets wide, non-technical distribution; not needed to have a real,
 working, shareable build today.
+
+The macOS build's free ad-hoc signature (see macOS step 5 above) is a
+separate thing from this and doesn't change any of it -- it costs
+nothing, needs no account, and doesn't make the app "signed" in the
+sense Gatekeeper/notarization care about. It exists only because Apple
+Silicon won't execute a *completely* unsigned binary at all; it doesn't
+remove either OS-level first-run warning above.
 
 ## What actually changed to make this possible
 
