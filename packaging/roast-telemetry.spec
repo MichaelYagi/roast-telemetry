@@ -135,8 +135,17 @@ hidden_imports = [
     "backend.app.main",
     "backend.app.api.auth",
     "backend.app.api.device_profiles",
+    "backend.app.api.device_plugins",
     "backend.app.api.devices",
     "backend.app.api.files",
+    "backend.app.api.webhooks",
+    "backend.app.webhooks",
+    # Device plugins (see device_plugins/README.md) -- device_plugins.base
+    # is imported by backend.app.roast_session.session at module level, so
+    # this is the same "second safety net" reasoning as hardware_fakes
+    # below, not something PyInstaller's own analysis is known to miss.
+    "device_plugins",
+    "device_plugins.base",
     # Built-in simulated devices (hardware_fakes/sim.py) run inside the server, so
     # they ship in every build.
     "hardware_fakes",

@@ -74,7 +74,7 @@ jobs:
           # LICENSE has to travel with the copy (the AGPL requires it to accompany copies).
           cp -r backend simulator mock_device alog_playback \
             modbus_bridge ms6514_bridge aillio_bridge tc4_bridge \
-            roast_heuristics hardware_fakes \
+            roast_heuristics hardware_fakes device_plugins \
             frontend requirements-dev.txt pytest.ini README.md \
             CONTRIBUTING.md LICENSE docs "$STAGE"/
           rm -f "$STAGE"/backend/data/roasts.db
