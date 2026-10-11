@@ -105,7 +105,9 @@ Write a plain-text review (no markdown formatting, no headers with #, just clear
 3. Any concerns or risks you see in the data (reference specific times/values).
 4. If compared_to_this_beans_other_roasts is present, call out anything that differs notably \
 (roughly two or more standard deviations) from usual for this bean -- say plainly if nothing does, \
-don't invent a difference that isn't there.
+don't invent a difference that isn't there. When you refer to this comparison in your prose, call \
+it "this bean's other roasts" -- never reuse "compared_to_this_beans_other_roasts" or any other \
+underscored JSON key name as a word, phrase, or heading in your review.
 5. Concrete, specific suggestions for the next roast of this bean/setup.
 
 Be specific and reference the actual numbers given -- avoid generic advice that doesn't engage \

@@ -9,6 +9,11 @@
 
 const escapeHtml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+// Models occasionally echo a snake_case JSON key (e.g. "compared_to_this_beans_other_roasts")
+// verbatim as a heading instead of writing prose -- turn stray underscores in heading text
+// into spaces so that still reads as a title rather than a variable name.
+const headingText = (s) => s.replace(/_/g, " ");
+
 export function formatMessage(text) {
     const blocks = [], inline = [], links = [], mathInline = [], mathBlock = [];
 
@@ -162,7 +167,7 @@ export function formatMessage(text) {
         const i = links.length; links.push({ label: cleanUrl, url: cleanUrl }); return `@@LINK_${i}@@${trailing}`;
     });
     text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    text = text.replace(/^######\s+(.+)$/gm, "<h6>$1</h6>").replace(/^#####\s+(.+)$/gm, "<h5>$1</h5>").replace(/^####\s+(.+)$/gm, "<h4>$1</h4>").replace(/^###\s+(.+)$/gm, "<h3>$1</h3>").replace(/^##\s+(.+)$/gm, "<h2>$1</h2>").replace(/^#\s+(.+)$/gm, "<h1>$1</h1>");
+    text = text.replace(/^######\s+(.+)$/gm, (m, t) => `<h6>${headingText(t)}</h6>`).replace(/^#####\s+(.+)$/gm, (m, t) => `<h5>${headingText(t)}</h5>`).replace(/^####\s+(.+)$/gm, (m, t) => `<h4>${headingText(t)}</h4>`).replace(/^###\s+(.+)$/gm, (m, t) => `<h3>${headingText(t)}</h3>`).replace(/^##\s+(.+)$/gm, (m, t) => `<h2>${headingText(t)}</h2>`).replace(/^#\s+(.+)$/gm, (m, t) => `<h1>${headingText(t)}</h1>`);
     text = text.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>").replace(/~~(.+?)~~/g, "<del>$1</del>");
     // Task lists (before bullet rule so - [x] isn't consumed as a plain bullet)
     text = text.replace(/^- \[x\]\s+(.+)$/gim, '&#9745; $1');
