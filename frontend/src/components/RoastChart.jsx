@@ -320,9 +320,15 @@ function layoutCallouts(chart, events, tempUnit, dragPreview) {
     b.boxX < a.boxX + a.boxWidth + 2 &&
     a.boxY < b.boxY + b.boxHeight + 2 &&
     b.boxY < a.boxY + a.boxHeight + 2;
+  // Set by handleCanvasMouseMove below, read here so the hovered dot can
+  // draw bigger/glowing -- the same "stash it directly on the live Chart.js
+  // instance" trick $dragPreview already uses, for the same reason (a
+  // plain mousemove shouldn't trigger a React re-render on every pixel).
+  const hoverId = chart.$hoverEventId;
 
   for (const ev of [...events].sort((a, b) => a.time_s - b.time_s)) {
     const dragging = Boolean(dragPreview && dragPreview.eventId === ev.id);
+    const hovering = !dragging && hoverId === ev.id;
     const { x, dotY, timeS, displayValue } = markerPosition(chart, ev, tempUnit, dragging ? dragPreview.timeS : null);
     if (x < chartArea.left || x > chartArea.right) continue;
     const lines = [ev.label, formatTime(timeS), displayValue != null ? `${displayValue.toFixed(1)}${unitSuffix(tempUnit)}` : null].filter(Boolean);
@@ -340,10 +346,10 @@ function layoutCallouts(chart, events, tempUnit, dragPreview) {
     }
     const fit = candidates
       .filter((boxY) => boxY >= chartArea.top + 2 && boxY + boxHeight <= chartArea.bottom - 2)
-      .map((boxY) => ({ ev, dragging, x, dotY, lines, boxX, boxY, boxWidth, boxHeight }))
+      .map((boxY) => ({ ev, dragging, hovering, x, dotY, lines, boxX, boxY, boxWidth, boxHeight }))
       .find((c) => !placed.some((p) => overlaps(c, p)));
 
-    placed.push(fit ?? { ev, dragging, x, dotY, lines, boxX, boxY: preferred, boxWidth, boxHeight });
+    placed.push(fit ?? { ev, dragging, hovering, x, dotY, lines, boxX, boxY: preferred, boxWidth, boxHeight });
   }
   return placed;
 }
@@ -363,7 +369,7 @@ const eventMarkersPlugin = {
     const dragPreview = chart.$dragPreview;
     const { ctx } = chart;
     ctx.save();
-    layoutCallouts(chart, events, tempUnit, dragPreview).forEach(({ ev, dragging, x, dotY, lines, boxX, boxY, boxWidth, boxHeight }) => {
+    layoutCallouts(chart, events, tempUnit, dragPreview).forEach(({ ev, dragging, hovering, x, dotY, lines, boxX, boxY, boxWidth, boxHeight }) => {
       const color = eventColor(opts?.colors, ev.type);
 
       ctx.strokeStyle = color;
@@ -378,9 +384,26 @@ const eventMarkersPlugin = {
       ctx.stroke();
       ctx.setLineDash([]);
 
+      // A soft halo behind the dot on hover -- the dot itself is tiny by
+      // design (it has to sit precisely on the BT curve, not become a big
+      // obvious target that obscures it), so hovering is the only thing
+      // that can make it feel grabbable without changing how the chart
+      // looks at rest. Confirmed real feedback: a 3.5px dot read as
+      // "too small to click" even though the actual hit area (see
+      // hitTestMarker/MARKER_HIT_RADIUS_PX) is already much larger.
+      if (hovering) {
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, dotY, 9, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(x, dotY, dragging ? 5 : 3.5, 0, Math.PI * 2);
+      ctx.arc(x, dotY, dragging || hovering ? 5.5 : 3.5, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = "rgba(28, 25, 23, 0.92)";
@@ -401,7 +424,18 @@ const eventMarkersPlugin = {
 
 ChartJS.register(eventMarkersPlugin, scopeBandsPlugin, axisUnitLabelsPlugin, phaseBandsPlugin);
 
-const MARKER_HIT_RADIUS_PX = 12;
+// Generous -- hover/glow, right-click-to-delete, and (see onPanStart's
+// own comment) the one-time fallback hit test for starting a drag, where
+// "near enough to notice" is exactly what's wanted (see the earlier
+// "hard to click the tiny dot" feedback). A separate, *tighter* radius
+// was tried here for drag-start specifically, to stop a plain pan/scroll
+// gesture starting near a milestone from getting hijacked into grabbing
+// it -- that overcorrected: it made a genuinely glowing (hover-confirmed)
+// dot fail to drag most of the time, since real cursor precision rarely
+// lands inside a radius tighter than the hover zone that was shown as
+// "you can grab this." onPanStart now gates on the *live* hover state
+// instead of a second magic number -- see its own comment.
+const MARKER_HIT_RADIUS_PX = 14;
 
 // Plain scroll over the chart used to zoom it directly -- confirmed live
 // as a real problem: scrolling the page with the cursor resting over the
@@ -430,14 +464,14 @@ const WHEEL_ZOOM_MODIFIER_LABEL =
 // the context-menu (right-click) and drag-to-retime (onPanStart) entry
 // points below, closest-first so two nearby markers never fight over an
 // ambiguous click.
-function hitTestMarker(chart, events, x, y, tempUnit) {
+function hitTestMarker(chart, events, x, y, tempUnit, radius = MARKER_HIT_RADIUS_PX) {
   let best = null;
   let bestDist = Infinity;
   for (const ev of events) {
     if (!isEditableMilestone(ev)) continue;
     const { x: mx, dotY } = markerPosition(chart, ev, tempUnit, null);
     const dist = Math.hypot(mx - x, dotY - y);
-    if (dist <= MARKER_HIT_RADIUS_PX && dist < bestDist) {
+    if (dist <= radius && dist < bestDist) {
       best = ev;
       bestDist = dist;
     }
@@ -476,7 +510,7 @@ const RoastChart = forwardRef(function RoastChart({
   events = [],
   background = [],
   backgroundLabel = null,
-  height = 420,
+  height = 280,
   title,
   tempUnit = "c",
   // The roast's extra_units ({label: "temp" | "percent" | "number"}) --
@@ -805,17 +839,17 @@ const RoastChart = forwardRef(function RoastChart({
     const chart = chartRef.current;
     if (!drag || !chart) return;
     const preview = chart.$dragPreview;
-    // Clear the preview immediately, before the retime API call even
-    // resolves -- the marker visually reverts to its stored position
-    // right away, then jumps to the new one once onRetimeEvent's own
-    // state update lands. If the backend rejects the move (crosses a
-    // neighboring milestone, say), the marker just never moves from the
-    // reverted position -- but the reason isn't silent: onRetimeEvent
-    // (RoastDetailView's handleRetimeMilestone) sets its own
-    // milestoneError on failure and never rethrows, so the .catch()
-    // below is only a last-resort net for some other failure in
-    // onRetimeEvent itself, not the normal "crossed a neighbor" case.
+    // Clear the preview immediately -- the marker visually reverts to its
+    // stored position right away, then jumps straight to the new one
+    // once onRetimeEvent's own state update lands (synchronous today --
+    // RoastDetailView's handleRetimeMilestone only stages this into
+    // local state, it doesn't call the API; the actual backend
+    // neighbor-order check only runs later, at Save, see
+    // RoastDetailView.jsx's own handleSaveMilestoneEdits). The .catch()
+    // below is just a last-resort net for some unexpected failure in
+    // onRetimeEvent itself, not a normal path.
     chart.$dragPreview = null;
+    chart.canvas.style.cursor = chart.$hoverEventId ? "grab" : "";
     chart.update("none");
     if (preview && onRetimeEvent) {
       Promise.resolve(onRetimeEvent(drag.eventId, preview.timeS)).catch((err) => {
@@ -844,6 +878,39 @@ const RoastChart = forwardRef(function RoastChart({
     if (!hit) return; // not on an editable marker -- let the browser's own context menu through
     e.preventDefault();
     setContextMenu({ eventId: hit.id, x: e.clientX, y: e.clientY });
+  }
+
+  // Hovering a milestone's dot makes it bigger + glows it (see
+  // eventMarkersPlugin's own comment on why) and swaps the cursor to a
+  // hand, so a target that has to stay visually tiny (it marks an exact
+  // point on the BT curve) still reads as grabbable before you commit to
+  // a click -- confirmed real feedback: without any of this, the plain
+  // 3.5px dot read as too small to reliably click even though its actual
+  // hit area (MARKER_HIT_RADIUS_PX) was already generous. Only wired up
+  // at all when this chart can actually edit milestones (onDeleteEvent/
+  // onRetimeEvent set) -- a read-only embed (e.g. a history thumbnail)
+  // has nothing for hovering to offer.
+  function handleCanvasMouseMove(e) {
+    const chart = chartRef.current;
+    if (!chart || dragRef.current || (!onDeleteEvent && !onRetimeEvent)) return;
+    const rect = chart.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const hit = hitTestMarker(chart, events, x, y, tempUnit);
+    const nextId = hit ? hit.id : null;
+    if (chart.$hoverEventId !== nextId) {
+      chart.$hoverEventId = nextId;
+      chart.canvas.style.cursor = nextId ? "grab" : "";
+      chart.update("none");
+    }
+  }
+
+  function handleCanvasMouseLeave() {
+    const chart = chartRef.current;
+    if (!chart || chart.$hoverEventId == null) return;
+    chart.$hoverEventId = null;
+    chart.canvas.style.cursor = "";
+    chart.update("none");
   }
 
   const options = useMemo(() => {
@@ -934,12 +1001,26 @@ const RoastChart = forwardRef(function RoastChart({
               // pans the chart, as anywhere else. The dot itself drags
               // without Alt, as before.
               const altDrag = event?.srcEvent?.altKey && !hideEventLabels;
-              const hit = onRetimeEvent
-                ? (altDrag && hitTestLabel(chart, events, point.x, point.y, tempUnit)) || hitTestMarker(chart, events, point.x, point.y, tempUnit)
-                : null;
+              // Checks the *live* hover state (handleCanvasMouseMove, set
+              // on every mousemove) first, rather than only a fresh hit
+              // test here -- ties "the dot is glowing" and "you can grab
+              // it" to the exact same condition, so a genuinely glowing
+              // dot never fails to drag (a real regression from an
+              // earlier, tighter-than-hover drag-start radius: most real
+              // clicks land well within the hover zone but outside a much
+              // smaller one, so the drag silently never started even
+              // though the dot was lit up). Falls back to a fresh hit
+              // test only for a drag that starts before any mousemove
+              // ever reported this point as hovered -- the very first
+              // click on the chart, or a touchscreen tap with no hover
+              // phase at all.
+              const hoveredDot = chart.$hoverEventId ? events.find((e) => e.id === chart.$hoverEventId) : null;
+              const dotHit = hoveredDot || hitTestMarker(chart, events, point.x, point.y, tempUnit);
+              const hit = onRetimeEvent ? (altDrag && hitTestLabel(chart, events, point.x, point.y, tempUnit)) || dotHit : null;
               if (hit) {
                 dragRef.current = { eventId: hit.id };
                 chart.$dragPreview = { eventId: hit.id, timeS: hit.time_s };
+                chart.canvas.style.cursor = "grabbing";
                 window.addEventListener("mousemove", handleDragMove);
                 window.addEventListener("mouseup", handleDragEnd);
                 return false;
@@ -1050,7 +1131,14 @@ const RoastChart = forwardRef(function RoastChart({
             )}
           </div>
         )}
-        <Line ref={chartRef} data={data} options={options} onContextMenu={handleContextMenu} />
+        <Line
+          ref={chartRef}
+          data={data}
+          options={options}
+          onContextMenu={handleContextMenu}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseLeave={handleCanvasMouseLeave}
+        />
         {contextMenu && (
           <div className="milestone-context-menu" ref={contextMenuRef} style={{ left: contextMenu.x, top: contextMenu.y }}>
             <button

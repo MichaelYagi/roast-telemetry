@@ -597,6 +597,13 @@ class Roast(RoastSummary):
     )
     events: list[RoastEvent] = []
     notes: list[RoastNote] = []
+    # Milestones exactly as recorded when this roast first finished, for
+    # the web/mobile "Reset to original" control to diff `events` against
+    # (only shown once they've actually diverged -- see
+    # RoastSession._finish's own original_events_json comment for where
+    # this comes from). None for a still-in-progress roast, or one that
+    # finished before this field existed.
+    original_events: Optional[list[RoastEvent]] = None
 
     @model_validator(mode="after")
     def _fill_extra_units(self) -> "Roast":

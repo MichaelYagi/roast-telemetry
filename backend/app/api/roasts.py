@@ -634,6 +634,29 @@ async def retime_event(roast_id: str, event_id: str, update: EventUpdateRequest,
     return updated
 
 
+@router.post("/{roast_id}/events/reset")
+async def reset_events(roast_id: str, http_request: Request) -> dict:
+    """Undoes every add/retime/delete made to this roast's milestones
+    since it first finished, restoring the exact original recording --
+    see RoastSessionManager.reset_events_to_original. 409s (rather than
+    404) when the roast exists but has nothing to restore to (still
+    recording, or finished before this feature existed)."""
+    _require_roast_exists(roast_id)
+    try:
+        events = session_manager.reset_events_to_original(roast_id)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await pubsub.publish(roast_id, {"type": "events_reset", "roast_id": roast_id, "events": events})
+    row = storage.get_roast_row(roast_id)
+    title = row["title"] if row else roast_id
+    storage.log_activity(
+        "roast", "reset_events", **auth.actor(http_request), roast_id=roast_id,
+        roast_title=row["title"] if row else None,
+        message=f'Reset milestones to the original recording on "{title}"',
+    )
+    return {"events": events}
+
+
 @router.post("/{roast_id}/weight")
 def set_weight(roast_id: str, grams: float, http_request: Request) -> dict:
     # Works for any roast with a saved .alog, not just a still-live

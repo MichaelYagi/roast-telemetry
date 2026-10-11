@@ -318,4 +318,21 @@ if FRONTEND_DIST.is_dir():
         candidate = (FRONTEND_DIST / full_path).resolve()
         if full_path and candidate.is_relative_to(FRONTEND_DIST.resolve()) and candidate.is_file():
             return FileResponse(candidate)
-        return FileResponse(FRONTEND_DIST / "index.html")
+        # index.html itself is the one frontend file with no content hash
+        # in its name (unlike /assets/*.js|css, which Vite names
+        # index-<hash>.js precisely so a new build is automatically a new
+        # URL) -- every rebuild overwrites it at the exact same path, and
+        # this server always answers at the same http://127.0.0.1:<port>.
+        # Without an explicit Cache-Control, a browser's own heuristic
+        # caching (no explicit freshness info -> guess one from
+        # Last-Modified) can keep serving an old cached copy indefinitely
+        # across app rebuilds/restarts -- which, since that stale HTML
+        # still references the *old* hashed asset filenames, means the
+        # browser tab keeps running old frontend code forever even though
+        # the backend (and a freshly built frontend/dist right next to it
+        # on disk) has moved on. Confirmed as the explanation for a real
+        # "I rebuilt it and the new feature still isn't there" report --
+        # same reasoning as /api/v1/health's own no-store above.
+        response = FileResponse(FRONTEND_DIST / "index.html")
+        response.headers["Cache-Control"] = "no-store"
+        return response

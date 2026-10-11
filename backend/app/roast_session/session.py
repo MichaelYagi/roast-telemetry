@@ -4,6 +4,8 @@ playback) over its lifecycle and streams samples out over pub/sub.
 from __future__ import annotations
 
 import asyncio
+import copy
+import json
 import logging
 import os
 import re
@@ -51,6 +53,7 @@ from ..models import (
     NoteCreateRequest,
     Roast,
     RoastCreateRequest,
+    RoastEvent,
     RoastEventType,
     RoastMode,
     RoastStatus,
@@ -888,6 +891,14 @@ class RoastSession:
             alog_path=self.alog_path,
             playback_speed=self.playback_speed,
             reached_drop=reached_drop,
+            # Captured exactly once, right here -- never touched again,
+            # even by this same roast's own later edits -- so "Reset to
+            # original" (see reset_events_to_original below) always has
+            # something to go back to, no matter how much gets edited
+            # afterward. self.events is about to keep being mutated in
+            # place by delete_event/add_milestone_at/retime_event, so this
+            # has to be a real copy, not a reference to the same list.
+            original_events_json=json.dumps(copy.deepcopy(self.events)),
         )
         webhooks.fire_background("roast_finished", {**self._webhook_base_payload(), "status": self.status.value})
         await pubsub.publish(self.id, {"type": "finished", "roast_id": self.id, "status": self.status.value})
@@ -1285,6 +1296,19 @@ class RoastSession:
         self._refresh_duration()
         return event
 
+    def reset_events_to_original(self, original_events: list[dict]) -> list[dict]:
+        """Undoes every add/retime/delete made since this roast first
+        finished, not just this editing session's -- see _finish's own
+        original_events_json comment for where `original_events` (already
+        decoded by the caller) comes from. A real deep copy, not the list
+        the caller holds, since self.events keeps being mutated in place
+        by every milestone edit from here on."""
+        self.events = copy.deepcopy(original_events)
+        self._rewrite_alog()
+        self._refresh_duration()
+        self._refresh_reached_drop()
+        return self.events
+
     # -- serialization ----------------------------------------------------
     def summary(self) -> RoastSummary:
         return RoastSummary(
@@ -1475,6 +1499,8 @@ class RoastSessionManager:
                     setattr(roast, key, row.get(key))
                 for key, value in _persistent_flags_from_row(row).items():
                     setattr(roast, key, value)
+                if row.get("original_events_json"):
+                    roast.original_events = [RoastEvent(**e) for e in json.loads(row["original_events_json"])]
             return roast
 
         row = storage.get_roast_row(roast_id)
@@ -1513,6 +1539,7 @@ class RoastSessionManager:
             profile=parsed["profile"],
             events=parsed["events"],
             notes=parsed["notes"],
+            original_events=[RoastEvent(**e) for e in json.loads(row["original_events_json"])] if row.get("original_events_json") else None,
         )
 
     @staticmethod
@@ -1604,6 +1631,29 @@ class RoastSessionManager:
         storage.update_roast(roast_id, duration_s=roast_duration_s(parsed["profile"], parsed["events"]))
         self._rewrite_cold_alog(row, parsed)
         return event
+
+    def reset_events_to_original(self, roast_id: str) -> list[dict]:
+        """Restores this roast's milestones to exactly what they were the
+        moment it first finished -- see RoastSession._finish's own
+        original_events_json comment. Raises rather than no-op-ing when
+        there's nothing to restore to (a roast still in progress, or one
+        that finished before this column existed)."""
+        row = storage.get_roast_row(roast_id)
+        if row is None:
+            raise RoastSessionError(f"unknown roast {roast_id}")
+        original_json = row.get("original_events_json")
+        if not original_json:
+            raise RoastSessionError("no original recording was saved for this roast")
+        original_events = json.loads(original_json)
+        session = self.get(roast_id)
+        if session is not None:
+            return session.reset_events_to_original(original_events)
+        _, parsed = self._cold_roast_row_and_parsed(roast_id)
+        parsed["events"] = copy.deepcopy(original_events)
+        reached_drop = any(e["type"] == RoastEventType.DROP.value for e in parsed["events"])
+        storage.update_roast(roast_id, duration_s=roast_duration_s(parsed["profile"], parsed["events"]), reached_drop=reached_drop)
+        self._rewrite_cold_alog(row, parsed)
+        return parsed["events"]
 
     def add_note(self, roast_id: str, req: NoteCreateRequest) -> dict:
         session = self.get(roast_id)

@@ -131,12 +131,15 @@ const SPLIT_WIDTH_STORAGE_KEY = "roast-telemetry:breakoutSplitWidth";
 // floor on just the control panel was tried and reverted -- a flex row's
 // height follows its tallest child regardless of align-self, so that
 // dragged the whole row taller than the chart's own real height instead
-// of keeping the three in sync). No hard ceiling -- unlike splitWidth,
-// which trades width against a sibling panel with its own floor, height
-// only trades against page scroll, which is the user's own call.
+// of keeping the three in sync).
 const CHART_MIN_HEIGHT = 260;
+// A ceiling exists too (unlike the width divider's own no-cap reasoning,
+// which trades space against a sibling panel that has its own floor) --
+// confirmed real feedback: nothing stopped the handle from being dragged
+// to an absurd height, well past anything a real monitor shows at once.
+const CHART_MAX_HEIGHT = 900;
 const CHART_HEIGHT_STORAGE_KEY = "roast-telemetry:chartHeight";
-const CHART_DEFAULT_HEIGHT = 420; // RoastChart's own default -- kept in sync explicitly, see chartHeight state below
+const CHART_DEFAULT_HEIGHT = 280; // RoastChart's own default -- kept in sync explicitly, see chartHeight state below
 
 export default function LiveRoastView() {
   const { t } = useTranslation();
@@ -352,7 +355,10 @@ export default function LiveRoastView() {
   // here shrinks Small Readout right along with it for free.
   const [chartHeight, setChartHeight] = useState(() => {
     const saved = typeof window !== "undefined" && Number(localStorage.getItem(CHART_HEIGHT_STORAGE_KEY));
-    return saved >= CHART_MIN_HEIGHT ? saved : CHART_DEFAULT_HEIGHT;
+    // Clamped against CHART_MAX_HEIGHT too, not just on the next drag --
+    // a height saved before that ceiling existed could otherwise still
+    // load oversized once, on this one render, before any interaction.
+    return saved >= CHART_MIN_HEIGHT ? Math.min(saved, CHART_MAX_HEIGHT) : CHART_DEFAULT_HEIGHT;
   });
   const chartDragStateRef = useRef(null);
   // Tracked only so the render below can derive a *display* width that's
@@ -506,7 +512,7 @@ export default function LiveRoastView() {
   function handleChartResizePointerMove(e) {
     if (!chartDragStateRef.current) return;
     const { startY, startHeight } = chartDragStateRef.current;
-    setChartHeight(Math.max(CHART_MIN_HEIGHT, startHeight + (e.clientY - startY)));
+    setChartHeight(Math.min(CHART_MAX_HEIGHT, Math.max(CHART_MIN_HEIGHT, startHeight + (e.clientY - startY))));
   }
 
   function handleChartResizePointerUp(e) {

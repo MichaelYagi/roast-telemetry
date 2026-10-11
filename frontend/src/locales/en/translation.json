@@ -840,6 +840,15 @@
         "COOL_END": "Cool End"
       }
     },
+    "milestoneEdits": {
+      "pendingNotice_one": "{{count}} unsaved milestone change",
+      "pendingNotice_other": "{{count}} unsaved milestone changes",
+      "save": "Save changes",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "resetToOriginal": "Reset to original recording",
+      "resetConfirm": "Reset every milestone on this roast back to exactly how it was first recorded? This undoes all edits ever made to it, not just unsaved ones."
+    },
     "downloads": {
       "download": "Download",
       "spreadsheetNote": "(spreadsheet, tab-separated)",

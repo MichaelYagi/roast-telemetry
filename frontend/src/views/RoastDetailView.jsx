@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import RoastChart from "../components/RoastChart.jsx";
 import AddMilestoneControl from "../components/AddMilestoneControl.jsx";
+import { diffMilestoneEvents, nearestProfileBt } from "../lib/milestoneEdits.js";
 import RoastReviewCard from "../components/RoastReviewCard.jsx";
 import { isSimulatedRoast } from "../simulated.js";
 import { endedBeforeDrop, isEmergencyStopped } from "../roastFlags.js";
@@ -78,13 +79,32 @@ function otherFilename(title, createdAt, ext) {
 }
 
 // The chart's height, saved per browser (same idea as LiveRoastView's own
-// chart height). Whatever height the page loads with is the minimum for
-// that visit -- the handle under the chart can only make it taller.
-const DETAIL_CHART_HEIGHT_KEY = "roast-telemetry:roastDetailChartHeight";
-const DETAIL_CHART_DEFAULT_HEIGHT = 420;
+// chart height). The resize handle can make it shorter too now, down to
+// a fixed floor (DETAIL_CHART_MIN_HEIGHT) -- it used to clamp to whatever
+// height the page happened to *load* with instead, which meant a chart
+// that loaded tall (an old saved height, or a bumped-up default) could
+// only ever get taller from there, never actually shrunk back down.
+// Matches LiveRoastView's own CHART_MIN_HEIGHT floor, same reasoning.
+// Renamed (was "roast-telemetry:roastDetailChartHeight") when the default
+// below dropped from 420 to 280 -- an old saved height from before that
+// change was almost always bigger than the new intended default, which
+// would have silently kept showing the old, too-tall chart forever (the
+// saved value always wins over the default -- see readSavedDetailChartHeight
+// below). A new key means every browser picks up the smaller default once,
+// the same as a fresh profile would, instead of being stuck on whatever
+// got saved under the old key.
+const DETAIL_CHART_HEIGHT_KEY = "roast-telemetry:roastDetailChartHeight:v2";
+const DETAIL_CHART_DEFAULT_HEIGHT = 280;
+const DETAIL_CHART_MIN_HEIGHT = 260;
+// Matches LiveRoastView's own CHART_MAX_HEIGHT -- nothing stopped the
+// handle being dragged to an absurd height before this.
+const DETAIL_CHART_MAX_HEIGHT = 900;
 function readSavedDetailChartHeight() {
   const saved = typeof window !== "undefined" && Number(localStorage.getItem(DETAIL_CHART_HEIGHT_KEY));
-  return saved >= 200 ? saved : DETAIL_CHART_DEFAULT_HEIGHT;
+  // Clamped against the max too, not just on the next drag -- a height
+  // saved before that ceiling existed could otherwise still load
+  // oversized once, on this one render, before any interaction.
+  return saved >= DETAIL_CHART_MIN_HEIGHT ? Math.min(saved, DETAIL_CHART_MAX_HEIGHT) : DETAIL_CHART_DEFAULT_HEIGHT;
 }
 
 export default function RoastDetailView() {
@@ -100,14 +120,23 @@ export default function RoastDetailView() {
   // for "the roast itself failed to load" but way too disruptive for a
   // failed milestone delete/retime on an otherwise-fine page.
   const [milestoneError, setMilestoneError] = useState(null);
+  // A working copy of roast.events that add/delete/retime stage into
+  // without touching the server -- Save sends the diff against
+  // roast.events (see diffMilestoneEvents), Cancel just drops this back
+  // to roast.events. Kept in sync with roast.events only at load time and
+  // after a successful Save (reloadAfterMilestoneEdit), never by a plain
+  // effect on `roast` -- that object gets a new reference on every
+  // unrelated edit too (tags, beans, notes, weights), which would
+  // otherwise silently wipe out in-progress milestone edits.
+  const [displayedEvents, setDisplayedEvents] = useState([]);
+  const [savingMilestones, setSavingMilestones] = useState(false);
   const [newTagInput, setNewTagInput] = useState("");
   const [tagsError, setTagsError] = useState(null);
   const [allTags, setAllTags] = useState([]); // feeds the <datalist> below -- existing tags to autocomplete against
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState(null);
   const chartRef = useRef(null); // gives the PDF button a toImage() of exactly what's on screen
-  const [chartMinHeight] = useState(readSavedDetailChartHeight);
-  const [chartHeight, setChartHeight] = useState(chartMinHeight);
+  const [chartHeight, setChartHeight] = useState(readSavedDetailChartHeight);
   const chartDragRef = useRef(null);
 
   function handleChartResizePointerDown(e) {
@@ -119,7 +148,7 @@ export default function RoastDetailView() {
   function handleChartResizePointerMove(e) {
     if (!chartDragRef.current) return;
     const { startY, startHeight } = chartDragRef.current;
-    setChartHeight(Math.max(chartMinHeight, startHeight + (e.clientY - startY)));
+    setChartHeight(Math.min(DETAIL_CHART_MAX_HEIGHT, Math.max(DETAIL_CHART_MIN_HEIGHT, startHeight + (e.clientY - startY))));
   }
 
   function handleChartResizePointerUp(e) {
@@ -136,6 +165,7 @@ export default function RoastDetailView() {
       .then((r) => {
         setRoast(r);
         setBeansText(r.beans || "");
+        setDisplayedEvents(r.events);
       })
       .catch((err) => setError(err.message));
   }, [id]);
@@ -236,57 +266,115 @@ export default function RoastDetailView() {
   // (and everything it depends on) has to stay referentially stable too.
   const reloadAfterMilestoneEdit = useCallback(async () => {
     try {
-      setRoast(await api.getRoast(id));
+      const fresh = await api.getRoast(id);
+      setRoast(fresh);
+      setDisplayedEvents(fresh.events); // drop back to the server's own copy -- Save/reset just committed
     } catch (err) {
       setMilestoneError(err.message);
     }
     setNumbersKey((k) => k + 1);
   }, [id]);
 
-  const handleDeleteMilestone = useCallback(
-    async (eventId) => {
-      setMilestoneError(null);
-      try {
-        await api.deleteEvent(id, eventId);
-        await reloadAfterMilestoneEdit();
-      } catch (err) {
-        setMilestoneError(err.message);
-      }
-    },
-    [id, reloadAfterMilestoneEdit]
-  );
+  // None of the three below touch the server at all -- they only stage a
+  // change into displayedEvents, so a stray drag/click can't silently
+  // commit anything. handleSaveMilestoneEdits (below) is the only thing
+  // that ever calls the add/delete/retime API.
+  const handleDeleteMilestone = useCallback((eventId) => {
+    setDisplayedEvents((events) => events.filter((e) => e.id !== eventId));
+  }, []);
 
   const handleRetimeMilestone = useCallback(
-    async (eventId, timeS) => {
-      setMilestoneError(null);
-      try {
-        await api.retimeEvent(id, eventId, timeS);
-        await reloadAfterMilestoneEdit();
-      } catch (err) {
-        setMilestoneError(err.message);
-      }
+    (eventId, timeS) => {
+      // Recomputed client-side from the profile, not just copied from the
+      // old position -- the dot is plotted straight from `value` (see
+      // RoastChart.jsx's markerPosition), so leaving the stale pre-drag
+      // reading in place would leave it floating off the BT line at the
+      // new x position instead of riding it like it does everywhere else.
+      // The server redoes this same nearest-sample snap for real on Save.
+      const value = nearestProfileBt(roast.profile, timeS);
+      setDisplayedEvents((events) => events.map((e) => (e.id === eventId ? { ...e, time_s: timeS, value } : e)));
     },
-    [id, reloadAfterMilestoneEdit]
+    [roast]
   );
 
-  // Returns whether it succeeded (rather than just swallowing the error
-  // like the two above) so AddMilestoneControl knows to collapse back to
-  // its closed state -- a failed add should leave the picker open with
-  // whatever was chosen, not reset it.
+  // Always succeeds (nothing to fail -- there's no request yet), unlike
+  // before this staged -- kept returning true so AddMilestoneControl's
+  // own success-closes-the-picker logic still works unchanged.
   const handleAddMilestone = useCallback(
-    async (eventType, timeS) => {
-      setMilestoneError(null);
-      try {
-        await api.addEvent(id, { type: eventType, label: eventType, time_s: timeS });
-        await reloadAfterMilestoneEdit();
-        return true;
-      } catch (err) {
-        setMilestoneError(err.message);
-        return false;
-      }
+    (eventType, timeS) => {
+      const value = nearestProfileBt(roast.profile, timeS);
+      setDisplayedEvents((events) => [
+        ...events,
+        { id: `pending-${eventType}`, type: eventType, label: eventType, time_s: timeS, value, channel: null },
+      ]);
+      return true;
     },
-    [id, reloadAfterMilestoneEdit]
+    [roast]
   );
+
+  const pendingMilestoneOps = useMemo(
+    () => (roast ? diffMilestoneEvents(roast.events, displayedEvents) : []),
+    [roast, displayedEvents]
+  );
+
+  const handleCancelMilestoneEdits = useCallback(() => {
+    setMilestoneError(null);
+    setDisplayedEvents(roast.events);
+  }, [roast]);
+
+  const handleSaveMilestoneEdits = useCallback(async () => {
+    setMilestoneError(null);
+    setSavingMilestones(true);
+    try {
+      // Deletes first (frees up the ordering room a retime/add into that
+      // same slot might need), then everything else in ascending target-
+      // time order, so each one's "already there" neighbors are as likely
+      // as possible to already be in their final position by the time it
+      // lands -- not a guarantee the backend's own neighbor-order check
+      // can't still reject (see RoastChart.jsx's own comment on this),
+      // just the ordering least likely to trip it for the common case of
+      // a couple of edits at once.
+      const deletes = pendingMilestoneOps.filter((op) => op.kind === "delete");
+      const rest = pendingMilestoneOps.filter((op) => op.kind !== "delete").sort((a, b) => a.time_s - b.time_s);
+      for (const op of deletes) await api.deleteEvent(id, op.id);
+      for (const op of rest) {
+        if (op.kind === "retime") await api.retimeEvent(id, op.id, op.time_s);
+        else await api.addEvent(id, { type: op.type, label: op.type, time_s: op.time_s });
+      }
+      await reloadAfterMilestoneEdit();
+    } catch (err) {
+      // Left staged on purpose -- displayedEvents isn't touched here, so
+      // whatever didn't make it (and whatever hadn't been tried yet)
+      // stays on screen for the user to fix and retry, instead of
+      // vanishing along with the one op that actually failed.
+      setMilestoneError(err.message);
+    } finally {
+      setSavingMilestones(false);
+    }
+  }, [id, pendingMilestoneOps, reloadAfterMilestoneEdit]);
+
+  // Only meaningful once a snapshot actually exists (see backend's
+  // original_events_json) -- null for a roast that finished before this
+  // feature shipped, or one still in progress; the Reset button itself is
+  // hidden in that case (see the render below), this just backs that.
+  const originalMilestoneOps = useMemo(
+    () => (roast?.original_events ? diffMilestoneEvents(roast.original_events, displayedEvents) : []),
+    [roast, displayedEvents]
+  );
+
+  const handleResetMilestonesToOriginal = useCallback(async () => {
+    if (!window.confirm(t("roastDetail.milestoneEdits.resetConfirm"))) return;
+    setMilestoneError(null);
+    setSavingMilestones(true);
+    try {
+      await api.resetEvents(id);
+      await reloadAfterMilestoneEdit();
+    } catch (err) {
+      setMilestoneError(err.message);
+    } finally {
+      setSavingMilestones(false);
+    }
+  }, [id, reloadAfterMilestoneEdit, t]);
 
   // Pulls the same numbers the Roast Stats/Numbers panels below already
   // show (they're separate GETs, not part of the Roast object itself),
@@ -435,11 +523,24 @@ export default function RoastDetailView() {
           ref={chartRef}
           profile={roast.profile}
           extraUnits={roast.extra_units}
-          events={roast.events}
+          events={displayedEvents}
           tempUnit={tempUnit}
           height={chartHeight}
-          onDeleteEvent={handleDeleteMilestone}
-          onRetimeEvent={handleRetimeMilestone}
+          // Editing (drag-to-retime, right-click-delete, the hover
+          // affordance that goes with both) is only offered at all when
+          // there's a real original_events snapshot to fall back to --
+          // without onDeleteEvent/onRetimeEvent, RoastChart's own
+          // onPanStart/handleContextMenu/handleCanvasMouseMove already
+          // no-op (each already gates on these being set), so leaving
+          // them unset here is the whole fix, nothing to change on that
+          // side. A roast that finished before this feature existed has
+          // no snapshot (see backend's original_events_json) and can
+          // only ever get a Cancel-before-Save safety net, never a real
+          // Reset -- simplest and safest is to not offer the edit at
+          // all there rather than ship a weaker, inconsistent version
+          // of it.
+          onDeleteEvent={roast.original_events ? handleDeleteMilestone : undefined}
+          onRetimeEvent={roast.original_events ? handleRetimeMilestone : undefined}
         />
         <div
           className="scope-chart-resize-handle no-print"
@@ -448,7 +549,30 @@ export default function RoastDetailView() {
           onPointerMove={handleChartResizePointerMove}
           onPointerUp={handleChartResizePointerUp}
         />
-        {["complete", "stopped", "aborted"].includes(roast.status) && <AddMilestoneControl roast={roast} onAdd={handleAddMilestone} />}
+        {["complete", "stopped", "aborted"].includes(roast.status) && roast.original_events && (
+          <AddMilestoneControl roast={{ ...roast, events: displayedEvents }} onAdd={handleAddMilestone} />
+        )}
+        {pendingMilestoneOps.length > 0 && (
+          // Nothing above this point ever reaches the server by itself --
+          // every add/delete/retime only stages into displayedEvents (see
+          // those handlers' own comments), so a stray drag or an
+          // accidental right-click-delete can always be walked back with
+          // Cancel instead of being a live mistake the moment it happens.
+          <div className="milestone-edit-actions no-print">
+            <span>{t("roastDetail.milestoneEdits.pendingNotice", { count: pendingMilestoneOps.length })}</span>
+            <button type="button" onClick={handleSaveMilestoneEdits} disabled={savingMilestones}>
+              {savingMilestones ? t("roastDetail.milestoneEdits.saving") : t("roastDetail.milestoneEdits.save")}
+            </button>
+            <button type="button" className="link-like" onClick={handleCancelMilestoneEdits} disabled={savingMilestones}>
+              {t("roastDetail.milestoneEdits.cancel")}
+            </button>
+          </div>
+        )}
+        {originalMilestoneOps.length > 0 && (
+          <button type="button" className="link-like no-print" onClick={handleResetMilestonesToOriginal} disabled={savingMilestones}>
+            {t("roastDetail.milestoneEdits.resetToOriginal")}
+          </button>
+        )}
         {milestoneError && <p className="error no-print">{milestoneError}</p>}
       </div>
 

@@ -118,6 +118,7 @@ export const api = {
   deleteEvent: (id, eventId) => request(`/roasts/${id}/events/${eventId}`, { method: "DELETE" }),
   retimeEvent: (id, eventId, timeS) =>
     request(`/roasts/${id}/events/${eventId}`, { method: "PATCH", body: JSON.stringify({ time_s: timeS }) }),
+  resetEvents: (id) => request(`/roasts/${id}/events/reset`, { method: "POST" }),
   alogDownloadUrl: (id) => `${BASE}/roasts/${id}/alog`,
   csvDownloadUrl: (id) => `${BASE}/roasts/${id}/csv`,
   jsonDownloadUrl: (id) => `${BASE}/roasts/${id}/json`,

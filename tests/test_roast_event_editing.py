@@ -534,3 +534,74 @@ def test_marking_without_a_time_still_needs_a_recording_roast(client):
 
     resp = client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": "FC_START", "label": "FC Start"})
     assert resp.status_code == 404
+
+
+# -- reset to the original recording -------------------------------------
+
+
+def test_finished_roast_carries_its_original_events(client):
+    # Captured once, at the moment the roast finished -- before any of
+    # this test's own edits -- so it should exactly match what GET showed
+    # right after stopping, untouched by anything that happens later.
+    roast_id, roast = _finished_roast(client)
+    assert roast["original_events"] is not None
+    assert {(e["type"], e["time_s"]) for e in roast["original_events"]} == {(e["type"], e["time_s"]) for e in roast["events"]}
+
+
+def test_reset_events_restores_deleted_and_retimed_milestones_warm(client):
+    roast_id, roast = _finished_roast(client)  # Charge (auto) + Dry End
+    original = roast["original_events"]
+    dry_end = next(e for e in roast["events"] if e["type"] == "DRY_END")
+
+    client.delete(f"/api/v1/roasts/{roast_id}/events/{dry_end['id']}")
+    assert "DRY_END" not in [e["type"] for e in client.get(f"/api/v1/roasts/{roast_id}").json()["events"]]
+
+    resp = client.post(f"/api/v1/roasts/{roast_id}/events/reset")
+    assert resp.status_code == 200
+
+    restored = client.get(f"/api/v1/roasts/{roast_id}").json()
+    assert {(e["type"], e["time_s"]) for e in restored["events"]} == {(e["type"], e["time_s"]) for e in original}
+
+
+def test_reset_events_restores_deleted_milestones_cold(client):
+    roast_id, roast = _finished_roast(client)
+    original = roast["original_events"]
+    dry_end = next(e for e in roast["events"] if e["type"] == "DRY_END")
+    client.delete(f"/api/v1/roasts/{roast_id}/events/{dry_end['id']}")
+    session_manager.sessions.pop(roast_id, None)  # as after a server restart
+
+    resp = client.post(f"/api/v1/roasts/{roast_id}/events/reset")
+    assert resp.status_code == 200
+
+    restored = client.get(f"/api/v1/roasts/{roast_id}").json()
+    assert {(e["type"], e["time_s"]) for e in restored["events"]} == {(e["type"], e["time_s"]) for e in original}
+
+
+def test_reset_events_recomputes_duration_and_reached_drop(client):
+    roast_id, roast = _finished_roast(client)  # stopped before Drop
+    last = roast["profile"][-1]["time_s"]
+    client.post(f"/api/v1/roasts/{roast_id}/events", json={"type": "DROP", "label": "x", "time_s": last})
+    assert client.get(f"/api/v1/roasts/{roast_id}").json()["reached_drop"] is True
+
+    resp = client.post(f"/api/v1/roasts/{roast_id}/events/reset")
+    assert resp.status_code == 200
+
+    restored = client.get(f"/api/v1/roasts/{roast_id}").json()
+    assert restored["reached_drop"] is False
+    assert "DROP" not in [e["type"] for e in restored["events"]]
+
+
+def test_reset_events_rejects_a_roast_with_no_original_snapshot(client):
+    # Simulates a roast that finished before original_events_json existed --
+    # storage still has the row, but with that column NULL, same as any
+    # pre-migration roast.
+    roast_id, _ = _finished_roast(client)
+    storage.update_roast(roast_id, original_events_json=None)
+
+    resp = client.post(f"/api/v1/roasts/{roast_id}/events/reset")
+    assert resp.status_code == 409
+
+
+def test_reset_events_404_for_unknown_roast(client):
+    resp = client.post("/api/v1/roasts/does-not-exist/events/reset")
+    assert resp.status_code == 404

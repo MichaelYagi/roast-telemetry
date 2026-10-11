@@ -827,6 +827,14 @@
         "COOL_END": "Cool End"
       }
     },
+    "milestoneEdits": {
+      "pendingNotice_other": "未保存のマイルストーン変更{{count}}件",
+      "save": "変更を保存",
+      "saving": "保存中…",
+      "cancel": "キャンセル",
+      "resetToOriginal": "元の記録にリセット",
+      "resetConfirm": "このロースト上のすべてのマイルストーンを、最初に記録された状態に戻しますか?これは未保存の変更だけでなく、これまでに行われたすべての編集を元に戻します。"
+    },
     "downloads": {
       "download": "ダウンロード",
       "spreadsheetNote": "（表計算ソフト用、タブ区切り）",

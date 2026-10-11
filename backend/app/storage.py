@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS roasts (
     aillio_model TEXT,
     tc4_port TEXT,
     plugin_kind TEXT,
-    plugin_port TEXT
+    plugin_port TEXT,
+    original_events_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS roast_presets (
@@ -343,6 +344,16 @@ def init_db() -> None:
         # hash), and for anything not imported from a file at all.
         if "source_sha256" not in existing_cols:
             c.execute("ALTER TABLE roasts ADD COLUMN source_sha256 TEXT")
+        # A one-time, never-overwritten copy of `events` exactly as they
+        # stood the moment this roast first finished (see
+        # RoastSession._finish), before any later add/retime/delete --
+        # lets "Reset to original" (RoastSessionManager.
+        # reset_events_to_original) undo every edit ever made, not just
+        # ones from the current page visit. NULL for every roast that
+        # finished before this column existed (and for one still in
+        # progress); the reset action simply isn't offered for those.
+        if "original_events_json" not in existing_cols:
+            c.execute("ALTER TABLE roasts ADD COLUMN original_events_json TEXT")
         c.execute("CREATE INDEX IF NOT EXISTS idx_roasts_source_sha256 ON roasts(source_sha256)")
         if "had_emergency_stop" not in existing_cols:
             c.execute("ALTER TABLE roasts ADD COLUMN had_emergency_stop INTEGER NOT NULL DEFAULT 0")
