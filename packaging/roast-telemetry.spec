@@ -260,7 +260,7 @@ if sys.platform == "darwin":
         icon=icon_path,
         bundle_identifier="com.roasttelemetry.app",
         info_plist={
-            "CFBundleShortVersionString": "1.3.22",
+            "CFBundleShortVersionString": "1.3.23",
             "NSHighResolutionCapable": True,
             # A tray/menu-bar-only app -- no Dock icon or app-switcher
             # entry, matching how the tray icon already behaves on
