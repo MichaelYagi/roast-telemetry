@@ -185,6 +185,15 @@ datas = [
     (repo_path("frontend", "dist"), "frontend/dist"),
     (repo_path("backend", "data", "sample_roasts"), "backend/data/sample_roasts"),
     (repo_path("frontend", "public", "icon-256x256.png"), "assets"),
+    # The one file here, not the whole installed/ folder (which also holds
+    # a bare .gitkeep and, once someone's built one, their own plugins --
+    # neither belongs in the bundle), so a stale __pycache__/*.pyc sitting
+    # next to it in the source tree never rides along either.
+    # device_plugins.base.ensure_example_copied() copies this out of
+    # PyInstaller's own extraction folder (not somewhere a user would ever
+    # go looking) into the real, persistent per-user installed/ at
+    # startup -- see its own docstring.
+    (repo_path("device_plugins", "installed", "example_serial_meter.py"), "device_plugins/installed"),
 ]
 
 # Windows wants a .ico (frontend/public/favicon.ico already exists and
@@ -260,7 +269,7 @@ if sys.platform == "darwin":
         icon=icon_path,
         bundle_identifier="com.roasttelemetry.app",
         info_plist={
-            "CFBundleShortVersionString": "1.3.24",
+            "CFBundleShortVersionString": "1.3.25",
             "NSHighResolutionCapable": True,
             # A tray/menu-bar-only app -- no Dock icon or app-switcher
             # entry, matching how the tray icon already behaves on
