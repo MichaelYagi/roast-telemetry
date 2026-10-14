@@ -246,12 +246,16 @@ export default function LiveRoastView() {
   useEffect(refreshDeviceProfiles, []);
 
   // Installed device plugins (see device_plugins/README.md) -- the "Plugin
-  // device" connection option only appears once this is non-empty; nothing
-  // ships installed by default, so most servers never show it at all.
+  // device" connection option only appears once there's at least one
+  // *enabled* one; nothing ships installed by default, so most servers
+  // never show it at all. devicePlugins itself keeps the full list
+  // (including disabled ones) so a past roast that used a since-disabled
+  // plugin can still show its real label instead of a bare kind string.
   const [devicePlugins, setDevicePlugins] = useState([]);
   useEffect(() => {
     api.listDevicePlugins().then(setDevicePlugins).catch(() => {});
   }, []);
+  const enabledDevicePlugins = devicePlugins.filter((p) => p.enabled);
   const selectedPlugin = devicePlugins.find((p) => p.kind === form.plugin_kind) || null;
 
   // Configure Roast form tabs -- General/Device always exist (every data
@@ -1339,7 +1343,7 @@ export default function LiveRoastView() {
                     <option value="ms6514_live">{t("liveRoast.connectionOptions.ms6514")}</option>
                     <option value="aillio_live">{t("liveRoast.connectionOptions.aillio")}</option>
                     <option value="tc4_live">{t("liveRoast.connectionOptions.tc4")}</option>
-                    {devicePlugins.length > 0 && <option value="plugin_live">{t("liveRoast.connectionOptions.plugin")}</option>}
+                    {enabledDevicePlugins.length > 0 && <option value="plugin_live">{t("liveRoast.connectionOptions.plugin")}</option>}
                   </select>
                 </label>
               </div>
@@ -1851,7 +1855,7 @@ export default function LiveRoastView() {
                 {t("liveRoast.plugin.kind")}
                 <select value={form.plugin_kind} onChange={(e) => setForm({ ...form, plugin_kind: e.target.value, plugin_port: "" })}>
                   <option value="">{t("liveRoast.plugin.choose")}</option>
-                  {devicePlugins.map((p) => (
+                  {enabledDevicePlugins.map((p) => (
                     <option key={p.kind} value={p.kind}>
                       {p.label}
                     </option>

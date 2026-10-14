@@ -4,9 +4,14 @@ for this example -- it isn't a real device's protocol -- and exists purely
 so a plugin author has a complete, working file to copy and adapt. See
 device_plugins/README.md for what's required of a real one.
 
-Not auto-loaded: device_plugins/base.py's load_installed() only scans
-device_plugins/installed/, not examples/. Copy this file there (and give it
-a real kind name) to actually use it.
+Lives directly in installed/ (not a separate examples/ folder) so
+load_installed() genuinely loads it on every startup, proving the whole
+mechanism end to end rather than just describing it -- but registered
+below with enabled=False, so it never appears in Settings > Device plugins
+or the New Roast form on its own (see PluginSpec.enabled's own docstring in
+base.py). To build a real plugin: copy this file to a new name in this
+same folder, remove (or flip to True) the enabled=False line below once
+it's ready for others to see, and give it its own real kind/label/protocol.
 """
 from __future__ import annotations
 
@@ -135,4 +140,5 @@ register(PluginSpec(
     needs_port=True,
     read_only=True,
     port_hint="Serial port",
+    enabled=False,  # see this file's own module docstring
 ))

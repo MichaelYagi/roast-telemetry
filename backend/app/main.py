@@ -102,7 +102,9 @@ async def lifespan(app: FastAPI):
     ])
     # Third-party protocol plugins -- see device_plugins/README.md. A file
     # that fails to import is logged and skipped there, so one broken
-    # plugin never stops the server from starting.
+    # plugin never stops the server from starting. ensure_example_copied()
+    # is a no-op outside a frozen desktop build -- see its own docstring.
+    device_plugins.ensure_example_copied()
     device_plugins.load_installed()
     yield
 

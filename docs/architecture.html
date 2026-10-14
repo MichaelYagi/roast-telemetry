@@ -82,12 +82,14 @@
   </p>
   <p>
     To write one: copy
-    <code>device_plugins/examples/example_serial_meter.py</code> into
-    <code>device_plugins/installed/</code>, implement the engine shape,
-    call <code>register()</code>, and restart the server —
+    <code>device_plugins/installed/example_serial_meter.py</code> to a new
+    filename in that same folder, implement the engine shape, call
+    <code>register()</code>, and restart the server —
     <code>GET /api/v1/device-plugins</code> then lists it and the New
-    Roast form shows a "Plugin device" option. Milestone auto-detection is
-    optional (forward temperatures to
+    Roast form shows a "Plugin device" option, once it's also marked
+    <code>enabled=True</code> (see below — the example itself ships
+    <code>enabled=False</code>, so copy it and remove that line). Milestone
+    auto-detection is optional (forward temperatures to
     <code>roast_heuristics.LiveRoastDetector</code> or skip it — manual
     event buttons always work either way), and testing against real
     hardware isn't required to write one but is required before trusting
@@ -95,6 +97,36 @@
     full writer's guide, and the AGPL licensing note in there before
     distributing a plugin to anyone else — it's loaded in-process and
     calls into this app's own code, which the AGPL has opinions about.
+  </p>
+  <p>
+    Two separate ways a plugin can be kept out of sight, for two different
+    reasons. <code>PluginSpec.enabled=False</code> is the author's own
+    code-level switch, for one still being built — it's loaded and
+    registered normally (an author can still point a roast straight at its
+    <code>kind</code> to test it directly), but never appears in
+    <code>GET /device-plugins</code>, Settings, or the New Roast form, and
+    can't be managed through that endpoint's PUT/DELETE either, until the
+    author removes the line and restarts the server.
+    <code>example_serial_meter.py</code> itself ships exactly this way —
+    real, loaded, fully working, invisible until someone copies it to
+    build something real. Once a plugin ships <code>enabled=True</code>
+    (the normal case), <strong>Settings &rarr; Device plugins</strong>
+    adds its own separate, reversible runtime checkbox on top — unchecking
+    it hides it from the New Roast form's picker and rejects starting a
+    roast with it (an already in-progress roast using it keeps running
+    regardless), without touching the file or restarting the server. The
+    same panel's <strong>Delete</strong> is permanent, not a toggle: it
+    removes the plugin from the running server immediately and deletes
+    its file, with no restart needed and no undo.
+  </p>
+  <p>
+    Running the packaged Windows/macOS build instead of a source checkout?
+    <code>installed/</code> lives in the app's own per-user data folder
+    there — the same one <code>roasts.db</code> and the server log already
+    use (the tray icon's <strong>Open data folder</strong> gets you there)
+    — with <code>example_serial_meter.py</code> itself refreshed into it
+    on every app start, so there's always a real, working example to copy
+    from without needing the repo.
   </p>
 
   <h2 id="whats-stored-where">What's stored where</h2>
@@ -220,7 +252,9 @@
       <tr><td>GET</td><td><code>/settings</code></td><td>App-wide settings (readout panels, control-panel layout, Ollama, temperature unit)</td></tr>
       <tr><td>PUT</td><td><code>/settings</code></td><td>Save app-wide settings</td></tr>
       <tr><td>GET</td><td><code>/settings/stream</code></td><td>Server-Sent Events push whenever any client saves settings, for hot-apply</td></tr>
-      <tr><td>GET</td><td><code>/device-plugins</code></td><td>List installed device plugins (see <a href="#device-plugins">Device plugins</a> above) for the New Roast form's "Plugin device" option</td></tr>
+      <tr><td>GET</td><td><code>/device-plugins</code></td><td>List installed device plugins, each with its current <code>enabled</code> state (see <a href="#device-plugins">Device plugins</a> above) for the New Roast form's "Plugin device" option</td></tr>
+      <tr><td>PUT</td><td><code>/device-plugins/{kind}</code></td><td>Enable or disable one installed plugin (Settings &rarr; Device plugins), without touching its file or restarting the server</td></tr>
+      <tr><td>DELETE</td><td><code>/device-plugins/{kind}</code></td><td>Permanently remove one — unregisters it immediately and deletes its file, no restart needed and no undo</td></tr>
       <tr><td>GET</td><td><code>/webhooks/events</code></td><td>{key: label} for every event a webhook can subscribe to — see <a href="#webhooks">Webhooks</a> below</td></tr>
       <tr><td>GET / POST / PUT / DELETE</td><td><code>/webhooks</code>, <code>/webhooks/{id}</code></td><td>Manage outbound webhooks (Settings &rarr; Webhooks)</td></tr>
       <tr><td>POST</td><td><code>/webhooks/test</code></td><td>Send a fixed test payload straight to a URL, independent of any saved webhook</td></tr>

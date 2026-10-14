@@ -5,6 +5,7 @@ import BreakoutSettingsEditor from "../components/BreakoutSettingsEditor.jsx";
 import ColorsSettingsEditor from "../components/ColorsSettingsEditor.jsx";
 import VerticalControlSettingsEditor from "../components/VerticalControlSettingsEditor.jsx";
 import WebhooksPanel from "../components/WebhooksPanel.jsx";
+import DevicePluginsPanel from "../components/DevicePluginsPanel.jsx";
 import { SMALL_READOUT_EXCLUDED_KEYS } from "../breakoutPanels.js";
 
 const CHECK_DEBOUNCE_MS = 600;
@@ -347,6 +348,8 @@ export default function SettingsView() {
       </div>
 
       <WebhooksPanel />
+
+      <DevicePluginsPanel />
 
       <div className="panel">
         <button type="button" onClick={handleSave} disabled={!loaded}>

@@ -1011,6 +1011,38 @@ def add_known_extra_channels(labels) -> None:
         )
 
 
+# Which installed device plugins (see device_plugins/README.md) are turned
+# off -- its own row in the settings table, not part of AppSettings/
+# get_settings()/set_settings() above, since this is toggled per-kind from
+# its own small GET/PUT /device-plugins endpoint rather than saved as part
+# of the whole Settings-page form. A plugin kind not currently installed
+# can still appear here (its file was removed after being disabled, or
+# this is a different machine's install) -- harmless, just dead weight
+# that drops out the moment something disables a kind that *is* installed
+# (set_plugin_enabled only ever writes the current, actually-registered set).
+_DISABLED_PLUGIN_KINDS_KEY = "disabled_plugin_kinds"
+
+
+def get_disabled_plugin_kinds() -> list[str]:
+    with _conn() as c:
+        row = c.execute("SELECT value FROM settings WHERE key = ?", (_DISABLED_PLUGIN_KINDS_KEY,)).fetchone()
+    try:
+        kinds = json.loads(row["value"]) if row and row["value"] else []
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return sorted({k for k in kinds if isinstance(k, str)}) if isinstance(kinds, list) else []
+
+
+def set_plugin_enabled(kind: str, enabled: bool) -> None:
+    disabled = set(get_disabled_plugin_kinds())
+    disabled.discard(kind) if enabled else disabled.add(kind)
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO settings (key, value) VALUES (:key, :value) ON CONFLICT(key) DO UPDATE SET value = :value",
+            {"key": _DISABLED_PLUGIN_KINDS_KEY, "value": json.dumps(sorted(disabled))},
+        )
+
+
 def set_settings(**kv) -> None:
     if "broken_out_panels" in kv:
         kv["broken_out_panels"] = json.dumps(kv["broken_out_panels"])

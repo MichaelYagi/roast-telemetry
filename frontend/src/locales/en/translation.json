@@ -108,6 +108,12 @@
       "nameAndUrlRequired": "Name and URL are both required.",
       "confirmDelete": "Delete this webhook?"
     },
+    "devicePlugins": {
+      "heading": "Device plugins",
+      "hint": "Installed third-party protocol plugins (see device_plugins/README.md). Disabling one hides it from the New Roast form without deleting the file or restarting the server.",
+      "delete": "Delete",
+      "confirmDelete": "Permanently delete \"{{label}}\"? This removes its file and cannot be undone -- you'd need to install it again to get it back."
+    },
     "save": "Save",
     "saved": "Saved.",
     "failedToSave": "Failed to save: {{error}}"

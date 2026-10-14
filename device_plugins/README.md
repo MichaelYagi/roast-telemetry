@@ -11,10 +11,25 @@ Profiles, which already let you add one by register facts (slave id,
 register numbers, scaling) alone. Reach for a plugin only when the device's
 own protocol genuinely isn't Modbus.
 
+## Where this lives if you're running the packaged desktop app
+
+Everything below assumes a source checkout, where `device_plugins/installed/`
+is just a folder in the repo. The packaged Windows/macOS build doesn't have
+a repo to put files in -- its copy of `installed/` lives in the app's own
+per-user data folder instead (the same one `roasts.db` and the server log
+already live in; the tray icon's **Open data folder** gets you there), with
+`example_serial_meter.py` itself refreshed into it on every app start, same
+as the source checkout's own copy below. Drop your own new plugin in there
+the same way the steps below describe, just in that folder instead of the
+repo's.
+
 ## Writing one
 
-1. Copy `device_plugins/examples/example_serial_meter.py` into
-   `device_plugins/installed/` and rename it.
+1. Copy `device_plugins/installed/example_serial_meter.py` to a new
+   filename in that same folder and rename it. It ships registered with
+   `enabled=False` (see its own module docstring) -- remove that line, or
+   flip it to `True`, once your own plugin is ready for Settings > Device
+   plugins and the New Roast form to actually show it (see below).
 2. Write a class matching the `DeviceEngine` shape in `base.py`: `tick`,
    `get_new_events`, `apply_command`, `is_finished`, `status`,
    `reset_detection`, `mark_milestone_fired`, `notify_manual_charge`,
@@ -26,7 +41,37 @@ own protocol genuinely isn't Modbus.
    `connect` function.
 4. Restart the server. `GET /api/v1/device-plugins` lists it, and the New
    Roast form shows a "Plugin device" option once at least one plugin is
-   installed.
+   installed *and enabled* (see below).
+
+## Hiding one while you're still building it
+
+`PluginSpec.enabled=False` is your own, in-code switch -- set it while a
+plugin is still a work in progress, and it's loaded and registered
+normally at startup (so you can still point a roast straight at its
+`kind` yourself, e.g. from a script or `curl`, to test it) but never
+appears in `GET /api/v1/device-plugins`, Settings > Device plugins, or the
+New Roast form, and can't be managed through that endpoint's PUT/DELETE
+either. There's nothing for anyone else to see or toggle until you remove
+the line (or flip it to `True`) yourself and restart the server.
+`example_serial_meter.py` itself ships this way -- real, loaded, fully
+working, and invisible until someone copies it to build something real.
+
+## Turning one off, or removing it for good
+
+This section is about Settings' own runtime checkbox -- it only ever
+applies to a plugin shipped `enabled=True` (the normal case above). It
+lists every such installed plugin with a checkbox -- unchecking one hides
+it from the New Roast form and rejects starting a new roast with it,
+without deleting the file or restarting the server (an already-running
+roast using it keeps going regardless). This is a visibility switch, not
+an unload: the file is still imported and registered at startup either
+way, same as always.
+
+The same panel's **Delete** button is the real thing: it removes the
+plugin from the running server immediately (no restart needed) and
+deletes its file from `installed/`, so it's gone even from this list
+until the file is put back. There's no undo -- keep a copy elsewhere
+first if you might want it again.
 
 ## What a plugin is not responsible for
 

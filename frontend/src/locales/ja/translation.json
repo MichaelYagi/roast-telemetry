@@ -107,6 +107,12 @@
       "nameAndUrlRequired": "名前とURLは両方とも必須です。",
       "confirmDelete": "このWebhookを削除しますか?"
     },
+    "devicePlugins": {
+      "heading": "デバイスプラグイン",
+      "hint": "インストール済みのサードパーティ製プロトコルプラグイン(device_plugins/README.md参照)。無効にすると、ファイルを削除したりサーバーを再起動したりせずに、新規ロースト画面から非表示にできます。",
+      "delete": "削除",
+      "confirmDelete": "「{{label}}」を完全に削除しますか?ファイルが削除され、元に戻せません -- 復元するには再度インストールする必要があります。"
+    },
     "save": "保存",
     "saved": "保存しました。",
     "failedToSave": "保存に失敗しました: {{error}}"

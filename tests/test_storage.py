@@ -437,3 +437,17 @@ def test_delete_api_key_is_scoped_to_its_own_user(isolated_db):
 
     assert isolated_db.delete_api_key(bob["id"], alices_key["id"]) is False  # not bob's to delete
     assert isolated_db.get_user_by_api_key_hash("hash-alice") is not None  # still there
+
+
+def test_disabled_plugin_kinds_defaults_empty_and_round_trips(isolated_db):
+    assert isolated_db.get_disabled_plugin_kinds() == []
+
+    isolated_db.set_plugin_enabled("example_serial_meter", False)
+    assert isolated_db.get_disabled_plugin_kinds() == ["example_serial_meter"]
+
+    # A second kind disabled, independently of the first.
+    isolated_db.set_plugin_enabled("some_other_plugin", False)
+    assert isolated_db.get_disabled_plugin_kinds() == ["example_serial_meter", "some_other_plugin"]
+
+    isolated_db.set_plugin_enabled("example_serial_meter", True)
+    assert isolated_db.get_disabled_plugin_kinds() == ["some_other_plugin"]

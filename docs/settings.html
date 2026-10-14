@@ -73,6 +73,19 @@
     Webhooks</a> for the full event list and payload shape.
   </p>
 
+  <h2 id="device-plugins">Device plugins</h2>
+  <p>
+    Only appears once at least one third-party protocol plugin is both
+    installed and marked ready by its own author (see
+    <a href="architecture.html#device-plugins">Architecture &rarr; Device
+    plugins</a> — the shipped example isn't, on purpose, so a fresh
+    install normally shows nothing here at all). A checkbox per plugin
+    hides or shows it on the New Roast form's "Plugin device" option,
+    without deleting its file or restarting the server.
+    <strong>Delete</strong> next to it is permanent instead — it removes
+    the plugin and its file for good.
+  </p>
+
   <h2 id="ai-roast-review">AI Roast Review (Ollama)</h2>
   <p>
     Point this at a local Ollama server to get AI-written reviews on a roast's own page (milestones,

@@ -484,6 +484,8 @@ class RoastSession:
                 plugin_spec = device_plugins.get(request.plugin_kind)
                 if plugin_spec is None:
                     raise RoastSessionError(f"device plugin {request.plugin_kind!r} isn't installed -- see device_plugins/README.md.")
+                if request.plugin_kind in storage.get_disabled_plugin_kinds():
+                    raise RoastSessionError(f"device plugin {request.plugin_kind!r} is disabled -- enable it first (Settings > Device plugins).")
                 self._plugin_spec = plugin_spec
                 plugin_port = request.plugin_port
                 if plugin_spec.needs_port:
