@@ -115,6 +115,10 @@ export default function RoastDetailView() {
   const [numbersKey, setNumbersKey] = useState(0);
   const [beansText, setBeansText] = useState("");
   const [tempUnit, setTempUnit] = useState("c"); // display only, see Settings > Temperature Unit
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [renameError, setRenameError] = useState(null);
   // Deliberately separate from `error` above -- that one *replaces the
   // whole page* (see the early-return a few lines down), which is right
   // for "the roast itself failed to load" but way too disruptive for a
@@ -423,6 +427,31 @@ export default function RoastDetailView() {
     }
   }
 
+  function startEditTitle() {
+    setTitleDraft(roast.title);
+    setRenameError(null);
+    setEditingTitle(true);
+  }
+
+  async function handleSaveTitle() {
+    const title = titleDraft.trim();
+    if (!title || title === roast.title) {
+      setEditingTitle(false);
+      return;
+    }
+    setRenameSaving(true);
+    setRenameError(null);
+    try {
+      await api.setTitle(roast.id, title);
+      setRoast((prev) => ({ ...prev, title }));
+      setEditingTitle(false);
+    } catch (err) {
+      setRenameError(err.message);
+    } finally {
+      setRenameSaving(false);
+    }
+  }
+
   // "Weight loss" convention (a negative percentage,
   // e.g. "-13.2%") -- roast_review.py computes the same ratio but as a
   // positive "percent lost" for the AI review prompt; this is purely a
@@ -447,7 +476,27 @@ export default function RoastDetailView() {
     <div className="detail-view">
       <div className="panel no-print">
         <h2>
-          {roast.title}
+          {editingTitle ? (
+            <input
+              autoFocus
+              className="roast-title-input"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSaveTitle();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  setEditingTitle(false);
+                }
+              }}
+              maxLength={200}
+              disabled={renameSaving}
+            />
+          ) : (
+            roast.title
+          )}
           {isSimulatedRoast(roast) && (
             <span className="simulated-badge" title={t("roastDetail.simulatedBadgeTitle")}>
               {t("roastDetail.simulatedBadge")}
@@ -464,6 +513,24 @@ export default function RoastDetailView() {
             </span>
           )}
         </h2>
+        <p className="no-print">
+          {editingTitle ? (
+            <>
+              <button type="button" className="link-like" onClick={handleSaveTitle} disabled={renameSaving}>
+                {renameSaving ? t("roastDetail.rename.saving") : t("roastDetail.rename.save")}
+              </button>
+              {" · "}
+              <button type="button" className="link-like" onClick={() => setEditingTitle(false)} disabled={renameSaving}>
+                {t("roastDetail.rename.cancel")}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="link-like" onClick={startEditTitle}>
+              {t("roastDetail.rename.button")}
+            </button>
+          )}
+        </p>
+        {renameError && <p className="error no-print">{renameError}</p>}
         <p className="sub">
           {roast.mode} · {t("roastDetail.statusLine.status")} <strong>{roast.status}</strong> · {t("roastDetail.statusLine.duration")}{" "}
           {formatSeconds(roast.duration_s)}

@@ -3677,6 +3677,21 @@ button.link-neutral {
   text-decoration: none;
 }
 
+.inline-rename-input {
+  width: 100%;
+  font-weight: 600;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.roast-title-input {
+  font-size: inherit;
+  font-weight: inherit;
+  font-family: inherit;
+  min-width: 16rem;
+  max-width: 100%;
+}
+
 .roast-link:hover {
   color: var(--accent);
   text-decoration: underline;

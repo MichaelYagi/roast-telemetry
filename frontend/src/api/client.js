@@ -78,6 +78,7 @@ export const api = {
   deleteWeightRoasted: (id) => request(`/roasts/${id}/weight`, { method: "DELETE" }),
   deleteWeightGreen: (id) => request(`/roasts/${id}/weight-green`, { method: "DELETE" }),
   setTags: (id, tags) => request(`/roasts/${id}/tags`, { method: "PUT", body: JSON.stringify({ tags }) }),
+  setTitle: (id, title) => request(`/roasts/${id}/title`, { method: "PUT", body: JSON.stringify({ title }) }),
   listTags: () => request("/roasts/tags"),
   listRoasters: () => request("/roasts/roasters"),
   countRoasts: (params = {}) => request(`/roasts/count?${new URLSearchParams(params)}`),

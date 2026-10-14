@@ -62,6 +62,8 @@ export default function HistoryDashboard() {
   // filters.q (the thing refresh()'s effect actually watches) lags behind it.
   const [searchInput, setSearchInput] = useState("");
   const [allTags, setAllTags] = useState([]);
+  const [editingTitleId, setEditingTitleId] = useState(null);
+  const [editingTitleValue, setEditingTitleValue] = useState("");
   const [allRoasters, setAllRoasters] = useState([]);
   // 1-indexed. pageSize comes from Settings > History (default 100 until
   // that loads) -- GET /roasts itself has no hard cap on how many total
@@ -351,6 +353,27 @@ export default function HistoryDashboard() {
     }
     setImportError(failed.length ? failed.join("\n") : null);
     setImportSummary(done.length > 1 || (done.length && failed.length) ? t("history.import.importedRoasts", { count: done.length }) : null);
+  }
+
+  function startEditTitle(r) {
+    setEditingTitleId(r.id);
+    setEditingTitleValue(r.title);
+  }
+
+  async function commitEditTitle(id) {
+    const title = editingTitleValue.trim();
+    const current = roasts.find((r) => r.id === id);
+    if (!title || title === current?.title) {
+      setEditingTitleId(null);
+      return;
+    }
+    try {
+      await api.setTitle(id, title);
+      setEditingTitleId(null);
+      refresh();
+    } catch (err) {
+      notify(err.message, { title: t("history.notify.renameFailedTitle") });
+    }
   }
 
   async function handleDelete(id, title) {
@@ -742,9 +765,29 @@ export default function HistoryDashboard() {
                       />
                     </td>
                     <td className="cell-title">
-                      <Link className="roast-link" to={`/roasts/${r.id}`}>
-                        {r.title}
-                      </Link>
+                      {editingTitleId === r.id ? (
+                        <input
+                          autoFocus
+                          className="inline-rename-input"
+                          value={editingTitleValue}
+                          onChange={(e) => setEditingTitleValue(e.target.value)}
+                          onBlur={() => commitEditTitle(r.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              commitEditTitle(r.id);
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              setEditingTitleId(null);
+                            }
+                          }}
+                          maxLength={200}
+                        />
+                      ) : (
+                        <Link className="roast-link" to={`/roasts/${r.id}`}>
+                          {r.title}
+                        </Link>
+                      )}
                       {r.beans && <span className="cell-sub">{r.beans}</span>}
                     </td>
                     <td className="cell-mode">
@@ -785,12 +828,28 @@ export default function HistoryDashboard() {
                       </span>
                     </td>
                     <td className="cell-actions">
-                      <Link className="btn-sm" to={`/roasts/${r.id}`}>
-                        {t("history.table.view")}
-                      </Link>
-                      <button type="button" className="btn-sm btn-danger-soft" onClick={() => handleDelete(r.id, r.title)}>
-                        {t("history.table.delete")}
-                      </button>
+                      {editingTitleId === r.id ? (
+                        <>
+                          <button type="button" className="btn-sm" onMouseDown={(e) => e.preventDefault()} onClick={() => commitEditTitle(r.id)}>
+                            {t("history.table.renameSave")}
+                          </button>
+                          <button type="button" className="btn-sm" onMouseDown={(e) => e.preventDefault()} onClick={() => setEditingTitleId(null)}>
+                            {t("history.table.renameCancel")}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <Link className="btn-sm" to={`/roasts/${r.id}`}>
+                            {t("history.table.view")}
+                          </Link>
+                          <button type="button" className="btn-sm" onClick={() => startEditTitle(r)}>
+                            {t("history.table.rename")}
+                          </button>
+                          <button type="button" className="btn-sm btn-danger-soft" onClick={() => handleDelete(r.id, r.title)}>
+                            {t("history.table.delete")}
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 );

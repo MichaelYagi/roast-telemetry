@@ -1260,6 +1260,14 @@ class RoastSession:
         self.tags = tags
         storage.set_roast_tags(self.id, tags)
 
+    def set_title(self, title: str) -> None:
+        # Title *is* part of the .alog format (see _rewrite_alog), unlike
+        # tags above -- so this needs the full rewrite, same as the weight
+        # setters.
+        self.title = title
+        storage.update_roast(self.id, title=title)
+        self._rewrite_alog()
+
     def delete_event(self, event_id: str) -> dict:
         """Removes an already-marked milestone entirely, so it can be
         re-marked fresh via the normal add_event() flow (its own
@@ -1729,6 +1737,18 @@ class RoastSessionManager:
         if storage.get_roast_row(roast_id) is None:
             raise RoastSessionError(f"unknown roast {roast_id}")
         storage.set_roast_tags(roast_id, tags)
+
+    def set_title(self, roast_id: str, title: str) -> None:
+        session = self.get(roast_id)
+        if session is not None:
+            session.set_title(title)
+            return
+        # Title *is* part of the .alog format, unlike tags above -- same
+        # cold rewrite as the weight setters.
+        row, parsed = self._cold_roast_row_and_parsed(roast_id)
+        row["title"] = title
+        storage.update_roast(roast_id, title=title)
+        self._rewrite_cold_alog(row, parsed)
 
     def delete(self, roast_id: str) -> None:
         session = self.get(roast_id)

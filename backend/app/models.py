@@ -210,6 +210,15 @@ class RoastBeansUpdate(BaseModel):
     name: Optional[str] = Field(default=None, max_length=200)
 
 
+class TitleUpdateRequest(BaseModel):
+    """PUT /roasts/{id}/title body. Unlike beans/tags, blank isn't a valid
+    "clear it" state here -- every roast has a title from creation on, so
+    the API layer rejects a blank one outright rather than silently keeping
+    the old title or writing an empty string."""
+
+    title: str = Field(min_length=1, max_length=200)
+
+
 class SavedViewCreate(BaseModel):
     kind: Literal["compare", "analysis"]
     name: str = Field(min_length=1, max_length=120)

@@ -42,6 +42,7 @@ from ..models import (
     RoastStatus,
     RoastSummary,
     TagsUpdateRequest,
+    TitleUpdateRequest,
     UserStatus,
 )
 from ..roast_control import program_from_profile
@@ -768,6 +769,26 @@ def set_tags(roast_id: str, update: TagsUpdateRequest, http_request: Request) ->
         message=f'Set tags on "{row["title"] if row else roast_id}" to {tags_text}',
     )
     return {"ok": True, "tags": update.tags}
+
+
+@router.put("/{roast_id}/title")
+def set_title(roast_id: str, update: TitleUpdateRequest, http_request: Request) -> dict:
+    title = update.title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="title cannot be blank")
+    row = storage.get_roast_row(roast_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"roast {roast_id!r} not found")
+    old_title = row["title"]
+    try:
+        session_manager.set_title(roast_id, title)
+    except RoastSessionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    storage.log_activity(
+        "roast", "set_title", **auth.actor(http_request), roast_id=roast_id,
+        roast_title=title, message=f'Renamed "{old_title}" to "{title}"',
+    )
+    return {"title": title}
 
 
 @router.get("/{roast_id}/alog")

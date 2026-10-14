@@ -770,6 +770,9 @@
       "noMatch": "このフィルターに一致するローストはありません。",
       "noneYet": "まだローストがありません。",
       "view": "表示",
+      "rename": "名前を変更",
+      "renameSave": "保存",
+      "renameCancel": "キャンセル",
       "delete": "削除",
       "selectRoast": "{{title}} を選択",
       "pagePrev": "← 前へ",
@@ -801,11 +804,18 @@
     },
     "notify": {
       "deleteFailedTitle": "削除に失敗しました",
-      "deleteFailedSummary": "{{total}}件中{{failedCount}}件を削除できませんでした:\n{{details}}"
+      "deleteFailedSummary": "{{total}}件中{{failedCount}}件を削除できませんでした:\n{{details}}",
+      "renameFailedTitle": "名前の変更に失敗しました"
     }
   },
   "roastDetail": {
     "loading": "読み込み中…",
+    "rename": {
+      "button": "名前を変更",
+      "save": "保存",
+      "saving": "保存中…",
+      "cancel": "キャンセル"
+    },
     "statusLine": {
       "status": "ステータス:",
       "duration": "時間:"

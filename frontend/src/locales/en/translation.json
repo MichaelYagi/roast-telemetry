@@ -780,6 +780,9 @@
       "noMatch": "No roasts match these filters.",
       "noneYet": "No roasts yet.",
       "view": "View",
+      "rename": "Rename",
+      "renameSave": "Save",
+      "renameCancel": "Cancel",
       "delete": "Delete",
       "selectRoast": "Select {{title}}",
       "pagePrev": "← Prev",
@@ -814,11 +817,18 @@
     },
     "notify": {
       "deleteFailedTitle": "Delete failed",
-      "deleteFailedSummary": "{{failedCount}} of {{total}} couldn't be deleted:\n{{details}}"
+      "deleteFailedSummary": "{{failedCount}} of {{total}} couldn't be deleted:\n{{details}}",
+      "renameFailedTitle": "Rename failed"
     }
   },
   "roastDetail": {
     "loading": "Loading…",
+    "rename": {
+      "button": "Rename",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel"
+    },
     "statusLine": {
       "status": "status:",
       "duration": "duration:"
