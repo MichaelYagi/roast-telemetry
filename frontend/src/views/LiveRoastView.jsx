@@ -697,7 +697,29 @@ export default function LiveRoastView() {
       }
       setPhase("idle");
     } else if (phase === "roasting" || phase === "cooling") {
-      await api.stopRoast(roastId);
+      // Unlike the "armed" branch above, this used to leave the button's
+      // own click with no visible effect at all -- no local state change,
+      // no error handling -- entirely dependent on this tab's own
+      // WebSocket round-tripping the resulting "finished" push (see
+      // useRoastStream/the roast?.status effect below) before the button
+      // would flip to RESET. A slow or momentarily stalled socket made a
+      // genuinely successful stop look like a dead button, and clicking
+      // again did nothing new (the server treats a second stop on an
+      // already-stopped roast as a no-op), with no error to explain why.
+      // Setting phase from the response here -- the same phase the
+      // roast?.status effect would eventually set anyway -- makes the
+      // click itself authoritative instead of waiting on a second,
+      // separate confirmation.
+      try {
+        // stopRoast() always ends the roast (STOPPED, or COMPLETE/ABORTED
+        // if the engine or a tick error got there first) -- never a
+        // status this view still treats as "running" -- so "finished" is
+        // unconditionally the right phase on success.
+        await api.stopRoast(roastId);
+        setPhase("finished");
+      } catch (err) {
+        setError(err.message);
+      }
     } else if (phase === "finished") {
       handleReset();
     }
