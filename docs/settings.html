@@ -63,6 +63,16 @@
     How many roasts load per page, and the most you can compare at once.
   </p>
 
+  <h2 id="webhooks">Webhooks</h2>
+  <p>
+    Send an outbound HTTP POST to a URL of your own (ntfy, a Discord/Slack
+    incoming webhook, Home Assistant, a script) on roast milestones,
+    finish, or an emergency stop. Add any number, each with its own name,
+    URL, and subscribed events — "Send test" checks a URL before you save
+    it. See <a href="architecture.html#webhooks">Architecture &rarr;
+    Webhooks</a> for the full event list and payload shape.
+  </p>
+
   <h2 id="ai-roast-review">AI Roast Review (Ollama)</h2>
   <p>
     Point this at a local Ollama server to get AI-written reviews on a roast's own page (milestones,

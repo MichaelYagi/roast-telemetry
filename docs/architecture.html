@@ -52,6 +52,51 @@
     on <code>roast_heuristics</code> for the shared detection logic.
   </p>
 
+  <h2 id="device-plugins">Device plugins</h2>
+  <p>
+    A plugin adds a <em>protocol</em> this app doesn't already speak — a
+    raw-USB device, a different serial line format, Bluetooth, anything
+    that isn't Modbus and isn't already one of the built-in bridges
+    (<code>modbus_bridge</code>, <code>ms6514_bridge</code>,
+    <code>aillio_bridge</code>, <code>tc4_bridge</code>). That's a
+    narrower gap than it sounds — a new <em>Modbus</em> roaster needs no
+    code at all, just a Device Profile (see
+    <a href="modbus/index.html#device-profiles">Direct Modbus &rarr;
+    Device profiles</a>). Reach for a plugin only when the device's own
+    protocol genuinely isn't Modbus.
+  </p>
+  <p>
+    A plugin is a single Python file dropped into
+    <code>device_plugins/installed/</code> that calls
+    <code>register(PluginSpec(...))</code> at import time, providing a
+    <code>connect(port, ...)</code> function that returns an engine
+    implementing the same small duck-typed shape every built-in bridge
+    already has: <code>tick</code>, <code>get_new_events</code>,
+    <code>apply_command</code>, <code>is_finished</code>,
+    <code>status</code>, <code>reset_detection</code>,
+    <code>mark_milestone_fired</code>, <code>notify_manual_charge</code>,
+    <code>close</code>. <code>PluginSpec</code> lets a plugin opt out of a
+    port field (<code>needs_port=False</code>, for a device picked by
+    model name rather than a serial port) or of control entirely
+    (<code>read_only=True</code>, for a meter with no command channel).
+  </p>
+  <p>
+    To write one: copy
+    <code>device_plugins/examples/example_serial_meter.py</code> into
+    <code>device_plugins/installed/</code>, implement the engine shape,
+    call <code>register()</code>, and restart the server —
+    <code>GET /api/v1/device-plugins</code> then lists it and the New
+    Roast form shows a "Plugin device" option. Milestone auto-detection is
+    optional (forward temperatures to
+    <code>roast_heuristics.LiveRoastDetector</code> or skip it — manual
+    event buttons always work either way), and testing against real
+    hardware isn't required to write one but is required before trusting
+    it on a real roast. See <code>device_plugins/README.md</code> for the
+    full writer's guide, and the AGPL licensing note in there before
+    distributing a plugin to anyone else — it's loaded in-process and
+    calls into this app's own code, which the AGPL has opinions about.
+  </p>
+
   <h2 id="whats-stored-where">What's stored where</h2>
   <p>
     <strong>Backend, <code>backend/data/roasts.db</code> (SQLite)</strong>
@@ -175,8 +220,44 @@
       <tr><td>GET</td><td><code>/settings</code></td><td>App-wide settings (readout panels, control-panel layout, Ollama, temperature unit)</td></tr>
       <tr><td>PUT</td><td><code>/settings</code></td><td>Save app-wide settings</td></tr>
       <tr><td>GET</td><td><code>/settings/stream</code></td><td>Server-Sent Events push whenever any client saves settings, for hot-apply</td></tr>
+      <tr><td>GET</td><td><code>/device-plugins</code></td><td>List installed device plugins (see <a href="#device-plugins">Device plugins</a> above) for the New Roast form's "Plugin device" option</td></tr>
+      <tr><td>GET</td><td><code>/webhooks/events</code></td><td>{key: label} for every event a webhook can subscribe to — see <a href="#webhooks">Webhooks</a> below</td></tr>
+      <tr><td>GET / POST / PUT / DELETE</td><td><code>/webhooks</code>, <code>/webhooks/{id}</code></td><td>Manage outbound webhooks (Settings &rarr; Webhooks)</td></tr>
+      <tr><td>POST</td><td><code>/webhooks/test</code></td><td>Send a fixed test payload straight to a URL, independent of any saved webhook</td></tr>
     </tbody>
   </table>
+
+  <h2 id="webhooks">Webhooks</h2>
+  <p>
+    An outbound HTTP POST on roast events — to ntfy, a Discord/Slack
+    incoming webhook, Home Assistant, or a script of your own. Managed
+    from Settings &rarr; Webhooks: a name, a URL, which events it's
+    subscribed to, and enabled/disabled. A webhook with no events chosen
+    fires on every event — the "send me everything" default, not silence
+    until you pick events one by one.
+  </p>
+  <p>
+    Fires on every milestone (Charge, Turning Point, Dry End, First/Second
+    Crack start &amp; end, Drop, Cool End), plus <code>roast_finished</code>
+    (complete, stopped, or aborted) and <code>e_stop</code> (an emergency
+    stop or safety-limit trip). The JSON body is always
+    <code>{"event": &lt;key&gt;, "roast_id", "roast_title", "mode", "beans",
+    "time_s", "bt", "et", ...}</code>, plus fields specific to that event
+    (a milestone adds <code>milestone_value</code>; <code>roast_finished</code>
+    adds <code>status</code>; <code>e_stop</code> adds <code>reason</code>
+    and <code>written</code>). The Settings page's "Send test" button posts
+    <code>{"event": "test", "message": "Test notification from Roast
+    Telemetry"}</code> straight to a URL, independent of any saved webhook.
+  </p>
+  <p>
+    Every subscribed target for a firing event is sent to concurrently; one
+    slow or unreachable target never delays or blocks another, or the roast
+    itself. There is no retry — a failure is only logged and recorded on
+    the <a href="control.html#activity-log">Activity log</a>. There is no
+    authentication or custom-header support either: a plain JSON POST to
+    whatever URL you give it, so point it at something that doesn't need a
+    secret, or a relay/proxy that adds one on the way.
+  </p>
 
   <h2>Assumptions worth knowing about</h2>
   <ul>
