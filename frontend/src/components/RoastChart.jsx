@@ -29,6 +29,14 @@ const CONTINUOUS_FIELD_BY_CHANNEL = {
   Damper: null,
 };
 
+// How far ahead BT_PROJECTION/ET_PROJECTION extend -- short on purpose:
+// a straight-line extrapolation off a single current RoR reading (even
+// smoothed) wobbles a little sample to sample, and that wobble gets
+// visually exaggerated the further out it's drawn. 75s is enough to read
+// as "where this is headed" without the far end swinging distractingly
+// between samples.
+const PROJECTION_WINDOW_S = 75;
+
 // One entry per toggleable curve. `axis` names a scale defined in
 // `options.scales` below; `source` says how to build its data.
 // Lets a channel's color be customized in one place (Settings > Colors,
@@ -62,6 +70,15 @@ const SERIES_DEFS = [
   // doesn't have one, same as any other absent channel -- off by default
   // since most modes never populate it.
   { key: "DT", label: "DT", color: "#c2410c", axis: "yTemp", source: "profile", field: "dt", defaultOn: false },
+  // A short dashed extension of BT/ET from their current reading, using
+  // the already-smoothed ror_bt/ror_et as the slope -- "where this is
+  // headed if the current rate holds," not a real reading. Live roasts
+  // only (see the `data` useMemo's own projection branch for why) and
+  // only once Turning Point has actually happened: before that, BT is
+  // still falling from Charge, and projecting a falling/flat line
+  // forward isn't the "where is this heading" cue this is for.
+  { key: "BT_PROJECTION", label: "BT Projection", color: "#60a5fa", axis: "yTemp", source: "projection", field: "bt", rorField: "ror_bt", defaultOn: false },
+  { key: "ET_PROJECTION", label: "ET Projection", color: "#fb7185", axis: "yTemp", source: "projection", field: "et", rorField: "ror_et", defaultOn: false },
   { key: "ROR_BT", label: "RoR (BT)", color: "#1d4ed8", axis: "yRor", source: "profile", field: "ror_bt", defaultOn: true },
   { key: "ROR_ET", label: "RoR (ET)", color: "#be123c", axis: "yRor", source: "profile", field: "ror_et", defaultOn: false },
   { key: "Burner", label: "Burner", color: "#f59e0b", axis: "yControl", source: "channel", defaultOn: false },
@@ -132,7 +149,18 @@ const PHASE_DEFS = [
   { key: "dev", label: "Dev", color: PHASE_COLORS.dev, fromType: "FC_START", toType: "DROP" },
 ];
 
-function computePhases(events) {
+// `openEndTime` (the live roast's current time_s, or null for a finished
+// roast) lets the phase you're *currently in* show up and grow in real
+// time instead of waiting for its own closing milestone -- without it,
+// a live roast's color bar stays empty for the entire Dry phase (needs
+// both CHARGE and DRY_END) and then empty again for all of Maillard
+// (needs DRY_END and FC_START), only ever showing a phase well after
+// it's already over. At most one phase can ever be open this way (the
+// next one's own `from` milestone, e.g. DRY_END, doesn't exist yet
+// either, so PHASE_DEFS further down the list stay filtered out same as
+// always) -- finalized the instant its real closing milestone fires,
+// same as it always worked for a finished roast.
+function computePhases(events, openEndTime = null) {
   const byType = Object.fromEntries(events.map((e) => [e.type, e]));
   const charge = byType.CHARGE;
   const drop = byType.DROP;
@@ -140,15 +168,18 @@ function computePhases(events) {
 
   return PHASE_DEFS.map((def) => {
     const from = byType[def.fromType];
+    if (!from) return null;
     const to = byType[def.toType];
-    if (!from || !to) return null;
-    const duration = to.time_s - from.time_s;
+    const end = to ? to.time_s : openEndTime;
+    if (end == null || end <= from.time_s) return null;
+    const duration = end - from.time_s;
     return {
       ...def,
       start: from.time_s,
-      end: to.time_s,
+      end,
       duration,
       pct: total ? (duration / total) * 100 : null,
+      open: !to,
     };
   }).filter(Boolean);
 }
@@ -197,7 +228,13 @@ const phaseBandsPlugin = {
       const x1 = Math.min(chartArea.right, xScale.getPixelForValue(p.end));
       if (x1 <= x0) return;
       ctx.fillStyle = p.color;
+      // Slightly faded while still open (the phase you're currently in,
+      // live, its end still growing every tick) -- a visual cue that
+      // this one isn't final yet, same information `open` already
+      // carries for anything that wants it programmatically.
+      ctx.globalAlpha = p.open ? 0.7 : 1;
       ctx.fillRect(x0, bandTop, x1 - x0, bandHeight);
+      ctx.globalAlpha = 1;
       if (x1 - x0 > 70) {
         const label = `${p.label} · ${formatTime(p.duration)}${p.pct != null ? ` · ${p.pct.toFixed(1)}%` : ""}`;
         ctx.fillStyle = "#1c1917";
@@ -681,7 +718,10 @@ const RoastChart = forwardRef(function RoastChart({
   }, [seriesDefs]);
 
   const endTime = profile.length ? profile[profile.length - 1].time_s : null;
-  const phases = useMemo(() => computePhases(events), [events]);
+  // !interactive (live/recording -- see this prop's own docstring) is
+  // the only case with a "now" to grow an open phase toward; a finished
+  // roast only ever shows closed, final phases, same as before.
+  const phases = useMemo(() => computePhases(events, !interactive ? endTime : null), [events, endTime, interactive]);
 
   const availability = useMemo(() => {
     const out = {};
@@ -692,6 +732,12 @@ const RoastChart = forwardRef(function RoastChart({
         out[s.key] = background.some((p) => p[s.field] != null);
       } else if (s.source === "extra") {
         out[s.key] = profile.some((p) => p.extra?.[s.field] != null);
+      } else if (s.source === "projection") {
+        // Mirrors the `data` useMemo's own gating exactly -- a finished
+        // roast, or one that hasn't reached Turning Point yet, can never
+        // show this, so the toggle reads as empty rather than a live
+        // control that just happens to be doing nothing right now.
+        out[s.key] = !interactive && events.some((e) => e.type === "TURNING_POINT");
       } else {
         const continuousField = CONTINUOUS_FIELD_BY_CHANNEL[s.key];
         const hasContinuous = continuousField && profile.some((p) => p[continuousField] != null);
@@ -700,7 +746,7 @@ const RoastChart = forwardRef(function RoastChart({
       }
     }
     return out;
-  }, [seriesDefs, profile, events, background]);
+  }, [seriesDefs, profile, events, background, interactive]);
 
   function toggle(key) {
     setVisible((prev) => {
@@ -730,6 +776,10 @@ const RoastChart = forwardRef(function RoastChart({
     // temperature". Absolute temperatures (BT/ET/DT) use the real
     // celsiusToUnit conversion instead.
     const convertRor = (v) => (v == null ? null : tempUnit === "f" ? v * 1.8 : v);
+    // BT_PROJECTION/ET_PROJECTION only ever anchor off this -- before
+    // Turning Point, BT is still falling from Charge, so there's nothing
+    // meaningful to project forward yet.
+    const turningPointTime = events.find((e) => e.type === "TURNING_POINT")?.time_s ?? null;
     const datasets = seriesDefs.filter((s) => visible[s.key]).map((s) => {
       let points;
       let stepped = false;
@@ -747,6 +797,28 @@ const RoastChart = forwardRef(function RoastChart({
           x: p.time_s,
           y: p.extra?.[s.field] == null ? null : s.isTemperature ? celsiusToUnit(p.extra[s.field], tempUnit) : p.extra[s.field],
         }));
+      } else if (s.source === "projection") {
+        // Live only (!interactive -- see this prop's own docstring),
+        // past Turning Point, and only while the most recent sample is
+        // actually climbing -- a flat/falling instant (even after
+        // Turning Point, e.g. a momentary plateau) hides it rather than
+        // drawing a misleading flat or downward dashed line. Always
+        // anchored on the single latest sample, never an older one, so
+        // this never lags behind where the roast actually is right now.
+        points = [];
+        const last = profile.length ? profile[profile.length - 1] : null;
+        if (!interactive && last && turningPointTime != null && last.time_s > turningPointTime) {
+          const temp = last[s.field];
+          const ror = last[s.rorField];
+          if (temp != null && ror != null && ror > 0) {
+            const tempDisplay = celsiusToUnit(temp, tempUnit);
+            const rorDisplay = convertRor(ror);
+            points = [
+              { x: last.time_s, y: tempDisplay },
+              { x: last.time_s + PROJECTION_WINDOW_S, y: tempDisplay + (rorDisplay / 60) * PROJECTION_WINDOW_S },
+            ];
+          }
+        }
       } else {
         const continuousField = CONTINUOUS_FIELD_BY_CHANNEL[s.key];
         const hasContinuous = continuousField && profile.some((p) => p[continuousField] != null);
@@ -770,20 +842,29 @@ const RoastChart = forwardRef(function RoastChart({
         // Control channels (Burner/Fan/Drum/Damper, 0-100) are drawn low on the
         // temperature axis, in its 0-100 band, rather than on an axis of their own.
         isControl: s.axis === "yControl",
+        // Not a real reading -- excluded from the tooltip's own label
+        // list (see its callback below), same idea as isControl above.
+        isProjection: s.source === "projection",
         // Burner/Fan/Drum/Damper are percentages; an extra channel says its own.
         valueSuffix: s.valueSuffix ?? (s.axis === "yControl" ? "%" : undefined),
         borderColor: colorFor(s),
         backgroundColor: colorFor(s),
         pointRadius: 0,
-        borderWidth: seriesLineWidth(s.key, s.axis),
-        borderDash: s.source === "background" ? [6, 3] : undefined,
+        pointHitRadius: s.source === "projection" ? 0 : undefined,
+        // Thick and dotted, per the design discussion -- deliberately not
+        // reusing background's own [6, 3] dash (a loaded background roast
+        // and a projection can both be on screen at once; a more open
+        // dot pattern plus extra width keeps them from reading as the
+        // same kind of line).
+        borderWidth: s.source === "projection" ? 4 : seriesLineWidth(s.key, s.axis),
+        borderDash: s.source === "background" ? [6, 3] : s.source === "projection" ? [2, 7] : undefined,
         stepped,
         yAxisID: s.axis === "yControl" ? "yTemp" : s.axis,
-        tension: stepped ? 0 : 0.15,
+        tension: s.source === "projection" ? 0 : stepped ? 0 : 0.15,
       };
     });
     return { datasets };
-  }, [seriesDefs, profile, events, background, visible, endTime, tempUnit, channelColors]);
+  }, [seriesDefs, profile, events, background, visible, endTime, tempUnit, channelColors, interactive]);
 
   // The highest temperature on the chart, so the axis can grow past its default top.
   const tempDataMax = useMemo(() => {
@@ -947,6 +1028,11 @@ const RoastChart = forwardRef(function RoastChart({
       plugins: {
         legend: { display: false },
         tooltip: {
+          // BT_PROJECTION/ET_PROJECTION aren't real readings -- left out
+          // of the shared tooltip entirely rather than showing a
+          // confusing extra "BT Projection: 210°F" line next to the real
+          // BT value at the same x.
+          filter: (item) => !item.dataset.isProjection,
           callbacks: {
             title: (items) => (items.length ? formatTime(items[0].parsed.x) : ""),
             label: (item) => {

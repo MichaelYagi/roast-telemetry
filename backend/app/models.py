@@ -699,7 +699,7 @@ def is_color_key(key: str) -> bool:
 # Only the static, always-present curves -- background-roast overlay
 # (BG_BT/BG_ET) and per-roast extra temperature channels (EXTRA_<label>)
 # are built dynamically there and never meant to be toggled persistently.
-CHART_SERIES_KEYS = {"BT", "ET", "DT", "ROR_BT", "ROR_ET", "Burner", "Air", "Drum", "Damper"}
+CHART_SERIES_KEYS = {"BT", "ET", "DT", "ROR_BT", "ROR_ET", "Burner", "Air", "Drum", "Damper", "BT_PROJECTION", "ET_PROJECTION"}
 
 
 class ControlSafety(BaseModel):

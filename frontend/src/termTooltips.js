@@ -9,6 +9,8 @@ export const TERM_TOOLTIPS = {
   DT: "Drum Temperature -- a separate probe reading the drum chamber's air, not the beans",
   "RoR (BT)": "Rate of Rise -- how fast Bean Temperature is climbing, in °/min",
   "RoR (ET)": "Rate of Rise -- how fast Exhaust Temperature is climbing, in °/min",
+  "BT Projection": "A short dotted extrapolation of BT's current climb, using its Rate of Rise -- where it's headed if the current rate holds, not a real reading",
+  "ET Projection": "A short dotted extrapolation of ET's current climb, using its Rate of Rise -- where it's headed if the current rate holds, not a real reading",
   "ΔBT (RoR)": "Rate of Rise -- how fast Bean Temperature is climbing, in °/min",
   "ΔET (RoR)": "Rate of Rise -- how fast Exhaust Temperature is climbing, in °/min",
   Burner: "Heat source control",
