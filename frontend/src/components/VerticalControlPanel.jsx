@@ -22,6 +22,15 @@ import { celsiusToUnit, unitToCelsius, unitSuffix } from "../tempUnits.js";
 // simpler and legible over matching the desktop pairing exactly. See
 // VerticalControlSettingsEditor.jsx's own note about this.
 const LOCAL_ECHO_GUARD_MS = 1500;
+// A native range input's onChange (mapped to the DOM "input" event) fires
+// on every pixel of a drag -- without this, a single drag gesture fired a
+// full onSend/network command per tick (dozens of POSTs/second), flooding
+// the backend/hardware and making real hardware's own feedback lag behind
+// wherever you'd since dragged to. Throttled to at most one send per this
+// many ms while a pointer is actively down on the slider; a plain click or
+// arrow-button nudge (dragging never true) still sends immediately, same
+// as always. See beginDrag/sendThrottled/endDrag below.
+const DRAG_SEND_THROTTLE_MS = 150;
 const STEP = 1;
 const MOBILE_BREAKPOINT_PX = 700; // matches styles.css's own @media (max-width: 700px) for this panel
 
@@ -66,6 +75,87 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
   const [drumOn, setDrumOn] = useState(true);
   const [airOn, setAirOn] = useState(true);
   const lastLocalChangeAt = useRef({ drum_speed_pct: 0, fan_pct: 0, heater_pct: 0, burner_sv_c: 0 });
+  // One throttle/drag-tracking slot per channel -- see DRAG_SEND_THROTTLE_MS
+  // above and sendThrottled/beginDrag/endDrag below.
+  const dragState = useRef({
+    drum_speed_pct: { dragging: false, lastSentAt: 0, timer: null, pendingValue: null },
+    fan_pct: { dragging: false, lastSentAt: 0, timer: null, pendingValue: null },
+    heater_pct: { dragging: false, lastSentAt: 0, timer: null, pendingValue: null },
+    burner_sv_c: { dragging: false, lastSentAt: 0, timer: null, pendingValue: null },
+  });
+
+  // Sends immediately outside of a drag (plain click, arrow nudge, toggle --
+  // all exactly as before). While dragging, sends at most once every
+  // DRAG_SEND_THROTTLE_MS, always with the latest value by the time a
+  // pending send actually fires -- a real throttle (periodic sends during
+  // continuous motion), not a debounce that would otherwise go silent
+  // until the gesture pauses.
+  function sendThrottled(key, value) {
+    const state = dragState.current[key];
+    state.pendingValue = value;
+    if (!state.dragging) {
+      if (state.timer) {
+        clearTimeout(state.timer);
+        state.timer = null;
+      }
+      onSend({ [key]: value });
+      state.lastSentAt = Date.now();
+      return;
+    }
+    if (state.timer) return; // a trailing send is already scheduled -- it'll pick up pendingValue
+    const elapsed = Date.now() - state.lastSentAt;
+    if (elapsed >= DRAG_SEND_THROTTLE_MS) {
+      onSend({ [key]: value });
+      state.lastSentAt = Date.now();
+      return;
+    }
+    state.timer = setTimeout(() => {
+      state.timer = null;
+      onSend({ [key]: state.pendingValue });
+      state.lastSentAt = Date.now();
+    }, DRAG_SEND_THROTTLE_MS - elapsed);
+  }
+
+  function beginDrag(key) {
+    dragState.current[key].dragging = true;
+  }
+
+  // Unconditionally flushes the real final value the instant the pointer
+  // lifts, bypassing the throttle window -- without this, releasing right
+  // after a throttled send could leave hardware briefly sitting on a
+  // slightly-stale mid-drag value instead of exactly where you let go.
+  function endDrag(key, value) {
+    const state = dragState.current[key];
+    state.dragging = false;
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = null;
+    }
+    if (value == null) return; // input was disabled/unknown -- nothing real was dragged
+    // Toggled off (Drum/Fan only) -- same reasoning as handleDrumChange/
+    // handleFanChange's own gate: the value is staged in local state for
+    // when it's turned back on, but the drive itself stays stopped, so
+    // this release doesn't get to bypass that via the throttle's own
+    // unconditional flush.
+    if ((key === "drum_speed_pct" && !drumOn) || (key === "fan_pct" && !airOn)) return;
+    onSend({ [key]: value });
+    state.lastSentAt = Date.now();
+  }
+
+  // The raw/canonical value sendThrottled already uses for this key --
+  // burner_sv_c's own slider displays/drags in celsiusToUnit(sv, tempUnit)
+  // (see svRangeDisplay below), but what's actually sent (and what `sv`
+  // itself holds) is always Celsius, so endDrag's pointerup flush has to
+  // read this, never the display-unit value the input element shows.
+  function canonicalValueFor(key) {
+    switch (key) {
+      case "drum_speed_pct": return drum;
+      case "fan_pct": return fan;
+      case "heater_pct": return heater;
+      case "burner_sv_c": return sv;
+      default: return null;
+    }
+  }
 
   // Same reasoning as ControlPanel.jsx's own version of this effect pair:
   // a live device read lags at least one tick behind a write, so without
@@ -77,21 +167,25 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
   // window, even once the device's own feedback genuinely settles at 0.
   useEffect(() => {
     if (initial?.drum_speed_pct == null || !drumOn) return;
+    if (dragState.current.drum_speed_pct.dragging) return; // never mid-gesture, guard window or not
     if (Date.now() - lastLocalChangeAt.current.drum_speed_pct < LOCAL_ECHO_GUARD_MS) return;
     setDrum(initial.drum_speed_pct);
   }, [initial?.drum_speed_pct, drumOn]);
   useEffect(() => {
     if (initial?.fan_pct == null || !airOn) return;
+    if (dragState.current.fan_pct.dragging) return;
     if (Date.now() - lastLocalChangeAt.current.fan_pct < LOCAL_ECHO_GUARD_MS) return;
     setFan(initial.fan_pct);
   }, [initial?.fan_pct, airOn]);
   useEffect(() => {
     if (initial?.heater_pct == null) return;
+    if (dragState.current.heater_pct.dragging) return;
     if (Date.now() - lastLocalChangeAt.current.heater_pct < LOCAL_ECHO_GUARD_MS) return;
     setHeater(initial.heater_pct);
   }, [initial?.heater_pct]);
   useEffect(() => {
     if (initial?.burner_sv_c == null) return;
+    if (dragState.current.burner_sv_c.dragging) return;
     if (Date.now() - lastLocalChangeAt.current.burner_sv_c < LOCAL_ECHO_GUARD_MS) return;
     setSv(initial.burner_sv_c);
   }, [initial?.burner_sv_c]);
@@ -108,15 +202,22 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
     return Math.max(0, Math.min(100, ((svC - lo) / (hi - lo)) * 100));
   }
 
+  // While toggled off, dragging/nudging still moves the displayed value
+  // (so you can stage where it'll resume) but deliberately skips
+  // sendThrottled -- the drive is stopped, and sending a new nonzero
+  // speed while "off" would re-energize it out from under the operator.
+  // toggleDrumOn/toggleAirOn below already resend whatever `drum`/`fan`
+  // holds the moment you turn it back on, so staging it here is the
+  // entire mechanism -- nothing else has to remember it.
   function handleDrumChange(v) {
     lastLocalChangeAt.current.drum_speed_pct = Date.now();
     setDrum(v);
-    onSend({ drum_speed_pct: v });
+    if (drumOn) sendThrottled("drum_speed_pct", v);
   }
   function handleFanChange(v) {
     lastLocalChangeAt.current.fan_pct = Date.now();
     setFan(v);
-    onSend({ fan_pct: v });
+    if (airOn) sendThrottled("fan_pct", v);
   }
 
   // Toggling off sends 0 (the backend already treats that as Stop
@@ -130,13 +231,13 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
     const next = !drumOn;
     setDrumOn(next);
     lastLocalChangeAt.current.drum_speed_pct = Date.now();
-    onSend({ drum_speed_pct: next ? (drum ?? 0) : 0 });
+    sendThrottled("drum_speed_pct", next ? (drum ?? 0) : 0);
   }
   function toggleAirOn() {
     const next = !airOn;
     setAirOn(next);
     lastLocalChangeAt.current.fan_pct = Date.now();
-    onSend({ fan_pct: next ? (fan ?? 0) : 0 });
+    sendThrottled("fan_pct", next ? (fan ?? 0) : 0);
   }
   // Both of these stamp/preview the *other* unit too -- "one moves the
   // other", both writing the same underlying PID setpoint (see
@@ -152,7 +253,7 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
       lastLocalChangeAt.current.burner_sv_c = now;
       setSv(svPreview);
     }
-    onSend({ heater_pct: v });
+    sendThrottled("heater_pct", v);
   }
   function handleBurnerSvChange(v) {
     const now = Date.now();
@@ -163,7 +264,7 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
       lastLocalChangeAt.current.heater_pct = now;
       setHeater(pctPreview);
     }
-    onSend({ burner_sv_c: v });
+    sendThrottled("burner_sv_c", v);
   }
 
   // svRangeC/sv are always Celsius underneath (same setpoint ModbusEngine
@@ -211,7 +312,11 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
     const arrowStep = arrows?.[key] || STEP;
     const toggle = TOGGLES[key];
     const isOn = toggle ? toggle[0] : true;
-    const isDisabled = disabled || unknown || !isOn;
+    // Toggled off (!isOn) deliberately isn't in here -- that's a grey-out,
+    // not a lock (see vertical-slider-col-off in styles.css, driven by
+    // isOn alone). disabled (no active roast) and unknown (no reading
+    // yet) are the only two reasons there's really nothing to adjust.
+    const isDisabled = disabled || unknown;
 
     function nudge(dir) {
       const base = unknown ? ch.min : ch.value;
@@ -243,6 +348,15 @@ export default function VerticalControlPanel({ disabled, onSend, initial, layout
                 : undefined
           }
           onChange={(e) => ch.onChange(Number(e.target.value))}
+          // Marks the whole gesture as a drag (throttles sendThrottled,
+          // blocks the readback-sync effects above) from the first touch
+          // to the last -- onBlur is a safety net for a drag that ends
+          // without a clean pointerup (e.g. losing focus mid-gesture),
+          // so "dragging" can never get stuck true.
+          onPointerDown={() => beginDrag(key)}
+          onPointerUp={() => endDrag(key, canonicalValueFor(key))}
+          onPointerCancel={() => endDrag(key, canonicalValueFor(key))}
+          onBlur={() => dragState.current[key].dragging && endDrag(key, canonicalValueFor(key))}
         />
         {showArrows && (
           <button type="button" className="vertical-slider-arrow" disabled={isDisabled} onClick={() => nudge(-1)} title={`-${arrowStep}${unit}`}>
