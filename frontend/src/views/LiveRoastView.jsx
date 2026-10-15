@@ -172,7 +172,7 @@ export default function LiveRoastView() {
     // configured in Fahrenheit -- an installer-set option on the
     // controller itself, independent of which register map/profile is
     // selected (see backend/app/models.py's RoastCreateRequest.modbus_fahrenheit_native).
-    modbus_fahrenheit_native: false,
+    modbus_fahrenheit_native: true,
     ms6514_port: "",
     // aillio_live only -- a raw USB device, not a port/host, so this is
     // the whole "connection config" (see backend's
@@ -300,6 +300,13 @@ export default function LiveRoastView() {
   // whatever they were when that effect first subscribed.
   const phaseRef = useRef(phase);
   const roastIdRef = useRef(roastId);
+  // Set by handleCommand whenever the user touches a VerticalControlPanel
+  // slider while armed (preheating) -- lets handleStart tell "untouched
+  // preset defaults" from "the operator already set these by hand" so
+  // pressing Start doesn't clobber a manual preheat adjustment by
+  // resending the preset's original starting values. Reset back to
+  // false each time a fresh idle->armed transition begins.
+  const controlsAdjustedDuringArmedRef = useRef(false);
   useEffect(() => {
     phaseRef.current = phase;
     roastIdRef.current = roastId;
@@ -714,12 +721,14 @@ export default function LiveRoastView() {
           const payload = { ...buildConfigFromForm(), title: form.title };
           const summary = await api.createRoast(payload);
           setRoastId(summary.id);
+          controlsAdjustedDuringArmedRef.current = false;
           setPhase("armed");
         } catch (err) {
           setError(err.message);
         }
       } else {
         if (!requireTitle()) return;
+        controlsAdjustedDuringArmedRef.current = false;
         setPhase("armed");
       }
     } else if (phase === "armed") {
@@ -816,7 +825,10 @@ export default function LiveRoastView() {
   // See AUTO_APPLY_STARTING_CONTROLS_MODES's comment -- simulator always
   // applies its starting values; a CONTROLLABLE_LIVE_MODES mode only does
   // when those values came from an explicitly-loaded saved preset, not a
-  // fresh/blank start.
+  // fresh/blank start -- and even then, handleStart below skips it if
+  // controlsAdjustedDuringArmedRef says the operator already hand-set a
+  // slider while preheating, so Start never clobbers a manual preheat
+  // adjustment with the preset's stale original values.
   const shouldAutoApplyStartingControls =
     AUTO_APPLY_STARTING_CONTROLS_MODES.includes(form.mode) ||
     (CONTROLLABLE_LIVE_MODES.includes(form.mode) && Boolean(selectedPresetId));
@@ -850,7 +862,7 @@ export default function LiveRoastView() {
         setRoastId(summary.id);
       }
       setPhase("roasting");
-      if (shouldAutoApplyStartingControls) {
+      if (shouldAutoApplyStartingControls && !controlsAdjustedDuringArmedRef.current) {
         const controls = buildControlsFromForm();
         if (Object.keys(controls).length) {
           api.sendCommand(summary.id, controls).catch((err) => setError(err.message));
@@ -1074,6 +1086,7 @@ export default function LiveRoastView() {
 
   async function handleCommand(partial) {
     if (!roastId) return;
+    controlsAdjustedDuringArmedRef.current = true;
     api.sendCommand(roastId, partial).catch((err) => setError(err.message));
   }
 
@@ -1108,6 +1121,7 @@ export default function LiveRoastView() {
   // keeps the chart showing no curve pre-recording) -- so BT/ET/etc. come
   // from the live preview stream instead during that window.
   const latest = roast?.status === "idle" ? latestPreview : roast?.profile?.[roast.profile.length - 1];
+  const dropEvent = roast?.events?.find((e) => e.type === "DROP");
   // Stays 00:00 while merely connected/previewing (status "idle") even
   // though the engine's own clock is already ticking (that's how BT/ET's
   // RoR gets computed live) -- the elapsed timer
@@ -1115,8 +1129,12 @@ export default function LiveRoastView() {
   // genuinely resets to 0 at that point too (see ModbusEngine/MS6514Engine's
   // reset_detection(), called from begin_recording()) -- this just keeps
   // the *display* in sync with that reset instead of visibly jumping
-  // backward once recording actually starts.
-  const elapsedLabel = roast?.status === "idle" ? formatElapsed(null) : formatElapsed(latest?.time_s);
+  // backward once recording actually starts. Freezes at Drop's own
+  // time_s once it's marked -- without dropEvent here, this kept
+  // counting straight through cooling (the profile keeps recording
+  // samples after Drop), which read as the roast still "running" long
+  // after it was actually done.
+  const elapsedLabel = roast?.status === "idle" ? formatElapsed(null) : formatElapsed(dropEvent ? dropEvent.time_s : latest?.time_s);
 
   // Once a roast exists (including one reattached after a page refresh --
   // see the reconnect effect below), it's the source of truth for which
@@ -1142,7 +1160,6 @@ export default function LiveRoastView() {
   const chargeEvent = roast?.events?.find((e) => e.type === "CHARGE");
   const dryEndEvent = roast?.events?.find((e) => e.type === "DRY_END");
   const fcStartEvent = roast?.events?.find((e) => e.type === "FC_START");
-  const dropEvent = roast?.events?.find((e) => e.type === "DROP");
 
   // Thresholds only exist as a concept for simulator + the live-hardware
   // modes (auto-detected from a BT threshold); alog_playback just replays
