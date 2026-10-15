@@ -39,6 +39,17 @@ Artisan's license as binding on every change you make.
   source to understand a file format or protocol is fine; reproducing it is
   not.
 
+## Bumping the version
+
+Every version bump (`backend/app/version.py`, `frontend/package.json`,
+`frontend/package-lock.json`, `packaging/roast-telemetry.spec`) gets a
+matching `CHANGELOG.md` entry in the same commit, before the tag is
+pushed: a new `## [vX.Y.Z] - YYYY-MM-DD` section at the top (date =
+today), bullets summarizing the user-facing commits since the last tag
+in plain language (skip pure test/CI/internal-only commits, skip the
+version-bump commit itself). Keep the existing one-entry-per-tag,
+newest-first format.
+
 ## Adding a device model
 
 A new roaster or meter model gets a fake, and the fake is wired in four places:
