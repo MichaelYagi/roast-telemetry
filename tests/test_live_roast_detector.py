@@ -79,7 +79,10 @@ def test_notify_manual_charge_still_lets_turning_point_auto_fire():
     happened (see notify_manual_charge's own docstring). Confirmed against
     a real FZ-94 roast, where Turning Point is auto-plotted despite
     every other milestone being a manual click."""
-    detector = LiveRoastDetector(detect_milestones=False)
+    # confirm_s=0 -- this test is about the manual-charge/TP interaction,
+    # not the rebound-confirmation window (see
+    # test_turning_point_requires_a_sustained_rebound... below for that).
+    detector = LiveRoastDetector(detect_milestones=False, turning_point_confirm_s=0)
     detector.notify_manual_charge(0.0, 96.0)
 
     detector.observe(1.0, 90.0, None)  # dips further
@@ -95,7 +98,7 @@ def test_notify_manual_charge_still_lets_turning_point_auto_fire():
 def test_notify_manual_charge_does_not_reopen_dry_end_fc_start_detection():
     # detect_milestones=False must still block DRY_END/FC_START even once
     # we're past Turning Point -- only the dip-phase tracking is exempt.
-    detector = LiveRoastDetector(detect_milestones=False, dry_end_c=160.0)
+    detector = LiveRoastDetector(detect_milestones=False, dry_end_c=160.0, turning_point_confirm_s=0)
     detector.notify_manual_charge(0.0, 96.0)
     detector.observe(1.0, 90.0, None)
     detector.observe(2.0, 91.0, None)  # fires TURNING_POINT, moves to post_tp
@@ -107,7 +110,7 @@ def test_notify_manual_charge_does_not_reopen_dry_end_fc_start_detection():
 
 
 def test_notify_manual_charge_is_a_noop_once_past_pre_charge():
-    detector = LiveRoastDetector()
+    detector = LiveRoastDetector(turning_point_confirm_s=0)
     detector.observe(0.0, 100.0, None)
     detector.observe(1.0, 90.0, None)  # auto-fires CHARGE, moves to "dip"
     detector.get_new_events()
@@ -124,7 +127,7 @@ def test_notify_manual_charge_is_a_noop_once_past_pre_charge():
 def test_detect_milestones_true_auto_fires_dry_end_and_fc_start():
     # Opt-in auto-detection (RoastCreateRequest.auto_detect_milestones) --
     # confirms the whole chain works end to end, not just CHARGE/TP.
-    detector = LiveRoastDetector(dry_end_c=160.0, fc_start_c=196.0)
+    detector = LiveRoastDetector(dry_end_c=160.0, fc_start_c=196.0, turning_point_confirm_s=0)
     _feed_charge_drop(detector)
     detector.get_new_events()  # drain CHARGE
     detector.observe(2.0, 91.0, None)  # rebounds -- fires TURNING_POINT
@@ -139,6 +142,46 @@ def test_detect_milestones_true_auto_fires_dry_end_and_fc_start():
     assert fc_start and fc_start[0]["value"] == 197.0
 
 
+def test_turning_point_ignores_a_single_noisy_tick_above_the_rebound_threshold():
+    """The bug this guards against: BT is still trending down overall,
+    but one noisy sample crosses turning_point_rebound_c (0.5C by
+    default) for a single tick before falling back. That alone must not
+    finalize Turning Point at that blip -- the real, lower minimum later
+    in the same dip has to win instead."""
+    detector = LiveRoastDetector(detect_milestones=False)
+    detector.notify_manual_charge(0.0, 96.0)
+    detector.observe(1.0, 90.0, None)  # new minimum
+    detector.observe(2.0, 90.6, None)  # noisy blip >= 0.5C rebound -- starts a pending candidate
+    assert detector.get_new_events() == []  # not confirmed yet (needs to hold turning_point_confirm_s)
+
+    detector.observe(3.0, 85.0, None)  # the real dip continues -- new, lower minimum
+    assert detector.get_new_events() == []  # the earlier pending rebound is discarded, not fired
+
+    detector.observe(4.0, 85.6, None)  # rebounds again, now from the true minimum
+    detector.observe(9.1, 86.0, None)  # held above threshold for turning_point_confirm_s (5.0 default)
+    events = detector.get_new_events()
+
+    assert [e["type"] for e in events] == ["TURNING_POINT"]
+    assert events[0]["value"] == 85.0  # the true minimum, not the 90.0 blip
+
+
+def test_turning_point_fires_once_the_rebound_holds_for_the_confirm_window():
+    detector = LiveRoastDetector(detect_milestones=False)
+    detector.notify_manual_charge(0.0, 96.0)
+    detector.observe(1.0, 90.0, None)  # minimum
+    detector.observe(2.0, 91.0, None)  # rebound candidate starts at t=2.0
+    assert detector.get_new_events() == []
+
+    detector.observe(2.0 + 5.0 - 0.1, 91.0, None)  # just short of the 5s confirm window
+    assert detector.get_new_events() == []
+
+    detector.observe(2.0 + 5.0, 91.0, None)  # held for the full window -- confirmed
+    events = detector.get_new_events()
+
+    assert [e["type"] for e in events] == ["TURNING_POINT"]
+    assert events[0]["value"] == 90.0
+
+
 def test_mark_milestone_fired_prevents_a_later_duplicate_auto_fire():
     """The scenario this exists for: auto-detection is on, but the
     operator clicks DRY_END manually before BT actually crosses the
@@ -146,7 +189,7 @@ def test_mark_milestone_fired_prevents_a_later_duplicate_auto_fire():
     idea that happened and would still independently fire its own DRY_END
     once BT crosses 160 -- a real duplicate (see RoastSession.add_event's
     own docstring for why the auto-fired path can't self-dedupe)."""
-    detector = LiveRoastDetector(dry_end_c=160.0)
+    detector = LiveRoastDetector(dry_end_c=160.0, turning_point_confirm_s=0)
     _feed_charge_drop(detector)
     detector.get_new_events()
     detector.observe(2.0, 91.0, None)  # fires TURNING_POINT, moves to post_tp

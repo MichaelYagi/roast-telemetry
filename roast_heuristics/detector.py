@@ -12,8 +12,11 @@ per data source.
 
 When ``detect_milestones`` is on (the default): CHARGE is detected from
 a sharp BT drop (cold beans hitting the hot drum); TURNING_POINT as the
-BT minimum right after; DRY_END/FC_START from configurable BT
-thresholds, since real roasts vary too much by bean to hardcode these.
+BT minimum right after, confirmed only once BT has stayed above the
+rebound threshold for ``turning_point_confirm_s`` -- a single noisy
+sample crossing it isn't enough, so a lower minimum later in the same
+dip still wins; DRY_END/FC_START from configurable BT thresholds, since
+real roasts vary too much by bean to hardcode these.
 DROP/COOL_END aren't threshold-detectable -- they're roast-level
 judgment calls -- so those stay manual (mark them with this platform's
 own event buttons) regardless. With ``detect_milestones`` off, CHARGE/
@@ -47,6 +50,7 @@ class LiveRoastDetector:
         charge_drop_c: float = 8.0,
         charge_window_s: float = 20.0,
         turning_point_rebound_c: float = 0.5,
+        turning_point_confirm_s: float = 5.0,
         dry_end_c: Optional[float] = 160.0,
         fc_start_c: Optional[float] = 196.0,
         detect_milestones: bool = True,
@@ -57,6 +61,12 @@ class LiveRoastDetector:
         self._charge_drop_c = charge_drop_c
         self._charge_window_s = charge_window_s
         self._turning_point_rebound_c = turning_point_rebound_c
+        # A single noisy sample crossing turning_point_rebound_c (0.5C by
+        # default -- well within normal probe jitter) used to finalize
+        # Turning Point on the spot, even while the real BT trend was
+        # still falling. Now the rebound has to hold for this long before
+        # it's trusted -- see _detect_turning_point's _tp_rebound_since.
+        self._turning_point_confirm_s = turning_point_confirm_s
         self._dry_end_c = dry_end_c
         self._fc_start_c = fc_start_c
         # False for hardware where the operator marks every milestone by
@@ -77,6 +87,7 @@ class LiveRoastDetector:
         self._phase = "pre_charge"  # -> "dip" -> "post_tp"
         self._bt_min_since_charge: Optional[float] = None
         self._bt_min_time_since_charge: Optional[float] = None
+        self._tp_rebound_since: Optional[float] = None
         self._events_fired: set = set()
         self._event_queue: list = []
 
@@ -161,11 +172,28 @@ class LiveRoastDetector:
 
     def _detect_turning_point(self, time_s: float, bt: float) -> None:
         if self._bt_min_since_charge is None or bt < self._bt_min_since_charge:
+            # A new (lower) minimum invalidates any rebound that was
+            # still waiting to be confirmed -- it was a blip on the way
+            # down, not the real bottom.
             self._bt_min_since_charge = bt
             self._bt_min_time_since_charge = time_s
-        elif bt >= self._bt_min_since_charge + self._turning_point_rebound_c:
-            self._emit_event("TURNING_POINT", "Turning Point", self._bt_min_since_charge, self._bt_min_time_since_charge)
-            self._phase = "post_tp"
+            self._tp_rebound_since = None
+            return
+        if bt >= self._bt_min_since_charge + self._turning_point_rebound_c:
+            if self._tp_rebound_since is None:
+                self._tp_rebound_since = time_s
+            # Not "elif" -- with turning_point_confirm_s=0 (tests that
+            # aren't about this debounce window at all), the very tick
+            # that starts the candidate must also be the one that
+            # confirms it, same as the old instant-fire behavior.
+            if time_s - self._tp_rebound_since >= self._turning_point_confirm_s:
+                self._emit_event("TURNING_POINT", "Turning Point", self._bt_min_since_charge, self._bt_min_time_since_charge)
+                self._phase = "post_tp"
+        else:
+            # Rose partway toward the rebound threshold but fell back
+            # without crossing it (or crossed it only on an earlier,
+            # since-retracted tick) -- not sustained, forget it.
+            self._tp_rebound_since = None
 
     def _detect_dry_end_and_fc_start(self, time_s: float, bt: float) -> None:
         if self._dry_end_c is not None and "DRY_END" not in self._events_fired and bt >= self._dry_end_c:

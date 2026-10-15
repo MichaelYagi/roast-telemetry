@@ -457,6 +457,10 @@ def test_notify_manual_charge_lets_turning_point_fire_despite_no_auto_charge():
 
     primary.register_values[(11, 0)] = 906  # BT 90.6C -- rebounds 0.6C, over the 0.5C default
     engine.tick(1.0)
+    assert engine.get_new_events() == []  # rebound just started -- not confirmed yet (needs 5s to hold)
+
+    for _ in range(5):  # hold through the confirm window
+        engine.tick(1.0)
     events = engine.get_new_events()
 
     assert [e["type"] for e in events] == ["TURNING_POINT"]
@@ -498,7 +502,8 @@ def test_mark_milestone_fired_forwards_to_the_detector():
     _feed_charge_sequence(engine, primary)
     engine.get_new_events()  # drain CHARGE
     primary.register_values[(11, 0)] = 906  # rebounds -- fires TURNING_POINT
-    engine.tick(1.0)
+    for _ in range(6):  # hold through the confirm window
+        engine.tick(1.0)
     engine.get_new_events()  # drain TURNING_POINT
 
     engine.mark_milestone_fired("DRY_END")  # operator clicked it manually, early
