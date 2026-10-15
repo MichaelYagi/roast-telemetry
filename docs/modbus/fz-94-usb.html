@@ -107,6 +107,18 @@
     setpoint — not just an echo of this app's own last command.
   </p>
   <p>
+    <strong>Dragging either Burner slider to its minimum lands on the SV
+    range's low end, not 0.</strong> With the default 100-260&deg;C
+    range, 0% heater maps to 100&deg;C (212&deg;F) -- the SV slider's
+    floor really is 212&deg;F, it isn't tracking BT or drifting back to
+    "whatever the current temperature is," even though 212&deg;F sitting
+    right in typical drying-phase BT territory can make it look that
+    way if you're adjusting the burner right around then. To actually
+    reach a lower setpoint (or confirm this unit's real minimum), set
+    the Configure Roast form's advanced "Burner SV min/max" fields --
+    they override this profile's default range for that roast.
+  </p>
+  <p>
     <strong>Air and Drum are Delta VFD-L drives</strong> needing two
     writes each (control register for run/stop, then frequency register
     for speed), plus a separate read-only feedback register reporting the

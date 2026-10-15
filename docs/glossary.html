@@ -346,6 +346,20 @@
       serial connection — a simple way for the receiving end to catch a
       corrupted byte. The FZ-94 uses no parity at all ("N").
     </dd>
+    <dt id="term-projection">BT/ET Projection</dt>
+    <dd>
+      An optional, thick dotted extension of the live
+      <a href="#term-bt"><strong>BT</strong></a> or ET curve, a short
+      distance past the current reading — a straight-line guess at
+      "where this is headed" using the current
+      <a href="#term-ror-bt"><strong>RoR</strong></a>, not a real
+      reading. Off by default (its own chart toggle); only shows on a
+      roast that's actually recording, and only once
+      <a href="#term-turning-point"><strong>Turning Point</strong></a>
+      has happened and the curve is genuinely climbing right now —
+      before that, or during a flat/falling moment, there's nothing
+      meaningful to project.
+    </dd>
   </dl>
 
   <h2 class="glossary-letter" id="letter-r">R</h2>
@@ -456,7 +470,11 @@
       hold that target. This app shows Burner both ways — a familiar
       0&ndash;100% slider, and a second slider for the SV directly in
       &deg;C — moving either one moves the other, since they're just two
-      units for the same underlying target.
+      units for the same underlying target. The SV slider's own range
+      isn't 0&ndash;100 though — it's whatever absolute temperature
+      range the Device Profile maps 0% and 100% onto (100&ndash;260&deg;C
+      by default on the FZ-94), so dragging it to its floor lands on
+      that low end, not 0&deg;.
     </dd>
   </dl>
 
