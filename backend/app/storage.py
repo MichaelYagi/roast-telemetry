@@ -942,20 +942,19 @@ def get_settings() -> dict:
         control = {}
     try:
         # "0"/"1" text (TEXT-affinity column) -- None means never saved,
-        # which must default to on (the fixed behavior before this was
-        # configurable at all), not be conflated with an explicit off.
+        # which defaults to off.
         away_alarm_enabled = (
-            bool(int(values["away_alarm_enabled"])) if values.get("away_alarm_enabled") is not None else True
+            bool(int(values["away_alarm_enabled"])) if values.get("away_alarm_enabled") is not None else False
         )
     except (TypeError, ValueError):
-        away_alarm_enabled = True
+        away_alarm_enabled = False
     return {
         "ollama_url": values.get("ollama_url"),
         "ollama_model": values.get("ollama_model"),
         "broken_out_panels": broken_out_panels,
         "breakout_panel_colors": breakout_panel_colors,
         "small_readout_panels": small_readout_panels,
-        "temperature_unit": values.get("temperature_unit") or "c",
+        "temperature_unit": values.get("temperature_unit") or "f",
         "vertical_control_layout": vertical_control_layout,
         "vertical_control_arrows": vertical_control_arrows,
         "chart_series_visible": chart_series_visible,

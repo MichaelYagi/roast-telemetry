@@ -30,17 +30,17 @@ export default function SettingsView() {
   // same panelColors above), so the same value (e.g. "bt") can be
   // enabled in one, both, or neither independently, always the same color.
   const [smallReadoutPanels, setSmallReadoutPanels] = useState([]);
-  const [temperatureUnit, setTemperatureUnit] = useState("c");
+  const [temperatureUnit, setTemperatureUnit] = useState("f");
   const [verticalControlLayout, setVerticalControlLayout] = useState([]);
   const [verticalControlArrows, setVerticalControlArrows] = useState({});
   const [historyPageSize, setHistoryPageSize] = useState(100);
   const [maxCompare, setMaxCompare] = useState(20);
   const [bulkImportLimit, setBulkImportLimit] = useState(500);
   const [bulkExportLimit, setBulkExportLimit] = useState(500);
-  const [awayAlarmEnabled, setAwayAlarmEnabled] = useState(true);
+  const [awayAlarmEnabled, setAwayAlarmEnabled] = useState(false);
   const [language, setLanguage] = useState("en");
   const [control, setControl] = useState({
-    heater_max_pct: 100, fan_min_pct: 0, drum_min_pct: 0, safe_fan_pct: 100, client_watchdog_s: 0, safety_disabled: false,
+    heater_max_pct: 100, fan_min_pct: 0, drum_min_pct: 0, safe_fan_pct: 100, client_watchdog_s: 0, safety_disabled: true,
   });
   const [loaded, setLoaded] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -56,16 +56,16 @@ export default function SettingsView() {
       setPanelColors(s.breakout_panel_colors || {});
       setExtraChannels(s.extra_channels || []);
       setSmallReadoutPanels(s.small_readout_panels || []);
-      setTemperatureUnit(s.temperature_unit || "c");
+      setTemperatureUnit(s.temperature_unit || "f");
       setVerticalControlLayout(s.vertical_control_layout || []);
       setVerticalControlArrows(s.vertical_control_arrows || {});
       setHistoryPageSize(s.history_page_size || 100);
       setBulkImportLimit(s.bulk_import_limit || 500);
       setBulkExportLimit(s.bulk_export_limit || 500);
       setMaxCompare(s.max_compare || 20);
-      // Not `?? true`/`|| true` -- those would force it back on whenever
-      // the saved value is false, since false is falsy too.
-      setAwayAlarmEnabled(s.away_alarm_enabled !== false);
+      // Not `|| false` -- that's a no-op here, since false is already
+      // falsy; written explicitly so the default (off) is obvious.
+      setAwayAlarmEnabled(s.away_alarm_enabled === true);
       setLanguage(s.language || "en");
       if (s.control) setControl(s.control);
       setLoaded(true);

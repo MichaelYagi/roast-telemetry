@@ -119,6 +119,8 @@ def test_deleting_a_roast_logs_it_and_the_snapshot_survives(client):
 
 
 def test_emergency_stop_logs_a_safety_entry(client):
+    # safety_disabled defaults on now -- turn it off so the stop isn't a no-op.
+    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": {"safety_disabled": False}})
     roast_id = client.post("/api/v1/roasts", json={"title": "E-stop Test", "mode": "simulator"}).json()["id"]
     client.post(f"/api/v1/roasts/{roast_id}/emergency-stop")
 
@@ -131,6 +133,8 @@ def test_emergency_stop_logs_a_safety_entry(client):
 
 
 def test_activity_log_filters_by_category(client):
+    # safety_disabled defaults on now -- turn it off so the stop isn't a no-op.
+    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": {"safety_disabled": False}})
     roast_id = client.post("/api/v1/roasts", json={"title": "Mixed", "mode": "simulator"}).json()["id"]
     client.post(f"/api/v1/roasts/{roast_id}/emergency-stop")
     client.put(f"/api/v1/roasts/{roast_id}/tags", json={"tags": ["espresso"]})
@@ -287,6 +291,8 @@ def test_roast_edits_record_user_and_platform(client):
 
 
 def test_manual_emergency_stop_records_user_and_platform(client):
+    # safety_disabled defaults on now -- turn it off so the stop isn't a no-op.
+    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": {"safety_disabled": False}})
     roast_id = client.post("/api/v1/roasts", json={"title": "E-stop Who", "mode": "simulator"}).json()["id"]
     client.post(f"/api/v1/roasts/{roast_id}/emergency-stop", headers={"X-Client-Platform": "Roast Telemetry app 1.0.0 on Android 14"})
     [entry] = client.get("/api/v1/activity", params={"action": "safe_state"}).json()
@@ -301,6 +307,8 @@ def test_autonomous_safety_stop_is_marked_automatic(client):
 
     roast_id = client.post("/api/v1/roasts", json={"title": "Fail-safe", "mode": "simulator"}).json()["id"]
     session = session_manager.get(roast_id)
+    # safety_disabled defaults on now -- turn it off so the trip isn't a no-op.
+    session.control.limits.safety_disabled = False
     asyncio.run(session.control.enter_safe_state("lost the temperature reading during target control"))
     [entry] = client.get("/api/v1/activity", params={"action": "safe_state"}).json()
     assert entry["username"] is None

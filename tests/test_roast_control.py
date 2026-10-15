@@ -216,7 +216,9 @@ def make_session(mode=RoastMode.SIMULATOR) -> RoastSession:
     session = RoastSession("control-test", RoastCreateRequest(title="Control", mode=mode))
     session.status = RoastStatus.ROASTING
     session.device = FakeDevice()
-    session.control.limits = ControlSafety()
+    # safety_disabled defaults on now -- these tests are about limit/fail-safe
+    # enforcement, so keep it off here.
+    session.control.limits = ControlSafety(safety_disabled=False)
     return session
 
 
@@ -232,21 +234,21 @@ def mark_charge(session, t=0.0):
 
 def test_operator_commands_pass_through_the_limits():
     session = make_session()
-    session.control.limits = ControlSafety(heater_max_pct=70, fan_min_pct=25)
+    session.control.limits = ControlSafety(heater_max_pct=70, fan_min_pct=25, safety_disabled=False)
     session.apply_command(ControlCommand(heater_pct=100))
     assert session.device.writes[-1] == {"heater_pct": 70.0, "fan_pct": 25.0}
 
 
 def test_rule_commands_pass_through_the_limits_too():
     session = make_session()
-    session.control.limits = ControlSafety(heater_max_pct=60)
+    session.control.limits = ControlSafety(heater_max_pct=60, safety_disabled=False)
     session.apply_command(ControlCommand(heater_pct=90), source="rule")
     assert session.device.writes[-1]["heater_pct"] == 60
 
 
 def test_burner_setpoint_is_refused_while_a_heater_limit_is_set():
     session = make_session()
-    session.control.limits = ControlSafety(heater_max_pct=70)
+    session.control.limits = ControlSafety(heater_max_pct=70, safety_disabled=False)
     with pytest.raises(RoastSessionError):
         session.apply_command(ControlCommand(burner_sv_c=250))
     assert session.device.writes == []
@@ -525,7 +527,7 @@ def test_losing_the_temperature_reading_during_target_control_trips_the_fail_saf
 
 def test_watchdog_trips_when_nobody_is_watching_and_the_heater_is_on():
     session = make_session()
-    session.control.limits = ControlSafety(client_watchdog_s=0.05)
+    session.control.limits = ControlSafety(client_watchdog_s=0.05, safety_disabled=False)
     session.control._last_written["heater_pct"] = 60.0
 
     async def body():
@@ -540,7 +542,7 @@ def test_watchdog_trips_when_nobody_is_watching_and_the_heater_is_on():
 
 def test_watchdog_stays_quiet_while_someone_is_watching():
     session = make_session()
-    session.control.limits = ControlSafety(client_watchdog_s=0.05)
+    session.control.limits = ControlSafety(client_watchdog_s=0.05, safety_disabled=False)
     session.control._last_written["heater_pct"] = 60.0
 
     async def body():
@@ -648,6 +650,8 @@ def test_control_endpoints_404_for_an_unknown_roast(client):
 
 
 def test_emergency_stop_and_status_through_the_api(client):
+    # safety_disabled defaults on now -- turn it off so the stop isn't a no-op.
+    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": {"safety_disabled": False}})
     roast_id = client.post("/api/v1/roasts", json={"title": "E-stop", "mode": "simulator"}).json()["id"]
     status = client.get(f"/api/v1/roasts/{roast_id}/control").json()
     assert status["can_write"] is True and status["program"] is None and status["tripped_reason"] is None
@@ -669,16 +673,16 @@ def test_get_control_picks_up_a_settings_change_made_after_the_roast_started(cli
     otherwise. GET /control now refreshes the limits itself before
     returning them."""
     roast_id = client.post("/api/v1/roasts", json={"title": "Stale Limits", "mode": "simulator"}).json()["id"]
-    assert client.get(f"/api/v1/roasts/{roast_id}/control").json()["limits"]["safety_disabled"] is False
+    assert client.get(f"/api/v1/roasts/{roast_id}/control").json()["limits"]["safety_disabled"] is True
 
     client.put("/api/v1/settings", json={
         "ollama_url": None, "ollama_model": None,
-        "control": {"heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0, "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": True},
+        "control": {"heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0, "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": False},
     })
 
     # No emergency-stop attempt, no automation start -- a plain status poll
     # (exactly what the frontend's own 2s timer does) must see the change.
-    assert client.get(f"/api/v1/roasts/{roast_id}/control").json()["limits"]["safety_disabled"] is True
+    assert client.get(f"/api/v1/roasts/{roast_id}/control").json()["limits"]["safety_disabled"] is False
     client.post(f"/api/v1/roasts/{roast_id}/stop")
 
 

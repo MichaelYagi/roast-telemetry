@@ -194,6 +194,8 @@ def test_emergency_stop_fires_e_stop_with_the_reason(isolated_db, captured_webho
         request = RoastCreateRequest(title="Webhook Test", mode=RoastMode.SIMULATOR)
         session = RoastSession("webhook-estop-test", request)
         await session.start()
+        # safety_disabled defaults on now -- turn it off so the stop isn't a no-op.
+        session.control.limits.safety_disabled = False
         try:
             await session.control.emergency_stop(username="tester", platform="test")
         finally:

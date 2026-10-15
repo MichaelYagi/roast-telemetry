@@ -30,6 +30,9 @@ def make_roast(client, tmp_path, title="Roast", drop_at=600):
 
 
 def test_json_download_is_the_same_data_as_alog_as_valid_json(client, tmp_path):
+    # Pin to Celsius -- this test is about JSON structure/validity, not
+    # which unit the default happens to be.
+    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "temperature_unit": "c"})
     roast_id = make_roast(client, tmp_path)
     resp = client.get(f"/api/v1/roasts/{roast_id}/json")
     assert resp.status_code == 200 and resp.headers["content-type"] == "application/json"
@@ -265,6 +268,9 @@ def _set_fahrenheit(client):
 
 
 def test_alog_download_follows_temperature_unit_setting(client, tmp_path):
+    # The default is Fahrenheit now -- pin to Celsius explicitly for the
+    # "before" fetch instead of relying on the default being Celsius.
+    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "temperature_unit": "c"})
     roast_id = make_roast(client, tmp_path)
     celsius_content = client.get(f"/api/v1/roasts/{roast_id}/alog").content
     _set_fahrenheit(client)

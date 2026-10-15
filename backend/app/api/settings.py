@@ -114,7 +114,7 @@ async def update_settings(settings: AppSettings, http_request: Request) -> AppSe
     panels = _filter_panels(settings.broken_out_panels)
     colors = _filter_colors(settings.breakout_panel_colors)
     small_panels = _filter_panels(settings.small_readout_panels)
-    temperature_unit = settings.temperature_unit if settings.temperature_unit in ("c", "f") else "c"
+    temperature_unit = settings.temperature_unit if settings.temperature_unit in ("c", "f") else "f"
     language = settings.language if settings.language in ("en", "ja") else "en"
     vertical_layout = _filter_vertical_layout(settings.vertical_control_layout)
     vertical_arrows = _filter_arrows(settings.vertical_control_arrows)

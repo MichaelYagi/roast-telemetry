@@ -94,7 +94,7 @@ def test_get_settings_defaults(client):
     assert resp.status_code == 200
     assert resp.json() == {
         "ollama_url": None, "ollama_model": None, "broken_out_panels": [], "breakout_panel_colors": {},
-        "small_readout_panels": ["et", "bt", "dt", "ror_bt", "ror_et"], "temperature_unit": "c",
+        "small_readout_panels": ["et", "bt", "dt", "ror_bt", "ror_et"], "temperature_unit": "f",
         "vertical_control_layout": [["drum_speed_pct"], ["fan_pct"], ["heater_pct"]],
         "vertical_control_arrows": {},
         "chart_series_visible": {},
@@ -102,12 +102,12 @@ def test_get_settings_defaults(client):
         "max_compare": 20,
         "bulk_import_limit": 500,
         "bulk_export_limit": 500,
-        "away_alarm_enabled": True,
+        "away_alarm_enabled": False,
         "extra_channels": [],
         "language": "en",
         "control": {
             "heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0,
-            "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": False,
+            "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": True,
         },
     }
 
@@ -199,12 +199,12 @@ def test_put_settings_saves_temperature_unit(client):
     assert client.get("/api/v1/settings").json()["temperature_unit"] == "f"
 
 
-def test_put_settings_bogus_temperature_unit_falls_back_to_celsius(client):
+def test_put_settings_bogus_temperature_unit_falls_back_to_fahrenheit(client):
     # Same tolerant-instead-of-erroring convention as the panel/color
     # filtering above -- an invalid value falls back to the default
     # rather than failing the whole save.
     resp = client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "temperature_unit": "kelvin"})
-    assert resp.json()["temperature_unit"] == "c"
+    assert resp.json()["temperature_unit"] == "f"
 
 
 def test_put_settings_saves_history_page_size(client):
@@ -329,6 +329,12 @@ def test_chart_series_visible_round_trips_through_a_second_get(client):
 
 
 def test_enabling_safety_disabled_logs_the_toggle(client):
+    # Start from a known-off baseline (the default is now on), so enabling
+    # it below is a genuine flip.
+    client.put("/api/v1/settings", json={
+        "ollama_url": None, "ollama_model": None,
+        "control": {"heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0, "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": False},
+    })
     resp = client.put("/api/v1/settings", json={
         "ollama_url": None, "ollama_model": None,
         "control": {"heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0, "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": True},
@@ -343,23 +349,25 @@ def test_enabling_safety_disabled_logs_the_toggle(client):
 
 
 def test_saving_settings_again_with_the_same_value_does_not_log_again(client):
-    control = {"heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0, "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": True}
+    # safety_disabled=False here (the default is now on, so this is the
+    # flip to watch for not repeating).
+    control = {"heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0, "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": False}
     client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": control})
-    # A second, unrelated save (still safety_disabled=True, nothing changed
-    # about it) must not add a second "disabled" entry -- only the flip
+    # A second, unrelated save (still safety_disabled=False, nothing changed
+    # about it) must not add a second "enabled" entry -- only the flip
     # itself is logged, not every settings save that happens to already
-    # have it on.
+    # have it off.
     client.put("/api/v1/settings", json={"ollama_url": "http://x", "ollama_model": None, "control": control})
 
-    entries = client.get("/api/v1/activity", params={"category": "safety", "action": "safety_disabled"}).json()
+    entries = client.get("/api/v1/activity", params={"category": "safety", "action": "safety_enabled"}).json()
     assert len(entries) == 1
 
 
 def test_disabling_it_again_logs_safety_enabled(client):
     on = {"heater_max_pct": 100, "fan_min_pct": 0, "drum_min_pct": 0, "safe_fan_pct": 100, "client_watchdog_s": 0, "safety_disabled": True}
     off = {**on, "safety_disabled": False}
-    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": on})
     client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": off})
+    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": on})
 
     entries = client.get("/api/v1/activity", params={"category": "safety"}).json()
     actions = sorted(e["action"] for e in entries)

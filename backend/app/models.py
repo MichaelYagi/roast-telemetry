@@ -712,8 +712,8 @@ class ControlSafety(BaseModel):
     safe_fan_pct: float = Field(default=100, ge=0, le=100, description="Fan level set by Emergency stop and the automatic fail-safes (heater goes to 0).")
     client_watchdog_s: float = Field(default=0, ge=0, le=3600, description="If the heater is on and nobody has the roast open in a browser for this many seconds, go to the safe state. 0 (the default) turns this off.")
     safety_disabled: bool = Field(
-        default=False,
-        description="Off by default. When on, none of the above apply: the heater/fan/drum limits go "
+        default=True,
+        description="On by default. When on, none of the above apply: the heater/fan/drum limits go "
         "unenforced, and Emergency Stop and the automatic fail-safes (no-viewer watchdog, lost temperature "
         "reading, a tick error) all become no-ops -- nothing is written to the roaster and nothing about the "
         "suppressed trip is recorded, not even on the roast's own chart. Only turning this switch itself on or "
@@ -798,7 +798,7 @@ class AppSettings(BaseModel):
     # API stays Celsius always -- converting those bidirectionally was
     # judged more confusing than useful for a feature nobody asked for
     # beyond "let me see the numbers in my preferred unit".
-    temperature_unit: str = "c"
+    temperature_unit: str = "f"
     # Vertical control panel (left of the live chart, replaces the old
     # always-visible horizontal Controls panel entirely -- see
     # VerticalControlPanel.jsx). Ordered list of "lanes" (left to right),
@@ -849,9 +849,8 @@ class AppSettings(BaseModel):
     max_compare: int = 20
     # The Live Roast screen's away-alarm (useAwayAlarm.js) -- a gentle,
     # repeating audio cue while the tab is hidden during an actual roast.
-    # On by default (matches the behavior before this was ever
-    # configurable); off silences it entirely.
-    away_alarm_enabled: bool = True
+    # Off by default; on enables the repeating audio cue.
+    away_alarm_enabled: bool = False
     # The app's own UI language -- "en" or "ja" (frontend/src/locales/).
     # Doesn't touch temperature_unit above, a separate, unrelated choice.
     language: str = "en"
