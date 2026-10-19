@@ -3,6 +3,9 @@
 All notable changes to Roast Telemetry are documented here, newest first.
 One entry per tagged release; dates are the release commit's date.
 
+## [v1.3.30] - 2026-10-19
+- Hide BT/ET Projection toggles when they can never have data (every finished roast's History detail page, before Turning Point) instead of showing them greyed out
+
 ## [v1.3.29] - 2026-10-18
 - Make Settings > Temperature Unit genuinely global: typed threshold/setpoint fields (Dry End/FC Start, Burner SV range, alarm rule thresholds, device profile setpoint ranges, Hold Target) now show and accept the selected unit, not just readouts
 - Remove the separate "Controller reports °F" checkbox -- a Direct Modbus connection's hardware-native unit now just follows Settings > Temperature Unit
