@@ -3,9 +3,12 @@
 All notable changes to Roast Telemetry are documented here, newest first.
 One entry per tagged release; dates are the release commit's date.
 
-## [v1.3.28] - 2026-10-18
+## [v1.3.29] - 2026-10-18
 - Make Settings > Temperature Unit genuinely global: typed threshold/setpoint fields (Dry End/FC Start, Burner SV range, alarm rule thresholds, device profile setpoint ranges, Hold Target) now show and accept the selected unit, not just readouts
 - Remove the separate "Controller reports °F" checkbox -- a Direct Modbus connection's hardware-native unit now just follows Settings > Temperature Unit
+- Fix simulated-FZ94 tests broken by the above (heater_pct writes through the Burner SV channel, which the global unit now also gates)
+
+(v1.3.28's tag exists in history but was never released -- its backend-tests run failed in CI before the fix above landed; this release supersedes it.)
 
 ## [v1.3.27] - 2026-10-14
 - Debounce Turning Point detection against a single noisy BT sample
