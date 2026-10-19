@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import { useConfirm } from "./DialogProvider.jsx";
+import { celsiusToUnit, unitToCelsius, unitSuffix } from "../tempUnits.js";
 
 const TEMP_ROLES = ["bt", "et", "dt", "extra"];
 const CONTROL_SLOTS = [
@@ -15,11 +16,13 @@ function summarizeTempChannel(ch, t) {
   return t("common.deviceProfileEditor.tempSummary", { name, slave: ch.slave_id, register: ch.register_address, divisor: ch.divisor });
 }
 
-function summarizeControlChannel(ch, t) {
+function summarizeControlChannel(ch, t, tempUnit) {
   const slot = CONTROL_SLOTS.find((s) => s.value === ch.maps_to)?.label || ch.maps_to;
   if (ch.kind === "sv_temperature") {
     return t("common.deviceProfileEditor.svSummary", {
-      slot, slave: ch.slave_id, register: ch.register_address, lo: ch.sv_range_c?.[0], hi: ch.sv_range_c?.[1],
+      slot, slave: ch.slave_id, register: ch.register_address,
+      lo: celsiusToUnit(ch.sv_range_c?.[0], tempUnit), hi: celsiusToUnit(ch.sv_range_c?.[1], tempUnit),
+      unit: unitSuffix(tempUnit),
     });
   }
   if (ch.kind === "vfd_drive") {
@@ -39,7 +42,7 @@ function summarizeControlChannel(ch, t) {
 // picks a profile from -- that's the dropdown; this only creates/deletes
 // the custom ones (built-in profiles aren't editable here or anywhere,
 // see api/device_profiles.py).
-export default function DeviceProfileEditor({ onChange }) {
+export default function DeviceProfileEditor({ onChange, tempUnit = "c" }) {
   const { t } = useTranslation();
   const CONTROL_KINDS = [
     { value: "sv_temperature", label: t("common.deviceProfileEditor.controlKinds.svTemperature") },
@@ -293,7 +296,7 @@ export default function DeviceProfileEditor({ onChange }) {
             <ul className="device-profile-channel-list">
               {controlChannels.map((ch, i) => (
                 <li key={i}>
-                  {summarizeControlChannel(ch, t)}
+                  {summarizeControlChannel(ch, t, tempUnit)}
                   <button type="button" className="danger" onClick={() => setControlChannels((prev) => prev.filter((_, j) => j !== i))}>
                     {t("common.deviceProfileEditor.remove")}
                   </button>
@@ -364,10 +367,24 @@ export default function DeviceProfileEditor({ onChange }) {
               </>
             )}
             <label>
-              {draftKind === "sv_temperature" ? t("common.deviceProfileEditor.setpointRangeC") : t("common.deviceProfileEditor.valueRangePct")}
+              {draftKind === "sv_temperature"
+                ? `${t("common.deviceProfileEditor.setpointRangeC")} (${unitSuffix(tempUnit)})`
+                : t("common.deviceProfileEditor.valueRangePct")}
               <span className="device-profile-range-inputs">
-                <input type="number" value={draftRangeLo} onChange={(e) => setDraftRangeLo(e.target.value)} />
-                <input type="number" value={draftRangeHi} onChange={(e) => setDraftRangeHi(e.target.value)} />
+                <input
+                  type="number"
+                  value={draftKind === "sv_temperature" ? celsiusToUnit(Number(draftRangeLo), tempUnit) : draftRangeLo}
+                  onChange={(e) =>
+                    setDraftRangeLo(draftKind === "sv_temperature" ? unitToCelsius(Number(e.target.value), tempUnit) : e.target.value)
+                  }
+                />
+                <input
+                  type="number"
+                  value={draftKind === "sv_temperature" ? celsiusToUnit(Number(draftRangeHi), tempUnit) : draftRangeHi}
+                  onChange={(e) =>
+                    setDraftRangeHi(draftKind === "sv_temperature" ? unitToCelsius(Number(e.target.value), tempUnit) : e.target.value)
+                  }
+                />
               </span>
             </label>
             <button type="button" onClick={addControlChannel} disabled={controlSlotTaken(draftMapsTo)}>

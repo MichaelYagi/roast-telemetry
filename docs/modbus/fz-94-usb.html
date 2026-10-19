@@ -82,11 +82,13 @@
     something the FZ-94 or this app fixes. If your readings look
     plausible but shifted (a drum-heat-limit setpoint that matches your
     controller's own panel number but seems too low to reach a real
-    roasting temperature, say), your unit is likely °F-native — check
-    "Controller reports Fahrenheit, not Celsius" on the Configure Roast
-    form's Device tab; it converts every BT/ET/DT/Burner-SV reading and
-    write accordingly, independent of which device profile is
-    selected.
+    roasting temperature, say), your unit is likely °F-native — set
+    Settings &gt; Temperature Unit to Fahrenheit; for a Direct Modbus
+    connection this converts every BT/ET/DT/Burner-SV reading and write
+    accordingly, independent of which device profile is selected. (There
+    used to be a separate "Controller reports Fahrenheit" checkbox on
+    the Configure Roast form specifically for this — it's gone now,
+    folded into the one global Temperature Unit setting instead.)
   </p>
   <p>
     <strong>Burner is a drum-temperature <em>setpoint</em>, not a power

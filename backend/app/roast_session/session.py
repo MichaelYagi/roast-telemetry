@@ -259,6 +259,20 @@ def _retime_milestone(events: list, profile: list, event_id: str, new_time_s: fl
 
 
 class RoastSession:
+    @staticmethod
+    def _fahrenheit_native_from_settings() -> bool:
+        # The controller's hardware unit now just follows the global display
+        # setting (Settings > Temperature Unit) instead of a separate
+        # checkbox. A bad/unreadable saved value must never stop a roast
+        # from starting, so this falls back to the non-converting default
+        # (same reasoning as RoastControl._load_limits).
+        try:
+            unit = storage.get_settings().get("temperature_unit")
+        except Exception:
+            logger.exception("couldn't read the saved temperature unit -- defaulting modbus_fahrenheit_native to False")
+            return False
+        return unit == "f"
+
     def __init__(self, roast_id: str, request: RoastCreateRequest, created_by_username: Optional[str] = None):
         self.id = roast_id
         self.created_by_username = created_by_username
@@ -321,7 +335,7 @@ class RoastSession:
             self.modbus_port = request.modbus_port
             self.modbus_host = request.modbus_host
             self.modbus_tcp_port = request.modbus_tcp_port
-            self.modbus_fahrenheit_native = request.modbus_fahrenheit_native
+            self.modbus_fahrenheit_native = self._fahrenheit_native_from_settings()
 
         # ms6514_live only -- same reasoning as the modbus_* fields above.
         self.ms6514_port: Optional[str] = None
@@ -410,7 +424,7 @@ class RoastSession:
                             dry_end_c=request.dry_end_c,
                             fc_start_c=request.fc_start_c,
                             detect_milestones=request.auto_detect_milestones,
-                            fahrenheit_native=request.modbus_fahrenheit_native,
+                            fahrenheit_native=self.modbus_fahrenheit_native,
                             client_cls=ModbusTcpClient if is_tcp else ModbusSerialClient,
                         )
                     elif is_tcp:
@@ -431,7 +445,7 @@ class RoastSession:
                             dry_end_c=request.dry_end_c,
                             fc_start_c=request.fc_start_c,
                             detect_milestones=request.auto_detect_milestones,
-                            fahrenheit_native=request.modbus_fahrenheit_native,
+                            fahrenheit_native=self.modbus_fahrenheit_native,
                             **_modbus_register_overrides(request),
                         )
                 except ValueError as exc:

@@ -40,9 +40,15 @@
 
   <h2 id="temperature-unit">Temperature Unit</h2>
   <p>
-    Celsius or Fahrenheit — display only. Storage, the API, and every
-    threshold/config field you type into stay Celsius regardless.
-    Downloads (.alog, JSON, CSV, Excel, PDF) follow this setting too.
+    Celsius or Fahrenheit, applied everywhere: live readouts, the chart,
+    history, downloads (.alog, JSON, CSV, Excel, PDF), and every
+    threshold/setpoint field you type into (Dry End/FC Start, Burner SV
+    range, alarm rule thresholds, device profile setpoint ranges, Hold
+    Target). Storage and the API always stay Celsius underneath; only
+    what you see and type converts. For a Direct Modbus connection, this
+    setting also decides whether the controller's own raw register
+    values are treated as Fahrenheit and converted, so pick the unit
+    that actually matches your controller's own display.
   </p>
 
   <h2 id="readout-panels">Big Readout Panel &amp; Small Readout</h2>

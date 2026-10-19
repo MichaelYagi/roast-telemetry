@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api/client.js";
 import { formatSeconds } from "../lib/metricFormat.js";
+import { celsiusToUnit, unitToCelsius, unitSuffix, celsiusDeltaToUnit, unitDeltaToCelsius } from "../tempUnits.js";
 
 // Automatic control: repeat a saved roast's heater/fan/drum settings, or hold a
 // target by adjusting the heater. Moving any slider by hand takes over again.
-export default function AutoControlPanel({ roastId }) {
+export default function AutoControlPanel({ roastId, tempUnit = "c" }) {
   const { t } = useTranslation();
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
@@ -53,7 +54,7 @@ export default function AutoControlPanel({ roastId }) {
   if (!status || !status.can_write) return null;
 
   const { program, feedback, tripped_reason: tripped } = status;
-  const unit = variable === "bt" ? "°C" : "°C/min";
+  const unit = variable === "bt" ? unitSuffix(tempUnit) : `${unitSuffix(tempUnit)}/min`;
 
   return (
     <div className="panel auto-control-panel">
@@ -86,7 +87,13 @@ export default function AutoControlPanel({ roastId }) {
         <p className="auto-status">
           {t("common.autoControlPanel.holding")}{" "}
           {feedback.variable === "bt" ? t("common.autoControlPanel.beanTemperature") : t("common.autoControlPanel.rateOfRise")} at{" "}
-          <strong>{feedback.setpoint ?? "—"}</strong>
+          <strong>
+            {feedback.setpoint == null
+              ? "—"
+              : feedback.variable === "bt"
+                ? celsiusToUnit(feedback.setpoint, tempUnit)
+                : celsiusDeltaToUnit(feedback.setpoint, tempUnit)}
+          </strong>
           {t("common.autoControlPanel.heaterPct", { pct: feedback.output_pct })}
           {feedback.waiting_for_charge ? t("common.autoControlPanel.waitingForChargeParen") : ""}
         </p>
@@ -129,7 +136,15 @@ export default function AutoControlPanel({ roastId }) {
         <button
           type="button"
           disabled={target === "" || busy}
-          onClick={() => run(() => api.startFeedback(roastId, { variable, setpoint: Number(target), output_max_pct: maxHeater }))}
+          onClick={() =>
+            run(() =>
+              api.startFeedback(roastId, {
+                variable,
+                setpoint: variable === "bt" ? unitToCelsius(Number(target), tempUnit) : unitDeltaToCelsius(Number(target), tempUnit),
+                output_max_pct: maxHeater,
+              })
+            )
+          }
         >
           {t("common.autoControlPanel.holdIt")}
         </button>

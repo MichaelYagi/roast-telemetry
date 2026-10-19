@@ -22,6 +22,16 @@ export function celsiusDeltaToUnit(celsiusDelta, unit) {
   return unit === "f" ? (celsiusDelta * 9) / 5 : celsiusDelta;
 }
 
+// Inverse of celsiusDeltaToUnit -- for a *rate/spread* input (e.g. a Hold
+// Target Rate of Rise setpoint) typed in the selected unit that must be
+// converted back to Celsius before being sent to the API. Do not use
+// unitToCelsius for this: its +32 Fahrenheit offset is only correct for an
+// absolute reading, not a delta (see celsiusDeltaToUnit's own comment).
+export function unitDeltaToCelsius(delta, unit) {
+  if (delta == null) return null;
+  return unit === "f" ? (delta * 5) / 9 : delta;
+}
+
 // Inverse of celsiusToUnit -- needed wherever a live *control* (not just a
 // readout) is displayed/dragged in the selected unit but must still write
 // Celsius underneath (e.g. VerticalControlPanel's burner_sv_c slider).

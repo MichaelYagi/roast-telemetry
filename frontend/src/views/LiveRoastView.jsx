@@ -23,7 +23,7 @@ import WeightField from "../components/WeightField.jsx";
 import NotesPanel from "../components/NotesPanel.jsx";
 import BeansField from "../components/BeansField.jsx";
 import AutoControlPanel from "../components/AutoControlPanel.jsx";
-import { formatTemp } from "../tempUnits.js";
+import { formatTemp, celsiusToUnit, unitToCelsius, unitSuffix } from "../tempUnits.js";
 
 const SAMPLE_ALOG_PATH = "backend/data/sample_roasts/demo_roast.alog";
 
@@ -168,11 +168,6 @@ export default function LiveRoastView() {
     // Any other value is a DeviceProfile id, which takes over instead
     // (see buildConfigFromForm below) and hides the advanced section.
     modbus_device_profile_id: "",
-    // Whether the connected controller's own PID display/registers are
-    // configured in Fahrenheit -- an installer-set option on the
-    // controller itself, independent of which register map/profile is
-    // selected (see backend/app/models.py's RoastCreateRequest.modbus_fahrenheit_native).
-    modbus_fahrenheit_native: true,
     ms6514_port: "",
     // aillio_live only -- a raw USB device, not a port/host, so this is
     // the whole "connection config" (see backend's
@@ -768,7 +763,6 @@ export default function LiveRoastView() {
         payload.modbus_control_baudrate = Number(form.modbus_control_baudrate) || 19200;
       }
       payload.modbus_device_profile_id = form.modbus_device_profile_id || null;
-      payload.modbus_fahrenheit_native = Boolean(form.modbus_fahrenheit_native);
       payload.modbus_bt_slave_id = numOrNull(form.modbus_bt_slave_id);
       payload.modbus_bt_register = numOrNull(form.modbus_bt_register);
       payload.modbus_bt_divisor = numOrNull(form.modbus_bt_divisor);
@@ -1022,7 +1016,6 @@ export default function LiveRoastView() {
       modbus_host: c.modbus_host || "",
       modbus_tcp_port: c.modbus_tcp_port ?? 502,
       modbus_device_profile_id: c.modbus_device_profile_id || "",
-      modbus_fahrenheit_native: Boolean(c.modbus_fahrenheit_native),
       ms6514_port: c.ms6514_port || "",
       aillio_model: c.aillio_model || "r1",
       tc4_port: c.tc4_port || "",
@@ -1510,16 +1503,7 @@ export default function LiveRoastView() {
                   })}
                 </p>
               )}
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={form.modbus_fahrenheit_native}
-                  onChange={(e) => setForm({ ...form, modbus_fahrenheit_native: e.target.checked })}
-                />
-                {t("liveRoast.fahrenheitNative")}
-              </label>
-              <p className="hint">{t("liveRoast.fahrenheitNativeHint")}</p>
-              <DeviceProfileEditor onChange={refreshDeviceProfiles} />
+              <DeviceProfileEditor onChange={refreshDeviceProfiles} tempUnit={tempUnit} />
               {form.modbus_transport !== "tcp" && !form.modbus_device_profile_id && (
                 <div className="advanced-modbus-fields">
                   <p className="hint">{t("liveRoast.advancedModbusHint")}</p>
@@ -1785,21 +1769,27 @@ export default function LiveRoastView() {
                   </div>
                   <div className="form-row">
                     <label>
-                      {t("liveRoast.burnerSvMin")}
+                      {t("liveRoast.burnerSvMin")} ({unitSuffix(tempUnit)})
                       <input
                         type="number"
-                        placeholder="100"
-                        value={form.modbus_burner_sv_min_c}
-                        onChange={(e) => setForm({ ...form, modbus_burner_sv_min_c: e.target.value })}
+                        placeholder={celsiusToUnit(100, tempUnit).toFixed(0)}
+                        value={form.modbus_burner_sv_min_c === "" ? "" : celsiusToUnit(Number(form.modbus_burner_sv_min_c), tempUnit)}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setForm({ ...form, modbus_burner_sv_min_c: v === "" ? "" : unitToCelsius(Number(v), tempUnit) });
+                        }}
                       />
                     </label>
                     <label>
-                      {t("liveRoast.burnerSvMax")}
+                      {t("liveRoast.burnerSvMax")} ({unitSuffix(tempUnit)})
                       <input
                         type="number"
-                        placeholder="260"
-                        value={form.modbus_burner_sv_max_c}
-                        onChange={(e) => setForm({ ...form, modbus_burner_sv_max_c: e.target.value })}
+                        placeholder={celsiusToUnit(260, tempUnit).toFixed(0)}
+                        value={form.modbus_burner_sv_max_c === "" ? "" : celsiusToUnit(Number(form.modbus_burner_sv_max_c), tempUnit)}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setForm({ ...form, modbus_burner_sv_max_c: v === "" ? "" : unitToCelsius(Number(v), tempUnit) });
+                        }}
                       />
                     </label>
                     <p className="hint" style={{ flexBasis: "100%" }}>
@@ -1910,21 +1900,27 @@ export default function LiveRoastView() {
                 {t("liveRoast.autoDetectMilestones")}
               </label>
               <label>
-                {t("liveRoast.dryEndThreshold")}
+                {t("liveRoast.dryEndThreshold")} ({unitSuffix(tempUnit)})
                 <input
                   type="number"
-                  value={form.dry_end_c}
+                  value={form.dry_end_c === "" ? "" : celsiusToUnit(Number(form.dry_end_c), tempUnit)}
                   disabled={!form.auto_detect_milestones}
-                  onChange={(e) => setForm({ ...form, dry_end_c: e.target.value })}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm({ ...form, dry_end_c: v === "" ? "" : unitToCelsius(Number(v), tempUnit) });
+                  }}
                 />
               </label>
               <label>
-                {t("liveRoast.fcStartThreshold")}
+                {t("liveRoast.fcStartThreshold")} ({unitSuffix(tempUnit)})
                 <input
                   type="number"
-                  value={form.fc_start_c}
+                  value={form.fc_start_c === "" ? "" : celsiusToUnit(Number(form.fc_start_c), tempUnit)}
                   disabled={!form.auto_detect_milestones}
-                  onChange={(e) => setForm({ ...form, fc_start_c: e.target.value })}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm({ ...form, fc_start_c: v === "" ? "" : unitToCelsius(Number(v), tempUnit) });
+                  }}
                 />
               </label>
             </div>
@@ -1989,6 +1985,7 @@ export default function LiveRoastView() {
             <AlarmRulesEditor
               rules={form.alarmRules}
               onChange={(rules) => setForm((f) => ({ ...f, alarmRules: rules }))}
+              tempUnit={tempUnit}
             />
           )}
           <div className="form-row save-preset-row">
@@ -2318,7 +2315,7 @@ export default function LiveRoastView() {
           )}
 
           <div className="live-grid">
-            {CONTROLLABLE_MODES.includes(activeMode) && isActive && <AutoControlPanel roastId={roastId} />}
+            {CONTROLLABLE_MODES.includes(activeMode) && isActive && <AutoControlPanel roastId={roastId} tempUnit={tempUnit} />}
             {activeMode === "alog_playback" && (
               <div className="panel control-panel">
                 <h3>{t("liveRoast.playbackSpeedHeading")}</h3>

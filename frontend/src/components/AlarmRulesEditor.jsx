@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { EVENT_BUTTONS } from "./EventButtonRow.jsx";
+import { celsiusToUnit, unitToCelsius, unitSuffix } from "../tempUnits.js";
 
 // Every markable milestone (CHARGE..COOL_END) -- TURNING_POINT/CUSTOM
 // aren't valid triggers (TURNING_POINT is never manually markable; CUSTOM
@@ -17,9 +18,9 @@ function summarizeCommand(rule, t) {
   return parts.join(", ") || t("common.alarmRulesEditor.nothingSet");
 }
 
-function summarizeTrigger(rule, t) {
+function summarizeTrigger(rule, t, tempUnit) {
   if (rule.trigger_kind === "temperature") {
-    return `${(rule.channel || "bt").toUpperCase()} ≥ ${rule.threshold_c}°C`;
+    return `${(rule.channel || "bt").toUpperCase()} ≥ ${celsiusToUnit(rule.threshold_c, tempUnit)}${unitSuffix(tempUnit)}`;
   }
   if (rule.trigger_kind === "time") {
     const s = Number(rule.at_time_s) || 0;
@@ -31,7 +32,7 @@ function summarizeTrigger(rule, t) {
 // Bound to a saved preset's own config (see LiveRoastView.jsx's
 // buildConfigFromForm/handleLoadPreset) -- modbus_live only, since
 // ms6514_live has no write capability to bind a command to at all.
-export default function AlarmRulesEditor({ rules, onChange }) {
+export default function AlarmRulesEditor({ rules, onChange, tempUnit = "c" }) {
   const { t } = useTranslation();
   const TRIGGER_KINDS = [
     { value: "event", label: t("common.alarmRulesEditor.triggerKinds.event") },
@@ -89,7 +90,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
     setDraftKind(rule.trigger_kind);
     setDraftEventType(rule.event_type || EVENT_TRIGGER_OPTIONS[0]);
     setDraftChannel(rule.channel || "bt");
-    setDraftThreshold(rule.threshold_c ?? "");
+    setDraftThreshold(rule.threshold_c != null ? celsiusToUnit(rule.threshold_c, tempUnit) : "");
     setDraftAtTime(rule.at_time_s ?? "");
     setDraftDelay(rule.delay_s ?? 0);
     setDraftHeater(rule.heater_pct ?? "");
@@ -119,7 +120,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
       trigger_kind: draftKind,
       event_type: draftKind === "event" ? draftEventType : null,
       channel: draftKind === "temperature" ? draftChannel : null,
-      threshold_c: draftKind === "temperature" && draftThreshold !== "" ? Number(draftThreshold) : null,
+      threshold_c: draftKind === "temperature" && draftThreshold !== "" ? unitToCelsius(Number(draftThreshold), tempUnit) : null,
       at_time_s: draftKind === "time" && draftAtTime !== "" ? Number(draftAtTime) : null,
       delay_s: Number(draftDelay) || 0,
       heater_pct: draftHeater === "" ? null : Number(draftHeater),
@@ -163,7 +164,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
                     >
                       <input type="checkbox" checked={enabled} onChange={() => toggleEnabled(i)} />
                     </label>
-                    <span className="alarm-rules-trigger">{summarizeTrigger(rule, t)}</span>
+                    <span className="alarm-rules-trigger">{summarizeTrigger(rule, t, tempUnit)}</span>
                     <span className="alarm-rules-detail">
                       {rule.delay_s > 0 ? t("common.alarmRulesEditor.delayLabel", { seconds: rule.delay_s }) : t("common.alarmRulesEditor.immediately")}{" "}
                       → {summarizeCommand(rule, t)}
@@ -213,7 +214,7 @@ export default function AlarmRulesEditor({ rules, onChange }) {
                   </select>
                 </label>
                 <label>
-                  {t("common.alarmRulesEditor.atOrAbove")}
+                  {t("common.alarmRulesEditor.atOrAbove")} ({unitSuffix(tempUnit)})
                   <input
                     type="number"
                     placeholder={t("common.alarmRulesEditor.thresholdPlaceholder")}
@@ -323,10 +324,11 @@ export default function AlarmRulesEditor({ rules, onChange }) {
                       trigger_kind: draftKind,
                       event_type: draftEventType,
                       channel: draftChannel,
-                      threshold_c: draftThreshold,
+                      threshold_c: draftThreshold === "" ? null : unitToCelsius(Number(draftThreshold), tempUnit),
                       at_time_s: draftAtTime,
                     },
-                    t
+                    t,
+                    tempUnit
                   ),
                 })}
                 {Number(draftDelay) > 0 ? t("common.alarmRulesEditor.burnerConfirmDelay", { seconds: draftDelay }) : ""}

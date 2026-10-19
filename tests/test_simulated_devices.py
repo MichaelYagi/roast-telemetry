@@ -256,6 +256,14 @@ def test_real_ports_still_work_unchanged(client):
     ids=["fz94", "ms6514", "tc4", "fz94_evo"],
 )
 def test_the_recording_starts_at_charge_however_long_you_stay_connected_first(client, fields):
+    # The fz94/fz94_evo fakes always emit Celsius-scaled raw register
+    # values (hardware_fakes/modbus_fz94.py) -- RoastSession now derives
+    # modbus_fahrenheit_native from this setting instead of a per-roast
+    # checkbox, so a never-configured "f" default would otherwise make the
+    # modbus_live cases here wrongly convert the simulator's Celsius-native
+    # BT/ET as if it were Fahrenheit. ms6514_live/tc4_live never read this
+    # setting at all, so it's a no-op for those two parametrized cases.
+    client.put("/api/v1/settings", json={"temperature_unit": "c"})
     roast_id = _create(client, **fields).json()["id"]
     time.sleep(4.0)  # connected, not recording -- the simulated roast must not advance meanwhile
     assert client.post(f"/api/v1/roasts/{roast_id}/start").status_code == 200
