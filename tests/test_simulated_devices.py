@@ -14,6 +14,22 @@ from backend.app.roast_session.session import session_manager
 from hardware_fakes import sim
 
 
+@pytest.fixture(autouse=True)
+def _celsius_native_simulator(client):
+    # The fz94/fz94_evo fakes always emit/expect Celsius-native raw
+    # register values, and heater_pct writes through the Burner SV
+    # *temperature* channel (modbus_bridge.engine._write_sv_temperature),
+    # which is converted against RoastSession._fahrenheit_native_from_settings
+    # -- i.e. the global Settings > Temperature Unit, not a per-roast
+    # checkbox (that's gone now). A fresh/never-configured DB's "f"
+    # default would otherwise have every heater_pct command in this file
+    # written as a bogus, way-out-of-range native setpoint. A no-op for
+    # the ms6514_live/tc4_live cases and the handful of tests here that
+    # construct an engine directly (never read this setting at all), but
+    # pinned unconditionally for every test in this file for simplicity.
+    client.put("/api/v1/settings", json={"temperature_unit": "c"})
+
+
 def _sim_threads() -> list[str]:
     return [t.name for t in threading.enumerate() if t.name.startswith(("sim-", "tcp-serial"))]
 
@@ -256,14 +272,6 @@ def test_real_ports_still_work_unchanged(client):
     ids=["fz94", "ms6514", "tc4", "fz94_evo"],
 )
 def test_the_recording_starts_at_charge_however_long_you_stay_connected_first(client, fields):
-    # The fz94/fz94_evo fakes always emit Celsius-scaled raw register
-    # values (hardware_fakes/modbus_fz94.py) -- RoastSession now derives
-    # modbus_fahrenheit_native from this setting instead of a per-roast
-    # checkbox, so a never-configured "f" default would otherwise make the
-    # modbus_live cases here wrongly convert the simulator's Celsius-native
-    # BT/ET as if it were Fahrenheit. ms6514_live/tc4_live never read this
-    # setting at all, so it's a no-op for those two parametrized cases.
-    client.put("/api/v1/settings", json={"temperature_unit": "c"})
     roast_id = _create(client, **fields).json()["id"]
     time.sleep(4.0)  # connected, not recording -- the simulated roast must not advance meanwhile
     assert client.post(f"/api/v1/roasts/{roast_id}/start").status_code == 200

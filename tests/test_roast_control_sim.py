@@ -5,7 +5,24 @@ from __future__ import annotations
 
 import time
 
+import pytest
+
 from backend.app.roast_session.session import session_manager
+
+
+@pytest.fixture(autouse=True)
+def _celsius_native_simulator(client):
+    # heater_pct is written through the Burner SV *temperature* channel
+    # (modbus_bridge.engine._write_sv_temperature -> _write_sv_raw), which
+    # is converted against RoastSession._fahrenheit_native_from_settings --
+    # i.e. the global Settings > Temperature Unit, not a per-roast choice,
+    # now that the old "Controller reports °F" checkbox is gone. The
+    # fz94 fake always emits/expects Celsius-native raw values, so a
+    # fresh/never-configured DB's "f" default would otherwise have every
+    # heater_pct command here written as a bogus, way-out-of-range native
+    # setpoint -- pin it explicitly, same as test_simulated_devices.py's
+    # equivalent fixture.
+    client.put("/api/v1/settings", json={"temperature_unit": "c"})
 
 
 def _start_recording(client, **fields):
@@ -32,7 +49,7 @@ def _latest(roast_id):
 
 def test_emergency_stop_turns_the_simulated_heater_off(client):
     # safety_disabled defaults on now -- turn it off so the stop isn't a no-op.
-    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": {"safety_disabled": False}})
+    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "temperature_unit": "c", "control": {"safety_disabled": False}})
     roast_id = _start_recording(client)
     assert client.post(f"/api/v1/roasts/{roast_id}/commands", json={"heater_pct": 60, "fan_pct": 30}).status_code == 200
     assert _wait_for(lambda: session_manager.get(roast_id).profile and (_latest(roast_id).get("heater_pct") or 0) > 40)
@@ -47,7 +64,7 @@ def test_emergency_stop_turns_the_simulated_heater_off(client):
 
 
 def test_safety_limits_apply_to_the_real_device(client):
-    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": {"heater_max_pct": 50, "fan_min_pct": 40, "safety_disabled": False}})
+    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "temperature_unit": "c", "control": {"heater_max_pct": 50, "fan_min_pct": 40, "safety_disabled": False}})
     roast_id = _start_recording(client)
     client.post(f"/api/v1/roasts/{roast_id}/commands", json={"heater_pct": 100, "fan_pct": 0})
 
@@ -80,7 +97,7 @@ def test_target_control_moves_the_simulated_heater(client):
 
 
 def test_watchdog_turns_the_heater_off_when_nobody_is_watching(client):
-    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "control": {"client_watchdog_s": 2, "safety_disabled": False}})
+    client.put("/api/v1/settings", json={"ollama_url": None, "ollama_model": None, "temperature_unit": "c", "control": {"client_watchdog_s": 2, "safety_disabled": False}})
     roast_id = _start_recording(client)
     client.post(f"/api/v1/roasts/{roast_id}/commands", json={"heater_pct": 60})
     assert _wait_for(lambda: session_manager.get(roast_id).profile and (_latest(roast_id).get("heater_pct") or 0) > 40)
