@@ -1172,7 +1172,9 @@ const RoastChart = forwardRef(function RoastChart({
         </div>
       )}
       <div className="scope-toggles">
-        {seriesDefs.map((s) => (
+        {seriesDefs
+          .filter((s) => s.source !== "projection" || availability[s.key])
+          .map((s) => (
           <label
             key={s.key}
             className={`scope-toggle ${visible[s.key] ? "scope-toggle-on" : ""} ${!availability[s.key] ? "scope-toggle-empty" : ""}`}
