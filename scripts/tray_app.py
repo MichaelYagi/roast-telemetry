@@ -184,17 +184,50 @@ def _is_process_alive(pid: int) -> bool:
         return False
 
 
+def _looks_like_this_app(pid: int) -> bool:
+    """Best-effort check that the live process at `pid` is actually a
+    Roast Telemetry process, not just *some* live process. PIDs get
+    reused -- routinely on macOS, soon after the original process exits
+    -- so "alive" alone isn't enough to trust a lock file written by a
+    process that's long gone: confirmed as the explanation for a real
+    "worked in a previous version, now it just won't open, no error at
+    all" report, where force-quitting the stuck copy (via Activity
+    Monitor/Task Manager) didn't help because by the time the app was
+    relaunched, that exact PID number already belonged to something
+    else entirely, and the stale lock still pointed at it. A lookup
+    failure or unrecognized shape returns True (can't rule it out) --
+    same conservative bias _is_process_alive already has; this function
+    only ever turns a false "already running" into a correct "go ahead,"
+    never the other direction.
+    """
+    try:
+        if platform.system() == "Windows":
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"], capture_output=True, text=True, timeout=5
+            )
+        else:
+            result = subprocess.run(["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        return True
+    output = result.stdout.strip()
+    if not output:
+        return True
+    lowered = output.lower()
+    return "roast telemetry" in lowered or "tray_app.py" in lowered
+
+
 def _acquire_single_instance_lock() -> bool:
     """True if this process now holds the lock (the only instance);
     False if another instance is already running. A leftover lock file
-    from a previous crash (process no longer alive) is treated as stale
-    and safely taken over, not as "someone else is running"."""
+    from a previous crash (process no longer alive, or alive but no
+    longer recognizably this app -- see _looks_like_this_app) is treated
+    as stale and safely taken over, not as "someone else is running"."""
     if LOCK_PATH.exists():
         try:
             existing_pid = int(LOCK_PATH.read_text().strip())
         except (ValueError, OSError):
             existing_pid = None
-        if existing_pid is not None and _is_process_alive(existing_pid):
+        if existing_pid is not None and _is_process_alive(existing_pid) and _looks_like_this_app(existing_pid):
             return False
     LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     LOCK_PATH.write_text(str(os.getpid()))

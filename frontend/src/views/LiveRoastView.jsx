@@ -1115,19 +1115,28 @@ export default function LiveRoastView() {
   // from the live preview stream instead during that window.
   const latest = roast?.status === "idle" ? latestPreview : roast?.profile?.[roast.profile.length - 1];
   const dropEvent = roast?.events?.find((e) => e.type === "DROP");
-  // Stays 00:00 while merely connected/previewing (status "idle") even
-  // though the engine's own clock is already ticking (that's how BT/ET's
-  // RoR gets computed live) -- the elapsed timer
-  // starts at Charge, not at connect. The recorded roast's own time axis
-  // genuinely resets to 0 at that point too (see ModbusEngine/MS6514Engine's
-  // reset_detection(), called from begin_recording()) -- this just keeps
-  // the *display* in sync with that reset instead of visibly jumping
-  // backward once recording actually starts. Freezes at Drop's own
+  const chargeEvent = roast?.events?.find((e) => e.type === "CHARGE");
+  // Stays 00:00 while merely connected/previewing (status "idle"), and
+  // also before Charge has actually been marked -- recording (and the
+  // engine's own clock, e.g. ModbusEngine/MS6514Engine's reset_detection()
+  // via begin_recording()) can start well before Charge on real hardware,
+  // where Charge is a manual click (detect_milestones=False -- see
+  // add_event()'s own comment on the backend), not something that
+  // coincides with "press START". Offsetting by chargeEvent.time_s is
+  // what makes this match the roast's own CHARGE-relative time axis
+  // (RoastChart.jsx's computePhases()) instead of showing how long the
+  // connection/recording has existed. A no-op for engines that fire
+  // CHARGE automatically right as recording begins (simulator et al --
+  // chargeEvent.time_s is already 0 there). Freezes at Drop's own
   // time_s once it's marked -- without dropEvent here, this kept
   // counting straight through cooling (the profile keeps recording
   // samples after Drop), which read as the roast still "running" long
   // after it was actually done.
-  const elapsedLabel = roast?.status === "idle" ? formatElapsed(null) : formatElapsed(dropEvent ? dropEvent.time_s : latest?.time_s);
+  const elapsedBasis = dropEvent ? dropEvent.time_s : latest?.time_s;
+  const elapsedLabel =
+    roast?.status === "idle" || !chargeEvent || elapsedBasis == null
+      ? formatElapsed(null)
+      : formatElapsed(elapsedBasis - chargeEvent.time_s);
 
   // Once a roast exists (including one reattached after a page refresh --
   // see the reconnect effect below), it's the source of truth for which
@@ -1150,7 +1159,6 @@ export default function LiveRoastView() {
   // RoastToolbar/AutoControlPanel each polling /control on their own).
   const { platform: serverPlatform, osVersion: serverOsVersion, lanIp: serverLanIp } = useServerStatus();
 
-  const chargeEvent = roast?.events?.find((e) => e.type === "CHARGE");
   const dryEndEvent = roast?.events?.find((e) => e.type === "DRY_END");
   const fcStartEvent = roast?.events?.find((e) => e.type === "FC_START");
 
@@ -1168,18 +1176,28 @@ export default function LiveRoastView() {
   const dryEndEtaS = !dryEndEvent && isActive ? estimateEtaSeconds(latest?.bt, latest?.ror_bt, dryEndThreshold) : null;
   const fcStartEtaS = !fcStartEvent && isActive ? estimateEtaSeconds(latest?.bt, latest?.ror_bt, fcStartThreshold) : null;
 
+  // dryTime/fcsTime/dryPercent below read as "time/percent since Charge",
+  // same convention as the toolbar's own elapsedLabel above -- so, same
+  // reason as that one, they need chargeEvent.time_s subtracted rather
+  // than assuming Charge happened at time_s=0 (only true for engines
+  // that auto-fire Charge right as recording starts; false for manual
+  // Charge on real hardware). maillardPercent's denominator is "elapsed
+  // time so far", i.e. latest.time_s, same fix applies to it too.
+  const sinceCharge = (t) => (chargeEvent && t != null ? t - chargeEvent.time_s : null);
   const milestones = {
     dryPercent:
-      dryEndEvent && latest?.time_s ? `${((dryEndEvent.time_s / latest.time_s) * 100).toFixed(1)}%` : "---",
+      dryEndEvent && chargeEvent && latest?.time_s
+        ? `${((sinceCharge(dryEndEvent.time_s) / sinceCharge(latest.time_s)) * 100).toFixed(1)}%`
+        : "---",
     dryTime: dryEndEvent
-      ? formatElapsed(dryEndEvent.time_s)
+      ? formatElapsed(sinceCharge(dryEndEvent.time_s))
       : dryEndEtaS != null
-        ? `~${formatElapsed(latest.time_s + dryEndEtaS)}`
+        ? `~${formatElapsed(sinceCharge(latest.time_s + dryEndEtaS))}`
         : "--:--",
     fcsTime: fcStartEvent
-      ? formatElapsed(fcStartEvent.time_s)
+      ? formatElapsed(sinceCharge(fcStartEvent.time_s))
       : fcStartEtaS != null
-        ? `~${formatElapsed(latest.time_s + fcStartEtaS)}`
+        ? `~${formatElapsed(sinceCharge(latest.time_s + fcStartEtaS))}`
         : "--:--",
     // Same convention as dryPercent above: only shown once the phase's
     // own boundary events have *both* fired (a completed duration, not a
@@ -1187,8 +1205,8 @@ export default function LiveRoastView() {
     // not of the final Charge-to-Drop total, which isn't known yet mid-roast
     // (that's what RoastChart.jsx's own computePhases() shows post-hoc).
     maillardPercent:
-      dryEndEvent && fcStartEvent && latest?.time_s
-        ? `${(((fcStartEvent.time_s - dryEndEvent.time_s) / latest.time_s) * 100).toFixed(1)}%`
+      dryEndEvent && fcStartEvent && chargeEvent && latest?.time_s
+        ? `${(((fcStartEvent.time_s - dryEndEvent.time_s) / sinceCharge(latest.time_s)) * 100).toFixed(1)}%`
         : "---",
     // Unlike dryPercent/maillardPercent above, this one only ever shows
     // once dropEvent exists -- by then the true Charge-to-Drop total is

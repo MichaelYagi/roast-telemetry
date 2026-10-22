@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import platform
+import shutil
 import socket
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -20,7 +22,39 @@ from .roast_session import RoastSessionError, session_manager
 from .version import VERSION
 from modbus_bridge.device_profiles import BUILT_IN_PROFILES
 
-FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+_BUNDLED_FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+# Mirrors device_plugins/base.py's own _BUNDLED_INSTALLED_DIR/INSTALLED_DIR
+# split, for the same reason: in a frozen desktop build, Path(__file__)
+# resolves inside PyInstaller's own extraction folder (sys._MEIPASS for
+# onefile), not a stable location -- confirmed live as more than just
+# "gone between launches": a real macOS onefile build serving a
+# long-running roast started 500ing on every single request (the UI
+# itself included -- "FileNotFoundError: .../_MEI.../frontend/dist/
+# index.html does not exist") once the OS reclaimed that per-launch temp
+# folder out from under the still-running server, long before the
+# process itself ever exited or was restarted. Every other request this
+# process serves reads bundled Python modules that got loaded into
+# memory once at startup and never touched again -- this is the one
+# bundled resource re-read from disk on every single request
+# (serve_frontend() below), which is exactly why it alone showed
+# symptoms. Copying the built frontend out to the same real, persistent
+# per-user data directory tray_app.py already uses for roasts.db/roasts/
+# (ROAST_TELEMETRY_DATA_DIR) fixes that regardless of packaging mode or
+# which OS's temp-cleanup policy is in play. No-op in a source checkout
+# (ROAST_TELEMETRY_DATA_DIR unset there) -- _BUNDLED_FRONTEND_DIST is
+# already the right, stable place.
+_DATA_DIR_OVERRIDE = os.environ.get("ROAST_TELEMETRY_DATA_DIR")
+if _DATA_DIR_OVERRIDE and _BUNDLED_FRONTEND_DIST.is_dir():
+    FRONTEND_DIST = Path(_DATA_DIR_OVERRIDE) / "frontend_dist"
+    # Overwritten on every startup so it can't drift from the app's own
+    # shipped version (same reasoning as ensure_example_copied()) --
+    # rmtree first, not just copytree(dirs_exist_ok=True), so a file
+    # removed from a newer build (e.g. an old hashed /assets/*.js from a
+    # previous version) doesn't linger forever alongside the new ones.
+    shutil.rmtree(FRONTEND_DIST, ignore_errors=True)
+    shutil.copytree(_BUNDLED_FRONTEND_DIST, FRONTEND_DIST)
+else:
+    FRONTEND_DIST = _BUNDLED_FRONTEND_DIST
 
 # Ships as ready-to-use "Load saved config" entries instead of an empty
 # dropdown -- port is deliberately left blank on each (no sensible
