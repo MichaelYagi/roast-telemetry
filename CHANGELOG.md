@@ -3,6 +3,11 @@
 All notable changes to Roast Telemetry are documented here, newest first.
 One entry per tagged release; dates are the release commit's date.
 
+## [v1.3.31] - 2026-10-22
+- Fix a packaged macOS build going blank with Internal Server Errors after running a long time: the built frontend now gets copied out of PyInstaller's per-launch temp folder into the app's own persistent data directory at startup, instead of being re-read from a folder macOS can reclaim out from under a still-running server
+- Fix the elapsed-time clock and Dry End/FC Start readouts timing from pressing Start instead of from Charge, on real hardware where Charge is a manual click sometime after Start
+- Fix the tray's single-instance lock getting stuck thinking the app is already running (silently refusing to open, with no error shown) when a leftover lock file's PID has since been reused by an unrelated process
+
 ## [v1.3.30] - 2026-10-19
 - Hide BT/ET Projection toggles when they can never have data (every finished roast's History detail page, before Turning Point) instead of showing them greyed out
 
